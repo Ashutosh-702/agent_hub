@@ -6,15 +6,22 @@ This script validates the data models and their interactions to identify potenti
 """
 
 import sys
+import os
 from typing import List
 from loguru import logger
+import pandas as pd
+
+# Add current directory to Python path for relative imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 from sdr.models import Company, WorkflowState
 from sdr.logging_config import sdr_logger
 from sdr.nodes.streamlined_web_enricher import StreamlinedWebEnricher
 from sdr.nodes.file_storage import serialize_company_data
 from sdr.nodes.company_list_retriever import _normalize_company_data
-import pandas as pd
 
 
 def validate_company_model():

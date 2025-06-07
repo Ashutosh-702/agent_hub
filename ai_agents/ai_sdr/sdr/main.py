@@ -17,10 +17,10 @@ from dotenv import load_dotenv
 from loguru import logger
 from openai import AsyncOpenAI
 
-from sdr.models import WorkflowState
-from sdr.graph import compile_workflow
-from sdr.prompts import get_user_prompts, load_prompts_from_file, save_prompts_to_file
-from sdr.logging_config import setup_sdr_logging, log_workflow_start, log_workflow_completion, sdr_logger, clean_log, detailed_log, get_log_mode
+from .models import WorkflowState
+from .graph import compile_workflow
+from .prompts import get_user_prompts, load_prompts_from_file, save_prompts_to_file
+from .logging_config import setup_sdr_logging, log_workflow_start, log_workflow_completion, sdr_logger, clean_log, detailed_log, get_log_mode
 
 
 

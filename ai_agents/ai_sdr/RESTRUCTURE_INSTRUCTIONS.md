@@ -18,14 +18,14 @@ cd agent_hub
 Create a dedicated directory for the AI SDR agent within the agent_hub:
 
 ```bash
-mkdir -p agents/ai_sdr
+mkdir -p ai_agents/ai_sdr
 ```
 
 ### 3. Copy AI SDR Codebase
 Copy the entire ai_sdr codebase to the new location:
 
 ```bash
-cp -r ../ai_sdr/* agents/ai_sdr/
+cp -r ../ai_sdr/* ai_agents/ai_sdr/
 ```
 
 ### 4. Update Import Paths (if needed)
@@ -35,7 +35,7 @@ After moving, you may need to update any absolute import paths in the code. The 
 Update the project instructions to reflect the new directory structure:
 
 ```bash
-cd agents/ai_sdr
+cd ai_agents/ai_sdr
 # Edit CLAUDE.md to update paths and add agent_hub context
 ```
 
@@ -43,7 +43,7 @@ cd agents/ai_sdr
 Verify that the moved codebase still works:
 
 ```bash
-cd agents/ai_sdr
+cd ai_agents/ai_sdr
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
@@ -55,7 +55,7 @@ Once everything is working:
 
 ```bash
 cd /Users/ahmedropewala/PycharmProjects/etc1/agent_hub
-git add agents/ai_sdr
+git add ai_agents/ai_sdr
 git commit -m "Add AI SDR agent to agent hub
 
 - Integrated complete AI SDR workflow system
