@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(PYTHONPATH=/Users/ahmedropewala/PycharmProjects/etc1/ai_sdr python sdr/validate_models.py)"
+    ],
+    "deny": []
+  }
+}
