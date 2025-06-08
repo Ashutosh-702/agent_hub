@@ -8,7 +8,6 @@ This script validates the data models and their interactions to identify potenti
 import sys
 import os
 from typing import List
-from loguru import logger
 import pandas as pd
 
 # Add current directory to Python path for relative imports
@@ -17,20 +16,20 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from sdr.models import Company, WorkflowState
-from sdr.logging_config import sdr_logger
-from sdr.nodes.streamlined_web_enricher import StreamlinedWebEnricher
-from sdr.nodes.file_storage import serialize_company_data
-from sdr.nodes.company_list_retriever import _normalize_company_data
+from ai_agents.ai_sdr.sdr.models import Company, WorkflowState
+from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.nodes.streamlined_web_enricher import StreamlinedWebEnricher
+from ai_agents.ai_sdr.sdr.nodes.file_storage import serialize_company_data
+from ai_agents.ai_sdr.sdr.nodes.company_list_retriever import _normalize_company_data
 
 
 def validate_company_model():
     """Validate the Company model and its attributes"""
-    logger.info("Testing Company model creation...")
+    clean_log("Testing Company model creation...")
     
     # Test minimal company creation
     minimal_company = Company(name="Test Company")
-    logger.info(f"Created minimal company: {minimal_company}")
+    clean_log(f"Created minimal company: {minimal_company}")
     
     # Test full company creation
     full_company = Company(
@@ -43,10 +42,10 @@ def validate_company_model():
         description="A test company",
         linkedin_url="https://linkedin.com/company/test"
     )
-    logger.info(f"Created full company: {full_company}")
+    clean_log(f"Created full company: {full_company}")
     
     # Test attribute access
-    logger.info("Testing attribute access...")
+    clean_log("Testing attribute access...")
     attributes = [
         'name', 'website', 'domain', 'industry', 
         'size', 'location', 'description', 'linkedin_url'
@@ -55,30 +54,30 @@ def validate_company_model():
     for attr in attributes:
         try:
             value = getattr(minimal_company, attr)
-            logger.info(f"Minimal company.{attr} = {value}")
+            detailed_log(f"Minimal company.{attr} = {value}")
         except AttributeError as e:
-            logger.error(f"❌ Failed to access minimal_company.{attr}: {e}")
+            clean_log(f"❌ Failed to access minimal_company.{attr}: {e}", level="error")
     
     # Test serialization
-    logger.info("Testing company serialization...")
+    clean_log("Testing company serialization...")
     try:
         serialized = serialize_company_data(minimal_company, {"test": "data"})
-        logger.info(f"Serialized minimal company: {serialized}")
+        detailed_log(f"Serialized minimal company: {serialized}")
     except Exception as e:
-        logger.error(f"❌ Failed to serialize minimal company: {e}")
+        clean_log(f"❌ Failed to serialize minimal company: {e}", level="error")
     
     try:
         serialized = serialize_company_data(full_company, {"test": "data"})
-        logger.info(f"Serialized full company: {serialized}")
+        detailed_log(f"Serialized full company: {serialized}")
     except Exception as e:
-        logger.error(f"❌ Failed to serialize full company: {e}")
+        clean_log(f"❌ Failed to serialize full company: {e}", level="error")
     
     return minimal_company, full_company
 
 
 def validate_company_list_retrieval():
     """Validate company list retrieval from different data sources"""
-    logger.info("Testing company list retrieval...")
+    clean_log("Testing company list retrieval...")
     
     # Test with a minimal DataFrame
     data = {"company": ["Company A", "Company B", "Company C"]}
@@ -86,11 +85,11 @@ def validate_company_list_retrieval():
     
     try:
         companies = _normalize_company_data(df)
-        logger.info(f"Created {len(companies)} companies from minimal DataFrame")
+        clean_log(f"Created {len(companies)} companies from minimal DataFrame")
         for company in companies:
-            logger.info(f"Company: {company}")
+            detailed_log(f"Company: {company}")
     except Exception as e:
-        logger.error(f"❌ Failed to normalize minimal DataFrame: {e}")
+        clean_log(f"❌ Failed to normalize minimal DataFrame: {e}", level="error")
     
     # Test with a more complex DataFrame
     data = {
@@ -102,18 +101,18 @@ def validate_company_list_retrieval():
     
     try:
         companies = _normalize_company_data(df)
-        logger.info(f"Created {len(companies)} companies from complex DataFrame")
+        clean_log(f"Created {len(companies)} companies from complex DataFrame")
         for company in companies:
-            logger.info(f"Company: {company.name}, Website: {company.website}, Industry: {company.industry}")
+            detailed_log(f"Company: {company.name}, Website: {company.website}, Industry: {company.industry}")
     except Exception as e:
-        logger.error(f"❌ Failed to normalize complex DataFrame: {e}")
+        clean_log(f"❌ Failed to normalize complex DataFrame: {e}", level="error")
     
     return companies
 
 
 def validate_web_enricher(companies: List[Company]):
     """Validate web enricher with different company objects"""
-    logger.info("Testing web enricher with different company objects...")
+    clean_log("Testing web enricher with different company objects...")
     
     # Create dummy config
     config = {
@@ -144,14 +143,14 @@ def validate_web_enricher(companies: List[Company]):
                 company_location=company_location
             )
             
-            logger.info(f"Generated system prompt for {company.name}: {system_prompt}")
+            detailed_log(f"Generated system prompt for {company.name}: {system_prompt}")
         except Exception as e:
-            logger.error(f"❌ Failed to create web enricher for {company.name}: {e}")
+            clean_log(f"❌ Failed to create web enricher for {company.name}: {e}", level="error")
 
 
 def validate_workflow_state():
     """Validate WorkflowState with different company objects"""
-    logger.info("Testing WorkflowState...")
+    clean_log("Testing WorkflowState...")
     
     # Create minimal and full companies
     minimal_company = Company(name="Minimal State Company")
@@ -174,14 +173,14 @@ def validate_workflow_state():
     state.current_company_index = 0
     state.current_company = state.companies[0]
     
-    logger.info(f"Created WorkflowState with {len(state.companies)} companies")
-    logger.info(f"Current company: {state.current_company.name}")
+    clean_log(f"Created WorkflowState with {len(state.companies)} companies")
+    detailed_log(f"Current company: {state.current_company.name}")
     
     # Test state transitions
     state.current_company_index += 1
     state.current_company = state.companies[state.current_company_index]
     
-    logger.info(f"Transitioned to next company: {state.current_company.name}")
+    detailed_log(f"Transitioned to next company: {state.current_company.name}")
     
     # Test enriched data storage
     state.enriched_data[minimal_company.name] = {
@@ -194,20 +193,18 @@ def validate_workflow_state():
         }
     }
     
-    logger.info(f"Added enriched data for {minimal_company.name}")
-    logger.info(f"Enriched data: {state.enriched_data.get(minimal_company.name)}")
+    detailed_log(f"Added enriched data for {minimal_company.name}")
+    detailed_log(f"Enriched data: {state.enriched_data.get(minimal_company.name)}")
     
     return state
 
 
 def main():
     """Main validation function"""
-    logger.remove()
-    logger.add(sys.stdout, format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan> - <level>{message}</level>")
-    
-    logger.info("=" * 60)
-    logger.info("Starting model validation...")
-    logger.info("=" * 60)
+    # Use the SDR logging system instead of direct logger setup
+    clean_log("=" * 60)
+    clean_log("Starting model validation...")
+    clean_log("=" * 60)
     
     # Validate Company model
     minimal_company, full_company = validate_company_model()
@@ -221,9 +218,9 @@ def main():
     # Validate workflow state
     state = validate_workflow_state()
     
-    logger.info("=" * 60)
-    logger.info("Model validation completed!")
-    logger.info("=" * 60)
+    clean_log("=" * 60)
+    clean_log("Model validation completed!")
+    clean_log("=" * 60)
 
 
 if __name__ == "__main__":

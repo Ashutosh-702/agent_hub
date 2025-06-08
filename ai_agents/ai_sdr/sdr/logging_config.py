@@ -16,6 +16,25 @@ class SDRLogger:
 
     def __init__(self):
         self.setup_done = False
+        self.gui_callbacks = []  # Store GUI callback functions
+
+    def add_gui_callback(self, callback):
+        """Register a GUI callback function to receive log messages"""
+        if callback not in self.gui_callbacks:
+            self.gui_callbacks.append(callback)
+    
+    def remove_gui_callback(self, callback):
+        """Remove a GUI callback function"""
+        if callback in self.gui_callbacks:
+            self.gui_callbacks.remove(callback)
+    
+    def _emit_to_gui(self, message):
+        """Emit log messages to all registered GUI callbacks"""
+        for callback in self.gui_callbacks:
+            try:
+                callback(message)
+            except Exception:
+                pass  # Silently ignore GUI callback errors
 
     def setup_enhanced_logging(self, run_directories: Dict[str, str] = None):
         """Configure enhanced logging for the workflow with better readability"""
@@ -25,8 +44,16 @@ class SDRLogger:
         logger.remove()
 
         # Console logging with enhanced format - standardized column widths
+        def console_sink(message):
+            """Custom sink that also emits to GUI callbacks"""
+            # Emit to stdout
+            sys.stdout.write(message)
+            # Emit to GUI callbacks if any
+            if self.gui_callbacks:
+                self._emit_to_gui(message.record["message"])
+        
         logger.add(
-            sys.stdout,
+            console_sink,
             format="<green>{time:HH:mm:ss.SSS}</green> | <level>{level:>8}</level> | <cyan>{extra[module]:>30}</cyan> "
                    "| <level>{message}</level>",
             level="INFO",
@@ -43,7 +70,12 @@ class SDRLogger:
                        "message}",
                 level="DEBUG",
                 # No rotation - infinite file size
-                retention="30 days"
+                retention="30 days",
+                enqueue=True,  # Enable thread-safe logging
+                backtrace=True,  # Add backtrace for better debugging
+                diagnose=True,  # Add diagnosis info
+                colorize=False,  # No colors in file
+                serialize=False  # Don't serialize to JSON
             )
 
             # Separate error log file
@@ -54,25 +86,45 @@ class SDRLogger:
                        "message}",
                 level="ERROR",
                 # No rotation - infinite file size
-                retention="30 days"
+                retention="30 days",
+                enqueue=True,
+                backtrace=True,
+                diagnose=True,
+                colorize=False
             )
 
             # Separate LLM response log file (no console output)
-            llm_log = f"{run_directories['logs_dir']}/llm_responses.log"
+            llm_log = f"{run_directories['logs_dir']}/llm_requests.log"
             logger.add(
                 llm_log,
                 format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:>8} | {name:>30} | {function:>20} | {line:>4} | {"
                        "message}",
                 level="DEBUG",
-                filter=lambda record: "llm_response" in record["extra"],
+                filter=lambda record: "llm_response" in record["extra"] or "llm_request" in record["extra"],
                 # No rotation - infinite file size
-                retention="30 days"
+                retention="30 days",
+                enqueue=True,
+                colorize=False
+            )
+
+            # Company progress log file
+            company_progress_log = f"{run_directories['logs_dir']}/company_progress.log"
+            logger.add(
+                company_progress_log,
+                format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:>8} | {name:>30} | {message}",
+                level="INFO",
+                filter=lambda record: "company_progress" in record["extra"],
+                # No rotation - infinite file size
+                retention="30 days",
+                enqueue=True,
+                colorize=False
             )
 
             logger.info(f"📊 Enhanced logging configured for run: {run_directories['run_id']}")
             logger.info(f"📄 Main log: {log_filename} (unlimited size)")
             logger.info(f"🚨 Error log: {error_log} (unlimited size)")
-            logger.info(f"🤖 LLM responses: {llm_log} (unlimited size, file only)")
+            logger.info(f"🤖 LLM requests: {llm_log} (unlimited size, file only)")
+            logger.info(f"📈 Company progress: {company_progress_log} (unlimited size, file only)")
             logger.info("")
 
         self.setup_done = True
@@ -197,6 +249,15 @@ class SDRLogger:
         logger.bind(llm_response=True).error("═" * 100)
 
     @staticmethod
+    def log_company_progress(company_name: str, step: str, status: str, details: Dict[str, Any] = None):
+        """Log company processing progress to dedicated file"""
+        message = f"Company: {company_name} | Step: {step} | Status: {status}"
+        if details:
+            details_str = " | " + " | ".join([f"{k}: {v}" for k, v in details.items()])
+            message += details_str
+        logger.bind(company_progress=True).info(message)
+    
+    @staticmethod
     def _get_result_emoji(key: str) -> str:
         """Get appropriate emoji for result keys"""
         key_lower = key.lower()
@@ -251,6 +312,16 @@ def detailed_log(message: str, level: str = "info"):
 def setup_sdr_logging(run_directories: Dict[str, str] = None):
     """Setup SDR logging configuration"""
     sdr_logger.setup_enhanced_logging(run_directories)
+
+
+def register_gui_callback(callback):
+    """Register a GUI callback to receive log messages"""
+    sdr_logger.add_gui_callback(callback)
+
+
+def unregister_gui_callback(callback):
+    """Unregister a GUI callback"""
+    sdr_logger.remove_gui_callback(callback)
 
 
 def log_workflow_start(workflow_name: str, config: Dict[str, Any]):

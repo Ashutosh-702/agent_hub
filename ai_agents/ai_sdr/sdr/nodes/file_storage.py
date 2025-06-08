@@ -9,8 +9,8 @@ import json
 from datetime import datetime
 from typing import Dict, Any
 
-from sdr.models import WorkflowState, Company
-from sdr.logging_config import clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.models import WorkflowState, Company
+from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
 
 
 def ensure_output_directory():

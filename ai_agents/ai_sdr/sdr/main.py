@@ -14,13 +14,12 @@ from typing import Dict, Any
 
 from agents import set_default_openai_client
 from dotenv import load_dotenv
-from loguru import logger
 from openai import AsyncOpenAI
 
-from .models import WorkflowState
-from .graph import compile_workflow
-from .prompts import get_user_prompts, load_prompts_from_file, save_prompts_to_file
-from .logging_config import setup_sdr_logging, log_workflow_start, log_workflow_completion, sdr_logger, clean_log, detailed_log, get_log_mode
+from ai_agents.ai_sdr.sdr.models import WorkflowState, ErrorSummary
+from ai_agents.ai_sdr.sdr.graph import compile_workflow
+from ai_agents.ai_sdr.sdr.prompts import get_user_prompts, load_prompts_from_file, save_prompts_to_file
+from ai_agents.ai_sdr.sdr.logging_config import setup_sdr_logging, log_workflow_start, log_workflow_completion, sdr_logger, clean_log, detailed_log, get_log_mode
 
 
 
@@ -160,9 +159,9 @@ def load_configuration(run_directories: Dict[str, str]) -> Dict[str, Any]:
     # Required configuration
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
-        logger.error("❌ OPENAI_API_KEY not found in environment variables")
-        logger.info("Please set your OpenAI API key:")
-        logger.info("export OPENAI_API_KEY='your-api-key-here'")
+        clean_log("❌ OPENAI_API_KEY not found in environment variables", level="error")
+        clean_log("Please set your OpenAI API key:")
+        clean_log("export OPENAI_API_KEY='your-api-key-here'")
         sys.exit(1)
 
     # Data source configuration
@@ -209,16 +208,16 @@ def load_configuration(run_directories: Dict[str, str]) -> Dict[str, Any]:
 
 def run_model_validation():
     """Run model validation to check for issues"""
-    logger.info("🧪 Running model validation...")
+    clean_log("🧪 Running model validation...")
 
     try:
         from validate_models import main as run_validation
         run_validation()
-        logger.info("✅ Model validation completed successfully")
+        clean_log("✅ Model validation completed successfully")
         return True
     except Exception as e:
-        logger.error(f"❌ Model validation failed: {e}")
-        logger.error(traceback.format_exc())
+        clean_log(f"❌ Model validation failed: {e}", level="error")
+        detailed_log(traceback.format_exc())
         return False
 
 
@@ -233,24 +232,20 @@ async def run_tms_workflow(config: Dict[str, Any]) -> WorkflowState:
         Final workflow state with all results
     """
 
-    logger.info("🚀 Starting TMS Workflow Execution...")
+    clean_log("🚀 Starting TMS Workflow Execution...")
 
     try:
         # Initialize state
         initial_state = WorkflowState(
-            companies=[],
-            enriched_data={},
-            errors=[],
             run_id=config["run_directories"]["run_id"],
             started_at=datetime.now(),
-            all_linkedin_profiles=[],
             run_directories=config["run_directories"]
         )
 
         # Create and run the workflow
         workflow = compile_workflow()
 
-        logger.info("📝 Executing workflow graph...")
+        clean_log("📝 Executing workflow graph...")
 
         final_state = await workflow.ainvoke(
             initial_state,
@@ -260,12 +255,12 @@ async def run_tms_workflow(config: Dict[str, Any]) -> WorkflowState:
         # Set completion time
         final_state["completed_at"] = datetime.now()
 
-        logger.info("✅ TMS Workflow completed successfully")
+        clean_log("✅ TMS Workflow completed successfully")
         return final_state
 
     except Exception as e:
-        logger.error(f"❌ TMS Workflow failed: {e}")
-        logger.error(traceback.format_exc())
+        clean_log(f"❌ TMS Workflow failed: {e}", level="error")
+        detailed_log(traceback.format_exc())
 
         # Create error state
         error_state = WorkflowState(
@@ -273,6 +268,7 @@ async def run_tms_workflow(config: Dict[str, Any]) -> WorkflowState:
             enriched_data={},
             errors=[f"Workflow failed: {str(e)}"],
             run_id=config["run_directories"]["run_id"],
+            run_directories=config.get("run_directories", {}),
             started_at=datetime.now(),
             completed_at=datetime.now(),
             all_linkedin_profiles=[]
@@ -305,10 +301,10 @@ def print_workflow_summary(final_state: WorkflowState):
     
     # Calculate categorized error counts
     error_summary = final_state.get("error_summary", {})
-    skipped_count = len(error_summary.get("skipped_companies", []))
-    prospect_failures = len(error_summary.get("prospect_enrichment_failures", []))
-    hubspot_failures = len(error_summary.get("hubspot_failures", []))
-    web_failures = len(error_summary.get("web_enrichment_failures", []))
+    skipped_count = len(error_summary.skipped_companies)
+    prospect_failures = len(error_summary.prospect_enrichment_failures)
+    hubspot_failures = len(error_summary.hubspot_failures)
+    web_failures = len(error_summary.web_enrichment_failures)
     total_categorized_errors = skipped_count + prospect_failures + hubspot_failures + web_failures
     
     # Clean summary for terminal
@@ -510,17 +506,15 @@ async def main():
         print_workflow_summary(final_state)
     #
     except KeyboardInterrupt:
-        logger.warning("⚠️ Workflow interrupted by user")
-        clean_log("Workflow interrupted by user", "warning")
+        clean_log("⚠️ Workflow interrupted by user", "warning")
         detailed_log("\n" + "=" * 60)
         detailed_log("⚠️ WORKFLOW INTERRUPTED")
         detailed_log("=" * 60)
         detailed_log("Workflow execution was interrupted. Partial results may be available in the output directory.")
 
     except Exception as e:
-        logger.error(f"❌ Workflow failed with error: {e}")
-        logger.error(traceback.format_exc())
-        clean_log(f"Workflow failed: {e}", "error")
+        clean_log(f"❌ Workflow failed with error: {e}", "error")
+        detailed_log(traceback.format_exc())
         clean_log(f"See logs: {run_directories['logs_dir']}/workflow.log", "error")
         detailed_log("\n" + "=" * 60)
         detailed_log("❌ WORKFLOW FAILED")
@@ -533,7 +527,7 @@ async def main():
         try:
             await graceful_shutdown()
         except Exception as shutdown_error:
-            logger.warning(f"⚠️ Error during final shutdown: {shutdown_error}")
+            clean_log(f"⚠️ Error during final shutdown: {shutdown_error}", "warning")
 
     clean_log("SDR workflow execution completed")
     detailed_log("\n" + "=" * 60)
@@ -548,4 +542,4 @@ if __name__ == "__main__":
         clean_log("Workflow interrupted by user", "warning")
     except Exception as e:
         clean_log(f"Fatal error: {e}", "error")
-        logger.error(traceback.format_exc())
+        detailed_log(traceback.format_exc())

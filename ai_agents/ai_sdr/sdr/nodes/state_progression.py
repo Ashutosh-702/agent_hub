@@ -3,8 +3,8 @@ State Progression Node
 
 Handles moving to the next company in the workflow
 """
-from sdr.logging_config import sdr_logger
-from sdr.models import WorkflowState
+from ai_agents.ai_sdr.sdr.logging_config import sdr_logger
+from ai_agents.ai_sdr.sdr.models import WorkflowState
 
 
 def company_progression(state: WorkflowState) -> WorkflowState:
@@ -26,6 +26,8 @@ def company_progression(state: WorkflowState) -> WorkflowState:
             }
         )
     else:
+        # Increasing the current_company_index so that in continue_company_loop, it goes to linkedin_progress_backup
+        state.current_company_index = next_index
         sdr_logger.log_completion(
             "Company Loop Progression",
             {"Status": "All companies processed", "Total Processed": len(state.companies)}

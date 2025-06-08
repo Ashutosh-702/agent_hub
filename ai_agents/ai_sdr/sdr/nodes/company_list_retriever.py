@@ -11,8 +11,8 @@ from io import StringIO
 from typing import Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from sdr.models import Company, WorkflowState
-from sdr.logging_config import clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.models import Company, WorkflowState
+from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 
@@ -238,17 +238,63 @@ async def company_list_retriever(state: WorkflowState, config: Dict[str, Any]) -
         # Normalize and convert to Company objects
         companies = _normalize_company_data(df)
 
-        if not companies:
-            raise ValueError("No valid companies found in data source")
+        # Enhanced validation for company list
+        if not companies or len(companies) == 0:
+            error_msg = "No valid companies found in data source - company list is empty"
+            clean_log(error_msg, "error")
+            detailed_log(error_msg, "error")
+            state.companies = []
+            state.current_company_index = 0
+            state.current_company = None
+            state.errors.append(error_msg)
+            
+            # Track in categorized errors
+            if not hasattr(state, 'error_summary') or state.error_summary is None:
+                from ai_agents.ai_sdr.sdr.models import ErrorSummary
+                state.error_summary = ErrorSummary()
+            state.error_summary.general_errors.append(error_msg)
+            
+            return state
 
-        # Update state
-        state.companies = companies
+        # Validate company data quality
+        valid_companies = []
+        invalid_count = 0
+        
+        for company in companies:
+            if company.name and company.name.strip():
+                valid_companies.append(company)
+            else:
+                invalid_count += 1
+                detailed_log(f"Skipping company with empty/invalid name: {company}", "warning")
+
+        if not valid_companies:
+            error_msg = f"No companies with valid names found. {invalid_count} companies had empty/invalid names"
+            clean_log(error_msg, "error")
+            detailed_log(error_msg, "error")
+            state.companies = []
+            state.current_company_index = 0
+            state.current_company = None
+            state.errors.append(error_msg)
+            
+            # Track in categorized errors
+            if not hasattr(state, 'error_summary') or state.error_summary is None:
+                from ai_agents.ai_sdr.sdr.models import ErrorSummary
+                state.error_summary = ErrorSummary()
+            state.error_summary.general_errors.append(error_msg)
+            
+            return state
+
+        # Update state with validated companies
+        state.companies = valid_companies
         state.current_company_index = 0
-        state.current_company = companies[0] if companies else None
+        state.current_company = valid_companies[0]
 
-        clean_log(f"Loaded {len(companies)} companies")
-        detailed_log(f"Successfully loaded {len(companies)} companies")
-        detailed_log(f"First company: {state.current_company.name if state.current_company else 'None'}")
+        # Log validation results
+        clean_log(f"Loaded {len(valid_companies)} valid companies")
+        detailed_log(f"Successfully loaded {len(valid_companies)} valid companies")
+        if invalid_count > 0:
+            detailed_log(f"Filtered out {invalid_count} companies with invalid names", "warning")
+        detailed_log(f"First company: {state.current_company.name}")
 
         return state
 

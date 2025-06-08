@@ -5,25 +5,23 @@ from typing import Literal
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 
-from .models import WorkflowState
-from .nodes.company_list_retriever import company_list_retriever
-from .nodes.hubspot_contact_creator import hubspot_contact_creator
-from .nodes.state_progression import company_progression
-from .nodes.streamlined_web_enricher import streamlined_web_enricher
-from .nodes.prospect_enricher import prospect_enricher
-from .nodes.file_storage import save_final_results
-from .nodes.progress_saver import linkedin_progress_saver
-from .nodes.error_reporter import error_reporter
-from .logging_config import sdr_logger
+from ai_agents.ai_sdr.sdr.models import WorkflowState
+from ai_agents.ai_sdr.sdr.nodes.company_list_retriever import company_list_retriever
+from ai_agents.ai_sdr.sdr.nodes.hubspot_contact_creator import hubspot_contact_creator
+from ai_agents.ai_sdr.sdr.nodes.state_progression import company_progression
+from ai_agents.ai_sdr.sdr.nodes.streamlined_web_enricher import streamlined_web_enricher
+from ai_agents.ai_sdr.sdr.nodes.prospect_enricher import prospect_enricher
+from ai_agents.ai_sdr.sdr.nodes.file_storage import save_final_results
+from ai_agents.ai_sdr.sdr.nodes.progress_saver import linkedin_progress_saver
+from ai_agents.ai_sdr.sdr.nodes.company_progress_saver import linkedin_progress_saver as company_linkedin_saver, hubspot_progress_saver
+from ai_agents.ai_sdr.sdr.nodes.final_progress_saver import final_progress_saver
+from ai_agents.ai_sdr.sdr.nodes.error_reporter import error_reporter
+from ai_agents.ai_sdr.sdr.logging_config import sdr_logger
 
 
-def start_company_loop(state: WorkflowState) -> Literal["streamlined_web_enricher", "end"]:
-    """Start the company processing loop or end if no companies"""
+def check_companies_exist(state: WorkflowState) -> Literal["streamlined_web_enricher", "save_results"]:
+    """Check if companies exist to process or skip to results"""
     if state.companies and len(state.companies) > 0:
-        # Set up for first company
-        state.current_company_index = 0
-        state.current_company = state.companies[0]
-        
         sdr_logger.log_section_start(
             "Company Processing Loop", 
             f"Processing {len(state.companies)} companies"
@@ -37,10 +35,10 @@ def start_company_loop(state: WorkflowState) -> Literal["streamlined_web_enriche
         return "streamlined_web_enricher"
     else:
         sdr_logger.log_warning_with_context(
-            "No companies found to process", 
-            "Company Loop Initialization"
+            "No companies found to process - skipping to results", 
+            "Company Processing"
         )
-        return "end"
+        return "save_results"
 
 
 def check_relevance_for_prospect_enrichment(state: WorkflowState) -> Literal[
@@ -68,7 +66,7 @@ def check_relevance_for_prospect_enrichment(state: WorkflowState) -> Literal[
 def continue_company_loop(state: WorkflowState) -> Literal["streamlined_web_enricher", "linkedin_progress_backup"]:
     """Determine whether to continue the loop or proceed to LinkedIn backup"""
     # Check if we have more companies to process
-    if state.current_company_index + 1 < len(state.companies):
+    if state.current_company_index < len(state.companies):
         remaining = len(state.companies) - (state.current_company_index + 1)
         sdr_logger.log_subsection(
             "Continuing Company Processing Loop",
@@ -87,23 +85,14 @@ def continue_company_loop(state: WorkflowState) -> Literal["streamlined_web_enri
         return "linkedin_progress_backup"
 
 
-def proceed_after_backup(state: WorkflowState) -> Literal["hubspot_batch", "error_summary_export"]:
-    """Decide whether to proceed to HubSpot batch processing or skip to error summary"""
-    # Check if we have LinkedIn profiles and HubSpot is enabled
-    has_profiles = hasattr(state, 'all_linkedin_profiles') and state.all_linkedin_profiles
-    
-    if has_profiles:
-        sdr_logger.log_section_start(
-            "HubSpot Batch Processing",
-            f"Processing {len(state.all_linkedin_profiles)} LinkedIn profiles for HubSpot"
-        )
-        return "hubspot_batch"
-    else:
-        sdr_logger.log_warning_with_context(
-            "No LinkedIn profiles found - skipping HubSpot processing",
-            "HubSpot Batch Processing"
-        )
-        return "error_summary_export"
+def proceed_after_backup(state: WorkflowState) -> Literal["final_progress_save", "error_summary_export"]:
+    """Proceed to final progress save or skip to error summary"""
+    # Always proceed to final progress save after backup
+    sdr_logger.log_section_start(
+        "Final Progress Save",
+        "Saving final workflow results and consolidated data"
+    )
+    return "final_progress_save"
 
 
 def create_workflow_graph() -> StateGraph:
@@ -120,12 +109,14 @@ def create_workflow_graph() -> StateGraph:
     # Add nodes
     nodes_config = {
         "company_retriever": company_list_retriever,
+        "company_progression": company_progression,
         "streamlined_web_enricher": streamlined_web_enricher,
         "prospect_enricher": prospect_enricher,
+        "company_linkedin_progress": company_linkedin_saver,
         "hubspot_individual": hubspot_contact_creator,
-        "company_progression": company_progression,
+        "hubspot_progress_saver": hubspot_progress_saver,
         "linkedin_progress_backup": linkedin_progress_saver,
-        "hubspot_batch": hubspot_contact_creator,
+        "final_progress_save": final_progress_saver,
         "error_summary_export": error_reporter,
         "save_results": save_final_results
     }
@@ -146,13 +137,13 @@ def create_workflow_graph() -> StateGraph:
         {"Entry Point": "company_retriever", "Flow Type": "Conditional and Linear"}
     )
 
-    # After company retrieval, start the loop or end if no companies
+    # After company retrieval, check if companies exist or skip to results
     sdr_workflow.add_conditional_edges(
         "company_retriever",
-        start_company_loop,
+        check_companies_exist,
         {
             "streamlined_web_enricher": "streamlined_web_enricher",
-            "end": END
+            "save_results": "save_results"
         }
     )
 
@@ -166,11 +157,17 @@ def create_workflow_graph() -> StateGraph:
         }
     )
 
-    # After prospect enrichment, go to individual HubSpot processing
-    sdr_workflow.add_edge("prospect_enricher", "hubspot_individual")
+    # After prospect enrichment, save LinkedIn progress for this company
+    sdr_workflow.add_edge("prospect_enricher", "company_linkedin_progress")
 
-    # After individual HubSpot processing, progress to next company
-    sdr_workflow.add_edge("hubspot_individual", "company_progression")
+    # After LinkedIn progress save, go to individual HubSpot processing
+    sdr_workflow.add_edge("company_linkedin_progress", "hubspot_individual")
+
+    # After individual HubSpot processing, save HubSpot progress for this company
+    sdr_workflow.add_edge("hubspot_individual", "hubspot_progress_saver")
+
+    # After HubSpot progress save, progress to next company
+    sdr_workflow.add_edge("hubspot_progress_saver", "company_progression")
 
     # After company progression, continue loop or backup LinkedIn data
     sdr_workflow.add_conditional_edges(
@@ -182,18 +179,18 @@ def create_workflow_graph() -> StateGraph:
         }
     )
 
-    # After LinkedIn backup, proceed to HubSpot batch or error summary
+    # After LinkedIn backup, proceed to final progress save
     sdr_workflow.add_conditional_edges(
         "linkedin_progress_backup",
         proceed_after_backup,
         {
-            "hubspot_batch": "hubspot_batch",
+            "final_progress_save": "final_progress_save",
             "error_summary_export": "error_summary_export"
         }
     )
 
-    # After HubSpot batch processing, export error summary
-    sdr_workflow.add_edge("hubspot_batch", "error_summary_export")
+    # After final progress save, export error summary
+    sdr_workflow.add_edge("final_progress_save", "error_summary_export")
 
     # After error summary export, save final results
     sdr_workflow.add_edge("error_summary_export", "save_results")
@@ -206,7 +203,7 @@ def create_workflow_graph() -> StateGraph:
         {
             "Total Nodes": len(nodes_config),
             "Conditional Edges": 4,
-            "Linear Edges": 4,
+            "Linear Edges": 6,
             "Status": "Ready for compilation"
         }
     )

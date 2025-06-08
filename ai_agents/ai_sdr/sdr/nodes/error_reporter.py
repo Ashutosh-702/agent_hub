@@ -9,10 +9,9 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, Any
-from loguru import logger
 
-from sdr.models import WorkflowState
-from sdr.logging_config import sdr_logger
+from ai_agents.ai_sdr.sdr.models import WorkflowState
+from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log, detailed_log
 
 
 def save_error_summary(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:
@@ -138,13 +137,13 @@ def save_error_summary(state: WorkflowState, config: Dict[str, Any]) -> Workflow
             }
         )
         
-        logger.info(f"📊 Error summary export completed - {total_errors} issues categorized and saved")
+        clean_log(f"📊 Error summary export completed - {total_errors} issues categorized and saved")
         
     except Exception as e:
         error_msg = f"Error summary export failed: {str(e)}"
         sdr_logger.log_error_with_context(e, "Error Summary Export")
         state.error_summary.general_errors.append(error_msg)
-        logger.error(error_msg)
+        clean_log(error_msg, level="error")
     
     return state
 

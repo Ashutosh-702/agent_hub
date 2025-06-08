@@ -3,20 +3,16 @@ Prospect Enricher Node
 
 Uses browserMCP to find LinkedIn profiles of company executives and decision makers.
 """
-import csv
-from datetime import datetime
 from typing import Dict, Any
-import os
 
 import orjson
 from agents import Agent, Runner, ModelSettings
 from agents.mcp.server import MCPServerStdio
-from loguru import logger
 from openai.types import Reasoning
 
-from sdr.models import WorkflowState, Company
-from sdr.prompts import PromptsConfig
-from sdr.logging_config import log_llm_request, log_llm_response, log_llm_error, sdr_logger, clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.models import WorkflowState, Company
+from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
+from ai_agents.ai_sdr.sdr.logging_config import log_llm_request, log_llm_response, log_llm_error, sdr_logger, clean_log, detailed_log
 
 
 class ProspectEnricher:

@@ -11,13 +11,13 @@ from datetime import datetime
 import csv
 import json
 
-from sdr.models import WorkflowState
-from sdr.logging_config import clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.models import WorkflowState
+from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
 
 
 def save_linkedin_progress(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:
     """
-    Save all LinkedIn URLs and prospect data before HubSpot processing
+    Save all LinkedIn URLs and track totals across all companies
     
     Args:
         state: Current workflow state containing LinkedIn profiles
@@ -28,11 +28,11 @@ def save_linkedin_progress(state: WorkflowState, config: Dict[str, Any]) -> Work
     """
 
     # Clean log for main status
-    clean_log("LinkedIn Progress Backup: Saving collected URLs")
+    clean_log("LinkedIn Progress Backup: Saving totals across all companies")
     
     # Detailed logs
     detailed_log("LinkedIn Progress Backup Starting")
-    detailed_log("Saving all collected LinkedIn URLs before HubSpot processing")
+    detailed_log("Tracking totals: LinkedIn prospects identified and HubSpot contacts created")
 
     try:
         # Get run directories from config
@@ -85,6 +85,9 @@ def save_linkedin_progress(state: WorkflowState, config: Dict[str, Any]) -> Work
                     'Collection Timestamp': timestamp
                 })
 
+        # Calculate HubSpot totals from enriched data
+        hubspot_totals = _calculate_hubspot_totals(state)
+        
         # Save as JSON (for programmatic processing)
         json_filename = f"linkedin_profiles_backup_{timestamp}.json"
         json_filepath = os.path.join(progress_dir, json_filename)
@@ -96,10 +99,19 @@ def save_linkedin_progress(state: WorkflowState, config: Dict[str, Any]) -> Work
                     "backup_timestamp": timestamp,
                     "total_profiles": len(linkedin_profiles),
                     "total_companies": len(set(profile.get('company_name', '') for profile in linkedin_profiles)),
-                    "purpose": "Pre-HubSpot backup of all collected LinkedIn URLs"
+                    "purpose": "Backup of all collected LinkedIn URLs with HubSpot totals"
                 },
                 "profiles": linkedin_profiles,
-                "summary_by_company": _generate_company_summary(linkedin_profiles)
+                "summary_by_company": _generate_company_summary(linkedin_profiles),
+                "workflow_totals": {
+                    "total_linkedin_prospects_identified": len(linkedin_profiles),
+                    "total_hubspot_contacts_created": hubspot_totals['total_created'],
+                    "total_hubspot_duplicates": hubspot_totals['total_duplicates'],
+                    "total_hubspot_failures": hubspot_totals['total_failed'],
+                    "companies_processed": len(state.companies) if state.companies else 0,
+                    "companies_with_linkedin_profiles": len(set(profile.get('company_name', '') for profile in linkedin_profiles)),
+                    "companies_with_hubspot_contacts": hubspot_totals['companies_with_contacts']
+                }
             }
             json.dump(backup_data, f, indent=2, ensure_ascii=False)
 
@@ -123,9 +135,12 @@ def save_linkedin_progress(state: WorkflowState, config: Dict[str, Any]) -> Work
         detailed_log("")
         detailed_log("💾 LinkedIn Progress Backup Completed")
         detailed_log("─" * 50)
-        detailed_log(f"📊 Total LinkedIn URLs Saved: {len(linkedin_profiles)}")
+        detailed_log(f"📊 Total LinkedIn Prospects Identified: {len(linkedin_profiles)}")
         detailed_log(f"🏢 Companies with Profiles: {len(companies_with_profiles)}")
         detailed_log(f"👔 Executive Profiles: {executives_count}")
+        detailed_log(f"✅ Total HubSpot Contacts Created: {hubspot_totals['total_created']}")
+        detailed_log(f"🔄 Total HubSpot Duplicates: {hubspot_totals['total_duplicates']}")
+        detailed_log(f"❌ Total HubSpot Failures: {hubspot_totals['total_failed']}")
         detailed_log(f"📄 CSV Backup: {csv_filename}")
         detailed_log(f"🗂️ JSON Backup: {json_filename}")
         detailed_log(f"📁 Location: {progress_dir}")
@@ -145,6 +160,34 @@ def save_linkedin_progress(state: WorkflowState, config: Dict[str, Any]) -> Work
         detailed_log(error_msg, "error")
         state.errors.append(error_msg)
         return state
+
+
+def _calculate_hubspot_totals(state: WorkflowState) -> Dict[str, int]:
+    """Calculate HubSpot totals across all companies"""
+    
+    totals = {
+        'total_created': 0,
+        'total_duplicates': 0,
+        'total_failed': 0,
+        'companies_with_contacts': 0
+    }
+    
+    # Iterate through all companies' enriched data
+    for company_name, company_data in (state.enriched_data or {}).items():
+        hubspot_results = company_data.get('hubspot_results', {})
+        if hubspot_results:
+            created_count = hubspot_results.get('created_count', 0)
+            duplicate_count = hubspot_results.get('duplicate_count', 0)
+            failed_count = hubspot_results.get('failed_count', 0)
+            
+            totals['total_created'] += created_count
+            totals['total_duplicates'] += duplicate_count
+            totals['total_failed'] += failed_count
+            
+            if created_count > 0:
+                totals['companies_with_contacts'] += 1
+    
+    return totals
 
 
 def _generate_company_summary(linkedin_profiles: List[Dict[str, Any]]) -> Dict[str, Any]:

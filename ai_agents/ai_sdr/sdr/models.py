@@ -2,7 +2,7 @@
 Data models for the SDR workflow
 """
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 
 
@@ -74,7 +74,30 @@ class WorkflowState(BaseModel):
     saved_files: List[str] = Field(default_factory=list)
     backup_files: List[str] = Field(default_factory=list)
     run_id: Optional[str | int] = None
-    run_directories: Dict[str, str]
+    run_directories: Dict[str, str] = Field(default_factory=dict)
+    
+    # Progress tracking - Enhanced with per-company and final tracking
+    company_progress_files: List[str] = Field(default_factory=list)  # Individual company progress files
+    final_progress_files: List[str] = Field(default_factory=list)    # Final consolidated results files
+    linkedin_save_count: int = 0                                     # Count of LinkedIn progress saves
+    hubspot_save_count: int = 0                                      # Count of HubSpot progress saves
+    
+    # Workflow totals tracking
+    total_linkedin_prospects: int = 0                               # Total LinkedIn prospects found across all companies
+    total_hubspot_created: int = 0                                  # Total HubSpot contacts created
+    total_hubspot_duplicates: int = 0                               # Total HubSpot duplicates found
+    total_hubspot_failed: int = 0                                   # Total HubSpot creation failures
+    
+    @model_validator(mode='before')
+    @classmethod
+    def ensure_error_summary(cls, values):
+        """Ensure error_summary is properly initialized"""
+        if isinstance(values, dict):
+            if 'error_summary' not in values or values['error_summary'] is None:
+                values['error_summary'] = ErrorSummary()
+        return values
     
     class Config:
-        arbitrary_types_allowed = True 
+        arbitrary_types_allowed = True
+        # Ensure proper validation for LangGraph compatibility
+        validate_assignment = True 

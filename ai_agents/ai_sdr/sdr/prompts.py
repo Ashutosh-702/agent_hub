@@ -8,8 +8,7 @@ Users can customize these prompts or provide their own at runtime.
 import json
 import os
 from typing import Dict, Any
-from loguru import logger
-from sdr.logging_config import sdr_logger
+from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log, detailed_log
 
 
 class PromptsConfig:
@@ -76,45 +75,39 @@ DEFAULT_PROMPTS = {
 
     "prospect_enricher_instructions": """You are a LinkedIn research specialist with browser access, via BrowserMCP.
 Navigate www.linkedin.com to find company executives and key decision makers, and capture their 
-LinkedIn profile URLs for later contact enrichment via CSV upload.
+LinkedIn profile URLs.
 
 CRITICAL SCROLLING AND PAGINATION INSTRUCTIONS:
-1. Go to www.linkedin.com
-2. Search for the company name provided
-3. Navigate to the company's LinkedIn page
-4. Find and click on the "People" section/tab
+1. FIRST - Check current URL and navigate to LinkedIn if needed:
+   - If already on linkedin.com, proceed to step 2
+   - Wait for LinkedIn homepage to fully load before proceeding
+2. Search for the company name provided:
+   - Use the main search box at the top of LinkedIn
+   - Type the exact company name provided
+   - Press Enter or click the search button
+3. Navigate to the company's LinkedIn page:
+   - Look for the "Companies" tab in search results
+   - Click on the correct company from the results
+   - Verify you're on the right company page by checking the company name
+4. Find and click on the "People" section/tab and search for the TARGET EXECUTIVES provided:
+   - Look for "People" tab on the company page
+   - If not visible, scroll down to find it
+   - Click on "People" to see employees
 5. MANDATORY SCROLLING PROCESS:
    - Click "See all people" or "View all employees" or "SCROLL" if available
    - SCROLL DOWN SLOWLY and wait 2-3 seconds between scrolls
    - Look for "Show more results" or "Load more" buttons and click them
    - Check for pagination (Next page, page numbers) and navigate through ALL pages
-   - Continue scrolling until you see "No more results" or reach 200+ profiles
-
-6. TARGET EXECUTIVES:
-   - Founder, Co-founder
-   - CEO, Chief Executive Officer
-   - COO, Chief Operating Officer  
-   - CTO, Chief Technology Officer
-   - CFO, Chief Financial Officer
-   - Managers, Senior Managers
-   - Head of Operations, VP Operations
-   - Head of Supply Chain, Head of Logistics
-   - General Manager, Managing Director
-   - Directors, VPs, Senior Managers
-
-7. FOR EVERY TARGET PROFILE - URL COLLECTION:
-   - IMPORTANT: ONLY open profiles that match TARGET EXECUTIVES criteria in step 6
+   - Continue scrolling until you see "No more results" or reach 50+ profiles
+6. FOR EVERY TARGET EXECUTIVE PROFILE - URL COLLECTION:
+   - IMPORTANT: ONLY OPEN PROFILES THAT MATCH TARGET EXECUTIVE CRITERIA
    - DO NOT open profiles of regular employees, interns, or non-management staff
-   - Open the profile ONLY if title contains executive/manager/director/head/lead terms
+   - Open the profile ONLY if title contains the TARGET EXECUTIVES terms
    - Wait 3-5 seconds for the page to fully load
-   - CAPTURE THE LINKEDIN PROFILE URL (this is critical for CSV enrichment)
-   - Record: name, title, profile URL
-
-8. COMPREHENSIVE DATA COLLECTION:
+7. COMPREHENSIVE DATA COLLECTION:
    - Capture LinkedIn profile URLs for each TARGET person (MOST IMPORTANT)
    - Record department/function if identifiable
-   - Focus on profile URL accuracy for successful CSV enrichment
-   - ONLY INCLUDE PROFILES THAT MATCH TARGET EXECUTIVE CRITERIA
+   - Focus on profile URL accuracy
 
 TIMING CONSIDERATIONS:
 - Allow 3-5 seconds for LinkedIn profiles to load
@@ -166,7 +159,7 @@ Return ONLY the JSON object—do NOT include any markdown or ``` before/after
 WEBSITE: {company_website}
 INDUSTRY: {industry}
 
-TARGET EXECUTIVES TO FIND:
+TARGET EXECUTIVES TO FIND ONLY on LinkedIn are given below:
 {target_executives}
 
 TASK: Collect LinkedIn profile URLs for these key executives at this company.""",
@@ -381,17 +374,17 @@ def get_user_prompts() -> Dict[str, str]:
     Returns:
         Dictionary of custom prompts provided by user
     """
-    logger.info("\n" + "=" * 60)
-    logger.info("🎯 PROMPT CUSTOMIZATION")
-    logger.info("=" * 60)
-    logger.info("You can customize the prompts used in the SDR workflow.")
-    logger.info("Press Enter to use default prompts, or provide custom ones.")
-    logger.info("\nAvailable prompts to customize:")
-    logger.info("1. prospect_enricher_instructions - LinkedIn research agent instructions")
-    logger.info("2. web_enricher_system_prompt - Web research system prompt")
-    logger.info("3. hubspot_creator_instructions - HubSpot contact creation instructions")
-    logger.info("4. All prompts - Customize all prompts")
-    logger.info("5. Skip - Use default prompts")
+    clean_log("\n" + "=" * 60)
+    clean_log("🎯 PROMPT CUSTOMIZATION")
+    clean_log("=" * 60)
+    clean_log("You can customize the prompts used in the SDR workflow.")
+    clean_log("Press Enter to use default prompts, or provide custom ones.")
+    clean_log("\nAvailable prompts to customize:")
+    clean_log("1. prospect_enricher_instructions - LinkedIn research agent instructions")
+    clean_log("2. web_enricher_system_prompt - Web research system prompt")
+    clean_log("3. hubspot_creator_instructions - HubSpot contact creation instructions")
+    clean_log("4. All prompts - Customize all prompts")
+    clean_log("5. Skip - Use default prompts")
 
     choice = input(
         "\nEnter your choice (1-5) or press Enter to skip: ").strip()
@@ -399,42 +392,42 @@ def get_user_prompts() -> Dict[str, str]:
     custom_prompts = {}
 
     if choice == "1":
-        logger.info("\n📝 Customizing LinkedIn Research Instructions:")
-        logger.info("Current default focuses on comprehensive LinkedIn profile ")
+        clean_log("\n📝 Customizing LinkedIn Research Instructions:")
+        clean_log("Current default focuses on comprehensive LinkedIn profile ")
         custom_prompt = input(
             "Enter custom LinkedIn research instructions(system prompt) (or press Enter to keep default): ").strip()
         if custom_prompt:
             custom_prompts["prospect_enricher_instructions"] = custom_prompt
 
     elif choice == "2":
-        logger.info("\n📝 Customizing Web Research System Prompt:")
-        logger.info("Current default focuses on grocery/FMCG relevance assessment.")
+        clean_log("\n📝 Customizing Web Research System Prompt:")
+        clean_log("Current default focuses on grocery/FMCG relevance assessment.")
         custom_prompt = input(
             "Enter custom web research system prompt (or press Enter to keep default): ").strip()
         if custom_prompt:
             custom_prompts["web_enricher_system_prompt"] = custom_prompt
 
     elif choice == "3":
-        logger.info("\n📝 Customizing HubSpot Contact Creation Instructions:")
-        logger.info("Current default creates contacts with mandatory fields and retry logic.")
+        clean_log("\n📝 Customizing HubSpot Contact Creation Instructions:")
+        clean_log("Current default creates contacts with mandatory fields and retry logic.")
         custom_prompt = input(
             "Enter custom HubSpot instructions(system prompt) (or press Enter to keep default): ").strip()
         if custom_prompt:
             custom_prompts["hubspot_creator_instructions"] = custom_prompt
 
     elif choice == "4":
-        logger.info("\n📝 Customizing All Prompts:")
+        clean_log("\n📝 Customizing All Prompts:")
         for key in ["prospect_enricher_instructions", "web_enricher_system_prompt", "hubspot_creator_instructions"]:
-            logger.info(f"\n--- {key.replace('_', ' ').title()} ---")
+            clean_log(f"\n--- {key.replace('_', ' ').title()} ---")
             custom_prompt = input(
                 f"Enter custom {key} (or press Enter to keep default): ").strip()
             if custom_prompt:
                 custom_prompts[key] = custom_prompt
 
     if custom_prompts:
-        logger.info(f"\n✅ Using {len(custom_prompts)} custom prompt(s)")
+        clean_log(f"\n✅ Using {len(custom_prompts)} custom prompt(s)")
     else:
-        logger.info("\n✅ Using default prompts")
+        clean_log("\n✅ Using default prompts")
 
     return custom_prompts
 
@@ -453,16 +446,16 @@ def load_prompts_from_file(file_path: str) -> Dict[str, str]:
     import os
 
     if not os.path.exists(file_path):
-        logger.warning(f"Prompts file not found: {file_path}")
+        clean_log(f"Prompts file not found: {file_path}", level="warning")
         return {}
 
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             custom_prompts = json.load(f)
-        logger.info(f"Loaded {len(custom_prompts)} custom prompts from {file_path}")
+        clean_log(f"Loaded {len(custom_prompts)} custom prompts from {file_path}")
         return custom_prompts
     except Exception as e:
-        logger.error(f"Error loading prompts file: {e}")
+        clean_log(f"Error loading prompts file: {e}", level="error")
         return {}
 
 
@@ -478,6 +471,6 @@ def save_prompts_to_file(prompts: Dict[str, str], file_path: str):
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(prompts, f, indent=2, ensure_ascii=False)
-        logger.info(f"Saved custom prompts to {file_path}")
+        clean_log(f"Saved custom prompts to {file_path}")
     except Exception as e:
-        logger.error(f"Error saving prompts file: {e}")
+        clean_log(f"Error saving prompts file: {e}", level="error")

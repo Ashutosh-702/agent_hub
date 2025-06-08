@@ -15,9 +15,9 @@ from agents import Agent, Runner, ModelSettings
 from agents.mcp.server import MCPServerStdio
 from openai.types import Reasoning
 
-from sdr.models import WorkflowState
-from sdr.prompts import PromptsConfig
-from sdr.logging_config import log_llm_request, log_llm_response, log_llm_error, sdr_logger, clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.models import WorkflowState
+from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
+from ai_agents.ai_sdr.sdr.logging_config import log_llm_request, log_llm_response, log_llm_error, sdr_logger, clean_log, detailed_log
 
 
 class HubspotContactCreator:
@@ -399,7 +399,7 @@ class HubspotContactCreator:
 
 async def hubspot_contact_creator(state: WorkflowState, config: Dict[str, Any] = None) -> WorkflowState:
     """
-    Create HubSpot contacts from LinkedIn prospects data using HubSpot MCP server
+    Create HubSpot contacts from current company's LinkedIn prospects data
 
     Args:
         state: Current workflow state containing enriched LinkedIn data
@@ -409,35 +409,58 @@ async def hubspot_contact_creator(state: WorkflowState, config: Dict[str, Any] =
         Updated workflow state with HubSpot contact creation results
     """
 
+    if not state.current_company:
+        detailed_log("No current company to process HubSpot contacts for", "warning")
+        return state
+
+    company = state.current_company
+    
     detailed_log("")
-    detailed_log("🔗 Starting HubSpot Contact Creation...")
+    detailed_log(f"🔗 Starting HubSpot Contact Creation for {company.name}...")
 
     config = config.get("configurable", {})
 
+    # Skip HubSpot creation if disabled
+    if not config.get("create_hubspot_contacts", True):
+        clean_log(f"HubSpot creation disabled for {company.name}")
+        detailed_log("⚠️ HubSpot contact creation is disabled in configuration", "warning")
+        return state
+
     try:
-        # Get LinkedIn profiles from state
-        if hasattr(state, 'all_linkedin_profiles') and state.all_linkedin_profiles:
-            prospects_data = state.all_linkedin_profiles
-            detailed_log(f"📋 LinkedIn profiles available: {len(prospects_data)}")
-        else:
-            clean_log("No LinkedIn profiles found - skipping HubSpot", "warning")
-            detailed_log("⚠️ No LinkedIn profiles found - skipping HubSpot contact creation", "warning")
+        # Get current company's enriched data
+        company_data = state.enriched_data.get(company.name, {})
+        linkedin_data = company_data.get('linkedin_prospect_data', {})
+        
+        # Extract executives found for this company
+        executives_found = linkedin_data.get('executives_found', [])
+        
+        if not executives_found:
+            clean_log(f"No executives found for {company.name} - skipping HubSpot", "warning")
+            detailed_log(f"⚠️ No executives found for {company.name} - skipping HubSpot contact creation", "warning")
             return state
 
-        if not prospects_data:
-            clean_log("No prospects data found - skipping HubSpot", "warning")
-            detailed_log("⚠️ No prospects data found - skipping HubSpot contact creation", "warning")
-            return state
+        # Prepare prospects data for HubSpot
+        prospects_data = []
+        for exec_profile in executives_found:
+            # Add company name to each prospect
+            prospect = {
+                **exec_profile,
+                'company_name': company.name
+            }
+            prospects_data.append(prospect)
 
-        # Filter for executives and key contacts only
+        clean_log(f"Processing {len(prospects_data)} prospects for {company.name}")
+        detailed_log(f"📋 LinkedIn executives to process: {len(prospects_data)} for {company.name}")
+
+        # Filter for key decision makers only
         filtered_prospects = filter_key_prospects(prospects_data)
-        clean_log(f"Key prospects identified: {len(filtered_prospects)} executives/managers")
-        detailed_log(f"🎯 Key prospects identified: {len(filtered_prospects)} (executives and managers)")
+        clean_log(f"Key prospects identified: {len(filtered_prospects)} executives/managers for {company.name}")
+        detailed_log(f"🎯 Key prospects after filtering: {len(filtered_prospects)}")
         detailed_log("")
 
         if not filtered_prospects:
-            clean_log("No key prospects found after filtering", "warning")
-            detailed_log("⚠️ No key prospects found after filtering", "warning")
+            clean_log(f"No key prospects found after filtering for {company.name}", "warning")
+            detailed_log(f"⚠️ No key prospects found after filtering for {company.name}", "warning")
             return state
 
         # Create HubSpot contacts using MCP agent via HubspotContactCreator class
@@ -451,17 +474,18 @@ async def hubspot_contact_creator(state: WorkflowState, config: Dict[str, Any] =
                 name = failed_contact.get("name", "Unknown")
                 error = failed_contact.get("error", "Unknown error")
                 state.error_summary.hubspot_failures.append({
-                    "contact": name,
+                    "contact": f"{name} ({company.name})",
                     "error": str(error)
                 })
 
-        # Store results in state
-        state.enriched_data["hubspot_contacts"] = {
+        # Store results in company's enriched data
+        state.enriched_data[company.name]["hubspot_results"] = {
             "created_contacts": creation_results.get("created_contacts", []),
             "failed_contacts": creation_results.get("failed_contacts", []),
             "total_processed": len(filtered_prospects),
-            "success_count": len(creation_results.get("created_contacts", [])),
-            "failure_count": len(creation_results.get("failed_contacts", [])),
+            "created_count": len(creation_results.get("created_contacts", [])),
+            "failed_count": len(creation_results.get("failed_contacts", [])),
+            "duplicate_count": creation_results.get("summary", {}).get("duplicates_found", 0),
             "timestamp": datetime.now().isoformat(),
             "owner_email": config.get("hubspot_owner_email", "N/A"),
             "field_retry_summary": creation_results.get("summary", {}).get("field_retry_summary", "")
@@ -471,7 +495,7 @@ async def hubspot_contact_creator(state: WorkflowState, config: Dict[str, Any] =
         success_count = len(creation_results.get("created_contacts", []))
         failure_count = len(creation_results.get("failed_contacts", []))
 
-        detailed_log(f"✅ HubSpot Contact Creation Summary:")
+        detailed_log(f"✅ HubSpot Contact Creation Summary for {company.name}:")
         detailed_log(f"   📊 Total Processed: {len(filtered_prospects)}")
         detailed_log(f"   ✅ Successfully Created: {success_count}")
         detailed_log(f"   ❌ Failed to Create: {failure_count}")
@@ -483,13 +507,13 @@ async def hubspot_contact_creator(state: WorkflowState, config: Dict[str, Any] =
         return state
 
     except Exception as e:
-        error_msg = f"HubSpot contact creation failed: {str(e)}"
-        clean_log(f"HubSpot service failed: {str(e)}", "error")
+        error_msg = f"HubSpot contact creation failed for {company.name}: {str(e)}"
+        clean_log(f"HubSpot service failed for {company.name}: {str(e)}", "error")
         detailed_log(error_msg, "error")
         
         # Track general HubSpot failure
         state.error_summary.hubspot_failures.append({
-            "contact": "All prospects",
+            "contact": f"All prospects for {company.name}",
             "error": f"HubSpot service failed: {str(e)}"
         })
         
