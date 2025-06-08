@@ -8,7 +8,7 @@ Users can customize these prompts or provide their own at runtime.
 import json
 import os
 from typing import Dict, Any
-from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.logging_config import clean_log, prompt_log
 
 
 class PromptsConfig:
@@ -264,7 +264,6 @@ AVAILABLE TOOLS:
 
 OWNER RETRIEVAL:
 - Use the email address {hubspot_owner_email} to find the corresponding HubSpot owner ID
-- This owner ID will be assigned to all created contacts
 
 TOOL USAGE GUIDELINES:
 - Always check for existing contacts using LinkedIn URL (hs_linkedin_url) before creating new ones
@@ -369,67 +368,303 @@ Apply progressive field removal strategy for any contact creation errors.""",
 
 def get_user_prompts() -> Dict[str, str]:
     """
-    Get prompts from user input at the start of execution
+    Get prompts from user input at the start of execution with enhanced functionality
 
     Returns:
         Dictionary of custom prompts provided by user
     """
-    clean_log("\n" + "=" * 60)
-    clean_log("🎯 PROMPT CUSTOMIZATION")
-    clean_log("=" * 60)
-    clean_log("You can customize the prompts used in the SDR workflow.")
-    clean_log("Press Enter to use default prompts, or provide custom ones.")
-    clean_log("\nAvailable prompts to customize:")
-    clean_log("1. prospect_enricher_instructions - LinkedIn research agent instructions")
-    clean_log("2. web_enricher_system_prompt - Web research system prompt")
-    clean_log("3. hubspot_creator_instructions - HubSpot contact creation instructions")
-    clean_log("4. All prompts - Customize all prompts")
-    clean_log("5. Skip - Use default prompts")
+    prompt_log("\n" + "=" * 80)
+    prompt_log("🎯 ENHANCED PROMPT CUSTOMIZATION")
+    prompt_log("=" * 80)
+    prompt_log("You can customize the prompts used in the SDR workflow.")
+    prompt_log("Each prompt can be viewed before customization and you can choose to:")
+    prompt_log("• View the default prompt")
+    prompt_log("• Use the default prompt")
+    prompt_log("• Enter a custom prompt")
+    prompt_log("• Skip prompt customization entirely")
+    
+    prompt_log("\nAvailable prompts to customize:")
+    prompt_log("1. LinkedIn Research Instructions - Controls how LinkedIn profiles are searched")
+    prompt_log("2. Web Research System Prompt - Controls how companies are analyzed for relevance")
+    prompt_log("3. HubSpot Contact Creation - Controls how contacts are created in HubSpot")
+    prompt_log("4. User Prompt Templates - Controls user-facing prompt templates")
+    prompt_log("5. Target Executives List - Controls which roles to search for on LinkedIn")
+    prompt_log("6. Customize All Prompts - Interactive customization of all prompts")
+    prompt_log("7. View All Defaults - Display all default prompts without customizing")
+    prompt_log("8. Skip - Use all default prompts")
 
-    choice = input(
-        "\nEnter your choice (1-5) or press Enter to skip: ").strip()
+    choice = input("\nEnter your choice (1-8) or press Enter to skip: ").strip()
+    if not choice:
+        choice = "8"
 
     custom_prompts = {}
 
     if choice == "1":
-        clean_log("\n📝 Customizing LinkedIn Research Instructions:")
-        clean_log("Current default focuses on comprehensive LinkedIn profile ")
-        custom_prompt = input(
-            "Enter custom LinkedIn research instructions(system prompt) (or press Enter to keep default): ").strip()
-        if custom_prompt:
-            custom_prompts["prospect_enricher_instructions"] = custom_prompt
+        custom_prompts.update(_customize_single_prompt(
+            "prospect_enricher_instructions",
+            "LinkedIn Research Instructions",
+            "Controls how the AI searches for and collects LinkedIn profiles of company executives"
+        ))
 
     elif choice == "2":
-        clean_log("\n📝 Customizing Web Research System Prompt:")
-        clean_log("Current default focuses on grocery/FMCG relevance assessment.")
-        custom_prompt = input(
-            "Enter custom web research system prompt (or press Enter to keep default): ").strip()
-        if custom_prompt:
-            custom_prompts["web_enricher_system_prompt"] = custom_prompt
+        custom_prompts.update(_customize_single_prompt(
+            "web_enricher_system_prompt",
+            "Web Research System Prompt",
+            "Controls how the AI analyzes companies for business relevance and gathers information"
+        ))
 
     elif choice == "3":
-        clean_log("\n📝 Customizing HubSpot Contact Creation Instructions:")
-        clean_log("Current default creates contacts with mandatory fields and retry logic.")
-        custom_prompt = input(
-            "Enter custom HubSpot instructions(system prompt) (or press Enter to keep default): ").strip()
-        if custom_prompt:
-            custom_prompts["hubspot_creator_instructions"] = custom_prompt
+        custom_prompts.update(_customize_single_prompt(
+            "hubspot_creator_instructions",
+            "HubSpot Contact Creation Instructions",
+            "Controls how LinkedIn profiles are converted into HubSpot contacts"
+        ))
 
     elif choice == "4":
-        clean_log("\n📝 Customizing All Prompts:")
-        for key in ["prospect_enricher_instructions", "web_enricher_system_prompt", "hubspot_creator_instructions"]:
-            clean_log(f"\n--- {key.replace('_', ' ').title()} ---")
-            custom_prompt = input(
-                f"Enter custom {key} (or press Enter to keep default): ").strip()
-            if custom_prompt:
-                custom_prompts[key] = custom_prompt
+        prompt_log("\n📝 Customizing User Prompt Templates:")
+        user_prompts = [
+            ("prospect_enricher_user_prompt", "LinkedIn User Prompt Template"),
+            ("web_enricher_user_prompt", "Web Research User Prompt"),
+            ("hubspot_creator_user_prompt", "HubSpot User Prompt Template")
+        ]
+        for key, name in user_prompts:
+            custom_prompts.update(_customize_single_prompt(key, name, f"Template used for {name.lower()}"))
+
+    elif choice == "5":
+        custom_prompts.update(_customize_single_prompt(
+            "prospect_enricher_target_executives",
+            "Target Executives List",
+            "Defines which executive roles to search for on LinkedIn (comma-separated list)"
+        ))
+
+    elif choice == "6":
+        prompt_log("\n📝 Interactive Customization of All Prompts:")
+        all_prompts = [
+            ("prospect_enricher_instructions", "LinkedIn Research Instructions"),
+            ("prospect_enricher_user_prompt", "LinkedIn User Prompt Template"),
+            ("web_enricher_system_prompt", "Web Research System Prompt"),
+            ("web_enricher_user_prompt", "Web Research User Prompt"),
+            ("hubspot_creator_instructions", "HubSpot Contact Creation Instructions"),
+            ("hubspot_creator_user_prompt", "HubSpot User Prompt Template"),
+            ("prospect_enricher_target_executives", "Target Executives List")
+        ]
+        
+        for key, name in all_prompts:
+            custom_prompts.update(_customize_single_prompt(key, name, f"Customize {name.lower()}"))
+
+    elif choice == "7":
+        _display_all_default_prompts()
+        return {}
+
+    elif choice == "8":
+        prompt_log("\n✅ Using all default prompts")
+        return {}
+
+    else:
+        prompt_log("\n⚠️ Invalid choice, using default prompts")
+        return {}
 
     if custom_prompts:
-        clean_log(f"\n✅ Using {len(custom_prompts)} custom prompt(s)")
+        prompt_log(f"\n✅ Using {len(custom_prompts)} custom prompt(s)")
+        _show_customization_summary(custom_prompts)
     else:
-        clean_log("\n✅ Using default prompts")
+        prompt_log("\n✅ Using default prompts")
 
     return custom_prompts
+
+
+def _customize_single_prompt(prompt_key: str, prompt_name: str, description: str) -> Dict[str, str]:
+    """
+    Customize a single prompt with enhanced options
+    
+    Args:
+        prompt_key: Key for the prompt in DEFAULT_PROMPTS
+        prompt_name: Human-readable name for the prompt
+        description: Description of what this prompt controls
+    
+    Returns:
+        Dictionary with custom prompt if provided, empty dict otherwise
+    """
+    prompt_log(f"\n" + "─" * 60)
+    prompt_log(f"📝 Customizing: {prompt_name}")
+    prompt_log("─" * 60)
+    prompt_log(f"Description: {description}")
+    
+    default_prompt = DEFAULT_PROMPTS.get(prompt_key, "No default available")
+    
+    prompt_log("\nWhat would you like to do?")
+    prompt_log("1. View default prompt")
+    prompt_log("2. Use default prompt (no changes)")
+    prompt_log("3. Enter custom prompt")
+    prompt_log("4. Skip this prompt")
+    
+    sub_choice = input("Enter your choice (1-4): ").strip()
+    
+    if sub_choice == "1":
+        _display_prompt_with_formatting(prompt_name, default_prompt)
+        
+        # After viewing, ask what to do next
+        prompt_log("\nAfter viewing the default, what would you like to do?")
+        prompt_log("1. Use this default prompt")
+        prompt_log("2. Enter a custom prompt")
+        prompt_log("3. Skip this prompt")
+        
+        follow_up = input("Enter your choice (1-3): ").strip()
+        
+        if follow_up == "2":
+            return _get_custom_prompt_input(prompt_key, prompt_name)
+        elif follow_up == "1":
+            prompt_log(f"✅ Using default prompt for {prompt_name}")
+            return {}
+        else:
+            prompt_log(f"⏭️ Skipping {prompt_name}")
+            return {}
+    
+    elif sub_choice == "2":
+        prompt_log(f"✅ Using default prompt for {prompt_name}")
+        return {}
+    
+    elif sub_choice == "3":
+        return _get_custom_prompt_input(prompt_key, prompt_name)
+    
+    else:
+        prompt_log(f"⏭️ Skipping {prompt_name}")
+        return {}
+
+
+def _get_custom_prompt_input(prompt_key: str, prompt_name: str) -> Dict[str, str]:
+    """
+    Get custom prompt input from user with multi-line support
+    
+    Args:
+        prompt_key: Key for the prompt
+        prompt_name: Human-readable name
+    
+    Returns:
+        Dictionary with custom prompt
+    """
+    prompt_log(f"\n✏️ Enter custom prompt for {prompt_name}")
+    prompt_log("💡 Tips:")
+    prompt_log("   • Press Enter twice to finish")
+    prompt_log("   • Use clear, specific instructions")
+    prompt_log("   • Include formatting requirements if needed")
+    prompt_log("   • Type 'DEFAULT' to use the default prompt")
+    prompt_log("\nEnter your custom prompt (press Enter twice when done):")
+    
+    lines = []
+    empty_line_count = 0
+    
+    while True:
+        try:
+            line = input()
+            if line.strip() == "":
+                empty_line_count += 1
+                if empty_line_count >= 2:
+                    break
+                lines.append(line)
+            else:
+                empty_line_count = 0
+                lines.append(line)
+        except (EOFError, KeyboardInterrupt):
+            break
+    
+    custom_prompt = "\n".join(lines).strip()
+    
+    if not custom_prompt or custom_prompt.upper() == "DEFAULT":
+        prompt_log(f"✅ Using default prompt for {prompt_name}")
+        return {}
+    
+    prompt_log(f"✅ Custom prompt set for {prompt_name} ({len(custom_prompt)} characters)")
+    return {prompt_key: custom_prompt}
+
+
+def _display_prompt_with_formatting(prompt_name: str, prompt_content: str):
+    """
+    Display a prompt with nice formatting
+    
+    Args:
+        prompt_name: Name of the prompt
+        prompt_content: Content to display
+    """
+    prompt_log(f"\n" + "═" * 80)
+    prompt_log(f"📋 DEFAULT PROMPT: {prompt_name}")
+    prompt_log("═" * 80)
+    
+    # Truncate very long prompts for readability
+    if len(prompt_content) > 2000:
+        truncated = prompt_content[:2000] + "\n\n[... content truncated for display ...]"
+        prompt_log(truncated)
+        prompt_log(f"\n📊 Full prompt length: {len(prompt_content)} characters")
+    else:
+        prompt_log(prompt_content)
+    
+    prompt_log("═" * 80)
+
+
+def _display_all_default_prompts():
+    """Display all default prompts for reference"""
+    prompt_log("\n" + "═" * 80)
+    prompt_log("📚 ALL DEFAULT PROMPTS REFERENCE")
+    prompt_log("═" * 80)
+    
+    prompt_categories = {
+        "LinkedIn Research Prompts": [
+            ("prospect_enricher_instructions", "LinkedIn Research Instructions"),
+            ("prospect_enricher_user_prompt", "LinkedIn User Prompt Template"),
+            ("prospect_enricher_retry_prompt", "LinkedIn Retry Prompt"),
+            ("prospect_enricher_target_executives", "Target Executives List")
+        ],
+        "Web Research Prompts": [
+            ("web_enricher_system_prompt", "Web Research System Prompt"),
+            ("web_enricher_user_prompt", "Web Research User Prompt"),
+            ("web_enricher_output_format", "Web Research Output Format")
+        ],
+        "HubSpot Integration Prompts": [
+            ("hubspot_creator_instructions", "HubSpot Contact Creation Instructions"),
+            ("hubspot_creator_user_prompt", "HubSpot User Prompt Template"),
+            ("hubspot_creator_retry_prompt", "HubSpot Retry Prompt")
+        ]
+    }
+    
+    for category, prompts in prompt_categories.items():
+        prompt_log(f"\n🏷️ {category}")
+        prompt_log("─" * 60)
+        
+        for key, name in prompts:
+            prompt_content = DEFAULT_PROMPTS.get(key, "No default available")
+            prompt_log(f"\n📝 {name} ({key}):")
+            
+            # Show first 200 characters of each prompt
+            if len(prompt_content) > 200:
+                preview = prompt_content[:200] + "..."
+            else:
+                preview = prompt_content
+            
+            prompt_log(f"   {preview}")
+            prompt_log(f"   📊 Length: {len(prompt_content)} characters")
+    
+    prompt_log("\n" + "═" * 80)
+    prompt_log("💡 Use option 6 to customize any of these prompts interactively")
+    prompt_log("═" * 80)
+
+
+def _show_customization_summary(custom_prompts: Dict[str, str]):
+    """
+    Show summary of customized prompts
+    
+    Args:
+        custom_prompts: Dictionary of custom prompts
+    """
+    prompt_log("\n" + "─" * 60)
+    prompt_log("📋 CUSTOMIZATION SUMMARY")
+    prompt_log("─" * 60)
+    
+    for key, value in custom_prompts.items():
+        # Convert key to readable name
+        readable_name = key.replace("_", " ").title()
+        prompt_log(f"✏️ {readable_name}: {len(value)} characters")
+    
+    prompt_log("─" * 60)
 
 
 def load_prompts_from_file(file_path: str) -> Dict[str, str]:

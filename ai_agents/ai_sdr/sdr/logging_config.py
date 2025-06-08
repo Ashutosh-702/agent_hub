@@ -63,9 +63,15 @@ class SDRLogger:
 
         # File logging with detailed format if run directories provided
         if run_directories:
-            log_filename = f"{run_directories['logs_dir']}/workflow.log"
+            # Store log file paths globally for easy access
+            global _LOG_FILE_PATHS
+            _LOG_FILE_PATHS["workflow"] = f"{run_directories['logs_dir']}/workflow.log"
+            _LOG_FILE_PATHS["errors"] = f"{run_directories['logs_dir']}/errors.log"
+            _LOG_FILE_PATHS["llm_requests"] = f"{run_directories['logs_dir']}/llm_requests.log"
+            _LOG_FILE_PATHS["company_progress"] = f"{run_directories['logs_dir']}/company_progress.log"
+            
             logger.add(
-                log_filename,
+                _LOG_FILE_PATHS["workflow"],
                 format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:>8} | {name:>30} | {function:>20} | {line:>4} | {"
                        "message}",
                 level="DEBUG",
@@ -79,9 +85,8 @@ class SDRLogger:
             )
 
             # Separate error log file
-            error_log = f"{run_directories['logs_dir']}/errors.log"
             logger.add(
-                error_log,
+                _LOG_FILE_PATHS["errors"],
                 format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:>8} | {name:>30} | {function:>20} | {line:>4} | {"
                        "message}",
                 level="ERROR",
@@ -94,9 +99,8 @@ class SDRLogger:
             )
 
             # Separate LLM response log file (no console output)
-            llm_log = f"{run_directories['logs_dir']}/llm_requests.log"
             logger.add(
-                llm_log,
+                _LOG_FILE_PATHS["llm_requests"],
                 format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:>8} | {name:>30} | {function:>20} | {line:>4} | {"
                        "message}",
                 level="DEBUG",
@@ -108,9 +112,8 @@ class SDRLogger:
             )
 
             # Company progress log file
-            company_progress_log = f"{run_directories['logs_dir']}/company_progress.log"
             logger.add(
-                company_progress_log,
+                _LOG_FILE_PATHS["company_progress"],
                 format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:>8} | {name:>30} | {message}",
                 level="INFO",
                 filter=lambda record: "company_progress" in record["extra"],
@@ -121,10 +124,10 @@ class SDRLogger:
             )
 
             logger.info(f"📊 Enhanced logging configured for run: {run_directories['run_id']}")
-            logger.info(f"📄 Main log: {log_filename} (unlimited size)")
-            logger.info(f"🚨 Error log: {error_log} (unlimited size)")
-            logger.info(f"🤖 LLM requests: {llm_log} (unlimited size, file only)")
-            logger.info(f"📈 Company progress: {company_progress_log} (unlimited size, file only)")
+            logger.info(f"📄 Main log: {_LOG_FILE_PATHS['workflow']} (unlimited size)")
+            logger.info(f"🚨 Error log: {_LOG_FILE_PATHS['errors']} (unlimited size)")
+            logger.info(f"🤖 LLM requests: {_LOG_FILE_PATHS['llm_requests']} (unlimited size, file only)")
+            logger.info(f"📈 Company progress: {_LOG_FILE_PATHS['company_progress']} (unlimited size, file only)")
             logger.info("")
 
         self.setup_done = True
@@ -284,6 +287,14 @@ sdr_logger = SDRLogger()
 # Global variable for clean logging mode
 _LOG_MODE = None
 
+# Global variable for current log file paths
+_LOG_FILE_PATHS = {
+    "workflow": None,
+    "errors": None,
+    "llm_requests": None,
+    "company_progress": None
+}
+
 
 def get_log_mode() -> str:
     """Get the current logging mode from environment"""
@@ -322,6 +333,16 @@ def register_gui_callback(callback):
 def unregister_gui_callback(callback):
     """Unregister a GUI callback"""
     sdr_logger.remove_gui_callback(callback)
+
+
+def clear_all_gui_callbacks():
+    """Clear all registered GUI callbacks"""
+    sdr_logger.gui_callbacks.clear()
+
+
+def get_gui_callback_count():
+    """Get the number of registered GUI callbacks"""
+    return len(sdr_logger.gui_callbacks)
 
 
 def log_workflow_start(workflow_name: str, config: Dict[str, Any]):
@@ -383,3 +404,36 @@ def log_llm_response(model: str, response: str, context: str = "", tokens: int =
 def log_llm_error(model: str, error: str, context: str = ""):
     """Log LLM error to file only"""
     SDRLogger.log_llm_error(model, error, context)
+
+
+# Log file path access functions
+def get_log_file_path(log_type: str = "workflow") -> str:
+    """Get the path to a specific log file type"""
+    return _LOG_FILE_PATHS.get(log_type)
+
+
+def get_all_log_file_paths() -> Dict[str, str]:
+    """Get all current log file paths"""
+    return _LOG_FILE_PATHS.copy()
+
+
+def set_log_file_path(log_type: str, path: str):
+    """Set a log file path (for testing or custom setups)"""
+    global _LOG_FILE_PATHS
+    if log_type in _LOG_FILE_PATHS:
+        _LOG_FILE_PATHS[log_type] = path
+
+
+def clear_log_file_paths():
+    """Clear all log file paths"""
+    global _LOG_FILE_PATHS
+    for key in _LOG_FILE_PATHS:
+        _LOG_FILE_PATHS[key] = None
+
+
+def prompt_log(message: str):
+    """
+    Custom logging function for prompt customization interface
+    Provides clean output without timestamps for better user experience
+    """
+    print(message)

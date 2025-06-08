@@ -16,10 +16,10 @@ from agents import set_default_openai_client
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-from ai_agents.ai_sdr.sdr.models import WorkflowState, ErrorSummary
+from ai_agents.ai_sdr.sdr.models import WorkflowState
 from ai_agents.ai_sdr.sdr.graph import compile_workflow
 from ai_agents.ai_sdr.sdr.prompts import get_user_prompts, load_prompts_from_file, save_prompts_to_file
-from ai_agents.ai_sdr.sdr.logging_config import setup_sdr_logging, log_workflow_start, log_workflow_completion, sdr_logger, clean_log, detailed_log, get_log_mode
+from ai_agents.ai_sdr.sdr.logging_config import setup_sdr_logging, log_workflow_start, clean_log, detailed_log, get_log_mode
 
 
 
@@ -79,9 +79,7 @@ def create_run_directories() -> Dict[str, str]:
     return directories
 
 
-def setup_logging(run_directories: Dict[str, str] = None):
-    """Configure enhanced logging using the new SDR logging system"""
-    setup_sdr_logging(run_directories)
+# Removed redundant setup_logging function - use setup_sdr_logging directly
 
 
 def get_prompts_configuration() -> Dict[str, str]:
@@ -481,7 +479,7 @@ async def main():
     run_directories = create_run_directories()
 
     # Set up logging
-    setup_logging(run_directories)
+    setup_sdr_logging(run_directories)
 
     try:
         # Load configuration

@@ -13,7 +13,7 @@ Agent Hub is a centralized repository for AI-powered business automation agents.
 **Interactive CLI Mode (Recommended for setup):**
 ```bash
 source venv/bin/activate
-python ai_agents/ai_sdr/run_cli.py
+python ai_agents/ai_sdr/cli_app.py
 ```
 
 **GUI Mode:**
