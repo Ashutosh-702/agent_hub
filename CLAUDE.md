@@ -16,16 +16,10 @@ source venv/bin/activate
 python ai_agents/ai_sdr/cli_app.py
 ```
 
-**GUI Mode:**
+**Responsive GUI Mode:**
 ```bash
 source venv/bin/activate
-python ai_agents/ai_sdr/run_gui.py
-```
-
-**Responsive GUI Mode (Better for small screens):**
-```bash
-source venv/bin/activate
-python ai_agents/ai_sdr/run_gui_responsive.py
+python ai_agents/ai_sdr/sdr_gui_responsive.py
 ```
 
 **Direct Command Line Mode:**
@@ -40,11 +34,6 @@ source venv/bin/activate
 python ai_agents/ai_sdr/sdr/validate_models.py
 ```
 
-**Create Desktop Shortcut (macOS):**
-```bash
-source venv/bin/activate
-python ai_agents/ai_sdr/create_desktop_shortcut.py
-```
 
 ### Environment Setup
 
@@ -112,7 +101,7 @@ CREATE_HUBSPOT_CONTACTS=true
 - Error categorization (skipped companies, LinkedIn failures, HubSpot failures, web failures)
 
 **GUI Interface:**
-- PyQt6-based desktop application (`sdr_gui.py`)
+- PyQt6-based responsive desktop application (`sdr_gui_responsive.py`)
 - Real-time progress tracking with log streaming
 - Custom prompt configuration and file input handling
 
@@ -140,6 +129,9 @@ CREATE_HUBSPOT_CONTACTS=true
 - GUI spawns subprocess for workflow execution to prevent UI freezing
 - Model validation available for debugging Pydantic issues
 - Output files are versioned with run numbers for traceability
+- **No formal build system**: Project uses direct Python execution without build tools
+- **No automated testing**: Uses manual testing with model validation and small CSV files
+- **No linting/formatting**: No automated code quality enforcement configured
 
 ## Recent Updates
 
@@ -216,6 +208,8 @@ ai_agents/
 3. Use loguru for consistent logging
 4. Create numbered output directories for runs
 5. Support both CLI and GUI interfaces
+6. Follow environment-based configuration with .env files
+7. Implement graceful error handling with categorized error tracking
 
 ## Performance Optimization
 

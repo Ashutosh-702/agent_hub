@@ -8,6 +8,11 @@ This is the main CLI entry point for the AI SDR agent.
 
 import os
 import sys
+
+# Add project root to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 import json
 import asyncio
 from typing import Dict, Any, Optional
@@ -60,9 +65,9 @@ class CLIApp:
 
     def __init__(self):
         self.config = {}
-        current_dir = Path(__file__).parent
-        self.env_file_path = current_dir / ".env"
-        self.custom_prompts_file = current_dir / "sdr" / "config" / "custom_prompts.json"
+        self.current_dir = Path(__file__).parent
+        self.env_file_path = self.current_dir / ".env"
+        self.custom_prompts_file = self.current_dir / "sdr" / "config" / "custom_prompts.json"
         
     def print_header(self):
         """Print application header"""
@@ -276,12 +281,9 @@ class CLIApp:
             [
                 "Use default prompts (recommended for first-time users)",
                 "Use existing custom prompts" + (f" ({len(existing_prompts)} found)" if existing_prompts else ""),
-                "Interactive prompt customization (view defaults first)",
-                "View all default prompts (read-only)",
-                "Quick customize LinkedIn research only",
-                "Quick customize web research only", 
-                "Quick customize HubSpot integration only",
-                "Advanced: Customize all prompts with preview"
+                "Customize target executives (job titles to search for)",
+                "Customize web search criteria (business relevance)",
+                "Customize email template (contact outreach)"
             ],
             1
         )
@@ -295,18 +297,11 @@ class CLIApp:
             self.print_success("Using existing custom prompts")
             custom_prompts = existing_prompts
         elif prompt_choice == 3:
-            custom_prompts = self._interactive_prompt_customization()
+            custom_prompts = self._customize_target_executives()
         elif prompt_choice == 4:
-            self._display_all_defaults()
-            return
+            custom_prompts = self._customize_web_search()
         elif prompt_choice == 5:
-            custom_prompts = self._customize_linkedin_prompts()
-        elif prompt_choice == 6:
-            custom_prompts = self._customize_web_prompts()
-        elif prompt_choice == 7:
-            custom_prompts = self._customize_hubspot_prompts()
-        elif prompt_choice == 8:
-            custom_prompts = self._customize_all_prompts_advanced()
+            custom_prompts = self._customize_email_template()
         
         if custom_prompts:
             # Save custom prompts
@@ -319,54 +314,70 @@ class CLIApp:
             except Exception as e:
                 self.print_error(f"Could not save custom prompts: {e}")
 
-    def _interactive_prompt_customization(self) -> Dict[str, str]:
-        """Interactive prompt customization with default viewing"""
-        prompt_log(f"\n{Colors.BLUE}🎯 Interactive Prompt Customization{Colors.END}")
-        prompt_log("You can view each default prompt before deciding to customize it.")
+    def _customize_target_executives(self) -> Dict[str, str]:
+        """Customize target executive roles for LinkedIn search"""
+        prompt_log(f"\n{Colors.BLUE}🎯 Target Executives Configuration{Colors.END}")
+        prompt_log("Configure which executive roles to search for on LinkedIn")
+        prompt_log("Current default: CEO, CTO, COO, Founder, VP Operations, Head of Supply Chain")
         
-        from sdr.prompts import get_user_prompts
-        return get_user_prompts()
+        custom_targets = self.get_input(
+            "Enter target executive roles (comma-separated, or press Enter for default)",
+            "CEO, CTO, COO, Founder, VP Operations, Head of Supply Chain"
+        )
+        
+        if custom_targets and custom_targets != "CEO, CTO, COO, Founder, VP Operations, Head of Supply Chain":
+            self.print_success(f"Target executives updated: {custom_targets}")
+            return {"prospect_enricher_target_executives": custom_targets}
+        else:
+            self.print_info("Using default target executives")
+            return {}
 
-    def _display_all_defaults(self):
-        """Display all default prompts for reference"""
-        prompt_log(f"\n{Colors.BLUE}📚 All Default Prompts Reference{Colors.END}")
-        prompt_log("─" * 60)
+    def _customize_web_search(self) -> Dict[str, str]:
+        """Customize web search criteria for business relevance"""
+        prompt_log(f"\n{Colors.BLUE}🔍 Web Search Criteria Configuration{Colors.END}")
+        prompt_log("Configure how the AI determines if a company is relevant for your business")
+        prompt_log("Current default focuses on grocery and e-commerce relevance")
         
-        from sdr.prompts import DEFAULT_PROMPTS
+        custom_criteria = self.get_input(
+            "Enter custom business relevance criteria (or press Enter for default)",
+            "Companies in grocery retail, e-commerce, supply chain, or logistics"
+        )
         
-        prompt_categories = {
-            "LinkedIn Research": [
-                ("prospect_enricher_instructions", "LinkedIn Research Instructions"),
-                ("prospect_enricher_user_prompt", "LinkedIn User Prompt Template"),
-            ],
-            "Web Research": [
-                ("web_enricher_system_prompt", "Web Research System Prompt"),
-                ("web_enricher_user_prompt", "Web Research User Prompt")
-            ],
-            "HubSpot Integration": [
-                ("hubspot_creator_instructions", "HubSpot Contact Creation Instructions"),
-                ("hubspot_creator_user_prompt", "HubSpot User Prompt Template")
-            ]
-        }
+        if custom_criteria and custom_criteria != "Companies in grocery retail, e-commerce, supply chain, or logistics":
+            self.print_success(f"Web search criteria updated")
+            return {"web_enricher_user_prompt": f"Relevance Criteria: {custom_criteria}\n\nBegin your research now using the web search tool"}
+        else:
+            self.print_info("Using default web search criteria")
+            return {}
+
+    def _customize_email_template(self) -> Dict[str, str]:
+        """Customize email template for contact outreach"""
+        prompt_log(f"\n{Colors.BLUE}📧 Email Template Configuration{Colors.END}")
+        prompt_log("Configure the email template used for outreach to prospects")
+        prompt_log("This template will be used when creating HubSpot contacts")
         
-        for category, prompts in prompt_categories.items():
-            prompt_log(f"\n{Colors.CYAN}🏷️ {category}{Colors.END}")
-            prompt_log("─" * 40)
+        self.print_info("Current default creates professional outreach emails with:")
+        self.print_info("- Personalized subject lines")
+        self.print_info("- Company-specific value propositions")
+        self.print_info("- Clear call-to-action")
+        
+        customize_choice = self.get_choice(
+            "Do you want to customize the email template?",
+            ["Keep default email template", "Enter custom email template"],
+            1
+        )
+        
+        if customize_choice == 2:
+            custom_template = self.get_input(
+                "Enter your custom email template (use {{company_name}}, {{contact_name}} for placeholders)"
+            )
             
-            for key, name in prompts:
-                prompt_content = DEFAULT_PROMPTS.get(key, "No default available")
-                prompt_log(f"\n{Colors.YELLOW}📝 {name}:{Colors.END}")
-                
-                # Show first 300 characters
-                if len(prompt_content) > 5000:
-                    preview = prompt_content[:5000] + "..."
-                else:
-                    preview = prompt_content
-                
-                prompt_log(f"   {preview}")
-                prompt_log(f"   {Colors.BLUE}📊 Length: {len(prompt_content)} characters{Colors.END}")
+            if custom_template:
+                self.print_success("Email template updated")
+                return {"email_template": custom_template}
         
-        prompt_log(f"\n{Colors.GREEN}💡 Use option 3 or 8 to customize any of these prompts{Colors.END}")
+        self.print_info("Using default email template")
+        return {}
 
     def _show_customization_summary(self, custom_prompts: Dict[str, str]):
         """Show summary of customized prompts"""
@@ -374,164 +385,18 @@ class CLIApp:
         prompt_log("─" * 40)
         
         for key, value in custom_prompts.items():
-            readable_name = key.replace("_", " ").title()
+            if key == "prospect_enricher_target_executives":
+                readable_name = "Target Executives"
+            elif key == "web_enricher_user_prompt":
+                readable_name = "Web Search Criteria"
+            elif key == "email_template":
+                readable_name = "Email Template"
+            else:
+                readable_name = key.replace("_", " ").title()
+            
             prompt_log(f"{Colors.GREEN}✏️ {readable_name}: {len(value)} characters{Colors.END}")
         
         prompt_log("─" * 40)
-
-    def _customize_all_prompts_advanced(self) -> Dict[str, str]:
-        """Advanced customization with preview for all prompts"""
-        prompt_log(f"\n{Colors.BLUE}🔧 Advanced Prompt Customization{Colors.END}")
-        prompt_log("You'll be able to view and customize each prompt individually.")
-
-        all_prompts = [
-            ("prospect_enricher_instructions", "LinkedIn Research Instructions"),
-            ("prospect_enricher_user_prompt", "LinkedIn User Prompt Template"),
-            ("web_enricher_system_prompt", "Web Research System Prompt"),
-            ("web_enricher_user_prompt", "Web Research User Prompt"),
-            ("hubspot_creator_instructions", "HubSpot Contact Creation Instructions"),
-            ("hubspot_creator_user_prompt", "HubSpot User Prompt Template"),
-            ("prospect_enricher_target_executives", "Target Executives List")
-        ]
-        
-        custom_prompts = {}
-        
-        for key, name in all_prompts:
-            if self._should_customize_prompt(key, name):
-                custom_prompt = self._get_custom_prompt_with_preview(key, name)
-                if custom_prompt:
-                    custom_prompts[key] = custom_prompt
-        
-        return custom_prompts
-
-    def _should_customize_prompt(self, key: str, name: str) -> bool:
-        """Ask if user wants to customize this specific prompt"""
-        choice = self.get_choice(
-            f"Do you want to customize: {name}?",
-            ["Yes, customize this prompt", "Skip this prompt"],
-            2
-        )
-        return choice == 1
-
-    def _get_custom_prompt_with_preview(self, key: str, name: str) -> str:
-        """Get custom prompt with option to view default first"""
-        from sdr.prompts import DEFAULT_PROMPTS
-        
-        prompt_log(f"\n{Colors.CYAN}📝 Customizing: {name}{Colors.END}")
-        
-        default_prompt = DEFAULT_PROMPTS.get(key, "No default available")
-        
-        view_choice = self.get_choice(
-            "What would you like to do?",
-            ["View default prompt first", "Enter custom prompt directly", "Skip this prompt"],
-            1
-        )
-        
-        if view_choice == 1:
-            # Show default prompt
-            prompt_log(f"\n{Colors.BLUE}📋 Default Prompt for {name}:{Colors.END}")
-            prompt_log("═" * 60)
-            
-            if len(default_prompt) > 1000:
-                prompt_log(default_prompt[:1000] + "\n\n[... truncated for display ...]")
-                prompt_log(f"\n{Colors.YELLOW}📊 Full length: {len(default_prompt)} characters{Colors.END}")
-            else:
-                prompt_log(default_prompt)
-            
-            prompt_log("═" * 60)
-            
-            # After viewing, ask what to do
-            follow_up = self.get_choice(
-                "After viewing the default, what would you like to do?",
-                ["Use this default (no changes)", "Enter a custom prompt", "Skip this prompt"],
-                1
-            )
-            
-            if follow_up == 1:
-                return ""  # Use default
-            elif follow_up == 3:
-                return ""  # Skip
-            # If 2, continue to custom input below
-        
-        elif view_choice == 3:
-            return ""  # Skip
-        
-        # Get custom prompt input
-        prompt_log(f"\n{Colors.YELLOW}✏️ Enter custom prompt for {name}:{Colors.END}")
-        prompt_log("💡 Tips:")
-        prompt_log("   • Be specific and clear in your instructions")
-        prompt_log("   • Include any special formatting requirements")
-        prompt_log("   • Press Enter on an empty line to finish")
-        prompt_log("   • Type 'DEFAULT' to use the default prompt")
-        
-        custom_prompt = input(f"\nCustom prompt for {name}: ").strip()
-        
-        if custom_prompt.upper() == "DEFAULT" or not custom_prompt:
-            return ""
-        
-        prompt_log(f"{Colors.GREEN}✅ Custom prompt set ({len(custom_prompt)} characters){Colors.END}")
-        return custom_prompt
-
-    def _customize_linkedin_prompts(self) -> Dict[str, str]:
-        """Customize LinkedIn research prompts"""
-        prompt_log(f"\n{Colors.BLUE}LinkedIn Research Configuration:{Colors.END}")
-        prompt_log("Current default searches for executives and collects LinkedIn profile URLs")
-        prompt_log("You can customize the target roles and search instructions")
-        
-        custom_targets = self.get_input(
-            "Enter target executive roles (comma-separated, or press Enter for default)",
-            "CEO, CTO, COO, Founder, VP Operations, Head of Supply Chain"
-        )
-        
-        if custom_targets:
-            return {"prospect_enricher_target_executives": custom_targets}
-        return {}
-
-    def _customize_web_prompts(self) -> Dict[str, str]:
-        """Customize web research prompts"""
-        prompt_log(f"\n{Colors.BLUE}Web Research Configuration:{Colors.END}")
-        prompt_log("Current default focuses on grocery and e-commerce relevance")
-        prompt_log("You can customize the business criteria and research focus")
-        
-        custom_criteria = self.get_input(
-            "Enter custom business relevance criteria (or press Enter for default)"
-        )
-        
-        if custom_criteria:
-            return {"web_enricher_user_prompt": f"Relevance Criteria: {custom_criteria}\n\nBegin your research now using the web search tool"}
-        return {}
-
-    def _customize_hubspot_prompts(self) -> Dict[str, str]:
-        """Customize HubSpot integration prompts"""
-        prompt_log(f"\n{Colors.BLUE}HubSpot Integration Configuration:{Colors.END}")
-        prompt_log("Current default creates contacts with standard field mapping")
-        prompt_log("You can customize the field mapping and creation logic")
-        
-        custom_mapping = self.get_input(
-            "Enter custom field mapping instructions (or press Enter for default)"
-        )
-        
-        if custom_mapping:
-            return {"hubspot_creator_instructions": custom_mapping}
-        return {}
-
-    def _customize_all_prompts(self) -> Dict[str, str]:
-        """Customize all prompts interactively"""
-        custom_prompts = {}
-        
-        # LinkedIn
-        linkedin_prompts = self._customize_linkedin_prompts()
-        custom_prompts.update(linkedin_prompts)
-        
-        # Web research
-        web_prompts = self._customize_web_prompts()
-        custom_prompts.update(web_prompts)
-        
-        # HubSpot
-        hubspot_prompts = self._customize_hubspot_prompts()
-        custom_prompts.update(hubspot_prompts)
-        
-        return custom_prompts
 
     def save_env_file(self):
         """Save configuration to .env file"""
@@ -602,12 +467,18 @@ class CLIApp:
         self.print_info("Starting the complete prospect research and enrichment workflow...")
         
         try:
-            # Set environment variables from config
-            for key, value in self.config.items():
-                os.environ[key] = str(value)
+            # Ensure custom prompts file exists to prevent duplicate prompts
+            if self.custom_prompts_file.exists():
+                self.print_info(f"Using custom prompts from {self.custom_prompts_file}")
+            else:
+                # Create empty custom prompts file to signal we've already configured prompts
+                self.custom_prompts_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(self.custom_prompts_file, 'w') as f:
+                    json.dump({}, f)  # Empty dict means use defaults
+                self.print_info("Using default prompts")
             
-            # Run the main workflow
-            await run_workflow()
+            # Run the main workflow with CLI configuration
+            await run_workflow(self.config)
             self.print_success("Workflow completed successfully!")
             
         except KeyboardInterrupt:
@@ -633,7 +504,7 @@ class CLIApp:
         
         try:
             import subprocess
-            subprocess.run([sys.executable, str(current_dir / "run_gui.py")])
+            subprocess.run([sys.executable, str(self.current_dir / "run_gui.py")])
         except Exception as e:
             self.print_error(f"Could not launch GUI: {e}")
 

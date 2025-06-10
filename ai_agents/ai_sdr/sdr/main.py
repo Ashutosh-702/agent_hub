@@ -12,6 +12,11 @@ import traceback
 from datetime import datetime
 from typing import Dict, Any
 
+# Add project root to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from agents import set_default_openai_client
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
@@ -105,6 +110,12 @@ def get_prompts_configuration() -> Dict[str, str]:
         clean_log("Using default prompts (non-interactive mode)")
         return {}
     
+    # Check if we're being called from CLI app (which already handled prompt config)
+    # CLI app creates this file even if empty to signal prompts were configured
+    if os.path.exists(custom_prompts_file):
+        clean_log("Using default prompts")
+        return {}
+    
     # Interactive prompt configuration - only show in detailed mode
     detailed_log("\n" + "=" * 60)
     detailed_log("🎯 PROMPT CONFIGURATION")
@@ -148,41 +159,59 @@ def get_prompts_configuration() -> Dict[str, str]:
     return custom_prompts
 
 
-def load_configuration(run_directories: Dict[str, str]) -> Dict[str, Any]:
-    """Load and validate configuration with run directories"""
+def load_configuration(run_directories: Dict[str, str], cli_config: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Load and validate configuration with run directories and optional CLI config"""
 
     # Load environment variables
     load_dotenv()
 
+    # Helper function to get value from CLI config, then env vars, then default
+    def get_config_value(cli_key: str, env_key: str, default: Any = None):
+        if cli_config and cli_key in cli_config:
+            return cli_config[cli_key]
+        return os.getenv(env_key, default)
+
     # Required configuration
-    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_api_key = get_config_value("OPENAI_API_KEY", "OPENAI_API_KEY")
     if not openai_api_key:
-        clean_log("❌ OPENAI_API_KEY not found in environment variables", level="error")
+        clean_log("❌ OPENAI_API_KEY not found in configuration or environment variables", level="error")
         clean_log("Please set your OpenAI API key:")
         clean_log("export OPENAI_API_KEY='your-api-key-here'")
         sys.exit(1)
 
     # Data source configuration
-    data_source_type = os.getenv("DATA_SOURCE_TYPE", "csv")
+    data_source_type = get_config_value("DATA_SOURCE_TYPE", "DATA_SOURCE_TYPE", "csv")
 
-    # Get prompts configuration
-    custom_prompts = get_prompts_configuration()
+    # Get prompts configuration - use empty dict as default since user removed prompt input
+    custom_prompts = {}
+    # Load custom prompts from file if CLI configured them
+    if cli_config:
+        custom_prompts_file = "sdr/config/custom_prompts.json"
+        if os.path.exists(custom_prompts_file):
+            try:
+                from sdr.prompts import load_prompts_from_file
+                loaded_prompts = load_prompts_from_file(custom_prompts_file)
+                if loaded_prompts:
+                    custom_prompts = loaded_prompts
+                    clean_log(f"Loaded {len(custom_prompts)} custom prompts from CLI configuration")
+            except Exception as e:
+                clean_log(f"Warning: Could not load custom prompts: {e}", "warning")
 
     config = {
         "openai_api_key": openai_api_key,
         "data_source": {
             "type": data_source_type,
-            "file_path": os.getenv("CSV_FILE_PATH", "companies.csv"),
-            "sheet_url": os.getenv("GOOGLE_SHEET_URL"),
-            "worksheet_name": os.getenv("GOOGLE_WORKSHEET_NAME")
+            "file_path": get_config_value("CSV_FILE_PATH", "CSV_FILE_PATH", "companies.csv"),
+            "sheet_url": get_config_value("GOOGLE_SHEET_URL", "GOOGLE_SHEET_URL"),
+            "worksheet_name": get_config_value("GOOGLE_WORKSHEET_NAME", "GOOGLE_WORKSHEET_NAME")
         },
-        "clearbit_api_key": os.getenv("CLEARBIT_API_KEY"),
-        "browser_timeout": int(os.getenv("BROWSER_TIMEOUT", "30")),
-        "max_companies": int(os.getenv("MAX_COMPANIES", "100")),
-        "output_directory": os.getenv("OUTPUT_DIRECTORY", get_output_root()),
-        "hubspot_api_key": os.getenv("HUBSPOT_API_KEY"),
-        "hubspot_owner_email": os.getenv("HUBSPOT_OWNER_EMAIL", "atharvashetye@gofynd.com"),
-        "create_hubspot_contacts": os.getenv("CREATE_HUBSPOT_CONTACTS", "true").lower() == "true",
+        "clearbit_api_key": get_config_value("CLEARBIT_API_KEY", "CLEARBIT_API_KEY"),
+        "browser_timeout": int(get_config_value("BROWSER_TIMEOUT", "BROWSER_TIMEOUT", "30")),
+        "max_companies": int(get_config_value("MAX_COMPANIES", "MAX_COMPANIES", "100")),
+        "output_directory": get_config_value("OUTPUT_DIRECTORY", "OUTPUT_DIRECTORY", get_output_root()),
+        "hubspot_api_key": get_config_value("HUBSPOT_API_KEY", "HUBSPOT_API_KEY"),
+        "hubspot_owner_email": get_config_value("HUBSPOT_OWNER_EMAIL", "HUBSPOT_OWNER_EMAIL", "atharvashetye@gofynd.com"),
+        "create_hubspot_contacts": str(get_config_value("CREATE_HUBSPOT_CONTACTS", "CREATE_HUBSPOT_CONTACTS", "true")).lower() == "true",
         "custom_prompts": custom_prompts,
         "run_directories": run_directories,
     }
@@ -190,10 +219,12 @@ def load_configuration(run_directories: Dict[str, str]) -> Dict[str, Any]:
     # Clean config summary
     api_status = "✓" if openai_api_key else "✗"
     hubspot_status = "✓" if config['hubspot_api_key'] else "✗"
-    clean_log(f"Config loaded (OpenAI: {api_status}, HubSpot: {hubspot_status})")
+    config_source = "CLI" if cli_config else "env"
+    clean_log(f"Config loaded from {config_source} (OpenAI: {api_status}, HubSpot: {hubspot_status})")
     
     # Detailed config info for detailed mode
     detailed_log(f"⚙️  Configuration loaded for run: {run_directories['run_id']}")
+    detailed_log(f"  - Config source: {'CLI application' if cli_config else 'Environment variables'}")
     detailed_log(f"  - Data source: {data_source_type}")
     detailed_log(f"  - OpenAI API: {'✅ Configured' if openai_api_key else '❌ Missing'}")
     detailed_log(f"  - HubSpot API: {'✅ Configured' if config['hubspot_api_key'] else '⚠️  Optional'}")
@@ -474,7 +505,7 @@ async def graceful_shutdown():
     detailed_log("✅ Graceful shutdown completed")
 
 
-async def main():
+async def main(cli_config=None):
     # Set up run directories
     run_directories = create_run_directories()
 
@@ -483,7 +514,7 @@ async def main():
 
     try:
         # Load configuration
-        config = load_configuration(run_directories)
+        config = load_configuration(run_directories, cli_config)
 
         # Initialize OpenAI client
         openai_client = AsyncOpenAI(api_key=config.get('openai_api_key'))
