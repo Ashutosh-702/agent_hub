@@ -209,7 +209,7 @@ class CLIApp:
         elif source_choice == 2:
             self.config["DATA_SOURCE_TYPE"] = "excel"
         else:
-            self.config["DATA_SOURCE_TYPE"] = "google_sheet"
+            self.config["DATA_SOURCE_TYPE"] = "google_sheets"
         
         # File path or Google Sheet URL
         if self.config["DATA_SOURCE_TYPE"] in ["csv", "excel"]:
