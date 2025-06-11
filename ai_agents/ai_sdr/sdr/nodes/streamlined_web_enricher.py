@@ -13,7 +13,7 @@ import orjson
 from openai import OpenAI
 
 from ai_agents.ai_sdr.sdr.logging_config import log_llm_response, log_llm_request, log_llm_error, clean_log, detailed_log, sdr_logger
-from ai_agents.ai_sdr.sdr.models import WorkflowState, Company
+from ai_agents.ai_sdr.sdr.models import WorkflowState, Company, CompanyRelevance
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
 
 
@@ -288,10 +288,32 @@ async def streamlined_web_enricher(state: WorkflowState, config: Dict[str, Any])
         }
         state.enriched_data[company.name] = comprehensive_data
 
-        # Log results
+        # Log results and create relevance assessment
         relevance = web_analysis.get('relevance_assessment', {})
         is_relevant = relevance.get('is_relevant', False)
         confidence = relevance.get('confidence_level', 'unknown')
+        reasoning = relevance.get('reasoning', 'No reasoning provided')
+        key_factors = relevance.get('key_factors', [])
+        
+        # Get additional data from research summary
+        research_summary = web_analysis.get('research_summary', {})
+        website_analyzed = research_summary.get('website_found', getattr(company, 'website', None))
+        industry_identified = research_summary.get('industry_identified', getattr(company, 'industry', None))
+        
+        # Create CompanyRelevance object and add to state
+        company_relevance = CompanyRelevance(
+            company_name=company.name,
+            is_relevant=is_relevant,
+            confidence_level=confidence,
+            reasoning=reasoning,
+            key_factors=key_factors,
+            assessment_timestamp=comprehensive_data["research_timestamp"],
+            website_analyzed=website_analyzed,
+            industry_identified=industry_identified
+        )
+        
+        # Add to state's relevance assessments list
+        state.company_relevance_assessments.append(company_relevance)
         
         # Clean summary
         relevance_status = "RELEVANT" if is_relevant else "NOT RELEVANT"
@@ -310,6 +332,21 @@ async def streamlined_web_enricher(state: WorkflowState, config: Dict[str, Any])
         error_msg = f"Streamlined web enrichment failed for {company.name}: {str(e)}"
         clean_log(f"Web enrichment failed: {company.name}", "error")
         detailed_log(f"Streamlined web enrichment failed for {company.name}: {str(e)}", "error")
+        
+        # Create fallback CompanyRelevance object for failed analysis
+        fallback_relevance = CompanyRelevance(
+            company_name=company.name,
+            is_relevant=False,
+            confidence_level="none",
+            reasoning=f"Web enrichment failed: {str(e)}",
+            key_factors=["enrichment_error"],
+            assessment_timestamp=datetime.now().isoformat(),
+            website_analyzed=getattr(company, 'website', None),
+            industry_identified=getattr(company, 'industry', None)
+        )
+        
+        # Add fallback relevance to state
+        state.company_relevance_assessments.append(fallback_relevance)
         
         # Track in categorized error summary
         state.error_summary.web_enrichment_failures.append({

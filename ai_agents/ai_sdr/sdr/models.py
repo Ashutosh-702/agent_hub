@@ -37,6 +37,18 @@ class NodeResult(BaseModel):
     retry_count: int = 0
 
 
+class CompanyRelevance(BaseModel):
+    """Company relevance assessment model"""
+    company_name: str
+    is_relevant: bool
+    confidence_level: str  # "high", "medium", "low"
+    reasoning: str
+    key_factors: List[str] = Field(default_factory=list)
+    assessment_timestamp: Optional[str] = None
+    website_analyzed: Optional[str] = None
+    industry_identified: Optional[str] = None
+
+
 class ErrorSummary(BaseModel):
     """Categorized error tracking for workflow"""
     skipped_companies: List[Dict[str, str]] = Field(default_factory=list)  # [{"company": "name", "reason": "not relevant"}]
@@ -60,6 +72,9 @@ class WorkflowState(BaseModel):
     # LinkedIn profiles data
     all_linkedin_profiles: List[Dict[str, Any]] = Field(default_factory=list)
     consolidated_prospects_file: Optional[str] = None
+    
+    # Company relevance tracking
+    company_relevance_assessments: List[CompanyRelevance] = Field(default_factory=list)
     
     # Errors and logging - Enhanced error categorization
     errors: List[str] = Field(default_factory=list)  # Keep for backward compatibility

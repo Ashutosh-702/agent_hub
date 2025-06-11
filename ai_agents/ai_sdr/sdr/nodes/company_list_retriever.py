@@ -284,6 +284,14 @@ async def company_list_retriever(state: WorkflowState, config: Dict[str, Any]) -
             
             return state
 
+        # Apply MAX_COMPANIES limit if configured
+        max_companies = config.get('max_companies', None)
+        if max_companies and max_companies > 0 and len(valid_companies) > max_companies:
+            original_count = len(valid_companies)
+            valid_companies = valid_companies[:max_companies]
+            clean_log(f"Limited to {max_companies} companies (MAX_COMPANIES setting)")
+            detailed_log(f"Applied MAX_COMPANIES limit: {original_count} -> {max_companies} companies")
+
         # Update state with validated companies
         state.companies = valid_companies
         state.current_company_index = 0

@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 from typing import Dict, Any
 
-from ai_agents.ai_sdr.sdr.models import WorkflowState, Company
+from ai_agents.ai_sdr.sdr.models import WorkflowState, Company, CompanyRelevance
 from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
 
 
@@ -158,6 +158,118 @@ def save_consolidated_final_file(run_directories: Dict[str, str], state: Workflo
     return csv_filepath
 
 
+def save_company_relevance_report(run_directories: Dict[str, str], state: WorkflowState) -> str:
+    """
+    Generate company relevance report with all companies and their relevance status
+    """
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    results_dir = run_directories.get("results_dir", "output/results")
+    os.makedirs(results_dir, exist_ok=True)
+    
+    # Create CSV file for company relevance report
+    csv_filename = f"company_relevance_report_{timestamp}.csv"
+    csv_filepath = os.path.join(results_dir, csv_filename)
+    
+    with open(csv_filepath, 'w', encoding='utf-8', newline='') as f:
+        fieldnames = ['Company Name', 'Website', 'Industry', 'Location', 'Is Relevant', 
+                     'Confidence Level', 'Reasoning', 'Key Factors', 'Assessment Timestamp']
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        
+        for company in state.companies:
+            # Get enriched data for this company
+            enriched_data = state.enriched_data.get(company.name, {})
+            web_analysis = enriched_data.get('web_search_analysis', {})
+            relevance_assessment = web_analysis.get('relevance_assessment', {})
+            
+            # Extract relevance information
+            is_relevant = relevance_assessment.get('is_relevant', False)
+            confidence_level = relevance_assessment.get('confidence_level', 'unknown')
+            reasoning = relevance_assessment.get('relevance_reason', relevance_assessment.get('reasoning', 'No analysis available'))
+            key_factors = relevance_assessment.get('key_factors', [])
+            
+            # Get website from analysis or company data
+            research_summary = web_analysis.get('research_summary', {})
+            website_analyzed = research_summary.get('website_found', getattr(company, 'website', 'N/A'))
+            industry_identified = research_summary.get('industry_identified', getattr(company, 'industry', 'N/A'))
+            location_identified = research_summary.get('location_found', getattr(company, 'location', 'N/A'))
+            
+            # Get assessment timestamp from enriched data
+            assessment_timestamp = enriched_data.get('research_timestamp', 'N/A')
+            
+            writer.writerow({
+                'Company Name': company.name,
+                'Website': website_analyzed,
+                'Industry': industry_identified,
+                'Location': location_identified,
+                'Is Relevant': 'Yes' if is_relevant else 'No',
+                'Confidence Level': confidence_level.title(),
+                'Reasoning': reasoning,
+                'Key Factors': ', '.join(key_factors) if key_factors else 'N/A',
+                'Assessment Timestamp': assessment_timestamp
+            })
+    
+    # Create JSON file with detailed data
+    json_filename = f"company_relevance_report_{timestamp}.json"
+    json_filepath = os.path.join(results_dir, json_filename)
+    
+    relevance_data = {
+        "report_metadata": {
+            "generation_timestamp": timestamp,
+            "total_companies_analyzed": len(state.companies),
+            "relevant_companies": len([c for c in state.companies if state.enriched_data.get(c.name, {}).get('web_search_analysis', {}).get('relevance_assessment', {}).get('is_relevant', False)]),
+            "not_relevant_companies": len([c for c in state.companies if not state.enriched_data.get(c.name, {}).get('web_search_analysis', {}).get('relevance_assessment', {}).get('is_relevant', False)]),
+        },
+        "companies": []
+    }
+    
+    for company in state.companies:
+        enriched_data = state.enriched_data.get(company.name, {})
+        web_analysis = enriched_data.get('web_search_analysis', {})
+        relevance_assessment = web_analysis.get('relevance_assessment', {})
+        research_summary = web_analysis.get('research_summary', {})
+        
+        company_relevance_data = {
+            "company_info": {
+                "name": company.name,
+                "website": getattr(company, 'website', None),
+                "industry": getattr(company, 'industry', None),
+                "location": getattr(company, 'location', None)
+            },
+            "relevance_assessment": {
+                "is_relevant": relevance_assessment.get('is_relevant', False),
+                "confidence_level": relevance_assessment.get('confidence_level', 'unknown'),
+                "reasoning": relevance_assessment.get('relevance_reason', relevance_assessment.get('reasoning', 'No analysis available')),
+                "key_factors": relevance_assessment.get('key_factors', [])
+            },
+            "research_findings": {
+                "website_analyzed": research_summary.get('website_found', 'N/A'),
+                "industry_identified": research_summary.get('industry_identified', 'N/A'),
+                "company_size": research_summary.get('company_size', 'N/A'),
+                "business_model": research_summary.get('business_model', 'N/A')
+            },
+            "assessment_timestamp": enriched_data.get('research_timestamp', 'N/A')
+        }
+        
+        relevance_data["companies"].append(company_relevance_data)
+    
+    with open(json_filepath, 'w', encoding='utf-8') as f:
+        json.dump(relevance_data, f, indent=2, ensure_ascii=False)
+    
+    # Log results
+    relevant_count = relevance_data["report_metadata"]["relevant_companies"]
+    not_relevant_count = relevance_data["report_metadata"]["not_relevant_companies"]
+    
+    detailed_log(f"📊 Company Relevance Report generated:")
+    detailed_log(f"   📄 CSV Report: {csv_filename}")
+    detailed_log(f"   📋 JSON Report: {json_filename}")
+    detailed_log(f"   ✅ Relevant: {relevant_count} companies")
+    detailed_log(f"   ❌ Not Relevant: {not_relevant_count} companies")
+    detailed_log(f"   📊 Total Analyzed: {len(state.companies)} companies")
+    
+    return csv_filepath
+
+
 async def save_final_results(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:
     """
     LangGraph node to save final workflow results
@@ -220,6 +332,9 @@ async def save_final_results(state: WorkflowState, config: Dict[str, Any]) -> Wo
         with open(complete_filename, 'w', encoding='utf-8') as f:
             json.dump(complete_data, f, indent=2, ensure_ascii=False)
 
+        # Generate and save company relevance report
+        relevance_report_path = save_company_relevance_report(run_directories, state)
+        
         # Generate and save summary report
         summary_report = generate_summary_report(state)
         summary_filename = f"{results_dir}/summary_report_{timestamp}.json"

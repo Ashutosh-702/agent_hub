@@ -248,7 +248,8 @@ Return ONLY the JSON object—do NOT include any markdown or ``` before/after.:
         "is_relevant": true/false,
         "relevance_reason": "Explanation of why company is or isn't relevant based on criteria",
         "confidence_level": "high/medium/low",
-        "business_type": "online_grocer/offline_grocer/not_grocery/unclear"
+        "business_type": "online_grocer/offline_grocer/not_grocery/unclear",
+        "key_factors": ["List of 2-3 key factors that influenced the relevance decision"]
     }}
 }}""",
 
