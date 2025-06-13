@@ -453,7 +453,7 @@ async def hubspot_contact_creator(state: WorkflowState, config: Dict[str, Any] =
         detailed_log(f"📋 LinkedIn executives to process: {len(prospects_data)} for {company.name}")
 
         # Filter for key decision makers only
-        filtered_prospects = filter_key_prospects(prospects_data)
+        filtered_prospects = prospects_data
         clean_log(f"Key prospects identified: {len(filtered_prospects)} executives/managers for {company.name}")
         detailed_log(f"🎯 Key prospects after filtering: {len(filtered_prospects)}")
         detailed_log("")
