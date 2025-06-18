@@ -189,7 +189,6 @@ def load_configuration(run_directories: Dict[str, str], cli_config: Dict[str, An
         custom_prompts_file = "sdr/config/custom_prompts.json"
         if os.path.exists(custom_prompts_file):
             try:
-                from sdr.prompts import load_prompts_from_file
                 loaded_prompts = load_prompts_from_file(custom_prompts_file)
                 if loaded_prompts:
                     custom_prompts = loaded_prompts

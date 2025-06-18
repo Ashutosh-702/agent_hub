@@ -178,17 +178,9 @@ def create_workflow_graph() -> StateGraph:
             "linkedin_progress_backup": "linkedin_progress_backup"
         }
     )
-
-    # After LinkedIn backup, proceed to final progress save
-    sdr_workflow.add_conditional_edges(
-        "linkedin_progress_backup",
-        proceed_after_backup,
-        {
-            "final_progress_save": "final_progress_save",
-            "error_summary_export": "error_summary_export"
-        }
-    )
-
+    
+    sdr_workflow.add_edge("linkedin_progress_backup", "final_progress_save")
+    
     # After final progress save, export error summary
     sdr_workflow.add_edge("final_progress_save", "error_summary_export")
 

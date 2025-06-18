@@ -64,7 +64,7 @@ class WorkflowState(BaseModel):
     companies: List[Company] = Field(default_factory=list)
     current_company_index: int = 0
     current_company: Optional[Company] = None
-    
+
     # Enrichment data
     enriched_data: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     contacts: Dict[str, List[Contact]] = Field(default_factory=dict)
@@ -102,6 +102,12 @@ class WorkflowState(BaseModel):
     total_hubspot_created: int = 0                                  # Total HubSpot contacts created
     total_hubspot_duplicates: int = 0                               # Total HubSpot duplicates found
     total_hubspot_failed: int = 0                                   # Total HubSpot creation failures
+    
+    # Missing fields used in workflows
+    companies_to_process_count: int = 0                             # Total companies to process
+    processed_companies_count: int = 0                              # Companies actually processed
+    final_results: List[Dict[str, Any]] = Field(default_factory=list)  # Final workflow results
+    hubspot_results: List[Dict[str, Any]] = Field(default_factory=list)  # HubSpot operation results
     
     @model_validator(mode='before')
     @classmethod
