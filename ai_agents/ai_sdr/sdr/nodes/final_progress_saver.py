@@ -60,30 +60,30 @@ def save_final_workflow_results(state: WorkflowState, config: Dict[str, Any]) ->
         # 2. Save successful LinkedIn profiles as CSV
         successful_linkedin, failed_linkedin = _separate_linkedin_results(state)
         
+        success_csv_filename = f"linkedin_prospects_success_final_{run_id}_{timestamp}.csv"
+        success_csv_filepath = os.path.join(final_dir, success_csv_filename)
         if successful_linkedin:
-            success_csv_filename = f"linkedin_prospects_success_final_{run_id}_{timestamp}.csv"
-            success_csv_filepath = os.path.join(final_dir, success_csv_filename)
             _save_linkedin_profiles_csv(successful_linkedin, success_csv_filepath)
             sdr_logger.log_file_saved(success_csv_filepath, f"Successful LinkedIn prospects CSV ({len(successful_linkedin)} profiles)")
         
+        failure_csv_filename = f"linkedin_prospects_failures_final_{run_id}_{timestamp}.csv"
+        failure_csv_filepath = os.path.join(final_dir, failure_csv_filename)
         if failed_linkedin:
-            failure_csv_filename = f"linkedin_prospects_failures_final_{run_id}_{timestamp}.csv"
-            failure_csv_filepath = os.path.join(final_dir, failure_csv_filename)
             _save_linkedin_failures_csv(failed_linkedin, failure_csv_filepath)
             sdr_logger.log_file_saved(failure_csv_filepath, f"Failed LinkedIn searches CSV ({len(failed_linkedin)} companies)")
         
         # 3. Save HubSpot contacts separated by success/failure
         successful_hubspot, failed_hubspot = _separate_hubspot_results(state)
         
+        hubspot_success_filename = f"hubspot_contacts_success_final_{run_id}_{timestamp}.csv"
+        hubspot_success_filepath = os.path.join(final_dir, hubspot_success_filename)
         if successful_hubspot:
-            hubspot_success_filename = f"hubspot_contacts_success_final_{run_id}_{timestamp}.csv"
-            hubspot_success_filepath = os.path.join(final_dir, hubspot_success_filename)
             _save_hubspot_contacts_csv(successful_hubspot, hubspot_success_filepath)
             sdr_logger.log_file_saved(hubspot_success_filepath, f"Successful HubSpot contacts CSV ({len(successful_hubspot)} contacts)")
         
+        hubspot_failure_filename = f"hubspot_contacts_failures_final_{run_id}_{timestamp}.csv"
+        hubspot_failure_filepath = os.path.join(final_dir, hubspot_failure_filename)
         if failed_hubspot:
-            hubspot_failure_filename = f"hubspot_contacts_failures_final_{run_id}_{timestamp}.csv"
-            hubspot_failure_filepath = os.path.join(final_dir, hubspot_failure_filename)
             _save_hubspot_failures_csv(failed_hubspot, hubspot_failure_filepath)
             sdr_logger.log_file_saved(hubspot_failure_filepath, f"Failed HubSpot contacts CSV ({len(failed_hubspot)} failures)")
         

@@ -31,15 +31,21 @@ def _convert_google_sheet_url_to_csv(sheet_url: str, worksheet_name: str = None)
 
         sheet_id = match.group(1)
 
-        # Get worksheet GID if specified
+        # Extract GID from URL if present (e.g., #gid=123456 or &gid=123456)
         gid = "0"  # Default to first sheet
-        if worksheet_name:
-            # For named worksheets, we'll use GID 0 and let the user specify the correct URL
-            # In a more advanced implementation, we could parse the sheet to find the correct GID
-            detailed_log(f"Worksheet name '{worksheet_name}' specified, but using default sheet (GID=0)", "warning")
+        gid_pattern = r'[#&]gid=([0-9]+)'
+        gid_match = re.search(gid_pattern, sheet_url)
+        
+        if gid_match:
+            gid = gid_match.group(1)
+            detailed_log(f"Found GID in URL: {gid}")
+        elif worksheet_name:
+            detailed_log(f"Worksheet name '{worksheet_name}' specified, but no GID found in URL. Using default GID=0", "warning")
+            detailed_log("To use a specific worksheet, include #gid=WORKSHEET_ID in your Google Sheets URL", "info")
 
         # Construct CSV export URL
         csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+        detailed_log(f"Generated CSV URL: {csv_url}")
         return csv_url
 
     except Exception as e:

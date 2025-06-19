@@ -1,4 +1,4 @@
-Standard Workflow
+## Standard Workflow
 
 1. First think through the problem, read the codebase for relevant files, and write a plan to projectplan.md.
 2. The plan should have a list of todo items that you can check off as you complete them
@@ -9,12 +9,11 @@ Standard Workflow
    Every change should impact as little code as possible. Everything is about simplicity.
 7. Finally, add a review section to the projectplan.md file with a summary of the changes you made and any other
    relevant information.
-
-- "Verify all function signatures and dependencies before using them"
-- "Test your code mentally - trace through the execution"
-- "Don't rush - think about architectural implications"
-- "If extracting components from a framework, ensure they can work standalone"
-- "Create new components rather than misusing existing ones outside their context"
+8. "Verify all function signatures and dependencies before using them"
+9. "Test your code mentally - trace through the execution"
+10. "Don't rush - think about architectural implications"
+11. "If extracting components from a framework, ensure they can work standalone"
+12. "Create new components rather than misusing existing ones outside their context"
 
 # SDR Workflow Execution Flow
 

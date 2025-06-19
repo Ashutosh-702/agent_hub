@@ -10,7 +10,7 @@ from agents import Agent, Runner, ModelSettings
 from agents.mcp.server import MCPServerStdio
 from openai.types import Reasoning
 
-from ai_agents.ai_sdr.sdr.models import WorkflowState, Company
+from ai_agents.ai_sdr.sdr.models import WorkflowState, Company, LinkedInProspectResponse
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
 from ai_agents.ai_sdr.sdr.logging_config import log_llm_request, log_llm_response, log_llm_error, sdr_logger, clean_log, detailed_log
 
@@ -29,50 +29,28 @@ class ProspectEnricher:
         # Store all LinkedIn profiles collected across companies
         self.all_linkedin_profiles = []
 
-    async def linkedin_prospect_search(self, company: Company, web_analysis: Dict[str, Any], retry_count: int = 0,
-                                       previous_context: str = "") -> Dict[str, Any]:
+    async def linkedin_prospect_search(self, company: Company, web_analysis: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Use browserMCP to search LinkedIn for company executives
+        Use browserMCP to search LinkedIn for company executives with simple retry logic
         """
-
         company_name = company.name
         company_website = web_analysis.get('research_summary', {}).get('website_found', 'Not found')
         industry = web_analysis.get('research_summary', {}).get('industry_identified', 'Unknown')
 
         # Clean log for main status
         clean_log(f"LinkedIn Research: {company_name}")
-        
-        # Detailed logs for extra info
         detailed_log("")
         detailed_log("─" * 50)
         detailed_log(f"🔍 LinkedIn Research: {company_name}")
         detailed_log("─" * 50)
         detailed_log(f"🌐 Website: {company_website}")
         detailed_log(f"🏢 Industry: {industry}")
-        if retry_count > 0:
-            detailed_log(f"🔄 Retry attempt: {retry_count + 1}/3")
-
-        # Build prompt with retry context using centralized prompts
-        base_prompt = self.prompts.get_prompt(
-            "prospect_enricher_user_prompt",
-            company_name=company_name,
-            company_website=company_website,
-            industry=industry
-        )
-
-        if retry_count > 0 and previous_context:
-            prompt = self.prompts.get_prompt(
-                "prospect_enricher_retry_prompt",
-                retry_count=retry_count,
-                previous_context=previous_context,
-                user_prompt=base_prompt
-            )
-        else:
-            prompt = base_prompt
 
         browser_mcp = None
+        last_error = "Unknown error"
+        
         try:
-            # Initialize MCP browser connection
+            # Create MCP connection once for all attempts
             browser_mcp = MCPServerStdio(
                 name="browsermcp",
                 params={
@@ -84,146 +62,143 @@ class ProspectEnricher:
                     },
                 },
                 cache_tools_list=True,
-                client_session_timeout_seconds=1800  # Reduced timeout for better cleanup
+                client_session_timeout_seconds=1800
             )
-
-            # Connect to MCP browser
+            
             await browser_mcp.connect()
             detailed_log(f"MCP browser connected for {company_name}", "debug")
-
-            # Set up agent
-            instructions = self.prompts.get_prompt("prospect_enricher_instructions")
-            model = "o3"
-            agent = Agent(
-                name="LinkedInProspectAgent",
-                model=model,
-                model_settings=ModelSettings(reasoning=Reasoning(effort="high"),
-                                             extra_body={"service_tier": "flex"}),
-                mcp_servers=[browser_mcp],
-                instructions=instructions
-            )
-
-            # Log the LLM request (file only)
-            log_llm_request(model, prompt, f"LinkedIn prospect search for {company_name}")
-
-            # Run the agent
-            result = await Runner.run(
-                starting_agent=agent,
-                input=prompt,
-                max_turns=100
-            )
-
-            # Log token usage if available
-            total_tokens = 0
-            if hasattr(result, 'usage_summary') and result.usage_summary:
-                input_tokens = getattr(result.usage_summary, 'input_tokens', 0)
-                output_tokens = getattr(result.usage_summary, 'output_tokens', 0)
-                total_tokens = input_tokens + output_tokens
-                detailed_log(f"💰 API Usage: {total_tokens:,} tokens")
             
-            # Log the LLM response (file only)
-            log_llm_response(model, result.final_output, f"LinkedIn prospect search for {company_name}", total_tokens)
+            # Simple retry loop - 3 attempts max
+            for attempt in range(3):
+                try:
+                    detailed_log(f"🔄 Attempt {attempt + 1}/3 for {company_name}")
+                    
+                    result = await self._single_search_attempt(browser_mcp, company, web_analysis, attempt)
+                    
+                    # Check if search was successful
+                    if result.get('linkedin_research', {}).get('search_successful', False):
+                        detailed_log(f"✅ LinkedIn search successful for {company_name}")
+                        return result
+                    
+                    # Search unsuccessful but no error - try again
+                    last_error = "LinkedIn search was not successful"
+                    detailed_log(f"⚠️ LinkedIn search unsuccessful for {company_name}, attempt {attempt + 1}")
+                    
+                except Exception as e:
+                    last_error = str(e)
+                    detailed_log(f"❌ LinkedIn search error for {company_name}, attempt {attempt + 1}: {e}", "error")
+                    
+                    # Don't log retry message on last attempt
+                    if attempt < 2:
+                        detailed_log(f"🔄 Retrying LinkedIn search for {company_name}...", "warning")
 
-            # Process the response
-            return await self._process_linkedin_response(result.final_output, company, web_analysis, retry_count)
-
-        except Exception as e:
-            detailed_log(f"LinkedIn prospect search failed for {company.name} (attempt {retry_count + 1}): {e}", "error")
-
-            # Retry on general error
-            if retry_count < 3:
-                detailed_log(f"Retrying LinkedIn search for {company.name} due to error...", "warning")
-                context = f"Previous attempt failed with error: {str(e)}"
-                return await self.linkedin_prospect_search(company, web_analysis, retry_count + 1, context)
-
-            # Log final failure - this will be handled by the calling function
-            clean_log(f"LinkedIn search failed for {company.name}", "error")
-            detailed_log(f"❌ Final LinkedIn search failure for {company.name}: {str(e)}", "error")
-            # Return error fallback structure
-            return self._create_error_fallback(company.name, str(e), retry_count + 1)
+            # All attempts failed
+            clean_log(f"LinkedIn search failed for {company_name}", "error")
+            detailed_log(f"❌ Final LinkedIn search failure for {company_name}: {last_error}", "error")
+            return self._create_error_fallback(company_name, last_error, 3)
 
         finally:
-            # Always ensure MCP cleanup happens
+            # Single cleanup after all attempts
             if browser_mcp:
                 try:
                     detailed_log(f"Cleaning up MCP browser for {company_name}", "debug")
                     await browser_mcp.cleanup()
                     detailed_log(f"MCP browser cleanup completed for {company_name}", "debug")
                 except Exception as cleanup_error:
-                    detailed_log(f"MCP cleanup error for {company.name}: {cleanup_error}", "warning")
+                    detailed_log(f"MCP cleanup error for {company_name}: {cleanup_error}", "warning")
 
-    async def _process_linkedin_response(self, response_text: str, company: Company, web_analysis: Dict[str, Any], retry_count: int) -> Dict[str, Any]:
-        """Process the LinkedIn search response with proper error handling"""
+    async def _single_search_attempt(self, browser_mcp, company: Company, web_analysis: Dict[str, Any], attempt: int) -> Dict[str, Any]:
+        """Single LinkedIn search attempt without retry logic"""
         company_name = company.name
+        company_website = web_analysis.get('research_summary', {}).get('website_found', 'Not found')
+        industry = web_analysis.get('research_summary', {}).get('industry_identified', 'Unknown')
+
+        # Build prompt
+        prompt = self.prompts.get_prompt(
+            "prospect_enricher_user_prompt",
+            company_name=company_name,
+            company_website=company_website,
+            industry=industry
+        )
+
+        # Set up agent with structured output
+        instructions = self.prompts.get_prompt("prospect_enricher_instructions")
+        model = "o3"
+        agent = Agent(
+            name="LinkedInProspectAgent",
+            model=model,
+            model_settings=ModelSettings(reasoning=Reasoning(effort="high"),
+                                       extra_body={"service_tier": "flex"}),
+            mcp_servers=[browser_mcp],
+            instructions=instructions,
+            output_type=LinkedInProspectResponse
+        )
+
+        # Log the LLM request
+        log_llm_request(model, prompt, f"LinkedIn prospect search for {company_name} (attempt {attempt + 1})")
+
+        # Run the agent
+        result = await Runner.run(
+            starting_agent=agent,
+            input=prompt,
+            max_turns=100
+        )
+
+        # Log token usage if available
+        total_tokens = 0
+        if hasattr(result, 'usage_summary') and result.usage_summary:
+            input_tokens = getattr(result.usage_summary, 'input_tokens', 0)
+            output_tokens = getattr(result.usage_summary, 'output_tokens', 0)
+            total_tokens = input_tokens + output_tokens
+            detailed_log(f"💰 API Usage: {total_tokens:,} tokens")
         
-        # Clean and parse the response
-        response_text = response_text.strip()
+        # Log the LLM response
+        log_llm_response(model, str(result.final_output), f"LinkedIn prospect search for {company_name} (attempt {attempt + 1})", total_tokens)
 
-        # Remove any markdown formatting if present
-        if response_text.startswith('```json'):
-            response_text = response_text[7:]
-        if response_text.startswith('```'):
-            response_text = response_text[3:]
-        if response_text.endswith('```'):
-            response_text = response_text[:-3]
+        # Process the structured response (no retry logic here)
+        return self._process_single_response(result.final_output, company_name)
 
-        response_text = response_text.strip()
-
-        # Try to parse as JSON
+    def _process_single_response(self, response_obj, company_name: str) -> Dict[str, Any]:
+        """Process structured response without retry logic"""
         try:
-            prospect_data = orjson.loads(response_text)
+            # Convert Pydantic model to dictionary
+            if isinstance(response_obj, LinkedInProspectResponse):
+                prospect_data = response_obj.model_dump()
+            elif hasattr(response_obj, 'model_dump'):
+                prospect_data = response_obj.model_dump()
+            elif isinstance(response_obj, dict):
+                prospect_data = response_obj
+            else:
+                # Fallback - try to parse as JSON
+                prospect_data = orjson.loads(str(response_obj))
 
-            # Check if search was successful
-            search_successful = prospect_data.get('linkedin_research', {}).get('search_successful', False)
-            total_profiles = prospect_data.get('linkedin_research', {}).get('total_profiles_collected', 0)
-
-            # Retry logic: if search failed
-            if not search_successful:
-                if retry_count < 3:
-                    detailed_log(
-                        f"LinkedIn search for {company.name} was not successful (attempt {retry_count + 1}). "
-                        f"Retrying...", "warning")
-
-                    # Extract context for next attempt
-                    context = f"Previous attempt found {total_profiles} profiles."
-
-                    # Recursive retry with context
-                    return await self.linkedin_prospect_search(company, web_analysis, retry_count + 1, context)
-                else:
-                    clean_log(f"LinkedIn search failed for {company.name}", "error")
-                    detailed_log(f"❌ LinkedIn search failed for {company.name} after 3 attempts", "error")
-
-            # Clean summary
+            # Log results and store profiles
             executives_count = len(prospect_data.get('executives_found', []))
-            clean_log(f"LinkedIn completed for {company.name}: {executives_count} executives found")
+            total_profiles = prospect_data.get('linkedin_research', {}).get('total_profiles_collected', 0)
             
-            # Detailed info
             detailed_log("")
-            detailed_log(f"✅ LinkedIn research completed for {company.name}")
+            detailed_log(f"✅ LinkedIn research completed for {company_name}")
             detailed_log(f"📊 Results: {total_profiles} profiles found, {executives_count} executives")
 
-            # Log detailed results
             self._log_prospect_results(prospect_data, company_name)
-            
-            # Process and store profiles
             self._store_profiles(prospect_data, company_name)
 
             return prospect_data
 
-        except Exception as json_error:
-            detailed_log(
-                f"LinkedIn prospect search JSON parse error for {company.name} (attempt {retry_count + 1}): "
-                f"{json_error}", "warning")
+        except Exception as e:
+            detailed_log(f"Response processing error for {company_name}: {e}", "error")
+            # Return basic error structure
+            return {
+                "linkedin_research": {
+                    "search_successful": False,
+                    "total_executives_found": 0,
+                    "total_profiles_collected": 0,
+                    "csv_enrichment_note": f"Processing error: {str(e)}"
+                },
+                "executives_found": [],
+                "all_profiles_found": []
+            }
 
-            # Retry on JSON parse error
-            if retry_count < 3:
-                detailed_log(f"Retrying LinkedIn search for {company.name} due to JSON parse error...", "warning")
-                context = (f"Previous attempt failed with JSON parse error. Raw response was: "
-                           f"{response_text[:200]}...")
-                return await self.linkedin_prospect_search(company, web_analysis, retry_count + 1, context)
-
-            # Fallback: Create structured data from raw response
-            return self._create_json_parse_fallback(company_name, response_text, json_error, retry_count + 1)
 
     def _log_prospect_results(self, prospect_data: Dict[str, Any], company_name: str):
         """Log the detailed results of LinkedIn prospect search"""
@@ -300,33 +275,6 @@ class ProspectEnricher:
                         'profile_type': 'General'
                     })
 
-    def _create_json_parse_fallback(self, company_name: str, response_text: str, json_error: Exception, retry_count: int) -> Dict[str, Any]:
-        """Create fallback data for JSON parse errors"""
-        return {
-            "linkedin_research": {
-                "company_linkedin_url": "Parse error",
-                "search_successful": False,
-                "total_executives_found": 0,
-                "total_profiles_collected": 0,
-                "pages_scrolled": 0,
-                "search_method": "failed",
-                "debug_info": f"JSON parse failed after {retry_count} attempts"
-            },
-            "executives_found": [],
-            "all_profiles_found": [],
-            "research_notes": {
-                "company_size_on_linkedin": "Unknown",
-                "linkedin_presence": "unknown",
-                "profile_accessibility": "unknown",
-                "scrolling_completed": False,
-                "pagination_used": False,
-                "additional_contacts": []
-            },
-            "linkedin_search_raw": response_text,
-            "json_parse_error": str(json_error),
-            "retry_count": retry_count
-        }
-
     def _create_error_fallback(self, company_name: str, error_message: str, retry_count: int) -> Dict[str, Any]:
         """Create fallback data for general errors"""
         return {
@@ -352,6 +300,7 @@ class ProspectEnricher:
             "error": error_message,
             "retry_count": retry_count
         }
+
 
 async def prospect_enricher(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:
     """

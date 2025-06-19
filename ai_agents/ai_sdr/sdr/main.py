@@ -512,8 +512,18 @@ async def main(cli_config=None):
     setup_sdr_logging(run_directories)
 
     try:
+        # Get prompts configuration first (if not from CLI)
+        if not cli_config:
+            custom_prompts = get_prompts_configuration()
+        else:
+            custom_prompts = {}
+            
         # Load configuration
         config = load_configuration(run_directories, cli_config)
+        
+        # Add custom prompts to config if obtained
+        if custom_prompts:
+            config["custom_prompts"] = custom_prompts
 
         # Initialize OpenAI client
         openai_client = AsyncOpenAI(api_key=config.get('openai_api_key'))

@@ -58,6 +58,40 @@ class ErrorSummary(BaseModel):
     general_errors: List[str] = Field(default_factory=list)  # Other errors that don't fit categories
 
 
+# LinkedIn Prospect Data Models for OpenAI Agents SDK
+class LinkedInResearch(BaseModel):
+    """LinkedIn research summary"""
+    company_linkedin_url: Optional[str] = None
+    search_successful: bool = False
+    total_executives_found: int = 0
+    total_profiles_collected: int = 0
+    csv_enrichment_note: str = ""
+
+
+class ExecutiveProfile(BaseModel):
+    """Executive profile data"""
+    name: str
+    title: str
+    linkedin_profile: str
+    seniority_level: str
+    department: str
+
+
+class ProfileData(BaseModel):
+    """General profile data"""
+    name: str
+    title: str
+    linkedin_profile: str
+    department: Optional[str] = None
+
+
+class LinkedInProspectResponse(BaseModel):
+    """Complete LinkedIn prospect enrichment response for OpenAI Agents SDK"""
+    linkedin_research: LinkedInResearch
+    executives_found: List[ExecutiveProfile] = Field(default_factory=list)
+    all_profiles_found: List[ProfileData] = Field(default_factory=list)
+
+
 class WorkflowState(BaseModel):
     """LangGraph state model for SDR workflow"""
     # Basic workflow state
