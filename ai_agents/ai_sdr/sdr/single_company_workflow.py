@@ -7,6 +7,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from ai_agents.ai_sdr.sdr.models import WorkflowState
 from ai_agents.ai_sdr.sdr.nodes.streamlined_web_enricher import streamlined_web_enricher
+from ai_agents.ai_sdr.sdr.nodes.web_enrichment_saver import save_web_enrichment_results
 from ai_agents.ai_sdr.sdr.nodes.prospect_enricher import prospect_enricher
 from ai_agents.ai_sdr.sdr.nodes.company_progress_saver import (
     linkedin_progress_saver as company_linkedin_saver,
@@ -52,6 +53,7 @@ def create_single_company_workflow() -> StateGraph:
     # Add nodes for single company processing
     nodes_config = {
         "streamlined_web_enricher": streamlined_web_enricher,
+        "web_enrichment_saver": save_web_enrichment_results,
         "prospect_enricher": prospect_enricher,
         "company_linkedin_progress": company_linkedin_saver,
         "hubspot_individual": hubspot_contact_creator,
@@ -69,9 +71,12 @@ def create_single_company_workflow() -> StateGraph:
     # Set entry point
     workflow.set_entry_point("streamlined_web_enricher")
     
-    # After web analysis, check relevance
+    # After web analysis, save the results
+    workflow.add_edge("streamlined_web_enricher", "web_enrichment_saver")
+
+    # After saving, check relevance
     workflow.add_conditional_edges(
-        "streamlined_web_enricher",
+        "web_enrichment_saver",
         check_relevance_for_prospect_enrichment,
         {
             "prospect_enricher": "prospect_enricher",
