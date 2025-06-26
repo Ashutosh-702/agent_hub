@@ -292,7 +292,7 @@ async def streamlined_web_enricher(state: WorkflowState, config: Dict[str, Any])
         relevance = web_analysis.get('relevance_assessment', {})
         is_relevant = relevance.get('is_relevant', False)
         confidence = relevance.get('confidence_level', 'unknown')
-        reasoning = relevance.get('reasoning', 'No reasoning provided')
+        reasoning = relevance.get('relevance_reason', 'No reasoning provided')
         key_factors = relevance.get('key_factors', [])
         
         # Get additional data from research summary
