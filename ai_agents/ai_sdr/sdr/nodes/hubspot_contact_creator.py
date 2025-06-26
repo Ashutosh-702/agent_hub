@@ -1,109 +1,62 @@
 """
 HubSpot Contact Creator Node
 
-Creates HubSpot contacts from LinkedIn prospects data using HubSpot MCP server.
+Creates HubSpot contacts from LinkedIn prospects data using HubSpot API Client
 """
 
+
 import json
-import os
+import time
 import traceback
 from typing import Dict, Any, List
 from datetime import datetime
 
-import orjson
-from agents import Agent, Runner, ModelSettings
-from agents.mcp.server import MCPServerStdio
-from openai.types import Reasoning
+from hubspot import HubSpot
+from hubspot.crm.contacts import SimplePublicObjectInput
+from hubspot.crm.contacts.exceptions import ApiException
+from hubspot.crm.owners import OwnersApi
 
 from ai_agents.ai_sdr.sdr.models import WorkflowState
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
 from ai_agents.ai_sdr.sdr.logging_config import log_llm_request, log_llm_response, log_llm_error, sdr_logger, clean_log, detailed_log
 
-
 class HubspotContactCreator:
-    """
-    HubSpot contact creation using HubSpot MCP
-    Creates contacts from LinkedIn prospects data
-    """
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        # Initialize prompts configuration
         custom_prompts = config.get('custom_prompts', {})
         self.prompts = PromptsConfig(custom_prompts)
+        self.client = HubSpot(access_token=self.config.get("hubspot_api_key"))
 
     async def create_hubspot_contacts(self, prospects: List[Dict[str, Any]], retry_count: int = 0,
                                       previous_context: str = "") -> Dict[str, Any]:
-        """
-        Create HubSpot contacts using HubSpot MCP server via Agent
-        Implements progressive field removal retry logic
-        """
-
-        # Clean log for main status
-        clean_log(f"HubSpot Contact Creation: Processing {len(prospects)} prospects")
-        
-        # Detailed formatting
-        detailed_log("")
-        detailed_log("═══════════════════════════════════════")
-        detailed_log("🏢 HubSpot Contact Creation Starting")
-        detailed_log("═══════════════════════════════════════")
-
         try:
-            # Initialize HubSpot MCP server
-            detailed_log("🔧 Initializing HubSpot MCP connection...")
-            hubspot_mcp = MCPServerStdio(
-                name="hubspot",
-                params={
-                    "command": "npx",
-                    "args": ["-y", "@hubspot/mcp-server@0.3.2"],
-                    "env": {
-                        "PRIVATE_APP_ACCESS_TOKEN": self.config.get("hubspot_api_key")
-                    }
-                },
-                cache_tools_list=True,
-                client_session_timeout_seconds=3600
-            )
+            clean_log(f"HubSpot Contact Creation: Processing {len(prospects)} prospects")
+            detailed_log("")
+            detailed_log("═══════════════════════════════════════")
+            detailed_log("🏢 HubSpot Contact Creation Starting")
+            detailed_log("═══════════════════════════════════════")
 
-            await hubspot_mcp.connect()
-            detailed_log("✅ HubSpot MCP connection established")
 
-            # Log prospects being processed with cleaner format
             detailed_log("")
             detailed_log(f"📋 Processing {len(prospects)} LinkedIn prospects for HubSpot")
             detailed_log("─" * 40)
-            
-            for i, prospect in enumerate(prospects[:5], 1):  # Show first 5
-                linkedin_url = prospect.get('linkedin_profile', prospect.get('Person LinkedIn', ''))
-                name = prospect.get('name', prospect.get('Person Name', 'Unknown'))
+            for i, prospect in enumerate(prospects[:5], 1):
+                name = prospect.get("name", prospect.get("Person Name", "Unknown"))
                 detailed_log(f"  {i:2d}. {name}")
-                
             if len(prospects) > 5:
                 detailed_log(f"      ... and {len(prospects) - 5} more prospects")
             detailed_log("")
 
-            # Get agent instructions from centralized prompts
             hubspot_owner_email = self.config.get("hubspot_owner_email", "no-owner@example.com")
-            instruction = self.prompts.get_prompt("hubspot_creator_instructions", 
-                                                 hubspot_owner_email=hubspot_owner_email)
+            # instruction = self.prompts.get_prompt("hubspot_creator_instructions", hubspot_owner_email=hubspot_owner_email)
 
-            # Create the agent with HubSpot MCP tools
-            agent = Agent(
-                name="HubSpotContactAgent",
-                model="o3",
-                model_settings=ModelSettings(reasoning=Reasoning(effort="high"),
-                                             extra_body={"service_tier": "flex"}),
-                mcp_servers=[hubspot_mcp],
-                instructions=instruction)
-
-            # Build prompt with retry context using centralized prompts
             user_prompt = self.prompts.get_prompt(
                 "hubspot_creator_user_prompt",
                 prospects_count=len(prospects),
                 prospects_json=json.dumps(prospects, indent=2),
                 hubspot_owner_email=hubspot_owner_email
             )
-            
-
             if retry_count > 0 and previous_context:
                 prompt = self.prompts.get_prompt(
                     "hubspot_creator_retry_prompt",
@@ -114,275 +67,137 @@ class HubspotContactCreator:
             else:
                 prompt = user_prompt
 
+            log_llm_request("manual", prompt, f"HubSpot contact creation for {len(prospects)} prospects")
             detailed_log("🚀 Starting HubSpot contact creation process...")
-            
-            # Log the LLM request (file only)
-            log_llm_request("o3", prompt, f"HubSpot contact creation for {len(prospects)} prospects")
-            
-            # Run the agent
-            result = await Runner.run(
-                starting_agent=agent,
-                input=prompt,
-                max_turns=50  # Allow more turns for contact creation
-            )
 
-            # Log token usage if available
-            total_tokens = 0
-            if hasattr(result, 'usage_summary') and result.usage_summary:
-                input_tokens = getattr(result.usage_summary, 'input_tokens', 0)
-                output_tokens = getattr(result.usage_summary, 'output_tokens', 0)
-                total_tokens = input_tokens + output_tokens
-                detailed_log(f"💰 API Usage: {total_tokens:,} tokens (Input: {input_tokens:,}, Output: {output_tokens:,})")
-            
-            # Log the LLM response (file only)
-            log_llm_response("o3", result.final_output, f"HubSpot contact creation for {len(prospects)} prospects", total_tokens)
+            results = []
+            for prospect in prospects:
+                result = self._create_contact(prospect, hubspot_owner_email, retry_count)
+                results.append(result)
 
-            # Ensure cleanup happens before processing result
-            detailed_log("🧹 Cleaning up HubSpot MCP connection...")
-            try:
-                await hubspot_mcp.cleanup()
-                detailed_log("✅ HubSpot MCP cleanup completed")
-            except Exception as cleanup_error:
-                detailed_log(f"⚠️ HubSpot MCP cleanup warning: {cleanup_error}", "warning")
-                # Force cleanup by setting cleanup flag
-                try:
-                    hubspot_mcp._is_connected = False
-                except:
-                    pass
+            created_contacts = [r for r in results if r["status"] == "created"]
+            failed_contacts = [r for r in results if r["status"] == "failed"]
+            duplicates = [r for r in results if r.get("duplicate")]
 
-            # Clean and parse the response
-            response_text = result.final_output.strip()
-
-            # Remove any markdown formatting if present
-            if response_text.startswith('```json'):
-                response_text = response_text[7:]
-            if response_text.startswith('```'):
-                response_text = response_text[3:]
-            if response_text.endswith('```'):
-                response_text = response_text[:-3]
-
-            response_text = response_text.strip()
-            # Try to parse as JSON
-            try:
-                contact_results = orjson.loads(response_text)
-
-                # Validate the response structure
-                if 'hubspot_results' in contact_results and 'created_contacts' in contact_results:
-                    # Extract metrics first
-                    total_processed = contact_results.get('hubspot_results', {}).get('total_processed', 0)
-                    successful = contact_results.get('hubspot_results', {}).get('successful_creations', 0)
-                    failed = contact_results.get('hubspot_results', {}).get('failed_creations', 0)
-                    duplicates = contact_results.get('hubspot_results', {}).get('duplicates_found', 0)
-                    
-                    # Clean log summary
-                    clean_log(f"HubSpot completed: {successful} created, {failed} failed, {duplicates} duplicates")
-                    
-                    detailed_log("")
-                    detailed_log("✅ HubSpot contact creation completed successfully")
-
-                    detailed_log("")
-                    detailed_log("📊 HubSpot Contact Creation Summary:")
-                    detailed_log("─" * 40)
-                    detailed_log(f"✅ Successfully Created: {successful}")
-                    detailed_log(f"❌ Failed to Create: {failed}")
-                    detailed_log(f"🔄 Duplicates Found: {duplicates}")
-                    detailed_log(f"📋 Total Processed: {total_processed}")
-                    detailed_log("")
-
-                    # Log detailed duplicate detection results
-                    duplicate_contacts = contact_results.get('duplicate_contacts', [])
-                    if duplicate_contacts:
-                        detailed_log("🔄 DUPLICATE CONTACTS FOUND IN HUBSPOT:")
-                        for i, duplicate in enumerate(duplicate_contacts[:3], 1):  # Show first 3
-                            name = duplicate.get('name', 'Unknown')
-                            existing_id = duplicate.get('existing_hubspot_contact_id', 'Unknown ID')
-                            detailed_log(f"   {i}. {name} (ID: {existing_id})")
-                        if len(duplicate_contacts) > 3:
-                            detailed_log(f"   ... and {len(duplicate_contacts) - 3} more duplicates")
-                    else:
-                        detailed_log("✨ No duplicates found - all contacts are new")
-
-                    # Log successful contact creation details
-                    created_contacts = contact_results.get('created_contacts', [])
-                    if created_contacts:
-                        detailed_log("✅ Created Contacts:")
-                        for i, contact in enumerate(created_contacts[:3], 1):  # Show first 3
-                            name = contact.get('name', 'Unknown')
-                            hubspot_id = contact.get('hubspot_contact_id', 'Unknown ID')
-                            detailed_log(f"   {i}. {name} (ID: {hubspot_id})")
-                        if len(created_contacts) > 3:
-                            detailed_log(f"   ... and {len(created_contacts) - 3} more contacts created")
-
-                    # Log failed contact creation details
-                    failed_contacts = contact_results.get('failed_contacts', [])
-                    if failed_contacts:
-                        detailed_log(f"❌ FAILED CONTACT CREATION:")
-                        for i, failed in enumerate(failed_contacts, 1):
-                            name = failed.get('name', 'Unknown')
-                            linkedin_url = failed.get('hs_linkedin_url', 'No URL')
-                            error = failed.get('error', 'Unknown error')
-                            detailed_log(f"   {i}. {name}")
-                            detailed_log(f"      LinkedIn: {linkedin_url}")
-                            detailed_log(f"      Error: {error}")
-
-                    # Log field retry summary if available
-                    retry_summary = contact_results.get('hubspot_results', {}).get('field_retry_summary')
-                    if retry_summary:
-                        detailed_log(f"🔄 Field retry summary: {retry_summary}")
-
-                    # Transform to expected format
-                    return {
-                        "created_contacts": contact_results.get('created_contacts', []),
-                        "failed_contacts": contact_results.get('failed_contacts', []),
-                        "summary": {
-                            "total_processed": total_processed,
-                            "successful": successful,
-                            "failed": failed,
-                            "field_retry_summary": retry_summary
-                        },
-                        "agent_response": response_text,
-                        "hubspot_owner_id": contact_results.get('hubspot_results', {}).get('owner_id')
-                    }
-                else:
-                    detailed_log(f"Invalid response structure from HubSpot agent (attempt {retry_count + 1})", "warning")
-
-                    # Retry logic: if invalid structure
-                    if retry_count < 3:
-                        detailed_log(
-                            f"Retrying HubSpot contact creation. Invalid structure (attempt {retry_count + 1})", "warning")
-
-                        # Extract context for next attempt
-                        context = (f"Previous attempt produced invalid JSON structure. Raw response was: "
-                                   f"{response_text[:200]}...")
-
-                        # Recursive retry with context
-                        return await self.create_hubspot_contacts(prospects, retry_count + 1, context)
-
-                    return self._create_fallback_response_from_text(response_text, prospects)
-
-            except Exception as json_error:
-                detailed_log(f"HubSpot agent JSON parse error (attempt {retry_count + 1}): {json_error}", "warning")
-
-                # Retry on JSON parse error
-                if retry_count < 3:
-                    detailed_log(f"Retrying HubSpot contact creation due to JSON parse error...", "warning")
-                    context = f"Previous attempt failed with JSON parse error. Raw response was: {response_text[:200]}..."
-                    return await self.create_hubspot_contacts(prospects, retry_count + 1, context)
-
-                return self._create_fallback_response_from_text(response_text, prospects)
-
-        except Exception as e:
-            detailed_log(traceback.format_exc(), "error")
-            clean_log(f"HubSpot creation failed: {str(e)}", "error")
-            detailed_log(f"Error in HubSpot MCP agent execution (attempt {retry_count + 1}): {e}", "error")
-
-            # Try to cleanup if hubspot_mcp exists
-            try:
-                if 'hubspot_mcp' in locals():
-                    detailed_log("🧹 Attempting emergency cleanup of HubSpot MCP...")
-                    await hubspot_mcp.cleanup()
-            except Exception as cleanup_error:
-                detailed_log(f"⚠️ Emergency cleanup failed: {cleanup_error}", "warning")
-
-            # Retry on general error
-            if retry_count < 3:
-                detailed_log(f"Retrying HubSpot contact creation due to error...", "warning")
-                context = f"Previous attempt failed with error: {str(e)}"
-                return await self.create_hubspot_contacts(prospects, retry_count + 1, context)
-
-            return self._create_error_response(prospects, str(e))
-
-    def _create_fallback_response_from_text(self, response_text: str, prospects: List[Dict[str, Any]]) -> Dict[
-        str, Any]:
-        """Create a fallback response when JSON parsing fails"""
-
-        detailed_log("Creating fallback response from HubSpot agent text output")
-
-        # Analyze the text for success indicators
-        lines = response_text.split('\n')
-        created_count = 0
-        failed_count = 0
-
-        # Look for success/failure indicators in the text
-        for line in lines:
-            line_lower = line.lower()
-            if any(word in line_lower for word in ['created', 'success', 'added']):
-                created_count += 1
-            elif any(word in line_lower for word in ['failed', 'error', 'unable']):
-                failed_count += 1
-
-        # If we found indicators, use them; otherwise simulate based on prospects
-        if created_count == 0 and failed_count == 0:
-            # Simulate successful creation for demonstration
-            created_count = len(prospects)
-
-        created_contacts = []
-        failed_contacts = []
-
-        # Create contact records based on analysis
-        for i, prospect in enumerate(prospects):
-            if i < created_count:
-                # Use full name as is without parsing
-                full_name = prospect.get('name', prospect.get('Person Name', ''))
-                
-                email = prospect.get('email') or prospect.get('Person Email', '')
-                phone = prospect.get('phone_number') or prospect.get('Person Phone', '')
-
-                # Create contact with full name as is
-                contact_data = {
-                    "name": full_name,
-                    "full_name": full_name,  # Keep the original full name
-                    "email": email,
-                    "title": prospect.get('title', prospect.get('Person Title', '')),
-                    "company": prospect.get('company', prospect.get('Company Name', '')),
-                    "phone": phone,
-                    "linkedin_url": prospect.get('linkedin_profile', prospect.get('Person LinkedIn', '')),
-                    "hubspot_contact_id": f"hubspot_contact_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{i}",
-                    "status": "Created via HubSpot MCP Agent",
-                    "created_at": datetime.now().isoformat(),
-                    "owner_email": self.config.get("hubspot_owner_email"),
-                    "fields_used": ["full_name", "linkedin_url", "email", "owner"],
-                    "retry_count": 0,
-                    "duplicate_check_performed": True
-                }
-                created_contacts.append(contact_data)
-            else:
-                # Simulate failure
-                failed_contacts.append({
-                    "name": prospect.get('name', prospect.get('Person Name', '')),
-                    "email": prospect.get('email', prospect.get('Person Email', '')),
-                    "linkedin_url": prospect.get('linkedin_profile', prospect.get('Person LinkedIn', '')),
-                    "company": prospect.get('company', prospect.get('Company Name', '')),
-                    "error": "Simulated failure for demonstration",
-                    "status": "Failed",
-                    "failed_fields": [],
-                    "retry_attempts": 0,
-                    "duplicate_check_performed": True
-                })
-
-        return {
-            "created_contacts": created_contacts,
-            "failed_contacts": failed_contacts,
-            "summary": {
+            summary = {
                 "total_processed": len(prospects),
                 "successful": len(created_contacts),
                 "failed": len(failed_contacts),
-                "field_retry_summary": "Fallback response - no field retries attempted"
-            },
-            "agent_response": response_text,
-            "note": "Response created from text analysis (HubSpot MCP integration)"
-        }
+                "duplicates_found": len(duplicates),
+                "field_retry_summary": "Field fallback retries applied where needed"
+            }
 
-    @staticmethod
-    def _create_error_response(prospects: List[Dict[str, Any]], error_message: str) -> Dict[str, Any]:
-        """Create an error response when agent execution fails"""
+            clean_log(f"HubSpot completed: {summary['successful']} created, {summary['failed']} failed, {summary['duplicates_found']} duplicates")
+            detailed_log("")
+            detailed_log("✅ HubSpot contact creation completed successfully")
+            detailed_log("")
+            detailed_log("📊 HubSpot Contact Creation Summary:")
+            detailed_log("─" * 40)
+            detailed_log(f"✅ Successfully Created: {summary['successful']}")
+            detailed_log(f"❌ Failed to Create: {summary['failed']}")
+            detailed_log(f"🔄 Duplicates Found: {summary['duplicates_found']}")
+            detailed_log(f"📋 Total Processed: {summary['total_processed']}")
+            detailed_log("")
 
+            return {
+                "created_contacts": created_contacts,
+                "failed_contacts": failed_contacts,
+                "summary": summary,
+                "agent_response": json.dumps(results, indent=2),
+                "hubspot_owner_id": self._get_owner_id(hubspot_owner_email)
+            }
+        except Exception as e:
+            detailed_log(traceback.format_exc(), "error")
+            clean_log(f"HubSpot creation failed: {str(e)}", "error")
+            return self._create_error_response(prospects, str(e))
+
+    def _create_contact(self, prospect: Dict[str, Any], owner_email: str, retry_count: int) -> Dict[str, Any]:
+        try:
+            email = prospect.get("email") or prospect.get("Person Email")
+            if not email:
+                return {"status": "failed", "reason": "Missing email", "prospect": prospect}
+
+            if self._is_duplicate(email):
+                return {"status": "skipped", "duplicate": True, "email": email}
+
+            name = prospect.get("name") or prospect.get("Person Name")
+            title = prospect.get("title") or prospect.get("Person Title")
+            company = prospect.get("company") or prospect.get("Company Name")
+            phone = prospect.get("phone_number") or prospect.get("Person Phone")
+            linkedin = prospect.get("linkedin_profile") or prospect.get("Person LinkedIn")
+
+            name_parts = name.split(" ") if name else []
+            firstname = name_parts[0] if name_parts else ""
+            lastname = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+
+            owner_id = self._get_owner_id(owner_email)
+
+            field_sets = [
+                ["email", "firstname", "lastname", "phone", "jobtitle", "company", "website", "hubspot_owner_id"],
+                ["email", "firstname", "lastname", "jobtitle", "company", "hubspot_owner_id"],
+                ["email", "firstname", "lastname"],
+                ["email"]
+            ]
+
+            base = {
+                "email": email,
+                "firstname": firstname,
+                "lastname": lastname,
+                "phone": phone,
+                "jobtitle": title,
+                "company": company,
+                "website": linkedin,
+                "hubspot_owner_id": owner_id
+            }
+
+            for fields in field_sets:
+                properties = {k: v for k, v in base.items() if k in fields and v}
+                contact_input = SimplePublicObjectInput(properties=properties)
+                try:
+                    created = self.client.crm.contacts.basic_api.create(simple_public_object_input=contact_input)
+                    return {"status": "created", "email": email, "hubspot_contact_id": created.id}
+                except ApiException as e:
+                    if e.status == 429:
+                        time.sleep(2 ** retry_count)
+                        continue
+            return {"status": "failed", "email": email, "error": str(e), "http_status": getattr(e, 'status', 'unknown')}
+        except Exception as e:
+            detailed_log(traceback.format_exc(), "error")
+            clean_log(f"HubSpot contact creation failed: {str(e)}", "error")
+            return self._create_error_response(prospect, str(e))
+
+    def _get_owner_id(self, owner_email: str) -> str:
+        try:
+            owners_api = OwnersApi(self.client)
+            all_owners = owners_api.get_page()
+            for owner in all_owners.results:
+                if owner.email == owner_email:
+                    return owner.id
+        except Exception as e:
+            detailed_log(f"Hubspot owner lookup failed: {e}", "warning")
+        return ""
+
+    def _is_duplicate(self, email: str) -> bool:
+        try:
+            search_payload = {
+                "filterGroups": [{
+                    "filters": [{"propertyName": "email", "operator": "EQ", "value": email}]
+                }],
+                "properties": ["email"]
+            }
+            api_response = self.client.crm.contacts.search_api.do_search(body=search_payload)
+            return bool(api_response.results)
+        except Exception as e:
+            detailed_log(f"HubSpot duplicate check failed for {email}: {e}", "warning")
+            return False
+
+    def _create_error_response(self, prospects: List[Dict[str, Any]], error_message: str) -> Dict[str, Any]:
         return {
             "created_contacts": [],
             "failed_contacts": [{
                 "error": error_message,
                 "prospects_count": len(prospects),
-                "note": "HubSpot MCP agent execution failed completely",
+                "note": "HubSpot API call failed completely",
                 "failed_fields": ["all"],
                 "retry_attempts": 3
             }],
@@ -390,7 +205,7 @@ class HubspotContactCreator:
                 "total_processed": len(prospects),
                 "successful": 0,
                 "failed": len(prospects),
-                "field_retry_summary": "Agent execution failed - no retries possible"
+                "field_retry_summary": "API failure - no retries possible"
             },
             "agent_response": None,
             "error": True
@@ -417,7 +232,8 @@ async def hubspot_contact_creator(state: WorkflowState, config: Dict[str, Any] =
     
     detailed_log("")
     detailed_log(f"🔗 Starting HubSpot Contact Creation for {company.name}...")
-
+    if config is None: 
+        config = {}
     config = config.get("configurable", {})
 
     # Skip HubSpot creation if disabled
@@ -522,47 +338,52 @@ async def hubspot_contact_creator(state: WorkflowState, config: Dict[str, Any] =
         return state
 
 
-def filter_key_prospects(prospects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def filter_key_prospects(self,prospects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Filter prospects to include only executives and key decision makers"""
+    try:
 
-    key_titles = [
-        'ceo', 'cto', 'cfo', 'founder', 'co-founder', 'president', 'director',
-        'vice president', 'vp', 'head', 'manager', 'general manager', 'owner',
-        'chief', 'executive', 'senior manager', 'regional manager', 'country manager'
-    ]
+        key_titles = [
+            'ceo', 'cto', 'cfo', 'founder', 'co-founder', 'president', 'director',
+            'vice president', 'vp', 'head', 'manager', 'general manager', 'owner',
+            'chief', 'executive', 'senior manager', 'regional manager', 'country manager'
+        ]
 
-    key_seniority = ['C-level', 'Director',
-                     'VP/Head', 'Manager', 'Senior Manager']
+        key_seniority = ['C-level', 'Director',
+                        'VP/Head', 'Manager', 'Senior Manager']
 
-    filtered = []
-    for prospect in prospects:
-        # Get title - check both formats (Person Title and title)
-        title = prospect.get('Person Title', prospect.get('title', '')).lower()
+        filtered = []
+        for prospect in prospects:
+            # Get title - check both formats (Person Title and title)
+            title = prospect.get('Person Title', prospect.get('title', '')).lower()
 
-        # Get seniority - check both formats
-        seniority = prospect.get('Seniority Level', prospect.get('seniority_level', ''))
+            # Get seniority - check both formats
+            seniority = prospect.get('Seniority Level', prospect.get('seniority_level', ''))
 
-        # Get profile type - check both formats
-        profile_type = prospect.get('Profile Type', prospect.get('profile_type', ''))
+            # Get profile type - check both formats
+            profile_type = prospect.get('Profile Type', prospect.get('profile_type', ''))
 
-        # Include if it has email (high priority)
-        if prospect.get('email') or prospect.get('Person Email'):
-            filtered.append(prospect)
-            continue
+            # Include if it has email (high priority)
+            if prospect.get('email') or prospect.get('Person Email'):
+                filtered.append(prospect)
+                continue
 
-        # Include if it's an executive profile type
-        if profile_type == 'Executive':
-            filtered.append(prospect)
-            continue
+            # Include if it's an executive profile type
+            if profile_type == 'Executive':
+                filtered.append(prospect)
+                continue
 
-        # Include if seniority level indicates decision maker
-        if seniority in key_seniority:
-            filtered.append(prospect)
-            continue
+            # Include if seniority level indicates decision maker
+            if seniority in key_seniority:
+                filtered.append(prospect)
+                continue
 
-        # Include if title contains key decision maker terms
-        if any(key_term in title for key_term in key_titles):
-            filtered.append(prospect)
-            continue
+            # Include if title contains key decision maker terms
+            if any(key_term in title for key_term in key_titles):
+                filtered.append(prospect)
+                continue
 
-    return filtered
+        return filtered
+    except Exception as e:
+        detailed_log(traceback.format_exc(), "error")
+        clean_log(f"HubSpot filtering key prospects failed: {str(e)}", "error")
+        return self._create_error_response(prospects, str(e))
