@@ -17,15 +17,12 @@ from hubspot.crm.contacts.exceptions import ApiException
 from hubspot.crm.owners import OwnersApi
 
 from ai_agents.ai_sdr.sdr.models import WorkflowState
-from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
-from ai_agents.ai_sdr.sdr.logging_config import log_llm_request, log_llm_response, log_llm_error, sdr_logger, clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
 
 class HubspotContactCreator:
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        custom_prompts = config.get('custom_prompts', {})
-        self.prompts = PromptsConfig(custom_prompts)
         self.client = HubSpot(access_token=self.config.get("hubspot_api_key"))
 
     async def create_hubspot_contacts(self, prospects: List[Dict[str, Any]], retry_count: int = 0,
@@ -49,25 +46,7 @@ class HubspotContactCreator:
             detailed_log("")
 
             hubspot_owner_email = self.config.get("hubspot_owner_email", "no-owner@example.com")
-            # instruction = self.prompts.get_prompt("hubspot_creator_instructions", hubspot_owner_email=hubspot_owner_email)
 
-            user_prompt = self.prompts.get_prompt(
-                "hubspot_creator_user_prompt",
-                prospects_count=len(prospects),
-                prospects_json=json.dumps(prospects, indent=2),
-                hubspot_owner_email=hubspot_owner_email
-            )
-            if retry_count > 0 and previous_context:
-                prompt = self.prompts.get_prompt(
-                    "hubspot_creator_retry_prompt",
-                    retry_count=retry_count,
-                    previous_context=previous_context,
-                    base_prompt=user_prompt
-                )
-            else:
-                prompt = user_prompt
-
-            log_llm_request("manual", prompt, f"HubSpot contact creation for {len(prospects)} prospects")
             detailed_log("🚀 Starting HubSpot contact creation process...")
 
             results = []
@@ -279,7 +258,7 @@ async def hubspot_contact_creator(state: WorkflowState, config: Dict[str, Any] =
             detailed_log(f"⚠️ No key prospects found after filtering for {company.name}", "warning")
             return state
 
-        # Create HubSpot contacts using MCP agent via HubspotContactCreator class
+        # Create HubSpot contacts using HubSpot API Client via HubspotContactCreator class
         creator = HubspotContactCreator(config)
         creation_results = await creator.create_hubspot_contacts(filtered_prospects)
 
