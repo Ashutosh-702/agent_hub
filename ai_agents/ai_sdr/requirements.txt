@@ -17,3 +17,4 @@ pillow~=11.2.1
 rubicon-objc
 PyQt6>=6.4.0
 PyQt6-tools>=6.4.0
+hubspot-api-client>=6.0.0
