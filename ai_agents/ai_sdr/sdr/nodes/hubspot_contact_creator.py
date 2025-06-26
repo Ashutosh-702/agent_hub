@@ -103,7 +103,7 @@ class HubspotContactCreator:
             title = prospect.get("title") or prospect.get("Person Title")
             company = prospect.get("company") or prospect.get("Company Name")
             phone = prospect.get("phone_number") or prospect.get("Person Phone")
-            linkedin = prospect.get("linkedin_profile") or prospect.get("Person LinkedIn")
+            linkedin_url = prospect.get("linkedin_profile") or prospect.get("Person LinkedIn")
 
             name_parts = name.split(" ") if name else []
             firstname = name_parts[0] if name_parts else ""
@@ -125,7 +125,7 @@ class HubspotContactCreator:
                 "phone": phone,
                 "jobtitle": title,
                 "company": company,
-                "website": linkedin,
+                "website": linkedin_url,
                 "hubspot_owner_id": owner_id
             }
 
