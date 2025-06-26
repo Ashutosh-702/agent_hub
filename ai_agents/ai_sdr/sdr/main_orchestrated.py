@@ -14,11 +14,6 @@ from typing import Dict, Any
 
 from ai_agents.ai_sdr.sdr.main import load_configuration, create_run_directories, get_project_root, get_prompts_configuration
 
-# Add project root to Python path
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from agents import set_default_openai_client
 from openai import AsyncOpenAI
 
@@ -37,11 +32,9 @@ async def main(cli_config=None):
 
 
     try:
-        # Get prompts configuration first (if not from CLI)
-        if not cli_config:
-            custom_prompts = get_prompts_configuration()
-        else:
-            custom_prompts = {}
+        # For main_orchestrated.py, always use defaults (no interactive prompts)
+        # Interactive configuration should be done via cli_app_orchestrated.py
+        custom_prompts = {}
             
         # Load configuration
         config = load_configuration(run_directories, cli_config)

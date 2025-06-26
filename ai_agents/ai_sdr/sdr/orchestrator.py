@@ -34,10 +34,6 @@ class OrchestratorResult:
     completed_at: Optional[datetime] = None
 
 
-def save_workflow_progress(consolidated_state, param):
-    pass
-
-
 class WorkflowOrchestrator:
     """
     Orchestrates the execution of individual company workflows.
@@ -233,9 +229,6 @@ class WorkflowOrchestrator:
 
             sdr_logger.log_subsection("Error Summary Export", {})
             consolidated_state = save_error_summary(consolidated_state,{"configurable": self.config})
-
-            sdr_logger.log_subsection("Save Final Results", {})
-            save_workflow_progress(consolidated_state,{"configurable": self.config})
 
             sdr_logger.log_completion(
                 "Post-Processing Complete",
