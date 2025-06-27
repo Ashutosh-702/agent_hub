@@ -13,6 +13,7 @@ from datetime import datetime
 
 from hubspot import HubSpot
 from hubspot.crm.contacts import SimplePublicObjectInput
+from hubspot.crm.contacts import PublicObjectSearchRequest
 from hubspot.crm.contacts.exceptions import ApiException
 from hubspot.crm.owners import OwnersApi
 
@@ -52,6 +53,8 @@ class HubspotContactCreator:
             results = []
             for prospect in prospects:
                 result = self._create_contact(prospect, hubspot_owner_email, retry_count)
+                if "status" not in result:
+                    result["status"] = "failed"
                 results.append(result)
 
             created_contacts = [r for r in results if r["status"] == "created"]
@@ -133,13 +136,13 @@ class HubspotContactCreator:
                 properties = {k: v for k, v in base.items() if k in fields and v}
                 contact_input = SimplePublicObjectInput(properties=properties)
                 try:
-                    created = self.client.crm.contacts.basic_api.create(simple_public_object_input=contact_input)
+                    created = self.client.crm.contacts.basic_api.create(simple_public_object_input_for_create=contact_input)
                     return {"status": "created", "email": email, "hubspot_contact_id": created.id}
                 except ApiException as e:
                     if e.status == 429:
                         time.sleep(2 ** retry_count)
                         continue
-            return {"status": "failed", "email": email, "error": str(e), "http_status": getattr(e, 'status', 'unknown')}
+                    return {"status": "failed", "email": email, "error": str(e), "http_status": getattr(e, 'status', 'unknown')}
         except Exception as e:
             detailed_log(traceback.format_exc(), "error")
             clean_log(f"HubSpot contact creation failed: {str(e)}", "error")
@@ -158,16 +161,20 @@ class HubspotContactCreator:
 
     def _is_duplicate(self, email: str) -> bool:
         try:
-            search_payload = {
-                "filterGroups": [{
-                    "filters": [{"propertyName": "email", "operator": "EQ", "value": email}]
+            search_request = PublicObjectSearchRequest(
+                filter_groups=[{
+                    "filters": [{
+                        "propertyName": "email",
+                        "operator": "EQ",
+                        "value": email
+                    }]
                 }],
-                "properties": ["email"]
-            }
-            api_response = self.client.crm.contacts.search_api.do_search(body=search_payload)
+            properties=["email"]
+        )
+            api_response = self.client.crm.contacts.search_api.do_search(public_object_search_request=search_request)
             return bool(api_response.results)
         except Exception as e:
-            detailed_log(f"HubSpot duplicate check failed for {email}: {e}", "warning")
+            print(f"HubSpot duplicate check failed for {email}: {e}", "warning")
             return False
 
     def _create_error_response(self, prospects: List[Dict[str, Any]], error_message: str) -> Dict[str, Any]:
