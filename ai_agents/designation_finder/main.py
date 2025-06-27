@@ -72,7 +72,10 @@ def load_configuration() -> Dict[str, Any]:
     
     # Data source configuration
     google_sheet_url = os.getenv("GOOGLE_SHEET_URL")
-    csv_file_path = os.getenv("CSV_FILE_PATH", "sample_input.csv")
+    # Get the current directory (designation_finder) for relative paths
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    default_csv_path = os.path.join(current_dir, "sample_input.csv")
+    csv_file_path = os.getenv("CSV_FILE_PATH", default_csv_path)
     
     config = {
         "openai_api_key": openai_api_key,
@@ -95,7 +98,7 @@ def load_company_designations(config: Dict[str, Any]) -> List[CompanyDesignation
     company_designations = []
     
     google_sheet_url = config.get("google_sheet_url")
-    csv_file_path = config.get("csv_file_path", "sample_input.csv")
+    csv_file_path = config.get("csv_file_path")
     
     if google_sheet_url:
         print(f"📊 Loading companies from Google Sheet...")
