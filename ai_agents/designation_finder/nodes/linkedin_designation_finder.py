@@ -49,7 +49,7 @@ class LinkedInDesignationFinder:
             await browser_mcp.connect()
 
             # Build search prompt
-            prompt = f"""Find one people at "{company_name}" whose current titles match or are similar to "
+            prompt = f"""Find multiple people at "{company_name}" whose current titles match or are similar to "
 {designation}" and give me the JSON result as specified."""
 
             # Set up agent
