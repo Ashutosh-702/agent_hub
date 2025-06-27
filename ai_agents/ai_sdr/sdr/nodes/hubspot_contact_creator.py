@@ -13,7 +13,6 @@ from datetime import datetime
 
 from hubspot import HubSpot
 from hubspot.crm.contacts import SimplePublicObjectInput
-from hubspot.crm.contacts import PublicObjectSearchRequest
 from hubspot.crm.contacts.exceptions import ApiException
 from hubspot.crm.owners import OwnersApi
 
@@ -99,14 +98,14 @@ class HubspotContactCreator:
             if not email:
                 return {"status": "failed", "reason": "Missing email", "prospect": prospect}
 
-            if self._is_duplicate(email):
-                return {"status": "skipped", "duplicate": True, "email": email}
+            linkedin_url = prospect.get("linkedin_profile") or prospect.get("Person LinkedIn")
+            if self._is_duplicate(linkedin_url):
+                return {"status": "skipped", "duplicate": True, "linkedin_url": linkedin_url}
 
             name = prospect.get("name") or prospect.get("Person Name")
             title = prospect.get("title") or prospect.get("Person Title")
             company = prospect.get("company") or prospect.get("Company Name")
             phone = prospect.get("phone_number") or prospect.get("Person Phone")
-            linkedin_url = prospect.get("linkedin_profile") or prospect.get("Person LinkedIn")
 
             name_parts = name.split(" ") if name else []
             firstname = name_parts[0] if name_parts else ""
@@ -115,7 +114,7 @@ class HubspotContactCreator:
             owner_id = self._get_owner_id(owner_email)
 
             field_sets = [
-                ["email", "firstname", "lastname", "phone", "jobtitle", "company", "website", "hubspot_owner_id"],
+                ["email", "firstname", "lastname", "phone", "jobtitle", "company", "hs_linkedin_url", "hubspot_owner_id"],
                 ["email", "firstname", "lastname", "jobtitle", "company", "hubspot_owner_id"],
                 ["email", "firstname", "lastname"],
                 ["email"]
@@ -128,7 +127,7 @@ class HubspotContactCreator:
                 "phone": phone,
                 "jobtitle": title,
                 "company": company,
-                "website": linkedin_url,
+                "hs_linkedin_url": linkedin_url,
                 "hubspot_owner_id": owner_id
             }
 
@@ -159,22 +158,20 @@ class HubspotContactCreator:
             detailed_log(f"Hubspot owner lookup failed: {e}", "warning")
         return ""
 
-    def _is_duplicate(self, email: str) -> bool:
+    def _is_duplicate(self, linkedin_url: str) -> bool:
+        if not linkedin_url:
+            return False
         try:
-            search_request = PublicObjectSearchRequest(
-                filter_groups=[{
-                    "filters": [{
-                        "propertyName": "email",
-                        "operator": "EQ",
-                        "value": email
-                    }]
+            search_payload = {
+                "filterGroups": [{
+                    "filters": [{"propertyName": "hs_linkedin_url", "operator": "EQ", "value": linkedin_url}]
                 }],
-            properties=["email"]
-        )
-            api_response = self.client.crm.contacts.search_api.do_search(public_object_search_request=search_request)
+                "properties": ["hs_linkedin_url"]
+            }
+            api_response = self.client.crm.contacts.search_api.do_search(body=search_payload)
             return bool(api_response.results)
         except Exception as e:
-            print(f"HubSpot duplicate check failed for {email}: {e}", "warning")
+            detailed_log(f"HubSpot duplicate check failed for {linkedin_url}: {e}", "warning")
             return False
 
     def _create_error_response(self, prospects: List[Dict[str, Any]], error_message: str) -> Dict[str, Any]:
