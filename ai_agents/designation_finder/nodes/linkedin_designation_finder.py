@@ -49,7 +49,8 @@ class LinkedInDesignationFinder:
             await browser_mcp.connect()
 
             # Build search prompt
-            prompt = f"""Find multiple people at "{company_name}" whose current titles match or are similar to "{designation}" and give me the JSON result as specified."""
+            prompt = f"""Find multiple people at "{company_name}" whose current titles match or are similar to "
+{designation}" and give me the JSON result as specified."""
 
             # Set up agent
             agent = Agent(
@@ -61,7 +62,8 @@ class LinkedInDesignationFinder:
                 ),
                 mcp_servers=[browser_mcp],
                 instructions=f"""You are a web-capable assistant.  
-Task: visit LinkedIn and search for people who work at “{company_name}” with titles matching or similar to “{designation}”.  
+Task: visit LinkedIn and search for people who work at “{company_name}” with titles matching or similar to “
+{designation}”.  
 Use fuzzy title matching, e.g.:
 
 • CEO → Chief Executive Officer, Co-CEO, President & CEO, etc.  
@@ -70,8 +72,8 @@ Use fuzzy title matching, e.g.:
 • Marketing Manager → Marketing Manager, Marketing Director, Head of Marketing, etc.  
 
 Steps  
-1. Go to linkedin.com and run the search “{designation}” AND “{company_name}”.  
-2. Scan results for current titles that match (exactly or fuzzily) “{designation}”.  
+1. Go to linkedin.com and run the search "{designation}" AND "{company_name}".  
+2. Scan results for current titles that match (exactly or fuzzily) "{designation}".  
 3. For every suitable profile found (collect several, up to a reasonable limit such as 10):  
    • Full name  
    • Current job title  
@@ -80,15 +82,13 @@ Steps
 Output strictly as a JSON array, one object per profile, each with:
 
 [
-  {
-    "name": "…",
-    "title": "…",
-    "linkedin_url": "…",
+  {{
+    "name": "",
+    "title": "",
+    "linkedin_url": "",
     "company_name": "{company_name}"
-  },
-  …
+  }}
 ]
-
 If none qualify, return `[]`. Respond with JSON only—no commentary.
 """
             )
@@ -162,7 +162,8 @@ If none qualify, return `[]`. Respond with JSON only—no commentary.
         return profiles
 
 
-async def linkedin_designation_finder(state: DesignationFinderState, config: Dict[str, Any] = None) -> DesignationFinderState | None:
+async def linkedin_designation_finder(state: DesignationFinderState,
+                                      config: Dict[str, Any] = None) -> DesignationFinderState | None:
     """
     LinkedIn designation finder node - single company processing
     """
@@ -180,7 +181,7 @@ async def linkedin_designation_finder(state: DesignationFinderState, config: Dic
 
     company_name = state.current_company_designation.company_name
     designation = state.current_company_designation.designation
-    
+
     print(f"✅ [LINKEDIN_FINDER] Input validated")
     print(f"🏢 [LINKEDIN_FINDER] Company: {company_name}")
     print(f"👔 [LINKEDIN_FINDER] Designation: {designation}")
@@ -201,18 +202,18 @@ async def linkedin_designation_finder(state: DesignationFinderState, config: Dic
         # Step 4: Execute search
         print(f"🔍 [LINKEDIN_FINDER] Step 4: Executing LinkedIn search")
         print(f"🔎 [LINKEDIN_FINDER] Searching for '{designation}' at '{company_name}'...")
-        
+
         profiles = await finder.search_designation_at_company(company_name, designation)
-        
+
         print(f"✅ [LINKEDIN_FINDER] Search completed")
         print(f"📊 [LINKEDIN_FINDER] Search returned {len(profiles) if profiles else 0} profiles")
 
         # Step 5: Process and store results
         print(f"📝 [LINKEDIN_FINDER] Step 5: Processing search results")
-        
+
         if profiles:
             print(f"✅ [LINKEDIN_FINDER] Found {len(profiles)} profiles - storing results")
-            
+
             # Log each profile found
             for i, profile in enumerate(profiles, 1):
                 print(f"   [LINKEDIN_FINDER] Profile {i}:")
@@ -221,12 +222,12 @@ async def linkedin_designation_finder(state: DesignationFinderState, config: Dic
                 print(f"      - Title: {profile.title or 'N/A'}")
                 print(f"      - Company: {profile.company_name}")
                 print(f"      - Searched for: {profile.designation_searched}")
-            
+
             # Store in state
             state.found_profiles.extend(profiles)
             print(f"✅ [LINKEDIN_FINDER] Stored {len(profiles)} profiles in state")
             print(f"🎉 [LINKEDIN_FINDER] Successfully found {len(profiles)} profiles for {company_name}")
-            
+
         else:
             print(f"⚠️ [LINKEDIN_FINDER] No profiles found for {designation} at {company_name}")
             print(f"📝 [LINKEDIN_FINDER] This will be logged as 'no results' in CSV")
@@ -235,7 +236,7 @@ async def linkedin_designation_finder(state: DesignationFinderState, config: Dic
         print(f"🔍 [LINKEDIN_FINDER] Step 6: Final state validation")
         total_profiles_in_state = len(state.found_profiles)
         print(f"📊 [LINKEDIN_FINDER] Total profiles now in state: {total_profiles_in_state}")
-        
+
         print(f"✅ [LINKEDIN_FINDER] LinkedIn search processing completed successfully")
 
     except Exception as e:
@@ -243,7 +244,7 @@ async def linkedin_designation_finder(state: DesignationFinderState, config: Dic
         state.errors.append(error_msg)
         print(f"❌ [LINKEDIN_FINDER] ERROR: {error_msg}")
         print(f"🔍 [LINKEDIN_FINDER] Error details: {type(e).__name__}: {str(e)}")
-        
+
         # Additional error context
         try:
             print(f"🔍 [LINKEDIN_FINDER] Error context:")
