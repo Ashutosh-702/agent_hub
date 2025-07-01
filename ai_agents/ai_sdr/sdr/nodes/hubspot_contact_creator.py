@@ -12,9 +12,8 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 from hubspot import HubSpot
-from hubspot.crm.contacts import SimplePublicObjectInput
+from hubspot.crm.contacts import PublicObjectSearchRequest, SimplePublicObjectInputForCreate
 from hubspot.crm.contacts.exceptions import ApiException
-from hubspot.crm.owners import OwnersApi
 
 from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
 from ai_agents.ai_sdr.sdr.models import WorkflowState
@@ -24,7 +23,7 @@ class HubspotContactCreator:
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.client = HubSpot(access_token=self.config.get("hubspot_api_key"))
+        self.client = HubSpot(access_token=self.config.get("hubspot_api_key"), verify_ssl=False)
 
     async def create_hubspot_contacts(self, prospects: List[Dict[str, Any]], retry_count: int = 0,
                                       previous_context: str = "") -> Dict[str, Any]:
@@ -131,7 +130,7 @@ class HubspotContactCreator:
 
             for fields in field_sets:
                 properties = {k: v for k, v in base.items() if k in fields and v}
-                contact_input = SimplePublicObjectInput(properties=properties)
+                contact_input = SimplePublicObjectInputForCreate(properties=properties)
                 try:
                     created = self.client.crm.contacts.basic_api.create(simple_public_object_input_for_create=contact_input)
                     return {"status": "created", "linkedin_url": linkedin_url, "hubspot_contact_id": created.id}
@@ -143,30 +142,58 @@ class HubspotContactCreator:
         except Exception as e:
             detailed_log(traceback.format_exc(), "error")
             clean_log(f"HubSpot contact creation failed: {str(e)}", "error")
-            return self._create_error_response(prospect, str(e))
+            return self._create_error_response([prospect], str(e))
 
     def _get_owner_id(self, owner_email: str) -> str:
+        """
+        Get owner ID by email address
+        
+        Args:
+            owner_email: Email address of the owner
+            
+        Returns:
+            Owner ID if found, email prefix as fallback
+        """
+        if not owner_email:
+            return ""
+        
         try:
-            owners_api = OwnersApi(self.client)
-            all_owners = owners_api.get_page()
-            for owner in all_owners.results:
+            # Get all owners (pagination may be needed for large lists)
+            owners = self.client.crm.owners.owners_api.get_page()
+            
+            # Search for the owner with matching email
+            for owner in owners.results:
                 if owner.email == owner_email:
-                    return owner.id
+                    return str(owner.id)
+                    
+            # If not found in first page, check additional pages
+            while owners.paging and owners.paging.next:
+                after = owners.paging.next.after
+                owners = self.client.crm.owners.owners_api.get_page(after=after)
+                
+                for owner in owners.results:
+                    if owner.email == owner_email:
+                        return str(owner.id)
+            
+            detailed_log(f"No owner found with email: {owner_email}, using email prefix as fallback", "warning")
+            return owner_email.split('@')[0]
+            
         except Exception as e:
-            detailed_log(f"Hubspot owner lookup failed: {e}", "warning")
-        return ""
+            detailed_log(f"Error getting owner: {e}, using email prefix as fallback", "warning")
+            return owner_email.split('@')[0]
 
     def _is_duplicate(self, linkedin_url: str) -> bool:
         if not linkedin_url:
             return False
         try:
             search_payload = {
-                "filterGroups": [{
-                    "filters": [{"propertyName": "hs_linkedin_url", "operator": "EQ", "value": linkedin_url}]
+                "filter_groups": [{
+                    "filters": [{"property_name": "hs_linkedin_url", "operator": "EQ", "value": linkedin_url}]
                 }],
                 "properties": ["hs_linkedin_url"]
             }
-            api_response = self.client.crm.contacts.search_api.do_search(body=search_payload)
+            search_request = PublicObjectSearchRequest(**search_payload)
+            api_response = self.client.crm.contacts.search_api.do_search(public_object_search_request=search_request)
             return bool(api_response.results)
         except Exception as e:
             detailed_log(f"HubSpot duplicate check failed for {linkedin_url}: {e}", "warning")
