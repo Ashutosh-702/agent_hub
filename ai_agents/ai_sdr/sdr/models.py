@@ -1,9 +1,10 @@
 """
 Data models for the SDR workflow
 """
-from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
+from typing import Dict, Any, List, Optional
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class Company(BaseModel):

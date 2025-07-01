@@ -2,21 +2,23 @@
 LangGraph workflow for SDR prospect research with loop-based per-company processing
 """
 from typing import Literal
+
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 
+from ai_agents.ai_sdr.sdr.logging_config import sdr_logger
 from ai_agents.ai_sdr.sdr.models import WorkflowState
 from ai_agents.ai_sdr.sdr.nodes.company_list_retriever import company_list_retriever
+from ai_agents.ai_sdr.sdr.nodes.company_progress_saver import linkedin_progress_saver as company_linkedin_saver, \
+    hubspot_progress_saver
+from ai_agents.ai_sdr.sdr.nodes.error_reporter import error_reporter
+from ai_agents.ai_sdr.sdr.nodes.file_storage import save_final_results
+from ai_agents.ai_sdr.sdr.nodes.final_progress_saver import final_progress_saver
 from ai_agents.ai_sdr.sdr.nodes.hubspot_contact_creator import hubspot_contact_creator
+from ai_agents.ai_sdr.sdr.nodes.progress_saver import linkedin_progress_saver
+from ai_agents.ai_sdr.sdr.nodes.prospect_enricher import prospect_enricher
 from ai_agents.ai_sdr.sdr.nodes.state_progression import company_progression
 from ai_agents.ai_sdr.sdr.nodes.streamlined_web_enricher import streamlined_web_enricher
-from ai_agents.ai_sdr.sdr.nodes.prospect_enricher import prospect_enricher
-from ai_agents.ai_sdr.sdr.nodes.file_storage import save_final_results
-from ai_agents.ai_sdr.sdr.nodes.progress_saver import linkedin_progress_saver
-from ai_agents.ai_sdr.sdr.nodes.company_progress_saver import linkedin_progress_saver as company_linkedin_saver, hubspot_progress_saver
-from ai_agents.ai_sdr.sdr.nodes.final_progress_saver import final_progress_saver
-from ai_agents.ai_sdr.sdr.nodes.error_reporter import error_reporter
-from ai_agents.ai_sdr.sdr.logging_config import sdr_logger
 
 
 def check_companies_exist(state: WorkflowState) -> Literal["streamlined_web_enricher", "save_results"]:

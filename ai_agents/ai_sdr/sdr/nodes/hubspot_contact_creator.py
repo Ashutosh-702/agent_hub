@@ -8,16 +8,17 @@ Creates HubSpot contacts from LinkedIn prospects data using HubSpot API Client
 import json
 import time
 import traceback
-from typing import Dict, Any, List
 from datetime import datetime
+from typing import Dict, Any, List
 
 from hubspot import HubSpot
 from hubspot.crm.contacts import SimplePublicObjectInput
 from hubspot.crm.contacts.exceptions import ApiException
 from hubspot.crm.owners import OwnersApi
 
-from ai_agents.ai_sdr.sdr.models import WorkflowState
 from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.models import WorkflowState
+
 
 class HubspotContactCreator:
 

@@ -5,14 +5,14 @@ Saves progress after LinkedIn and HubSpot processing for each individual company
 This provides incremental backups and enables workflow recovery if needed.
 """
 
-import os
-import json
 import csv
+import json
+import os
 from datetime import datetime
 from typing import Dict, Any, List
 
-from ai_agents.ai_sdr.sdr.models import WorkflowState
 from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log, sdr_logger
+from ai_agents.ai_sdr.sdr.models import WorkflowState
 
 
 def save_company_linkedin_progress(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:

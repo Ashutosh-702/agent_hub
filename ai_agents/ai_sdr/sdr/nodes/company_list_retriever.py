@@ -4,17 +4,18 @@ Company List Retriever Node
 Retrieves company data from Google Sheets or CSV files.
 """
 
-import pandas as pd
 import re
-import requests
 from io import StringIO
 from typing import Dict, Any
-from tenacity import retry, stop_after_attempt, wait_exponential
 
-from ai_agents.ai_sdr.sdr.models import Company, WorkflowState
-from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
+import pandas as pd
+import requests
 import urllib3
+from tenacity import retry, stop_after_attempt, wait_exponential
 from urllib3.exceptions import InsecureRequestWarning
+
+from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.models import Company, WorkflowState
 
 urllib3.disable_warnings(InsecureRequestWarning)
 

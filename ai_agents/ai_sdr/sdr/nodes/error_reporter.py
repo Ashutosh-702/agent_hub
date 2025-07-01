@@ -10,8 +10,8 @@ import os
 from datetime import datetime
 from typing import Dict, Any
 
+from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log
 from ai_agents.ai_sdr.sdr.models import WorkflowState
-from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log, detailed_log
 
 
 def save_error_summary(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:
