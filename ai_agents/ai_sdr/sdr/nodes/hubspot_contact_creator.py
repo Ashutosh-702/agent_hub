@@ -96,9 +96,6 @@ class HubspotContactCreator:
     def _create_contact(self, prospect: Dict[str, Any], owner_email: str, retry_count: int) -> Dict[str, Any]:
         try:
             email = prospect.get("email") or prospect.get("Person Email")
-            if not email:
-                return {"status": "failed", "reason": "Missing email", "prospect": prospect}
-
             linkedin_url = prospect.get("linkedin_profile") or prospect.get("Person LinkedIn")
             if self._is_duplicate(linkedin_url):
                 return {"status": "skipped", "duplicate": True, "linkedin_url": linkedin_url}
@@ -115,10 +112,10 @@ class HubspotContactCreator:
             owner_id = self._get_owner_id(owner_email)
 
             field_sets = [
-                ["email", "firstname", "lastname", "phone", "jobtitle", "company", "hs_linkedin_url", "hubspot_owner_id"],
-                ["email", "firstname", "lastname", "jobtitle", "company", "hubspot_owner_id"],
-                ["email", "firstname", "lastname"],
-                ["email"]
+                ["hs_linkedin_url","email", "firstname", "lastname", "phone", "jobtitle", "company", "hubspot_owner_id"],
+                ["hs_linkedin_url", "firstname", "lastname", "jobtitle", "company", "hubspot_owner_id"],
+                ["hs_linkedin_url", "firstname", "lastname"],
+                ["hs_linkedin_url"]
             ]
 
             base = {
@@ -137,12 +134,12 @@ class HubspotContactCreator:
                 contact_input = SimplePublicObjectInput(properties=properties)
                 try:
                     created = self.client.crm.contacts.basic_api.create(simple_public_object_input_for_create=contact_input)
-                    return {"status": "created", "email": email, "hubspot_contact_id": created.id}
+                    return {"status": "created", "linkedin_url": linkedin_url, "hubspot_contact_id": created.id}
                 except ApiException as e:
                     if e.status == 429:
                         time.sleep(2 ** retry_count)
                         continue
-                    return {"status": "failed", "email": email, "error": str(e), "http_status": getattr(e, 'status', 'unknown')}
+                    return {"status": "failed", "linkedin_url": linkedin_url, "error": str(e), "http_status": getattr(e, 'status', 'unknown')}
         except Exception as e:
             detailed_log(traceback.format_exc(), "error")
             clean_log(f"HubSpot contact creation failed: {str(e)}", "error")
