@@ -111,10 +111,10 @@ class HubspotContactCreator:
             owner_id = self._get_owner_id(owner_email)
 
             field_sets = [
-                ["hs_linkedin_url","email", "firstname", "lastname", "phone", "jobtitle", "company", "hubspot_owner_id"],
-                ["hs_linkedin_url", "firstname", "lastname", "jobtitle", "company", "hubspot_owner_id"],
-                ["hs_linkedin_url", "firstname", "lastname"],
-                ["hs_linkedin_url"]
+                ["linkedin_url","email", "firstname", "lastname", "phone", "jobtitle", "company", "hubspot_owner_id", "source","product"],
+                ["linkedin_url", "firstname", "lastname", "jobtitle", "company", "hubspot_owner_id", "source","product"],
+                ["linkedin_url", "firstname", "lastname", "source","product"],
+                ["linkedin_url", "source","product"]
             ]
 
             base = {
@@ -124,8 +124,10 @@ class HubspotContactCreator:
                 "phone": phone,
                 "jobtitle": title,
                 "company": company,
-                "hs_linkedin_url": linkedin_url,
-                "hubspot_owner_id": owner_id
+                "linkedin_url": linkedin_url,
+                "hubspot_owner_id": owner_id,
+                "source":"AI-SDR",
+                "product":"DaaS"
             }
 
             for fields in field_sets:
@@ -188,9 +190,9 @@ class HubspotContactCreator:
         try:
             search_payload = {
                 "filter_groups": [{
-                    "filters": [{"property_name": "hs_linkedin_url", "operator": "EQ", "value": linkedin_url}]
+                    "filters": [{"property_name": "linkedin_url", "operator": "EQ", "value": linkedin_url}]
                 }],
-                "properties": ["hs_linkedin_url"]
+                "properties": ["linkedin_url"]
             }
             search_request = PublicObjectSearchRequest(**search_payload)
             api_response = self.client.crm.contacts.search_api.do_search(public_object_search_request=search_request)
