@@ -4,12 +4,12 @@ Web Enrichment Saver Node
 Saves the results of the web enrichment process to a CSV file incrementally.
 """
 
-import os
 import csv
+import os
 from typing import Dict, Any
 
+from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
 from ai_agents.ai_sdr.sdr.models import WorkflowState
-from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log, detailed_log
 
 
 def save_web_enrichment_results(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:

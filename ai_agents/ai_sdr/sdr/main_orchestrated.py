@@ -10,16 +10,15 @@ import os
 import sys
 import traceback
 from datetime import datetime
-from typing import Dict, Any
-
-from ai_agents.ai_sdr.sdr.main import load_configuration, create_run_directories, get_project_root, get_prompts_configuration
 
 from agents import set_default_openai_client
 from openai import AsyncOpenAI
 
+from ai_agents.ai_sdr.sdr.logging_config import setup_sdr_logging, log_workflow_start, clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.main import load_configuration, create_run_directories
 from ai_agents.ai_sdr.sdr.models import WorkflowState
 from ai_agents.ai_sdr.sdr.workflow_adapter import WorkflowAdapter
-from ai_agents.ai_sdr.sdr.logging_config import setup_sdr_logging, log_workflow_start, clean_log, detailed_log
+
 
 async def main(cli_config=None):
     """Main entry point for the orchestrated SDR workflow"""

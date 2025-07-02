@@ -5,9 +5,10 @@ Model Validation Script
 This script validates the data models and their interactions to identify potential issues.
 """
 
-import sys
 import os
+import sys
 from typing import List
+
 import pandas as pd
 
 # Add current directory to Python path for relative imports
@@ -17,7 +18,7 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 from ai_agents.ai_sdr.sdr.models import Company, WorkflowState
-from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
 from ai_agents.ai_sdr.sdr.nodes.streamlined_web_enricher import StreamlinedWebEnricher
 from ai_agents.ai_sdr.sdr.nodes.file_storage import serialize_company_data
 from ai_agents.ai_sdr.sdr.nodes.company_list_retriever import _normalize_company_data

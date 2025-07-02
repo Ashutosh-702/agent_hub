@@ -2,11 +2,11 @@
 Workflow Adapter - Provides compatibility layer between old and new workflow architectures
 """
 from typing import Dict, Any
-import asyncio
+
+from ai_agents.ai_sdr.sdr.graph import compile_workflow as compile_monolithic_workflow
+from ai_agents.ai_sdr.sdr.logging_config import clean_log
 from ai_agents.ai_sdr.sdr.models import WorkflowState
 from ai_agents.ai_sdr.sdr.orchestrator import WorkflowOrchestrator, OrchestratorResult
-from ai_agents.ai_sdr.sdr.graph import compile_workflow as compile_monolithic_workflow
-from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log
 
 
 class WorkflowAdapter:

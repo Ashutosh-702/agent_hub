@@ -4,10 +4,13 @@ Workflow Orchestrator - Manages company processing with individual workflows
 This orchestrator runs OUTSIDE of LangGraph and manages the execution
 of individual LangGraph workflows for each company.
 """
-from typing import List, Dict, Any, Optional
-from datetime import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import List, Dict, Any, Optional
 
+from loguru import logger
+
+from ai_agents.ai_sdr.sdr.logging_config import sdr_logger
 from ai_agents.ai_sdr.sdr.models import Company, WorkflowState
 from ai_agents.ai_sdr.sdr.nodes.company_list_retriever import _read_google_sheet, _read_csv_file, \
     _normalize_company_data
@@ -15,8 +18,6 @@ from ai_agents.ai_sdr.sdr.nodes.error_reporter import save_error_summary
 from ai_agents.ai_sdr.sdr.nodes.final_progress_saver import save_final_workflow_results
 from ai_agents.ai_sdr.sdr.nodes.progress_saver import save_linkedin_progress
 from ai_agents.ai_sdr.sdr.single_company_workflow import compile_single_company_workflow
-from ai_agents.ai_sdr.sdr.logging_config import sdr_logger, clean_log
-from loguru import logger
 
 
 @dataclass

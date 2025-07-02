@@ -2,19 +2,20 @@
 Single Company Workflow - Processes one company at a time
 """
 from typing import Literal
+
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 
+from ai_agents.ai_sdr.sdr.logging_config import sdr_logger
 from ai_agents.ai_sdr.sdr.models import WorkflowState
-from ai_agents.ai_sdr.sdr.nodes.streamlined_web_enricher import streamlined_web_enricher
-from ai_agents.ai_sdr.sdr.nodes.web_enrichment_saver import save_web_enrichment_results
-from ai_agents.ai_sdr.sdr.nodes.prospect_enricher import prospect_enricher
 from ai_agents.ai_sdr.sdr.nodes.company_progress_saver import (
     linkedin_progress_saver as company_linkedin_saver,
     hubspot_progress_saver
 )
 from ai_agents.ai_sdr.sdr.nodes.hubspot_contact_creator import hubspot_contact_creator
-from ai_agents.ai_sdr.sdr.logging_config import sdr_logger
+from ai_agents.ai_sdr.sdr.nodes.prospect_enricher import prospect_enricher
+from ai_agents.ai_sdr.sdr.nodes.streamlined_web_enricher import streamlined_web_enricher
+from ai_agents.ai_sdr.sdr.nodes.web_enrichment_saver import save_web_enrichment_results
 
 
 def check_relevance_for_prospect_enrichment(state: WorkflowState) -> Literal[

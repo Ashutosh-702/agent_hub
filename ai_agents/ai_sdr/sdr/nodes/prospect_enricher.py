@@ -10,9 +10,9 @@ from agents import Agent, Runner, ModelSettings
 from agents.mcp.server import MCPServerStdio
 from openai.types import Reasoning
 
+from ai_agents.ai_sdr.sdr.logging_config import log_llm_request, log_llm_response, clean_log, detailed_log
 from ai_agents.ai_sdr.sdr.models import WorkflowState, Company, LinkedInProspectResponse
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
-from ai_agents.ai_sdr.sdr.logging_config import log_llm_request, log_llm_response, log_llm_error, sdr_logger, clean_log, detailed_log
 
 
 class ProspectEnricher:

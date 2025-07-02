@@ -4,13 +4,13 @@ File Storage Node
 Saves workflow progress and results to files for tracking and review.
 """
 import csv
-import os
 import json
+import os
 from datetime import datetime
 from typing import Dict, Any
 
-from ai_agents.ai_sdr.sdr.models import WorkflowState, Company, CompanyRelevance
 from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
+from ai_agents.ai_sdr.sdr.models import WorkflowState, Company
 
 
 def ensure_output_directory():

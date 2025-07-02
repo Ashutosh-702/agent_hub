@@ -6,13 +6,14 @@ Two-step LLM-driven approach:
 2. Browser Enhancement LLM - Uses browser to visit sites and enrich data
 """
 
-from typing import Dict, Any
 from datetime import datetime
+from typing import Dict, Any
 
 import orjson
 from openai import OpenAI
 
-from ai_agents.ai_sdr.sdr.logging_config import log_llm_response, log_llm_request, log_llm_error, clean_log, detailed_log, sdr_logger
+from ai_agents.ai_sdr.sdr.logging_config import log_llm_response, log_llm_request, log_llm_error, clean_log, \
+    detailed_log
 from ai_agents.ai_sdr.sdr.models import WorkflowState, Company, CompanyRelevance
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
 
