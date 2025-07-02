@@ -49,7 +49,7 @@ class LinkedInDesignationFinder:
             await browser_mcp.connect()
 
             # Build search prompt
-            prompt = f"""Find multiple people at "{company_name}" whose current titles match or are similar to "
+            prompt = f"""Find max 5 people at "{company_name}" whose current titles match or are similar to "
 {designation}" and give me the JSON result as specified."""
 
             # Set up agent
@@ -57,7 +57,7 @@ class LinkedInDesignationFinder:
                 name="LinkedInDesignationSearchAgent",
                 model="o3",
                 model_settings=ModelSettings(
-                    reasoning=Reasoning(effort="medium"),
+                    reasoning=Reasoning(effort="high"),
                     extra_body={"service_tier": "flex"}
                 ),
                 mcp_servers=[browser_mcp],
