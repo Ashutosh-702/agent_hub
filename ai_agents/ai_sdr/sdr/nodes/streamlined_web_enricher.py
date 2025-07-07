@@ -104,10 +104,6 @@ Please try a different search approach or be more thorough in your analysis.
                 tools=[
                     {
                         "type": "web_search_preview",
-                        "user_location": {
-                            "type": "approximate",
-                            "country": "IN"
-                        },
                         "search_context_size": "medium"
                     }
                 ],

@@ -32,16 +32,56 @@ class PromptsConfig:
             return custom_target
 
         # Default target executives
-        return """   - Founder, Co-founder
-   - CEO, Chief Executive Officer
-   - COO, Chief Operating Officer  
-   - CTO, Chief Technology Officer
-   - CFO, Chief Financial Officer
-   - Managers, Senior Managers
-   - Head of Operations, VP Operations
-   - Head of Supply Chain, Head of Logistics
-   - General Manager, Managing Director
-   - Directors, VPs, Senior Managers"""
+        return """   
+         Chief Executive Officer (CEO)
+Responsibilities: Drives overall business growth, strategy, and digital innovation.
+
+
+Relevance: Sees OMS as a strategic enabler for unified commerce, customer satisfaction, and operational scale.
+
+
+2. Chief Operating Officer (COO) / Head of Operations
+Responsibilities: Oversees day-to-day operations, supply chain, and fulfillment.
+
+
+Relevance: Benefits from OMS features like real-time order tracking, inventory sync, and process automation.
+
+
+3. Head of E-commerce / E-commerce Director
+Responsibilities: Manages digital sales channels, customer journey, and online growth.
+
+
+Relevance: Gains full visibility into orders from marketplaces and websites, ensuring consistent delivery performance.
+
+
+4. Chief Technology Officer (CTO) / Head of IT
+Responsibilities: Owns technology infrastructure, integrations, and platform reliability.
+
+
+Relevance: Fynd OMS’s API-driven architecture supports seamless integration with existing tech stacks.
+
+
+5. Head of Engineering
+Responsibilities: Leads engineering and software implementation, ensures scalability and code quality.
+
+
+Relevance: Evaluates OMS for ease of integration, customizability, and scalability in high-volume environments.
+
+
+6. Chief Digital Transformation Officer (CDTO) / Head of Digital Transformation
+Responsibilities: Drives company-wide digital initiatives and omnichannel strategies.
+
+
+Relevance: Seeks tools like Fynd OMS to bridge offline and online operations, enabling real-time orchestration and fulfillment optimization.
+
+
+7. Supply Chain Manager / Head of Logistics
+Responsibilities: Coordinates logistics, warehousing, and delivery.
+
+
+Relevance: Fynd OMS enhances visibility, auto-routing, and reduces order-to-delivery time across regions and warehouses.
+
+"""
 
     def get_prompt(self, prompt_key: str, **kwargs) -> str:
         """
@@ -179,12 +219,130 @@ then dive deeper into specific areas like:
 CRITICAL: Since initial data is minimal, be extra thorough in verifying you have the right company.
 Look for multiple sources confirming the same information.""",
 
+##### COMPANY RELEVANCE CRITERIA
+
     "web_enricher_user_prompt": """Relevance Criteria: Determine if the company fits either of the following:
 
-An online selling through an e-commerce website, OR
-        
-An offline grocer (e.g. supermarket or grocery store chain) clearly operating a retail grocery business (even 
-if they have no e-commerce).
+    RELEVANT COMPANY DEFINITION
+        To maximize outreach effectiveness, focus on companies with the following characteristics:
+        Industry: Retailers and brands in fashion, footwear, electronics, beauty, and home goods.
+
+
+        Size: Mid to large enterprises with a significant Online, Marketplaces presence or plans to expand digitally.
+
+
+        Geography: Operating in or targeting the Middle East market, including countries like UAE, Saudi Arabia, and Qatar.
+
+
+        Sales Channels: Utilizing multiple sales channels, including own e-commerce websites and third-party marketplaces.
+
+
+        Operational Complexity: Managing multiple warehouses, stores, or fulfillment centers, indicating a need for advanced order management solutions.
+
+
+        MANDATORY CRITERIA
+        To qualify, a company must:
+        Business should be selling online through Shopify or Magento platform
+        Should be headquartered in the Middle East
+
+
+
+
+        BUSINESS METRICS 
+        Revenue: $1M or higher
+
+
+        Company size: Between 11 and 1000 employees
+
+
+        Average Selling Price (ASP): $15
+
+
+
+        Segmented Business Categories for Fynd OMS
+        1. Fashion & Apparel
+        Company Size: Mid to large brands (50–500+ employees).
+
+
+        Digital Maturity: Medium to high — often already on Shopify, Magento, or custom e-commerce platforms.
+
+
+        Marketplace Presence: Strong on Noon, Amazon UAE, Namshi, Ounass, Sivvi.
+
+
+        Pain Points: Returns, real-time inventory sync, split shipments, and overselling across marketplaces.
+
+
+
+        2. Beauty & Personal Care
+        Company Size: Mid-sized D2C brands and regional distributors.
+
+
+        Digital Maturity: High — most are aggressive in online acquisition and customer loyalty.
+
+
+        Marketplace Presence: Amazon UAE, Noon, Faces, Basharacare.
+
+
+        Pain Points: Bundling, product expiry management, repeat order automation, stock unification.
+
+
+
+
+        3. Electronics & Mobile Accessories
+        Company Size: Medium to enterprise (including distributors & multi-brand chains).
+
+
+        Digital Maturity: Medium to high — often have integrations but poor real-time control.
+
+
+        Marketplace Presence: Amazon, Noon, Jumbo, Sharaf DG.
+
+
+        Pain Points: Returns/RTO, channel pricing sync, warranty tracking, serialized inventory.
+
+        4. Home & Living / Furniture
+        Company Size: Medium-sized retailers and large showrooms.
+
+
+        Digital Maturity: Low to medium — usually weaker e-commerce infra.
+
+
+        Marketplace Presence: Noon, Amazon, Home Centre.
+
+
+        Pain Points: Order-based fulfillment (MTO), warehouse-level routing, long shipping SLAs.
+
+        5. Department Stores & Multi-brand Retailers
+        Company Size: Large organizations (100+ stores or SKU count >10,000).
+
+
+        Digital Maturity: Medium — transitioning to omnichannel with legacy systems.
+
+
+        Marketplace Presence: Multiple — own site + 3rd-party channels + in-store POS.
+
+
+        Pain Points: Order orchestration, partial fulfillment, order splitting, centralized control.
+
+        6. Baby & Kids Products
+        Company Size: Small to mid-sized regional brands or specialty retailers.
+
+
+        Digital Maturity: Medium — often fast adopters of tech.
+
+
+        Marketplace Presence: Amazon, Noon, Sprii (was), Mumzworld.
+
+
+        Pain Points: SKU bundling, inventory forecasting, high return rates.
+
+        EXCLUSION CRITERIA
+        Leads should be disqualified if they:
+        Doesn’t have an online presence
+        Has fewer than 50 SKUs
+        Should be on the Magento or Shopify platform
+
 
 Begin your research now using the web search tool""",
 
