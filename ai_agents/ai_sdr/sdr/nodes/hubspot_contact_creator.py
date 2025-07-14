@@ -111,10 +111,10 @@ class HubspotContactCreator:
             owner_id = self._get_owner_id(owner_email)
 
             field_sets = [
-                ["linkedin_url","email", "firstname", "lastname", "phone", "jobtitle", "company", "hubspot_owner_id", "source","product"],
-                ["linkedin_url", "firstname", "lastname", "jobtitle", "company", "hubspot_owner_id", "source","product"],
-                ["linkedin_url", "firstname", "lastname", "source","product"],
-                ["linkedin_url", "source","product"]
+                ["linkedin_url","email", "firstname", "lastname", "phone", "jobtitle", "company", "hubspot_owner_id", "source","product","ci_lifecycle_stage"],
+                ["linkedin_url", "firstname", "lastname", "jobtitle", "company", "hubspot_owner_id", "source","product","ci_lifecycle_stage"],
+                ["linkedin_url", "firstname", "lastname", "source","product","ci_lifecycle_stage"],
+                ["linkedin_url", "source","product","ci_lifecycle_stage"]
             ]
 
             base = {
@@ -127,8 +127,11 @@ class HubspotContactCreator:
                 "linkedin_url": linkedin_url,
                 "hubspot_owner_id": owner_id,
                 "source":"AI-SDR",
-                "product":"DaaS"
+                "product":"OMS_Global",
+                "ci_lifecycle_stage":"Not Contacted",
             }
+
+            #### Custom Updates Above
 
             for fields in field_sets:
                 properties = {k: v for k, v in base.items() if k in fields and v}
