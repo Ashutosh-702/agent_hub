@@ -41,7 +41,6 @@ async def create_new_account(email: str, password: str) -> Optional[str]:
     Creates a new account with the given email and password. Returns accId
     """
     try:
-        # Unipile API call to create account
         api_token = os.getenv("UNIPILE_API_TOKEN")
         base_url = os.getenv("UNIPILE_API_URL")
         
@@ -58,6 +57,11 @@ async def create_new_account(email: str, password: str) -> Optional[str]:
         }
         
         response = requests.post(url, json=payload, headers=headers)
+        
+        # Debug logging, delete later
+        print(f"DEBUG: Unipile API URL: {url}")
+        print(f"DEBUG: Response Status: {response.status_code}")
+        print(f"DEBUG: Response Text: {response.text}")
         
         if response.status_code != 201:
             print(f"APIERROR: Unipile account creation failed: {response.status_code}, {response.text}")

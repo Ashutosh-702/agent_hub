@@ -33,12 +33,16 @@ async def upload_leads(email: str = Form(...),
 
         if not csv_reader.fieldnames or "linkedin_url" not in csv_reader.fieldnames:
             raise HTTPException(status_code=400, detail="ERROR: CSV must contain 'linkedin_url' column || upload_leads")
+        
+        if "task" not in csv_reader.fieldnames:
+            raise HTTPException(status_code=400, detail="ERROR: CSV must contain 'task' column || upload_leads")
 
         count = 0
         for row in csv_reader:
             linkedin_url = row.get("linkedin_url")
+            task = row.get("task", "connection")  # Read task from CSV, default to "connection"
             if linkedin_url:
-                await add_batch(batch_id, linkedin_url, task="connection")
+                await add_batch(batch_id, linkedin_url, task=task)
                 count += 1
 
     except Exception as e:
