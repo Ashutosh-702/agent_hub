@@ -22,13 +22,12 @@ async def add_batch(batch_id: str, linkedin_url: str, task: str) -> None:
 async def find_pending_batches(batch_id: str) -> list:
     """
     Finds and returns a list of batch value documents with status=False for the given batch_id.
-    
     """
     try:
-        return await list(batch_values_collection.find({
+        return await batch_values_collection.find({
             "batch_id": batch_id,
             "status": False
-        }))
+        }).to_list(length=None) 
     except Exception as e:
         print(f"ERROR: find_pending_batches: {e}")
         return []

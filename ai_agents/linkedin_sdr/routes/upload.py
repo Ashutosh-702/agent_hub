@@ -28,7 +28,7 @@ async def upload_leads(email: str = Form(...),
         decoded = contents.decode("utf-8")
         csv_reader = csv.DictReader(io.StringIO(decoded))
 
-        if "linkedin_url" not in csv_reader.fieldnames:
+        if not csv_reader.fieldnames or "linkedin_url" not in csv_reader.fieldnames:
             raise HTTPException(status_code=400, detail="ERROR: CSV must contain 'linkedin_url' column || upload_leads")
 
         count = 0

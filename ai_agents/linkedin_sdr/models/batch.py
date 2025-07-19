@@ -7,7 +7,6 @@ async def create_batch(account_id: str) -> str:
     Creates a new batch for the given account_id with is_completed=False. Returns the generated batch_id (UUID).
     """
     try:
-        # Generate unique batch ID
         batch_id = str(uuid.uuid4())
         
         batch_doc = {
