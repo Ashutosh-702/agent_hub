@@ -1,6 +1,5 @@
 import uuid
 from typing import Optional
-
 from ..database import batches_collection
 
 async def create_batch(account_id: str) -> str:
