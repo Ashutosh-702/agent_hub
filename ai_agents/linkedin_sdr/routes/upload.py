@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Form, HTTPException, UploadFile
-from ..models.accounts import get_account_id, validate_credentials
+from ..models.accounts import get_account_id, validate_credentials, create_new_account
 from ..models.batch import create_batch
 from ..models.batch_value import add_batch
 import csv
@@ -12,11 +12,14 @@ async def upload_leads(email: str = Form(...),
                        csv_file: UploadFile = Form(...)) -> dict:
     is_valid, message = await validate_credentials(email, password)
     if not is_valid:
-        raise HTTPException(status_code=400, detail=message)
-
-    account_id = await get_account_id(email, password)
-    if not account_id:
-        raise HTTPException(status_code=404, detail="ERROR: Account ID not found || upload_leads")
+        print(f"Account not found, creating new account for {email}")
+        account_id = await create_new_account(email, password)
+        if not account_id:
+            raise HTTPException(status_code=500, detail="Failed to create account with Unipile")
+    else:
+        account_id = await get_account_id(email, password)
+        if not account_id:
+            raise HTTPException(status_code=404, detail="ERROR: Account ID not found || upload_leads")
     
     try:
         batch_id = await create_batch(account_id)
