@@ -15,7 +15,7 @@ async def add_batch(batch_id: str, linkedin_url: str, task: str) -> None:
             "status": False
         }
         
-        batch_values_collection.insert_one(batch_value_doc)
+        await batch_values_collection.insert_one(batch_value_doc)
     except Exception as e:
         print(f"ERROR: add_batch: {e}")
 
@@ -25,7 +25,7 @@ async def find_pending_batches(batch_id: str) -> list:
     
     """
     try:
-        return list(batch_values_collection.find({
+        return await list(batch_values_collection.find({
             "batch_id": batch_id,
             "status": False
         }))
@@ -38,7 +38,7 @@ async def update_status(batch_id: str, linkedin_url: str, status: bool = True) -
     Updates the status of a specific linkedin_url in the given batch_id to the given status.
     """
     try:
-        batch_values_collection.update_one(
+        await batch_values_collection.update_one(
             {
                 "batch_id": batch_id,
                 "data.url": linkedin_url

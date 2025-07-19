@@ -23,7 +23,7 @@ async def validate_credentials(email: str, password: str) -> tuple[bool, str]:
     Returns True if credentials are valid, else False.
     """
     try:
-        account = accounts_collection.find_one({"linkedin_email": email})
+        account = await accounts_collection.find_one({"linkedin_email": email})
         if not account:
             return False, "account not found"
         
@@ -42,7 +42,7 @@ async def create_new_account(email: str, password: str) -> Optional[str]:
     try:
         # TODO: Make actual UNIPILE API call to create account
         account_id = str(uuid.uuid4())
-        accounts_collection.insert_one({
+        await accounts_collection.insert_one({
             "linkedin_email": email,
             "linkedin_password": password,
             "account_id": account_id

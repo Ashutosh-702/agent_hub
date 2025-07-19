@@ -19,7 +19,7 @@ async def upload_leads(email: str = Form(...),
         raise HTTPException(status_code=404, detail="ERROR: Account ID not found || upload_leads")
     
     try:
-        batch_id = create_batch(account_id)
+        batch_id = await create_batch(account_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ERROR: Failed to create batch || upload_leads: {str(e)}")
     
@@ -35,7 +35,7 @@ async def upload_leads(email: str = Form(...),
         for row in csv_reader:
             linkedin_url = row.get("linkedin_url")
             if linkedin_url:
-                add_batch(batch_id, linkedin_url, task="connection")
+                await add_batch(batch_id, linkedin_url, task="connection")
                 count += 1
 
     except Exception as e:

@@ -17,7 +17,7 @@ async def create_batch(account_id: str) -> str:
             "is_completed": False,
         }
         
-        result = batches_collection.insert_one(batch_doc)
+        result = await batches_collection.insert_one(batch_doc)
         
         if result.inserted_id:
             return batch_id
@@ -32,7 +32,7 @@ async def get_batch(batch_id: str) -> Optional[dict]:
     Fetches the batch document using batch_id. Returns the batch if found, else None.
     """
     try:
-        return batches_collection.find_one({"batch_id": batch_id})
+        return await batches_collection.find_one({"batch_id": batch_id})
     except Exception as e:
         print(f"ERROR: get_batch: {e}")
         return None
@@ -42,7 +42,7 @@ async def update_batch_completion(batch_id: str, is_completed: bool) -> bool:
     Update batch completion status
     """
     try:
-        result = batches_collection.update_one(
+        result = await batches_collection.update_one(
             {"batch_id": batch_id},
             {
                 "$set": {
