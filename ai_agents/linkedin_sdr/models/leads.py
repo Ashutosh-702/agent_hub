@@ -1,16 +1,13 @@
 import os
 import requests
-from pymongo import MongoClient
-
-client = MongoClient(os.getenv("MONGO_URI"))
-db = client["linkedin_db"]
+from ..database import leads_collection
 
 async def add_lead(linkedin_url: str, account_id: str, provider_id: str) -> None:
     """
     Adds a new lead document with the given linkedin_url, account_id, and provider_id.
     """
     try:
-        await db.leads.insert_one({
+        await leads_collection.insert_one({
             "linkedin_url": linkedin_url,
             "account_id": account_id,
             "provider_id": provider_id
@@ -23,7 +20,7 @@ async def get_provider_id(linkedin_url: str) -> str:
     Fetches from db or unipileAPI the provider_id for the given linkedin_url.
     """
     try:
-        lead = await db.leads.find_one({"linkedin_url": linkedin_url})
+        lead = await leads_collection.find_one({"linkedin_url": linkedin_url})
         if lead and "provider_id" in lead:
             return lead["provider_id"]
 
@@ -46,7 +43,7 @@ async def get_provider_id(linkedin_url: str) -> str:
         data = response.json()
         provider_id = data.get("provider_id")
 
-        await db.leads.insert_one({
+        await leads_collection.insert_one({
             "linkedin_url": linkedin_url,
             "provider_id": provider_id,
             "account_id": account_id
@@ -62,7 +59,7 @@ async def get_lead(linkedin_url: str) -> dict:
     Fetches the lead document using linkedin_url. Returns the lead if found, else None.
     """
     try:
-        return await db.leads.find_one({"linkedin_url": linkedin_url})
+        return await leads_collection.find_one({"linkedin_url": linkedin_url})
     except Exception as e:
         print(f"ERROR: get_lead: {e}")
         return None

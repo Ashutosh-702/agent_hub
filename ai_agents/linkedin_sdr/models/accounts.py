@@ -1,15 +1,13 @@
 import uuid
 from pymongo import MongoClient
-import os
-client = MongoClient(os.getenv("MONGO_URI"))
-db = client["linkedin_db"]
+from ..database import accounts_collection
 
 async def get_account_id(email: str, password: str) -> str:
     """
     Fetch account by email and password. Returns the account if found or None if not found.
     """
     try:
-        account = await db.accounts.find_one({
+        account = await accounts_collection.find_one({
             "linkedin_email": email,
             "linkedin_password": password
         })
@@ -25,7 +23,7 @@ async def validate_credentials(email: str, password: str) -> tuple[bool, str]:
     Returns True if credentials are valid, else False.
     """
     try:
-        account = db.accounts.find_one({"linkedin_email": email})
+        account = accounts_collection.find_one({"linkedin_email": email})
         if not account:
             return False, "account not found"
         
@@ -44,7 +42,7 @@ async def create_new_account(email: str, password: str) -> str:
     try:
         # TODO: Make actual UNIPILE API call to create account
         account_id = str(uuid.uuid4())
-        await db.accounts.insert_one({
+        await accounts_collection.insert_one({
             "linkedin_email": email,
             "linkedin_password": password,
             "account_id": account_id
