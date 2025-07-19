@@ -3,7 +3,7 @@ import requests
 from typing import Optional
 from ..database import leads_collection
 
-def add_lead(linkedin_url: str, account_id: str, provider_id: str) -> None:
+async def add_lead(linkedin_url: str, account_id: str, provider_id: str) -> None:
     """
     Adds a new lead document with the given linkedin_url, account_id, and provider_id.
     """
@@ -16,7 +16,7 @@ def add_lead(linkedin_url: str, account_id: str, provider_id: str) -> None:
     except Exception as e:
         print(f"ERROR: add_lead: {e}")
 
-def get_provider_id(linkedin_url: str) -> Optional[str]:
+async def get_provider_id(linkedin_url: str) -> Optional[str]:
     """
     Fetches from db or unipileAPI the provider_id for the given linkedin_url.
     """
@@ -55,7 +55,7 @@ def get_provider_id(linkedin_url: str) -> Optional[str]:
     except Exception as e:
         print(f"ERROR: get_provider_id: {e}")
         return None
-def get_lead(linkedin_url: str) -> Optional[dict]:
+async def get_lead(linkedin_url: str) -> Optional[dict]:
     """
     Fetches the lead document using linkedin_url. Returns the lead if found, else None.
     """

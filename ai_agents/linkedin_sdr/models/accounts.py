@@ -2,7 +2,7 @@ import uuid
 from ..database import accounts_collection
 from typing import Optional
 
-def get_account_id(email: str, password: str) -> Optional[str]:
+async def get_account_id(email: str, password: str) -> Optional[str]:
     """
     Fetch account by email and password. Returns the account if found or None if not found.
     """
@@ -18,12 +18,11 @@ def get_account_id(email: str, password: str) -> Optional[str]:
         print(f"ERROR: get_account_id: {e}")
         return None
 
-def validate_credentials(email: str, password: str) -> tuple[bool, str]:
+async def validate_credentials(email: str, password: str) -> tuple[bool, str]:
     """
     Returns True if credentials are valid, else False.
     """
     try:
-        account = accounts_collection.find_one({"linkedin_email": email})
         account = accounts_collection.find_one({"linkedin_email": email})
         if not account:
             return False, "account not found"
@@ -36,7 +35,7 @@ def validate_credentials(email: str, password: str) -> tuple[bool, str]:
         print(f"ERROR: validate_credentials: {e}")
         return False, "Error message"
 
-def create_new_account(email: str, password: str) -> Optional[str]:
+async def create_new_account(email: str, password: str) -> Optional[str]:
     """
     Creates a new account with the given email and password. Returns accId
     """
