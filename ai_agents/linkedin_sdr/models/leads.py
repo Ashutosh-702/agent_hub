@@ -1,8 +1,9 @@
 import os
 import requests
 from typing import Optional
-from ..database import leads_collection
-
+from ..database import leads_collection, batches_collection, batch_values_collection
+from ..models.accounts import get_account_id
+from ..unipile_service import fetch_provider_id
 async def add_lead(linkedin_url: str, account_id: str, provider_id: str) -> None:
     """
     Adds a new lead document with the given linkedin_url, account_id, and provider_id.
@@ -26,23 +27,19 @@ async def get_provider_id(linkedin_url: str) -> Optional[str]:
             return lead["provider_id"]
 
         identifier = linkedin_url
-        account_id = os.getenv("UNIPILE_ACCOUNT_ID")
-        api_token = os.getenv("UNIPILE_API_TOKEN")
-        base_url = os.getenv("UNIPILE_API_URL")
-
-        url = f"{base_url}/api/v1/users/{identifier}?account_id={account_id}"
-        headers = {
-            "X-API-KEY": api_token,
-            "Accept": "application/json"
-        }
-
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            print(f"APIERROR: Unipile API failed: {response.status_code}, {response.text}")
+        batch_value = await batch_values_collection.find_one({"data.url": linkedin_url})
+        if not batch_value:
+            print(f"No batch value found for {linkedin_url}")
             return None
+        batch_id = batch_value["batch_id"]
+        batch = await batches_collection.find_one({"batch_id": batch_id})
+        if not batch:
+            print(f"No batch found for batch_id: {batch_id}")
+            return None
+        account_id = batch["account_id"]
 
-        data = response.json()
-        provider_id = data.get("provider_id")
+
+        provider_id = await fetch_provider_id(linkedin_url, account_id)
 
         await leads_collection.insert_one({
             "linkedin_url": linkedin_url,

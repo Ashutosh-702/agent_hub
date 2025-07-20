@@ -15,7 +15,7 @@ async def upload_leads(email: str = Form(...),
         print(f"Account not found, creating new account for {email}")
         account_id = await create_new_account(email, password)
         if not account_id:
-            raise HTTPException(status_code=500, detail="Failed to create account with Unipile")
+            raise HTTPException(status_code=500, detail="ERROR: Failed to create account with Unipile || upload_leads")
     else:
         account_id = await get_account_id(email, password)
         if not account_id:
@@ -40,7 +40,7 @@ async def upload_leads(email: str = Form(...),
         count = 0
         for row in csv_reader:
             linkedin_url = row.get("linkedin_url")
-            task = row.get("task", "connection")  # Read task from CSV, default to "connection"
+            task = row.get("task", "connection")
             if linkedin_url:
                 await add_batch(batch_id, linkedin_url, task=task)
                 count += 1
