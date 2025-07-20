@@ -5,4 +5,11 @@ pymongo==4.6.2
 python-multipart==0.0.6
 python-dotenv==1.0.0
 pydantic==2.5.0
-requests==2.31.0
+httpx==0.25.0
+chronos_client@git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/chronos-client@v2.1.7#egg=chronos_client
+# Kafka dependencies for Chronos consumer, so for now u can comment out the below dependencies
+# aiokafka==0.8.1
+# confluent-kafka==2.3.0
+# eventbridge@git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/fynd-event-bridge@v2.1.0-alpha.4#egg=eventbridge
+# # Additional dependencies for production
+# requests==2.31.0

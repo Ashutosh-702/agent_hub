@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn SDR - Batch Management</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fab fa-linkedin"></i>
+                <h1>LinkedIn SDR</h1>
+            </div>
+            <p class="subtitle">Batch Management Dashboard</p>
+        </header>
+
+        <!-- Navigation & Actions -->
+        <div class="top-actions">
+            <div class="nav-buttons">
+                <a href="index.html" class="nav-btn">
+                    <i class="fas fa-plus"></i> Create New Batch
+                </a>
+                <button onclick="refreshBatches()" class="nav-btn secondary">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="stats-section">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalBatches">-</div>
+                    <div class="stat-label">Total Batches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="activeBatches">-</div>
+                    <div class="stat-label">Processing</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="completedBatches">-</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="batches-container">
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading your batches...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="fas fa-folder-open"></i>
+                <h3>No batches found</h3>
+                <p>Create your first batch to start connecting with prospects</p>
+                <a href="index.html" class="btn primary">
+                    <i class="fas fa-plus"></i> Create First Batch
+                </a>
+            </div>
+
+            <!-- Batch List -->
+            <div id="batchList" class="batch-list" style="display: none;">
+                <!-- Batches will be dynamically loaded here -->
+            </div>
+        </main>
+
+        <!-- Batch Detail Modal -->
+        <div id="batchModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-list-alt"></i> Batch Details</h3>
+                    <button class="close-btn" onclick="closeBatchModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- Content loaded dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast" class="toast" style="display: none;">
+            <div class="toast-content">
+                <span id="toastMessage"></span>
+                <button onclick="hideToast()" class="toast-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include JavaScript -->
+    <script src="script.js"></script>
+    <script>
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadBatches();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(loadBatches, 30000);
+        });
+    </script>
+</body>
+</html>

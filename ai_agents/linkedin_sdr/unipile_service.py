@@ -1,6 +1,6 @@
 import os
 import re
-import requests
+import httpx
 from typing import Optional
 
 BASE_URL = os.getenv("UNIPILE_API_URL")
@@ -20,9 +20,11 @@ async def connect_account(linkedin_email: str, password: str) -> Optional[str]:
             "username": linkedin_email,
             "password": password
         }
-        res = await requests.post(url, headers=HEADERS, json=data)
+        
+        async with httpx.AsyncClient() as client:
+            res = await client.post(url, headers=HEADERS, json=data)
 
-        if res.status_code == 200:
+        if res.status_code == 201:
             return res.json().get("account_id")
 
         raise Exception(f"ERROR: bad response || connect_account: {res.text}")
@@ -38,7 +40,9 @@ async def fetch_provider_id(linkedin_url: str, account_id: str) -> Optional[str]
 
         identifier = match.group(1)
         url = f"{BASE_URL}/api/v1/users/{identifier}?account_id={account_id}"
-        res = await requests.get(url, headers=HEADERS)
+        
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, headers=HEADERS)
 
         if res.status_code == 200:
             return res.json().get("provider_id")
@@ -56,7 +60,9 @@ async def send_connection_request(provider_id: str, account_id: str, message: st
             "account_id": account_id,
             "message": message
         }
-        res = await requests.post(url, headers=HEADERS, json=data)
+        
+        async with httpx.AsyncClient() as client:
+            res = await client.post(url, headers=HEADERS, json=data)
 
         if res.status_code == 201:
             return True

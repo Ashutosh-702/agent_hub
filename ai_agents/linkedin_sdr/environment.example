@@ -1,0 +1,26 @@
+# LinkedIn SDR Environment Configuration
+# Copy this file to .env and fill in your actual values
+
+# Application Mode
+# Use "server" for FastAPI server, "consumer" for Kafka consumer
+MODE=server
+PORT=8000
+
+# Database Configuration
+MONGO_URI=mongodb://localhost:27017/linkedin_sdr
+
+# Chronos Service Configuration (Remote)
+CHRONOS_INTRNL_SVC=https://api.tmsz0.de/chronos
+
+# Kafka Configuration
+KAFKA_BROKER_LIST=127.0.0.1:9092
+CONSUMER_TYPE=connection_consumer
+
+# Unipile API Configuration
+# Get these from your Unipile dashboard
+UNIPILE_API_TOKEN=your_unipile_api_token_here
+UNIPILE_API_URL=https://api.unipile.com:13443
+
+# Optional: Logging and Monitoring
+LOG_LEVEL=INFO
+DEBUG=false 

@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import upload, batch_processor
+# NEW: Added for Chronos individual processing
+from .routes import individual_processor
 
 app = FastAPI(
     title="LinkedIn SDR",
@@ -16,8 +18,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ORIGINAL ROUTES
 app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
 app.include_router(batch_processor.router, prefix="/api/v1", tags=["batch"])
+
+# NEW: Chronos individual processing route
+app.include_router(individual_processor.router, prefix="/api/v1", tags=["individual"])
 
 @app.get("/")
 async def root():
