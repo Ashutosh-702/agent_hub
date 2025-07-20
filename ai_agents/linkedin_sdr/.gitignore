@@ -1,6 +1,7 @@
 # LinkedIn SDR - Kafka Development Files
 # Ignore these files while Kafka implementation is in progress
 
+environment.example
 # Kafka Infrastructure Files
 docker-compose.yml
 Dockerfile
