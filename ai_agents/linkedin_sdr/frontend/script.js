@@ -194,10 +194,10 @@ async function handleUploadSubmit(event) {
         loadingOverlay.style.display = 'flex';
     }
     
-    // Prepare form data
-    formData.append('file', selectedFile);
-    formData.append('account_id', linkedinAccount);
-    formData.append('password', password);
+    // Prepare form data - Match backend API parameter names
+    formData.append('csv_file', selectedFile);  // Backend expects 'csv_file' 
+    formData.append('email', linkedinAccount);  // Backend expects 'email'
+    formData.append('password', password);      // Backend expects 'password'
     
     try {
         const response = await fetch(`${API_BASE}/api/v1/upload-leads`, {
@@ -207,6 +207,14 @@ async function handleUploadSubmit(event) {
         
         if (response.ok) {
             const result = await response.json();
+            
+            // OPTION 1: Store the new batch details from API response
+            if (result.batch_details) {
+                let existingBatches = JSON.parse(localStorage.getItem('linkedin_sdr_batches') || '[]');
+                existingBatches.unshift(result.batch_details);
+                localStorage.setItem('linkedin_sdr_batches', JSON.stringify(existingBatches));
+            }
+            
             showToast(`Batch created successfully! Batch ID: ${result.batch_id}`, 'success');
             
             // Redirect to batches page after a short delay
@@ -243,11 +251,11 @@ async function loadBatches() {
     if (batchList) batchList.style.display = 'none';
     
     try {
-        const response = await fetch(`${API_BASE}/api/v1/batches`);
+        // FIXED: Load batches from localStorage (populated by the 2 APIs)
+        batches = JSON.parse(localStorage.getItem('linkedin_sdr_batches') || '[]');
         
-        if (response.ok) {
-            batches = await response.json();
-            
+        // Simulate brief loading for better UX
+        setTimeout(() => {
             if (batches.length === 0) {
                 // Show empty state
                 if (loadingState) loadingState.style.display = 'none';
@@ -259,16 +267,15 @@ async function loadBatches() {
                 renderBatches();
                 updateStats();
             }
-        } else {
-            throw new Error('Failed to load batches');
-        }
+        }, 500); // Brief delay to show loading state
+        
     } catch (error) {
-        console.error('Error loading batches:', error);
-        showToast('Failed to load batches', 'error');
+        console.error('Error loading batches from storage:', error);
         
         // Show empty state as fallback
         if (loadingState) loadingState.style.display = 'none';
         if (emptyState) emptyState.style.display = 'block';
+        batches = [];
     }
 }
 
@@ -380,12 +387,22 @@ async function processBatch(batchId) {
         
         if (response.ok) {
             const result = await response.json();
-            showToast(`Batch processing started! ${result.scheduled_count} connections scheduled.`, 'success');
+            showToast(`Batch processing started! ${result.scheduled || result.scheduled_count} connections scheduled.`, 'success');
             
-            // Reload batches to show updated status
-            setTimeout(() => {
-                loadBatches();
-            }, 1000);
+            // OPTION 1: Update batches from API response
+            if (result.all_batches) {
+                localStorage.setItem('linkedin_sdr_batches', JSON.stringify(result.all_batches));
+                
+                // Immediately update the display
+                batches = result.all_batches;
+                renderBatches();
+                updateStats();
+            } else {
+                // Fallback: reload from storage
+                setTimeout(() => {
+                    loadBatches();
+                }, 1000);
+            }
         } else {
             const errorData = await response.json();
             showToast(errorData.detail || 'Failed to start batch processing', 'error');
@@ -398,13 +415,14 @@ async function processBatch(batchId) {
 
 async function viewBatchDetails(batchId) {
     try {
-        const response = await fetch(`${API_BASE}/api/v1/batch/${batchId}/details`);
+        // OPTION 1: Get batch details from localStorage (populated by APIs)
+        const storedBatches = JSON.parse(localStorage.getItem('linkedin_sdr_batches') || '[]');
+        const batch = storedBatches.find(b => b.id === batchId);
         
-        if (response.ok) {
-            const details = await response.json();
-            showBatchModal(details);
+        if (batch) {
+            showBatchModal(batch);
         } else {
-            showToast('Failed to load batch details', 'error');
+            showToast('Batch not found', 'error');
         }
     } catch (error) {
         console.error('Error loading batch details:', error);
@@ -441,17 +459,34 @@ function showBatchModal(batchDetails) {
                 </div>
             </div>
             
-            ${batchDetails.batch_values ? `
-                <h5>Individual Connections:</h5>
-                <div class="connection-list">
-                    ${batchDetails.batch_values.map(connection => `
-                        <div class="connection-item">
-                            <span class="connection-url">${connection.linkedin_url}</span>
-                            <span class="connection-status ${connection.status}">${connection.status}</span>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : ''}
+            <div class="simple-info">
+                <h5>📊 Batch Information</h5>
+                <p><strong>Batch ID:</strong> ${batchDetails.id}</p>
+                <p><strong>LinkedIn Account:</strong> ${batchDetails.account_id}</p>
+                <p><strong>Total Leads Uploaded:</strong> ${batchDetails.lead_count}</p>
+                <p><strong>Current Status:</strong> 
+                    <span class="status-badge status-${batchDetails.status}">${batchDetails.status.toUpperCase()}</span>
+                </p>
+                
+                ${batchDetails.status === 'ready' ? `
+                    <div class="status-note">
+                        <p>💡 This batch is ready to be processed. Click "Process Batch" to start sending connection requests.</p>
+                    </div>
+                ` : ''}
+                
+                ${batchDetails.status === 'processing' ? `
+                    <div class="status-note">
+                        <p>⚡ This batch is currently being processed. Connections are being sent via Chronos scheduler.</p>
+                        <p><small>Note: Individual connection status tracking requires database integration.</small></p>
+                    </div>
+                ` : ''}
+                
+                ${batchDetails.status === 'completed' ? `
+                    <div class="status-note">
+                        <p>✅ This batch has been completed. All connections have been processed.</p>
+                    </div>
+                ` : ''}
+            </div>
         </div>
     `;
     

@@ -53,3 +53,18 @@ async def update_batch_completion(batch_id: str, is_completed: bool) -> bool:
     except Exception as e:
         print(f"ERROR: update_batch_completion: {e}")
         return False
+
+#Had to create this function for frontend working, no need in backend working
+async def get_all_batches() -> list:
+    """
+    OPTION 1: Get all batches for frontend (needed for process-batch response)
+    Returns list of all batches sorted by newest first
+    """
+    try:
+        batches = await batches_collection.find().sort("_id", -1).to_list(length=None)
+        return batches
+    except Exception as e:
+        print(f"ERROR: get_all_batches: {e}")
+        return []
+
+

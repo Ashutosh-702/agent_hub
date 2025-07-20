@@ -4,6 +4,7 @@ from ..models.batch import create_batch
 from ..models.batch_value import add_batch
 import csv
 import io
+from datetime import datetime
 router = APIRouter()
 
 @router.post('/upload-leads')
@@ -48,7 +49,19 @@ async def upload_leads(email: str = Form(...),
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"ERROR: CSV processing failed || upload_leads: {e}")
 
+    # Return batch details for frontend, not required for backend working...but for frontend working
+    batch_details = {
+        "id": batch_id,
+        "account_id": email,  # Use email as account identifier  
+        "status": "ready",    # New batches start as ready
+        "lead_count": count,
+        "created_at": datetime.now().isoformat(),
+        "is_completed": False
+    }
+
     return {
         "status": "success",
         "batch_id": batch_id,
-        "leads_added": count}
+        "leads_added": count,
+        "batch_details": batch_details  # Frontend can use this to show the new batch
+    }

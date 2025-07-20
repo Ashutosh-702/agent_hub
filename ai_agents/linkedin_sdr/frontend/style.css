@@ -661,6 +661,66 @@ body {
     overflow-y: auto;
 }
 
+/* Modal Content Styles */
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.detail-item {
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 3px solid #0077B5;
+}
+
+.simple-info {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f0f8ff;
+    border-radius: 8px;
+    border: 1px solid #d1e7ff;
+}
+
+.simple-info h5 {
+    color: #0077B5;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.simple-info p {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-note {
+    margin-top: 15px;
+    padding: 15px;
+    background: #fff;
+    border-radius: 6px;
+    border-left: 4px solid #10b981;
+}
+
+.status-note p {
+    margin-bottom: 8px;
+    color: #374151;
+}
+
+.status-note small {
+    color: #6b7280;
+    font-style: italic;
+}
+
 /* Toast Notifications */
 .toast {
     position: fixed;

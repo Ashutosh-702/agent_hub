@@ -1,8 +1,7 @@
-import os
-import requests
+from datetime import datetime
 from fastapi import APIRouter, HTTPException
-from ..models.batch import get_batch, update_batch_completion
-from ..models.batch_value import find_pending_batches, update_status
+from ..models.batch import get_batch, update_batch_completion, get_all_batches
+from ..models.batch_value import find_pending_batches, update_status, get_all_batch_values
 #from ..models.leads import get_lead, get_provider_id, add_lead
 from ..chronos_utils import schedule_connection_processing
 
@@ -102,50 +101,59 @@ async def process_batch(batch_id: str):
                 print(f"Error scheduling {linkedin_url}: {e}")
                 failed_to_schedule += 1
         
+        # Get all batches to return to frontend
+        all_batches_raw = await get_all_batches()
+        
+        # Format batches for frontend
+        formatted_batches = []
+        for batch in all_batches_raw:
+            # Get batch values to count leads and determine status
+            batch_values = await get_all_batch_values(batch["batch_id"])
+            total_leads = len(batch_values)
+            completed_leads = len([bv for bv in batch_values if bv.get("status", False)])
+            
+            # Determine status
+            if batch.get("is_completed", False):
+                status = "completed"
+            elif batch["batch_id"] == batch_id:
+                status = "processing"  # This batch was just started
+            elif completed_leads > 0:
+                status = "processing"
+            else:
+                status = "ready"
+            
+            # Safe creation time extraction
+            creation_time = "unknown"
+            if batch.get("_id") and hasattr(batch["_id"], "generation_time"):
+                try:
+                    creation_time = batch["_id"].generation_time.isoformat()
+                except:
+                    creation_time = datetime.now().isoformat()
+            else:
+                creation_time = datetime.now().isoformat()
+            
+            formatted_batch = {
+                "id": batch["batch_id"],
+                "account_id": batch["account_id"],
+                "status": status,
+                "lead_count": total_leads,
+                "created_at": creation_time,
+                "progress": {
+                    "total": total_leads,
+                    "completed": completed_leads
+                } if status == "processing" else None
+            }
+            formatted_batches.append(formatted_batch)
+
         return {
             "batch_id": batch_id,
             "scheduled": scheduled_count,
             "failed_to_schedule": failed_to_schedule,
-            "message": f"Scheduled {scheduled_count} connections for processing with random delays (5-35 mins each)"
+            "message": f"Scheduled {scheduled_count} connections for processing with random delays (5-35 mins each)",
+            "all_batches": formatted_batches  # Frontend can use this to update the batch list
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error scheduling batch: {str(e)}")
-
-# def send_connection_request(provider_id: str, account_id: str) -> bool:
-#     """
-#     Send LinkedIn connection request via Unipile API
-#     Returns True if successful, False otherwise
-#     """
-#     try:
-#         api_token = os.getenv("UNIPILE_API_TOKEN")
-#         base_url = os.getenv("UNIPILE_API_URL")
-        
-#         url = f"{base_url}/users/invite"
-#         headers = {
-#             "X-API-KEY": api_token,
-#             "Accept": "application/json",
-#             "Content-Type": "application/json"
-#         }
-        
-#         payload = {
-#             "provider_id": provider_id,
-#             "account_id": account_id,
-#             "message": "I'd like to connect with you on LinkedIn."
-#         }
-        
-#         response = requests.post(url, headers=headers, json=payload)
-        
-#         if response.status_code == 201:
-#             print(f"Connection request sent successfully to provider_id: {provider_id}")
-#             return True
-#         else:
-#             print(f"Failed to send connection to provider_id {provider_id}: {response.status_code}, {response.text}")
-#             return False
-            
-#     except Exception as e:
-#         print(f"Error sending connection request to provider_id {provider_id}: {e}")
-#         return False
-
 
 

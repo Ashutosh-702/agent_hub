@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from ..models.batch import get_batch, update_batch_completion
 from ..models.batch_value import find_pending_batches, update_status, get_batch_value_by_url
 from ..models.leads import get_lead, get_provider_id, add_lead
