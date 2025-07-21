@@ -14,16 +14,14 @@ async def upload_leads(email: str = Form(...),
                        password: str = Form(...),
                        csv_file: UploadFile = Form(...),
                        cron_expression: Optional[str] = Form(None)) -> dict:
-    is_valid, message = await validate_credentials(email, password)
-    if not is_valid:
-        print(f"Account not found, creating new account for {email}")
+    account_id = await get_account_id(email, password)
+    if not account_id:
         account_id = await create_new_account(email, password)
         if not account_id:
             raise HTTPException(status_code=500, detail="ERROR: Failed to create account with Unipile || upload_leads")
-    else:
-        account_id = await get_account_id(email, password)
-        if not account_id:
-            raise HTTPException(status_code=404, detail="ERROR: Account ID not found || upload_leads")
+    is_valid = await validate_credentials(email, password)
+    if not is_valid:
+        raise HTTPException(status_code=401, detail=f"ERROR: Invalid credentials || upload_leads")
     
     try:
         batch_id = await create_batch(account_id)
