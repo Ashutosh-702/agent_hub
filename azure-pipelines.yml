@@ -1,0 +1,13 @@
+#tagdeploy pipeline
+trigger:
+  tags:
+    include:
+      - "deploy.*"
+resources:
+  repositories:
+    - repository: Templates
+      type: git
+      name: Infrastructure/kube-infrastructure
+
+extends:
+  template: pipeline/azure-pipelines.yml@Templates
