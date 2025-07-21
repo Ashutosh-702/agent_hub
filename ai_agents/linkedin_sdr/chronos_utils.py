@@ -41,7 +41,7 @@ async def schedule_batch_processing(batch_id: str, cron_expression: str):
             "batch_id": batch_id,
             "action": "process_batch"  
         },
-        "cron_expression": cron_expression,  
+        "cron": cron_expression,  
         "partition_value": batch_id
     }
     
