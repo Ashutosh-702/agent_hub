@@ -1,25 +1,95 @@
+"""Configuration for LinkedIn SDR Kafka consumer (Following Vector's Pattern)."""
 import os
 from typing import Dict, Any
 
-# EventBridge Consumer Configuration
-KAFKA_CONSUMER_SETTINGS = {
-    "linkedin_batch_consumer": {
-        "topic": "linkedin-batch-processing",
-        "group_id": "linkedin-batch-consumer-group",
+# Import constants and handlers (Like Vector does)
+from .constants import LinkedInSDRServices, LINKEDIN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING
+from .handlers import linkedin_batch_processing_handler
+
+# Global Kafka Configuration Constants (Following Vector's Minimal Pattern)
+KAFKA_SERIALIZATION_FORMAT = "json"
+KAFKA_SESSION_TIMEOUT_IN_MS = 30000
+KAFKA_OFFSET_RESET_STRATEGY = "latest"
+
+# LinkedIn SDR Group ID
+LINKEDIN_SDR_GROUP_ID = "linkedin-batch-consumer-group"
+
+# Common Consumer Configuration (Following Vector's Pattern)
+COMMON_CONSUMER_CONFIG = {
+    "bootstrap.servers": os.getenv("KAFKA_BROKER_LIST", "localhost:9092"),
+    "session.timeout.ms": KAFKA_SESSION_TIMEOUT_IN_MS,
+    "default.topic.config": {"auto.offset.reset": KAFKA_OFFSET_RESET_STRATEGY},
+    "group.id": LINKEDIN_SDR_GROUP_ID,
+}
+
+# Test Consumer Configuration (Different Group ID)
+TEST_CONSUMER_CONFIG = {
+    "bootstrap.servers": os.getenv("KAFKA_BROKER_LIST", "localhost:9092"),
+    "session.timeout.ms": KAFKA_SESSION_TIMEOUT_IN_MS,
+    "default.topic.config": {"auto.offset.reset": KAFKA_OFFSET_RESET_STRATEGY},
+    "group.id": "test-linkedin-sdr-group-id",
+}
+
+# Producer Configuration (Following Vector's Pattern)
+KAFKA_COMMON_PRODUCER_CONFIG = {
+    "service_name": LinkedInSDRServices.linkedin_sdr,
+    "producer_config": {
         "bootstrap_servers": os.getenv("KAFKA_BROKER_LIST", "localhost:9092"),
-        "auto_offset_reset": "latest",
-        "enable_auto_commit": True,
-        "auto_commit_interval_ms": 1000,
-        "session_timeout_ms": 30000,
-        "heartbeat_interval_ms": 10000,
-        "max_poll_records": 1,  # Process one message at a time
-        "message_handler": None,  # Will be set in consumer
+        "enable_idempotence": True,
+        "acks": "all",
+    },
+}
+
+# Main Consumer Settings Dictionary (Following Vector's Service-Level Nesting)
+KAFKA_CONSUMER_SETTINGS = {
+    LinkedInSDRServices.linkedin_sdr: {
+        "linkedin_batch_consumer": {
+            "service_name": LinkedInSDRServices.linkedin_sdr,
+            "deserialization_format": KAFKA_SERIALIZATION_FORMAT,
+            "consumer_config": COMMON_CONSUMER_CONFIG,
+            "topics_configurations": {
+                KAFKA_SERVICE_CONFIG_MAPPING[LinkedInSDRServices.linkedin_sdr][LINKEDIN_BATCH_PROCESSING]["topics"][0]: {
+                    "tasks": [linkedin_batch_processing_handler]  # Handler function directly here (Like Vector)
+                }
+            },
+        },
+        "test_linkedin_batch_consumer": {
+            "service_name": LinkedInSDRServices.linkedin_sdr,
+            "deserialization_format": KAFKA_SERIALIZATION_FORMAT,
+            "consumer_config": TEST_CONSUMER_CONFIG,
+            "topics_configurations": {
+                KAFKA_SERVICE_CONFIG_MAPPING[LinkedInSDRServices.linkedin_sdr][LINKEDIN_BATCH_PROCESSING]["topics"][0]: {
+                    "tasks": [linkedin_batch_processing_handler]  # Handler function directly here (Like Vector)
+                }
+            },
+        },
+        # Future consumers - Just uncomment to add (Vector's "Uncomment to Add" Pattern)
+        # "linkedin_shipment_consumer": {
+        #     "service_name": LinkedInSDRServices.linkedin_sdr,
+        #     "deserialization_format": KAFKA_SERIALIZATION_FORMAT,
+        #     "consumer_config": COMMON_CONSUMER_CONFIG,
+        #     "topics_configurations": {
+        #         "linkedin-shipment-processing": {
+        #             "tasks": [linkedin_shipment_processing_handler]  # Import this handler when uncommenting
+        #         }
+        #     },
+        # },
+        # "linkedin_user_consumer": {
+        #     "service_name": LinkedInSDRServices.linkedin_sdr,
+        #     "deserialization_format": KAFKA_SERIALIZATION_FORMAT,
+        #     "consumer_config": COMMON_CONSUMER_CONFIG,
+        #     "topics_configurations": {
+        #         "linkedin-user-processing": {
+        #             "tasks": [linkedin_user_processing_handler]  # Import this handler when uncommenting
+        #         }
+        #     },
+        # },
     }
 }
 
 def get_consumer_config(consumer_type: str) -> Dict[str, Any]:
     """
-    Get consumer configuration for the specified consumer type
+    Get consumer configuration for the specified consumer type (Following Vector's Pattern)
     
     Args:
         consumer_type: Type of consumer (e.g., 'linkedin_batch_consumer')
@@ -27,7 +97,17 @@ def get_consumer_config(consumer_type: str) -> Dict[str, Any]:
     Returns:
         Consumer configuration dictionary
     """
-    if consumer_type not in KAFKA_CONSUMER_SETTINGS:
-        raise ValueError(f"Unknown consumer type: {consumer_type}")
+    service_configs = KAFKA_CONSUMER_SETTINGS.get(LinkedInSDRServices.linkedin_sdr, {})
+    if consumer_type not in service_configs:
+        raise ValueError(f"Unknown consumer type: {consumer_type}. Available types: {list(service_configs.keys())}")
     
-    return KAFKA_CONSUMER_SETTINGS[consumer_type].copy() 
+    return service_configs[consumer_type].copy()
+
+def get_producer_config() -> Dict[str, Any]:
+    """
+    Get global producer configuration
+    
+    Returns:
+        Producer configuration dictionary
+    """
+    return KAFKA_COMMON_PRODUCER_CONFIG.copy() 

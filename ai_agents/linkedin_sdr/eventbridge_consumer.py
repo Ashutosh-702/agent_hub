@@ -1,4 +1,5 @@
 import asyncio
+import os
 from eventbridge.consumer import setup_and_start_consumer
 from eventbridge.health import _healthz, _readyz
 from typing import Any
@@ -15,10 +16,11 @@ class LinkedInEventBridgeConsumer:
         self.consumer_config = get_consumer_config(consumer_type)
         
         print(f"🤖 LinkedIn EventBridge Consumer initialized")
-        print(f"   📡 Kafka servers: {self.consumer_config['bootstrap_servers']}")
-        print(f"   📂 Topic: {self.consumer_config['topic']}")
-        print(f"   👥 Group ID: {self.consumer_config['group_id']}")
+        print(f"   📡 Kafka servers: {self.consumer_config['consumer_config']['bootstrap.servers']}")
+        print(f"   📂 Topic: linkedin-batch-processing")
+        print(f"   👥 Group ID: {self.consumer_config['consumer_config']['group.id']}")
         print(f"   🎯 Consumer type: {consumer_type}")
+        print(f"   🔧 Service name: {self.consumer_config['service_name']}")
 
     async def linkedin_message_handler(self, message: Any):
         """
@@ -99,12 +101,15 @@ class LinkedInEventBridgeConsumer:
         print("🚀 Starting LinkedIn EventBridge Consumer...")
         
         try:
-            # Set the message handler in config
-            self.consumer_config["message_handler"] = self.linkedin_message_handler
+            # Set the message handler in the topics configuration (Vector's pattern)
+            topics_config = self.consumer_config["topics_configurations"]
+            for topic_name, topic_config in topics_config.items():
+                topic_config["tasks"] = [self.linkedin_message_handler]
+                print(f"   📂 Set handler for topic: {topic_name}")
             
             print("   📡 Connecting to Kafka via EventBridge...")
-            print(f"   📂 Topic: {self.consumer_config['topic']}")
-            print("   👂 Listening for Chronos batch processing messages...")
+            print(f"   👂 Listening for Chronos batch processing messages...")
+            print(f"   ⚙️  Consumer config: {self.consumer_config['service_name']}")
             
             # Start health check endpoints
             print("   ❤️ Starting health check endpoints...")

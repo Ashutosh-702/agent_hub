@@ -4,8 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .routes import upload, batch_processor
-from .kafka_consumer import start_batch_consumer  # Original raw Kafka consumer
-from .eventbridge_consumer import start_eventbridge_consumer  # New EventBridge consumer
+
+# EventBridge imports (Following Vector's Pattern)
+from eventbridge.consumer import setup_and_start_consumer
+from eventbridge.health import _healthz, _readyz
+from .kafka_config import KAFKA_CONSUMER_SETTINGS
+from .constants import LinkedInSDRServices
 
 def create_fastapi_app():
     app = FastAPI(
@@ -37,7 +41,7 @@ def create_fastapi_app():
 
 async def main():
     mode = os.getenv("MODE", "server").lower()
-    consumer_type = os.getenv("CONSUMER_TYPE", "eventbridge_batch_consumer")
+    consumer_type = os.getenv("CONSUMER_TYPE", "linkedin_batch_consumer")
     
     print(f"🚀 Starting LinkedIn SDR in {mode.upper()} mode...")
     
@@ -58,20 +62,33 @@ async def main():
         print(f"   📡 Consumer type: {consumer_type}")
         print("   📨 Listening for Chronos batch processing messages...")
         print("   🔄 Will process LinkedIn URLs one at a time")
+        print("   🌉 Using EventBridge abstraction")
         
-        if consumer_type == "eventbridge_batch_consumer":
-            print("   🌉 Using EventBridge abstraction (RECOMMENDED)")
-            await start_eventbridge_consumer(consumer_type="linkedin_batch_consumer")
+        # Vector's Exact Pattern: Service-level access (NO helper functions!)
+        try:
+            # This is EXACTLY how Vector does it
+            consumer_config = KAFKA_CONSUMER_SETTINGS[LinkedInSDRServices.linkedin_sdr][consumer_type]
             
-        elif consumer_type == "raw_batch_consumer":
-            print("   ⚡ Using raw Kafka consumer (LEGACY)")
-            await start_batch_consumer()
+            print(f"   ⚙️  Service: {consumer_config['service_name']}")
+            print(f"   📂 Topics: {list(consumer_config['topics_configurations'].keys())}")
             
-        else:
+            # Start health check endpoints
+            print("   ❤️ Starting health check endpoints...")
+            asyncio.create_task(_healthz())
+            asyncio.create_task(_readyz())
+            
+            # Vector's exact pattern: Direct EventBridge call
+            await setup_and_start_consumer(consumer_config)
+            
+        except KeyError as e:
+            available_consumers = list(KAFKA_CONSUMER_SETTINGS.get(LinkedInSDRServices.linkedin_sdr, {}).keys())
             print(f"❌ Unknown consumer type: {consumer_type}")
-            print("   Valid consumer types:")
-            print("     - 'eventbridge_batch_consumer' (EventBridge - RECOMMENDED)")
-            print("     - 'raw_batch_consumer' (Raw Kafka - LEGACY)")
+            print(f"   Available consumer types: {available_consumers}")
+            print("   Set CONSUMER_TYPE environment variable")
+            print("   Examples:")
+            for consumer in available_consumers:
+                if not consumer.startswith('#'):  # Skip commented consumers
+                    print(f"     CONSUMER_TYPE={consumer}")
             
     else:
         print(f"❌ Unknown mode: {mode}")
@@ -79,8 +96,7 @@ async def main():
         print("   Set MODE environment variable")
         print("   Examples:")
         print("     MODE=server python main.py")
-        print("     MODE=consumer CONSUMER_TYPE=eventbridge_batch_consumer python main.py")
-        print("     MODE=consumer CONSUMER_TYPE=raw_batch_consumer python main.py")
+        print("     MODE=consumer CONSUMER_TYPE=linkedin_batch_consumer python main.py")
 
 if __name__ == "__main__":
     asyncio.run(main())
