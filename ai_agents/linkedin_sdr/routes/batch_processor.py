@@ -42,7 +42,7 @@ async def process_batch(batch_id: str):
                 existing_lead = await get_lead(linkedin_url)
                 
                 if not existing_lead:
-                    provider_id = await get_provider_id(linkedin_url)
+                    provider_id = await get_provider_id(linkedin_url, account_id)
                     if provider_id:
                         await add_lead(linkedin_url, account_id, provider_id)
                     else:

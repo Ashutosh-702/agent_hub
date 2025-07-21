@@ -17,7 +17,7 @@ async def add_lead(linkedin_url: str, account_id: str, provider_id: str) -> None
     except Exception as e:
         print(f"ERROR: add_lead: {e}")
 
-async def get_provider_id(linkedin_url: str) -> Optional[str]:
+async def get_provider_id(linkedin_url: str, account_id: str) -> Optional[str]:
     """
     Fetches from db or unipileAPI the provider_id for the given linkedin_url.
     """
@@ -25,19 +25,6 @@ async def get_provider_id(linkedin_url: str) -> Optional[str]:
         lead = await leads_collection.find_one({"linkedin_url": linkedin_url})
         if lead and "provider_id" in lead:
             return lead["provider_id"]
-
-        identifier = linkedin_url
-        batch_value = await batch_values_collection.find_one({"data.url": linkedin_url})
-        if not batch_value:
-            print(f"No batch value found for {linkedin_url}")
-            return None
-        batch_id = batch_value["batch_id"]
-        batch = await batches_collection.find_one({"batch_id": batch_id})
-        if not batch:
-            print(f"No batch found for batch_id: {batch_id}")
-            return None
-        account_id = batch["account_id"]
-
 
         provider_id = await fetch_provider_id(linkedin_url, account_id)
 

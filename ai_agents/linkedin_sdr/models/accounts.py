@@ -19,22 +19,18 @@ async def get_account_id(email: str, password: str) -> Optional[str]:
         print(f"ERROR: get_account_id: {e}")
         return None
 
-async def validate_credentials(email: str, password: str) -> tuple[bool, str]:
+async def validate_credentials(email: str, password: str) -> bool:
     """
     Returns True if credentials are valid, else False.
     """
     try:
         account = await accounts_collection.find_one({"linkedin_email": email})
-        if not account:
-            return False, "account not found"
-        
         if account["linkedin_password"] != password:
-            return False, "invalid email-password combination"
-        
-        return True, "Valid credentials"
+            return False
+        return True
     except Exception as e:
         print(f"ERROR: validate_credentials: {e}")
-        return False, "Error message"
+        return False
 
 async def create_new_account(email: str, password: str) -> Optional[str]:
     """
