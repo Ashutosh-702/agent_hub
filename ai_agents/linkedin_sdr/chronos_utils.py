@@ -1,7 +1,11 @@
 import os
 import random
+from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from chronos_client.client import SchedulerAPIClient
+
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(dotenv_path=env_path)
 
 def get_eta_datetime(eta: int) -> str:
     """Calculate ETA in ISO format - copied from vector"""

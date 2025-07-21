@@ -2,6 +2,10 @@ import os
 import re
 import httpx
 from typing import Optional
+from dotenv import load_dotenv
+
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(dotenv_path=env_path)
 
 BASE_URL = os.getenv("UNIPILE_API_URL")
 API_KEY = os.getenv("UNIPILE_API_TOKEN")

@@ -2,7 +2,8 @@ import os
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient as AsyncMongoClient
 
-load_dotenv()
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(dotenv_path=env_path)
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME = os.getenv("DB_NAME", "linkedin_db")
