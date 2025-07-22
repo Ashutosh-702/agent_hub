@@ -63,7 +63,12 @@ RUN pip install --upgrade --no-cache-dir pip wheel && \
 COPY ./ai_agents/linkedin_sdr/ .
 
 # Store the current Git commit hash and remove the .git directory (Following Vector's Pattern)
-RUN git rev-parse HEAD > gitsha && rm -rf .git
+# Handle case where git repo might not be available in CI/CD context
+RUN if git rev-parse --git-dir > /dev/null 2>&1; then \
+        git rev-parse HEAD > gitsha && rm -rf .git; \
+    else \
+        echo "unknown-commit-$(date +%s)" > gitsha; \
+    fi
 
 # Use the specified Python base image for the runtime stage
 FROM python:${PYTHON_VERSION}
