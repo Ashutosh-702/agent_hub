@@ -1,4 +1,4 @@
-from ..database import batch_values_collection
+from agent_hub.ai_agents.linkedin_sdr.database import batch_values_collection
 
 async def add_batch(batch_id: str, linkedin_url: str, task: str) -> None:
     """

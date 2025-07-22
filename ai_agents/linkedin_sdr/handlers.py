@@ -1,8 +1,8 @@
 """LinkedIn SDR Kafka message handlers (Following Vector's Pattern)."""
 from typing import Any
 
-from .models.batch import get_batch
-from .routes.batch_processor import process_batch_with_limit
+from agent_hub.ai_agents.linkedin_sdr.models.batch import get_batch
+from agent_hub.ai_agents.linkedin_sdr.routes.batch_processor import process_batch_with_limit
 
 async def linkedin_batch_processing_handler(message: Any):
     """

@@ -1,5 +1,5 @@
-from ..database import accounts_collection
-from ..unipile_service import connect_account
+from agent_hub.ai_agents.linkedin_sdr.database import accounts_collection
+from agent_hub.ai_agents.linkedin_sdr.unipile_service import connect_account
 from typing import Optional
 
 async def get_account_id(email: str, password: str) -> Optional[str]:
