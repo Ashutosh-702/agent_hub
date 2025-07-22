@@ -1,3 +1,6 @@
+# LinkedIn SDR Service Dockerfile (Root Level for SIT Deployment)
+# This builds the LinkedIn SDR service from the ai_agents/linkedin_sdr subdirectory
+
 # Define the Python version and base image variant (Following Vector's Pattern)
 ARG PYTHON_VERSION=3.10.15-alpine3.20
 
@@ -33,8 +36,8 @@ RUN git clone --recurse-submodules -b main https://github.com/google/crc32c.git 
 # Set the working directory (Following Vector's Pattern)
 WORKDIR /srv/linkedin_sdr
 
-# Copy the requirements file (Copy requirements first for better Docker caching)
-COPY ./requirements.txt .
+# Copy the requirements file from LinkedIn SDR subdirectory (Copy requirements first for better Docker caching)
+COPY ./ai_agents/linkedin_sdr/requirements.txt .
 
 ARG AZURE_PRIVATE_TOKEN_BASE64
 
@@ -56,8 +59,8 @@ RUN pip install --upgrade --no-cache-dir pip wheel && \
     pip install --upgrade --no-cache-dir setuptools && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
-COPY . .
+# Copy the LinkedIn SDR application code from subdirectory
+COPY ./ai_agents/linkedin_sdr/ .
 
 # Store the current Git commit hash and remove the .git directory (Following Vector's Pattern)
 RUN git rev-parse HEAD > gitsha && rm -rf .git
