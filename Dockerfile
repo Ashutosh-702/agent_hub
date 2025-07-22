@@ -102,8 +102,10 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Expose port 80 (Following Vector's Pattern)
 EXPOSE 80
 
-# Set permissions for the log directory (Following Vector's Pattern)
-RUN mkdir -p /var/log/fynd && chmod 777 /var/log/fynd
+# Make the ci-test.sh script executable and set permissions for the log directory (Following Vector's Pattern)
+RUN chmod +x ci-test.sh && \
+    mkdir -p /var/log/fynd && chmod 777 /var/log/fynd && \
+    mkdir -p /mnt/artifacts && chmod 777 /mnt/artifacts
 
 # Define the entrypoint (Following Vector's Pattern)
 ENTRYPOINT ["python", "main.py"] 
