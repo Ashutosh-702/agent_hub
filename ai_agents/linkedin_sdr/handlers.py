@@ -81,16 +81,3 @@ async def _process_linkedin_batch(batch_id: str):
         print(f"❌ Error processing batch {batch_id}: {e}")
         # Re-raise to let EventBridge handle retry logic
         raise
-
-# Future handlers ready to uncomment (Vector's "Uncomment to Add" Pattern)
-# async def linkedin_shipment_processing_handler(message: Any):
-#     """Handler for LinkedIn shipment processing messages"""
-#     print(f"📦 Processing LinkedIn shipment message")
-#     # Add shipment processing logic here
-#     pass
-#
-# async def linkedin_user_processing_handler(message: Any):
-#     """Handler for LinkedIn user processing messages"""
-#     print(f"👤 Processing LinkedIn user message")
-#     # Add user processing logic here
-#     pass 

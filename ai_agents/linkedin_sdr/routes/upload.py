@@ -71,7 +71,7 @@ async def upload_leads(email: str = Form(...),
     batch_details = {
         "id": batch_id,
         "account_id": email,  # Use email as account identifier  
-        "status": "scheduled",    # NEW: Status is now 'scheduled' instead of 'ready'
+        "status": "scheduled",    # Status is now 'scheduled' instead of 'ready'
         "lead_count": count,
         "created_at": datetime.now().isoformat(),
         "scheduled_cron": cron_expression,  # NEW: Show when it's scheduled to run

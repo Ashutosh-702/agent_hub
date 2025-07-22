@@ -2,11 +2,11 @@
 import os
 from typing import Dict, Any
 
-# Import constants and handlers (Like Vector does)
+# Import constants and handlers 
 from .constants import LinkedInSDRServices, LINKEDIN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING
 from .handlers import linkedin_batch_processing_handler
 
-# Global Kafka Configuration Constants (Following Vector's Minimal Pattern)
+# Global Kafka Configuration Constants 
 KAFKA_SERIALIZATION_FORMAT = "json"
 KAFKA_SESSION_TIMEOUT_IN_MS = 30000
 KAFKA_OFFSET_RESET_STRATEGY = "latest"
@@ -14,7 +14,7 @@ KAFKA_OFFSET_RESET_STRATEGY = "latest"
 # LinkedIn SDR Group ID
 LINKEDIN_SDR_GROUP_ID = "linkedin-batch-consumer-group"
 
-# Common Consumer Configuration (Following Vector's Pattern)
+# Common Consumer Configuration 
 COMMON_CONSUMER_CONFIG = {
     "bootstrap.servers": os.getenv("KAFKA_BROKER_LIST", "localhost:9092"),
     "session.timeout.ms": KAFKA_SESSION_TIMEOUT_IN_MS,
@@ -30,7 +30,7 @@ TEST_CONSUMER_CONFIG = {
     "group.id": "test-linkedin-sdr-group-id",
 }
 
-# Producer Configuration (Following Vector's Pattern)
+# Producer Configuration 
 KAFKA_COMMON_PRODUCER_CONFIG = {
     "service_name": LinkedInSDRServices.linkedin_sdr,
     "producer_config": {
@@ -40,7 +40,7 @@ KAFKA_COMMON_PRODUCER_CONFIG = {
     },
 }
 
-# Main Consumer Settings Dictionary (Following Vector's Service-Level Nesting)
+# Main Consumer Settings Dictionary 
 KAFKA_CONSUMER_SETTINGS = {
     LinkedInSDRServices.linkedin_sdr: {
         "linkedin_batch_consumer": {
@@ -49,7 +49,7 @@ KAFKA_CONSUMER_SETTINGS = {
             "consumer_config": COMMON_CONSUMER_CONFIG,
             "topics_configurations": {
                 KAFKA_SERVICE_CONFIG_MAPPING[LinkedInSDRServices.linkedin_sdr][LINKEDIN_BATCH_PROCESSING]["topics"][0]: {
-                    "tasks": [linkedin_batch_processing_handler]  # Handler function directly here (Like Vector)
+                    "tasks": [linkedin_batch_processing_handler]  # Handler function directly here
                 }
             },
         },
@@ -63,27 +63,6 @@ KAFKA_CONSUMER_SETTINGS = {
                 }
             },
         },
-        # Future consumers - Just uncomment to add (Vector's "Uncomment to Add" Pattern)
-        # "linkedin_shipment_consumer": {
-        #     "service_name": LinkedInSDRServices.linkedin_sdr,
-        #     "deserialization_format": KAFKA_SERIALIZATION_FORMAT,
-        #     "consumer_config": COMMON_CONSUMER_CONFIG,
-        #     "topics_configurations": {
-        #         "linkedin-shipment-processing": {
-        #             "tasks": [linkedin_shipment_processing_handler]  # Import this handler when uncommenting
-        #         }
-        #     },
-        # },
-        # "linkedin_user_consumer": {
-        #     "service_name": LinkedInSDRServices.linkedin_sdr,
-        #     "deserialization_format": KAFKA_SERIALIZATION_FORMAT,
-        #     "consumer_config": COMMON_CONSUMER_CONFIG,
-        #     "topics_configurations": {
-        #         "linkedin-user-processing": {
-        #             "tasks": [linkedin_user_processing_handler]  # Import this handler when uncommenting
-        #         }
-        #     },
-        # },
     }
 }
 

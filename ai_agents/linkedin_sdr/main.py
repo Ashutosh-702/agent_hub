@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .routes import upload, batch_processor
 
-# EventBridge imports (Following Vector's Pattern)
+# EventBridge imports 
 from eventbridge.consumer import setup_and_start_consumer
 from eventbridge.health import _healthz, _readyz
 from .kafka_config import KAFKA_CONSUMER_SETTINGS
@@ -33,7 +33,6 @@ def create_fastapi_app():
     async def health():
         return {"status": "healthy", "mode": "server"}
     
-    # This MUST be last since it catches all remaining routes...important to note
     frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
     
@@ -64,20 +63,18 @@ async def main():
         print("   🔄 Will process LinkedIn URLs one at a time")
         print("   🌉 Using EventBridge abstraction")
         
-        # Vector's Exact Pattern: Service-level access (NO helper functions!)
         try:
-            # This is EXACTLY how Vector does it
             consumer_config = KAFKA_CONSUMER_SETTINGS[LinkedInSDRServices.linkedin_sdr][consumer_type]
             
             print(f"   ⚙️  Service: {consumer_config['service_name']}")
             print(f"   📂 Topics: {list(consumer_config['topics_configurations'].keys())}")
             
-            # Start health check endpoints
+            # Health check endpoints
             print("   ❤️ Starting health check endpoints...")
             asyncio.create_task(_healthz())
             asyncio.create_task(_readyz())
             
-            # Vector's exact pattern: Direct EventBridge call
+            # EventBridge call
             await setup_and_start_consumer(consumer_config)
             
         except KeyError as e:
@@ -87,7 +84,7 @@ async def main():
             print("   Set CONSUMER_TYPE environment variable")
             print("   Examples:")
             for consumer in available_consumers:
-                if not consumer.startswith('#'):  # Skip commented consumers
+                if not consumer.startswith('#'):
                     print(f"     CONSUMER_TYPE={consumer}")
             
     else:

@@ -4,13 +4,13 @@
 LINKEDIN_BATCH_PROCESSING = "linkedin_batch_processing"
 
 class LinkedInSDRServices:
-    """LinkedIn SDR Service Names (Like Vector's KafkaServices)"""
+    """LinkedIn SDR Service Names"""
     linkedin_sdr = "linkedin_sdr"
 
 # LinkedIn SDR Group ID
 LINKEDIN_SDR_GROUP_ID = "linkedin-batch-consumer-group"
 
-# Service Configuration Mapping (Following Vector's Pattern)
+# Service Configuration Mapping
 KAFKA_SERVICE_CONFIG_MAPPING = {
     LinkedInSDRServices.linkedin_sdr: {
         LINKEDIN_BATCH_PROCESSING: {

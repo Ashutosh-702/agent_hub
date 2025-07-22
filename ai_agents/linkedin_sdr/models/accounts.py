@@ -1,4 +1,3 @@
-import os
 from ..database import accounts_collection
 from ..unipile_service import connect_account
 from typing import Optional

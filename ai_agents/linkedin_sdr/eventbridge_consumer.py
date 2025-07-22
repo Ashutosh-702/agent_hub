@@ -1,5 +1,4 @@
 import asyncio
-import os
 from eventbridge.consumer import setup_and_start_consumer
 from eventbridge.health import _healthz, _readyz
 from typing import Any
