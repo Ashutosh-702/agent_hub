@@ -3,9 +3,9 @@ from eventbridge.consumer import setup_and_start_consumer
 from eventbridge.health import _healthz, _readyz
 from typing import Any
 
-from agent_hub.ai_agents.linkedin_sdr.models.batch import get_batch
-from agent_hub.ai_agents.linkedin_sdr.routes.batch_processor import process_batch_with_limit
-from agent_hub.ai_agents.linkedin_sdr.kafka_config import get_consumer_config
+from ai_agents.linkedin_sdr.models.batch import get_batch
+from ai_agents.linkedin_sdr.routes.batch_processor import process_batch_with_limit
+from ai_agents.linkedin_sdr.kafka_config import get_consumer_config
 
 class LinkedInEventBridgeConsumer:
     """LinkedIn batch consumer using EventBridge abstraction"""

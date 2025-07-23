@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Form, HTTPException, UploadFile
-from agent_hub.ai_agents.linkedin_sdr.models.accounts import get_account_id, validate_credentials, create_new_account
-from agent_hub.ai_agents.linkedin_sdr.models.batch import create_batch
-from agent_hub.ai_agents.linkedin_sdr.models.batch_value import add_batch
-from agent_hub.ai_agents.linkedin_sdr.chronos_utils import generate_default_cron_expression, schedule_batch_processing
+from ai_agents.linkedin_sdr.models.accounts import get_account_id, validate_credentials, create_new_account
+from ai_agents.linkedin_sdr.models.batch import create_batch
+from ai_agents.linkedin_sdr.models.batch_value import add_batch
+from ai_agents.linkedin_sdr.chronos_utils import generate_default_cron_expression, schedule_batch_processing
 import csv
 import io
 from datetime import datetime

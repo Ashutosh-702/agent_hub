@@ -4,13 +4,13 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from agent_hub.ai_agents.linkedin_sdr.routes import upload, batch_processor
+from ai_agents.linkedin_sdr.routes import upload, batch_processor
 
 # EventBridge imports 
 from eventbridge.consumer import setup_and_start_consumer
 from eventbridge.health import _healthz, _readyz
-from agent_hub.ai_agents.linkedin_sdr.kafka_config import KAFKA_CONSUMER_SETTINGS
-from agent_hub.ai_agents.linkedin_sdr.constants import LinkedInSDRServices
+from ai_agents.linkedin_sdr.kafka_config import KAFKA_CONSUMER_SETTINGS
+from ai_agents.linkedin_sdr.constants import LinkedInSDRServices
 
 def create_fastapi_app():
     app = FastAPI(
