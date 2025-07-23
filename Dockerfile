@@ -108,4 +108,4 @@ RUN chmod +x ci-test.sh && \
     mkdir -p /mnt/artifacts && chmod 777 /mnt/artifacts
 
 # Define the entrypoint (Following Vector's Pattern)
-ENTRYPOINT ["python", "main.py"] 
+ENTRYPOINT ["python","-m", "linkedin_sdr.main.py"] 
