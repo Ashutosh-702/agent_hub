@@ -39,53 +39,62 @@ def create_fastapi_app():
     
     return app
 
-async def main():
-    mode = os.getenv("MODE", "server").lower()
+def server_main():
+    """Non-async server startup (like Vector's pattern)"""
+    print("🌐 Starting FastAPI server...")
+    print("   📡 API will be available at: http://localhost:8000")
+    print("   📋 Health check: http://localhost:8000/health")
+    print("   📊 Upload endpoint: http://localhost:8000/api/v1/upload-leads")
+    print("   🔄 Process endpoint: http://localhost:8000/api/v1/process-batch/{batch_id}")
+    
+    app = create_fastapi_app()
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+async def consumer_main():
+    """Async consumer startup (like Vector's pattern)"""
     consumer_type = os.getenv("CONSUMER_TYPE", "linkedin_batch_consumer")
+    print("🤖 Starting Kafka consumer...")
+    print(f"   📡 Consumer type: {consumer_type}")
+    print("   📨 Listening for Chronos batch processing messages...")
+    print("   🔄 Will process LinkedIn URLs one at a time")
+    print("   🌉 Using EventBridge abstraction")
+    
+    try:
+        consumer_config = KAFKA_CONSUMER_SETTINGS[LinkedInSDRServices.linkedin_sdr][consumer_type]
+        
+        print(f"   ⚙️  Service: {consumer_config['service_name']}")
+        print(f"   📂 Topics: {list(consumer_config['topics_configurations'].keys())}")
+        
+        # Health check endpoints
+        print("   ❤️ Starting health check endpoints...")
+        asyncio.create_task(_healthz())
+        asyncio.create_task(_readyz())
+        
+        # EventBridge call
+        await setup_and_start_consumer(consumer_config)
+        
+    except KeyError as e:
+        available_consumers = list(KAFKA_CONSUMER_SETTINGS.get(LinkedInSDRServices.linkedin_sdr, {}).keys())
+        print(f"❌ Unknown consumer type: {consumer_type}")
+        print(f"   Available consumer types: {available_consumers}")
+        print("   Set CONSUMER_TYPE environment variable")
+        print("   Examples:")
+        for consumer in available_consumers:
+            if not consumer.startswith('#'):
+                print(f"     CONSUMER_TYPE={consumer}")
+
+def main():
+    """Main entry point (like Vector's pattern)"""
+    mode = os.getenv("MODE", "server").lower()
     
     print(f"🚀 Starting LinkedIn SDR in {mode.upper()} mode...")
     
     if mode == "server":
-        print("🌐 Starting FastAPI server...")
-        print("   📡 API will be available at: http://localhost:8000")
-        print("   📋 Health check: http://localhost:8000/health")
-        print("   📊 Upload endpoint: http://localhost:8000/api/v1/upload-leads")
-        print("   🔄 Process endpoint: http://localhost:8000/api/v1/process-batch/{batch_id}")
-        
-        app = create_fastapi_app()
-        port = int(os.getenv("PORT", 8000))
-        uvicorn.run(app, host="0.0.0.0", port=port)
+        server_main()                    # ← Non-async call
         
     elif mode == "consumer":
-        print("🤖 Starting Kafka consumer...")
-        print(f"   📡 Consumer type: {consumer_type}")
-        print("   📨 Listening for Chronos batch processing messages...")
-        print("   🔄 Will process LinkedIn URLs one at a time")
-        print("   🌉 Using EventBridge abstraction")
-        
-        try:
-            consumer_config = KAFKA_CONSUMER_SETTINGS[LinkedInSDRServices.linkedin_sdr][consumer_type]
-            
-            print(f"   ⚙️  Service: {consumer_config['service_name']}")
-            print(f"   📂 Topics: {list(consumer_config['topics_configurations'].keys())}")
-            
-            # Health check endpoints
-            print("   ❤️ Starting health check endpoints...")
-            asyncio.create_task(_healthz())
-            asyncio.create_task(_readyz())
-            
-            # EventBridge call
-            await setup_and_start_consumer(consumer_config)
-            
-        except KeyError as e:
-            available_consumers = list(KAFKA_CONSUMER_SETTINGS.get(LinkedInSDRServices.linkedin_sdr, {}).keys())
-            print(f"❌ Unknown consumer type: {consumer_type}")
-            print(f"   Available consumer types: {available_consumers}")
-            print("   Set CONSUMER_TYPE environment variable")
-            print("   Examples:")
-            for consumer in available_consumers:
-                if not consumer.startswith('#'):
-                    print(f"     CONSUMER_TYPE={consumer}")
+        asyncio.run(consumer_main())     # ← Async call like Vector
             
     else:
         print(f"❌ Unknown mode: {mode}")
@@ -96,4 +105,4 @@ async def main():
         print("     MODE=consumer CONSUMER_TYPE=linkedin_batch_consumer python main.py")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()                               # ← Non-async call (like Vector)
