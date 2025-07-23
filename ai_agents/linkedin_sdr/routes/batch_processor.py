@@ -1,9 +1,9 @@
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
-from linkedin_sdr.models.batch import get_batch, update_batch_completion, get_all_batches
-from linkedin_sdr.models.batch_value import find_pending_batches, update_status, get_all_batch_values
-from linkedin_sdr.models.leads import get_lead, get_provider_id, add_lead
-from linkedin_sdr.unipile_service import send_connection_request
+from models.batch import get_batch, update_batch_completion, get_all_batches
+from models.batch_value import find_pending_batches, update_status, get_all_batch_values
+from models.leads import get_lead, get_provider_id, add_lead
+from unipile_service import send_connection_request
 from typing import Optional
 
 router = APIRouter()

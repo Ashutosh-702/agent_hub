@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Form, HTTPException, UploadFile
-from linkedin_sdr.models.accounts import get_account_id, validate_credentials, create_new_account
-from linkedin_sdr.models.batch import create_batch
-from linkedin_sdr.models.batch_value import add_batch
-from linkedin_sdr.chronos_utils import generate_default_cron_expression, schedule_batch_processing
+from models.accounts import get_account_id, validate_credentials, create_new_account
+from models.batch import create_batch
+from models.batch_value import add_batch
+from chronos_utils import generate_default_cron_expression, schedule_batch_processing
 import csv
 import io
 from datetime import datetime

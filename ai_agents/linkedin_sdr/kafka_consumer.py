@@ -3,8 +3,8 @@ import os
 from aiokafka import AIOKafkaConsumer
 from typing import Dict, Any
 
-from linkedin_sdr.models.batch import get_batch
-from linkedin_sdr.routes.batch_processor import process_batch_with_limit
+from models.batch import get_batch
+from routes.batch_processor import process_batch_with_limit
 
 class LinkedInBatchConsumer:
     def __init__(self):
