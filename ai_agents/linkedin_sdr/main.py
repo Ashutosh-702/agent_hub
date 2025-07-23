@@ -34,6 +34,15 @@ def create_fastapi_app():
     async def health():
         return {"status": "healthy", "mode": "server"}
     
+    # Kubernetes health check endpoints
+    @app.get("/_healthz")
+    async def healthz():
+        return {"status": "ok"}
+        
+    @app.get("/_readyz") 
+    async def readyz():
+        return {"status": "ready"}
+    
     frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
     
