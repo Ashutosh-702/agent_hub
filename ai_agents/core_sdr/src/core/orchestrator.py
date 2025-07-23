@@ -84,13 +84,18 @@ class LeadGenerationOrchestrator:
         
         try:
             # Step 1: Input received (handled by caller)
+            print(f"🚀 DEBUG: Step 1 - Starting search request {search_id}")
+            print(f"🚀 DEBUG: Input data: {request_data}")
             logger.info(f"Processing search request {search_id}")
             
             # Step 2: Input Validation
+            print(f"🚀 DEBUG: Step 2 - Starting input validation")
             search_request = self._validate_input(request_data)
+            print(f"🚀 DEBUG: Step 2 - ✅ Input validation successful: {search_request.query}")
             logger.debug(f"Validated input: {search_request.query}")
             
             # Step 3: Cache Check
+            print(f"🚀 DEBUG: Step 3 - Starting cache check")
             cache_params = {
                 'max_results': search_request.max_results,
                 'timeout': search_request.timeout,
@@ -99,37 +104,52 @@ class LeadGenerationOrchestrator:
             
             cached_result = self.cache_manager.get(search_request.query, cache_params)
             if cached_result:
+                print(f"🚀 DEBUG: Step 3 - ✅ Cache hit found!")
                 logger.info(f"Cache hit for query: {search_request.query}")
                 self.stats['cache_hits'] += 1
                 return self._create_response_from_cache(cached_result, search_id)
             
+            print(f"🚀 DEBUG: Step 3 - ❌ Cache miss, proceeding with search")
             logger.info(f"Cache miss for query: {search_request.query}")
             self.stats['cache_misses'] += 1
             
             # Step 4: Query Parsing (NL → DSL)
+            print(f"🚀 DEBUG: Step 4 - Starting query parsing (NL → DSL)")
             entities, dsl_query = self._parse_query(search_request)
+            print(f"🚀 DEBUG: Step 4 - ✅ Query parsing successful!")
+            print(f"🚀 DEBUG: Entities: {entities}")
+            print(f"🚀 DEBUG: DSL Query: {dsl_query.dict()}")
             logger.debug(f"Parsed entities: {entities}")
             
             # Step 5: CoreSignal Search API
+            print(f"🚀 DEBUG: Step 5 - Starting CoreSignal API search")
             company_ids, total_found = self._search_companies(dsl_query)
+            print(f"🚀 DEBUG: Step 5 - ✅ CoreSignal search completed: {len(company_ids)} IDs, {total_found} total")
             logger.info(f"Found {total_found} companies, got {len(company_ids)} IDs")
             
             # Step 6: Process Search Results
+            print(f"🚀 DEBUG: Step 6 - Processing search results")
             limited_ids = self._limit_results(company_ids, search_request.max_results)
+            print(f"🚀 DEBUG: Step 6 - ✅ Limited to {len(limited_ids)} results")
             
             # Step 7: Company Collection
+            print(f"🚀 DEBUG: Step 7 - Starting company collection")
             companies = self._collect_companies(limited_ids)
+            print(f"🚀 DEBUG: Step 7 - ✅ Collected {len(companies)} companies")
             logger.info(f"Collected {len(companies)} companies")
             
             # Step 8: Format Results (handled by caller, but we prepare the data)
-            # Results are formatted later based on output_format
+            print(f"🚀 DEBUG: Step 8 - Results prepared for formatting")
             
             # Step 9: Update Caches
+            print(f"🚀 DEBUG: Step 9 - Updating caches")
             credits_used = self.coresignal_client.credits_used
             self._update_cache(search_request.query, cache_params, dsl_query.dict(), 
                              companies, credits_used, total_found)
+            print(f"🚀 DEBUG: Step 9 - ✅ Cache updated")
             
             # Step 10: Return to User
+            print(f"🚀 DEBUG: Step 10 - Creating final response")
             processing_time = time.time() - start_time
             response = self._create_response(
                 search_id=search_id,
@@ -146,10 +166,17 @@ class LeadGenerationOrchestrator:
             # Update statistics
             self._update_stats(credits_used, processing_time)
             
+            print(f"🚀 DEBUG: Step 10 - ✅ ALL STEPS COMPLETED SUCCESSFULLY!")
+            print(f"🚀 DEBUG: Final response: search_id={search_id}, processing_time={processing_time:.2f}s")
             logger.info(f"Completed search request {search_id} in {processing_time:.2f}s")
             return response
             
         except Exception as e:
+            print(f"❌ DEBUG: ERROR in orchestrator at step: {str(e)}")
+            print(f"❌ DEBUG: Exception type: {type(e).__name__}")
+            print(f"❌ DEBUG: Full traceback follows...")
+            import traceback
+            traceback.print_exc()
             logger.error(f"Search request {search_id} failed: {str(e)}")
             raise LeadGenerationError(f"Search processing failed: {str(e)}")
     
@@ -163,11 +190,32 @@ class LeadGenerationOrchestrator:
     def _parse_query(self, search_request: SearchRequest) -> tuple[ParsedEntity, DSLQuery]:
         """Step 4: Query Parsing (NL → DSL)"""
         try:
-            return self.query_parser.parse_query(
+            print(f"🔄 DEBUG: _parse_query - Input query: '{search_request.query}'")
+            print(f"🔄 DEBUG: _parse_query - Max results: {search_request.max_results}")
+            print(f"🔄 DEBUG: _parse_query - About to call query_parser.parse_query()")
+            
+            # Get DSL query from parser
+            dsl_query = self.query_parser.parse_query(
                 search_request.query,
                 search_request.max_results
             )
+            
+            print(f"🔄 DEBUG: _parse_query - ✅ DSL query generated successfully!")
+            print(f"🔄 DEBUG: _parse_query - DSL query type: {type(dsl_query)}")
+            
+            # Extract entities if entity extractor is available
+            print(f"🔄 DEBUG: _parse_query - Extracting entities...")
+            entities = ParsedEntity()  # Default empty entities
+            if hasattr(self.query_parser, 'entity_extractor') and self.query_parser.entity_extractor:
+                entities = self.query_parser.entity_extractor.extract_entities(search_request.query)
+                print(f"🔄 DEBUG: _parse_query - ✅ Entities extracted: {entities}")
+            else:
+                print(f"🔄 DEBUG: _parse_query - Using default empty entities")
+            
+            print(f"🔄 DEBUG: _parse_query - ✅ Returning tuple (entities, dsl_query)")
+            return entities, dsl_query
         except Exception as e:
+            print(f"❌ DEBUG: _parse_query - ERROR: {str(e)}")
             raise LeadGenerationError(f"Query parsing failed: {str(e)}")
     
     def _search_companies(self, dsl_query: DSLQuery) -> tuple[List[str], int]:

@@ -32,8 +32,9 @@ class CoreSignalClient:
         self.session = httpx.Client(
             timeout=timeout,
             headers={
-                'Authorization': f'Bearer {api_key}',
+                'apikey': api_key,
                 'Content-Type': 'application/json',
+                'accept': 'application/json',
                 'User-Agent': 'LeadGenPrototype/1.0'
             }
         )
@@ -123,33 +124,58 @@ class CoreSignalClient:
         Raises:
             CoreSignalAPIError: If search fails
         """
+        print(f"🌐 DEBUG: CoreSignal Client - Starting company search")
+        print(f"🌐 DEBUG: CoreSignal Client - DSL query type: {type(dsl_query)}")
+        
         logger.info(f"Searching companies with DSL query")
         
         try:
+            # Extract pagination parameters and query
+            query_dict = dsl_query.dict(by_alias=True)
+            from_param = query_dict.pop('from', 0)
+            size_param = query_dict.pop('size', 20)
+            
+            # Build query parameters for URL
+            params = {
+                'from': from_param,
+                'items_per_page': size_param
+            }
+            
+            print(f"🌐 DEBUG: CoreSignal Client - Query params: {params}")
+            print(f"🌐 DEBUG: CoreSignal Client - Query body: {query_dict}")
+            print(f"🌐 DEBUG: CoreSignal Client - About to make API request to CoreSignal...")
+            print(f"🌐 DEBUG: CoreSignal Client - Endpoint: /cdapi/v2/company_multi_source/search/es_dsl")
+            print(f"🌐 DEBUG: CoreSignal Client - Method: POST")
+            
             response = self._make_request(
                 'POST',
-                '/company_multi_source/search/es_dsl',
-                json=dsl_query.dict(by_alias=True)
+                '/cdapi/v2/company_multi_source/search/es_dsl',
+                params=params,
+                json=query_dict
             )
             
-            # Extract company IDs from response
-            company_ids = []
-            total_found = 0
+            print(f"🌐 DEBUG: CoreSignal Client - ✅ API request successful!")
+            print(f"🌐 DEBUG: CoreSignal Client - Response type: {type(response)}")
+            print(f"🌐 DEBUG: CoreSignal Client - Response: {response}")
             
-            if 'hits' in response:
-                hits = response['hits']
-                total_found = hits.get('total', {}).get('value', 0)
-                
-                for hit in hits.get('hits', []):
-                    if '_id' in hit:
-                        company_ids.append(hit['_id'])
-                    elif '_source' in hit and 'id' in hit['_source']:
-                        company_ids.append(str(hit['_source']['id']))
+            # CoreSignal returns a simple list of company IDs
+            if isinstance(response, list):
+                company_ids = [str(company_id) for company_id in response]
+                total_found = len(company_ids)
+                print(f"🌐 DEBUG: CoreSignal Client - Found {total_found} company IDs")
+            else:
+                print(f"🌐 DEBUG: CoreSignal Client - Unexpected response format: {type(response)}")
+                company_ids = []
+                total_found = 0
             
             logger.info(f"Found {total_found} companies, returning {len(company_ids)} IDs")
+            print(f"🌐 DEBUG: CoreSignal Client - ✅ Search completed successfully!")
             return company_ids, total_found
             
         except Exception as e:
+            print(f"❌ DEBUG: CoreSignal Client - API request failed!")
+            print(f"❌ DEBUG: CoreSignal Client - Error type: {type(e).__name__}")
+            print(f"❌ DEBUG: CoreSignal Client - Error message: {str(e)}")
             logger.error(f"Company search failed: {str(e)}")
             raise CoreSignalAPIError(f"Company search failed: {str(e)}")
     
@@ -166,7 +192,7 @@ class CoreSignalClient:
         try:
             response = self._make_request(
                 'GET',
-                f'/company_multi_source/collect/{company_id}'
+                f'/cdapi/v2/company_multi_source/collect/{company_id}'
             )
             
             # Convert response to Company model

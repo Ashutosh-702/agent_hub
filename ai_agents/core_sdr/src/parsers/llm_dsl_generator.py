@@ -80,7 +80,7 @@ DSL GENERATION RULES:
    - "bool" with "must" for AND conditions
    - "bool" with "should" for OR conditions
 3. Only use predefined values when they exist for a field
-4. For location queries, check country, state, and city fields
+4. For location queries, use hq_country, hq_state, and hq_city fields
 5. For technology queries, use nested query on technologies_used.technology
 6. For employee/revenue ranges, use appropriate range operators (gte, lte, gt, lt)
 7. Include "size" and "from" fields for pagination
@@ -104,7 +104,7 @@ Output: {
       "must": [
         {"match": {"industry": {"query": "Artificial Intelligence Technology", "fuzziness": "AUTO"}}},
         {"term": {"company_type": "startup"}},
-        {"term": {"headquarters_location.city": "San Francisco"}},
+        {"term": {"hq_city": "San Francisco"}},
         {"range": {"employees_count": {"gte": 10}}}
       ]
     }
@@ -173,11 +173,17 @@ IMPORTANT: Always return valid JSON. Do not include any explanations or comments
             Exception: If LLM request fails or returns invalid JSON
         """
         try:
+            print(f"🤖 DEBUG: LLM DSL Generator - Starting generation for query: '{query}'")
+            print(f"🤖 DEBUG: LLM DSL Generator - Max results: {max_results}, From offset: {from_offset}")
+            
             user_prompt = f"""Query: "{query}"
 Max results: {max_results}
 From offset: {from_offset}
 
 Generate the Elasticsearch DSL query:"""
+            
+            print(f"🤖 DEBUG: LLM DSL Generator - User prompt created")
+            print(f"🤖 DEBUG: LLM DSL Generator - Model: {self.model}")
             
             # Build request parameters
             request_params = {
@@ -194,20 +200,34 @@ Generate the Elasticsearch DSL query:"""
             # Add reasoning effort for reasoning models
             if "o1" in self.model.lower() or "reasoning" in self.model.lower():
                 request_params["reasoning_effort"] = self.reasoning_effort
+                print(f"🤖 DEBUG: LLM DSL Generator - Added reasoning effort for o1 model")
+            
+            print(f"🤖 DEBUG: LLM DSL Generator - About to make OpenAI API call...")
+            print(f"🤖 DEBUG: LLM DSL Generator - Request params: model={request_params['model']}, temperature={request_params['temperature']}")
             
             response = self.client.chat.completions.create(**request_params)
             
+            print(f"🤖 DEBUG: LLM DSL Generator - ✅ OpenAI API call successful!")
+            print(f"🤖 DEBUG: LLM DSL Generator - Response received, extracting content...")
+            
             dsl_json = response.choices[0].message.content
+            print(f"🤖 DEBUG: LLM DSL Generator - Raw DSL JSON (first 200 chars): {dsl_json[:200]}...")
+            
             dsl_query = json.loads(dsl_json)
+            print(f"🤖 DEBUG: LLM DSL Generator - ✅ JSON parsing successful!")
             
             # Ensure size and from are set correctly
             dsl_query["size"] = max_results
             dsl_query["from"] = from_offset
+            print(f"🤖 DEBUG: LLM DSL Generator - Size and offset set correctly")
             
             # Validate the generated DSL
+            print(f"🤖 DEBUG: LLM DSL Generator - Validating DSL...")
             self._validate_dsl(dsl_query)
+            print(f"🤖 DEBUG: LLM DSL Generator - ✅ DSL validation passed!")
             
             logger.debug(f"Generated DSL for query '{query}': {json.dumps(dsl_query, indent=2)}")
+            print(f"🤖 DEBUG: LLM DSL Generator - ✅ DSL generation completed successfully!")
             return dsl_query
             
         except json.JSONDecodeError as e:
