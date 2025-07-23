@@ -1,0 +1,39 @@
+{
+  "location_fields": {
+    "country": "hq_country",
+    "city": "hq_city",
+    "state": "hq_state",
+    "region": "hq_region"
+  },
+  "range_fields": {
+    "employees": "employees_count",
+    "revenue": "revenue_annual.source_1_annual_revenue.annual_revenue",
+    "founded": "founded_year",
+    "followers": "followers_count_linkedin",
+    "funding": "funding_total"
+  },
+  "exact_fields": {
+    "technology": "technologies_used.technology",
+    "public": "is_public",
+    "b2b": "is_b2b",
+    "type": "type",
+    "industry": "industry"
+  },
+  "text_fields": {
+    "name": "company_name",
+    "description": "description",
+    "website": "website"
+  },
+  "range_operators": {
+    "after": "gte",
+    "before": "lte",
+    "above": "gt",
+    "below": "lt",
+    "over": "gt",
+    "under": "lt",
+    "more than": "gt",
+    "less than": "lt",
+    "at least": "gte",
+    "at most": "lte"
+  }
+}

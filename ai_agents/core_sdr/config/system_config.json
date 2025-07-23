@@ -1,0 +1,159 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2024-01-15T10:30:00Z",
+  
+  "feature_flags": {
+    "schema_auto_update": false,
+    "schema_api_driven_updates": false,
+    "schema_scheduled_updates": false
+  },
+  
+  "llm_config": {
+    "model": "gpt-4o",
+    "temperature": 0.1,
+    "max_tokens": 1500,
+    "reasoning_effort": "medium"
+  },
+  
+  "coresignal_schema": {
+    "version": "1.2.0",
+    "last_schema_update": "2024-01-15T10:30:00Z",
+    "update_source": "manual",
+    "metadata": {
+      "total_fields": 8,
+      "api_version": "v2",
+      "compatibility": "elasticsearch_7.x"
+    },
+    "fields": {
+      "company_name": {
+        "type": "text",
+        "elasticsearch_type": "text",
+        "searchable": true,
+        "description": "Company's official name",
+        "example_values": ["Apple Inc.", "Microsoft Corporation", "OpenAI"],
+        "query_types": ["match", "fuzzy", "wildcard"]
+      },
+      "industry": {
+        "type": "keyword",
+        "elasticsearch_type": "keyword",
+        "searchable": true,
+        "description": "Primary industry classification",
+        "predefined_values": [
+          "Technology", "Healthcare", "Finance", "Retail", "Manufacturing",
+          "Education", "Real Estate", "Energy", "Media", "Transportation",
+          "Artificial Intelligence", "Machine Learning", "Software", "SaaS"
+        ],
+        "query_types": ["term", "terms", "match"]
+      },
+      "employees_count": {
+        "type": "long",
+        "elasticsearch_type": "long",
+        "range_queryable": true,
+        "description": "Total number of employees",
+        "value_ranges": {
+          "startup": "1-50",
+          "small": "51-200",
+          "medium": "201-1000",
+          "large": "1001-5000",
+          "enterprise": "5000+"
+        },
+        "query_types": ["range", "term"]
+      },
+      "company_type": {
+        "type": "keyword",
+        "elasticsearch_type": "keyword",
+        "description": "Type of company organization",
+        "predefined_values": [
+          "startup", "sme", "enterprise", "corporation", "non-profit",
+          "government", "partnership", "sole_proprietorship"
+        ],
+        "query_types": ["term", "terms"]
+      },
+      "technologies_used": {
+        "type": "nested",
+        "elasticsearch_type": "nested",
+        "description": "Technologies and tools used by the company",
+        "properties": {
+          "technology": {
+            "type": "keyword",
+            "predefined_values": {
+              "cloud_platforms": ["AWS", "Azure", "Google Cloud", "Digital Ocean"],
+              "programming_languages": ["Python", "JavaScript", "Java", "C#", "Go", "Rust"],
+              "frameworks": ["React", "Angular", "Django", "Spring", "Laravel", "FastAPI"],
+              "databases": ["PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch"],
+              "analytics": ["Google Analytics", "Mixpanel", "Tableau", "Power BI"]
+            }
+          }
+        },
+        "query_types": ["nested"]
+      },
+      "headquarters_location": {
+        "type": "object",
+        "elasticsearch_type": "object",
+        "description": "Company headquarters location",
+        "properties": {
+          "country": {
+            "type": "keyword",
+            "predefined_values": [
+              "United States", "United Kingdom", "Germany", "France",
+              "Canada", "Australia", "India", "China", "Japan"
+            ]
+          },
+          "state": {
+            "type": "keyword",
+            "predefined_values": [
+              "California", "New York", "Texas", "Florida", "Illinois",
+              "Massachusetts", "Washington", "Colorado", "Georgia"
+            ]
+          },
+          "city": {
+            "type": "keyword",
+            "predefined_values": [
+              "San Francisco", "New York", "Los Angeles", "Chicago",
+              "Boston", "Seattle", "Austin", "Miami", "London", "Berlin"
+            ]
+          }
+        },
+        "query_types": ["term", "terms"]
+      },
+      "is_public": {
+        "type": "boolean",
+        "elasticsearch_type": "boolean",
+        "description": "Whether company is publicly traded",
+        "predefined_values": [true, false],
+        "query_types": ["term"]
+      },
+      "founded_year": {
+        "type": "date",
+        "elasticsearch_type": "date",
+        "range_queryable": true,
+        "description": "Year company was founded",
+        "value_ranges": {
+          "very_new": "2020-2024",
+          "new": "2015-2019",
+          "established": "2000-2014",
+          "mature": "1980-1999",
+          "legacy": "before 1980"
+        },
+        "query_types": ["range", "term"]
+      }
+    }
+  },
+  
+  "schema_update_config": {
+    "update_schedule": {
+      "daily_update": "02:00",
+      "weekly_deep_update": "sunday_03:00"
+    },
+    "update_sources": {
+      "api_discovery": true,
+      "manual_validation": true,
+      "documentation_scraping": false
+    },
+    "validation_rules": {
+      "min_sample_size": 100,
+      "confidence_threshold": 0.8,
+      "max_new_values_per_update": 50
+    }
+  }
+}
