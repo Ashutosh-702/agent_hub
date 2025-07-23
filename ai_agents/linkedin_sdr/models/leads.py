@@ -1,7 +1,7 @@
 from typing import Optional
-from ai_agents.linkedin_sdr.database import leads_collection, batches_collection, batch_values_collection
-from ai_agents.linkedin_sdr.models.accounts import get_account_id
-from ai_agents.linkedin_sdr.unipile_service import fetch_provider_id
+from linkedin_sdr.database import leads_collection, batches_collection, batch_values_collection
+from linkedin_sdr.models.accounts import get_account_id
+from linkedin_sdr.unipile_service import fetch_provider_id
 async def add_lead(linkedin_url: str, account_id: str, provider_id: str) -> None:
     """
     Adds a new lead document with the given linkedin_url, account_id, and provider_id.

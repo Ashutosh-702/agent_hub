@@ -1,8 +1,8 @@
 from fastapi import APIRouter
-from ai_agents.linkedin_sdr.models.batch import get_batch, update_batch_completion
-from ai_agents.linkedin_sdr.models.batch_value import find_pending_batches, update_status, get_batch_value_by_url
-from ai_agents.linkedin_sdr.models.leads import get_lead, get_provider_id, add_lead
-from ai_agents.linkedin_sdr.unipile_service import send_connection_request
+from linkedin_sdr.models.batch import get_batch, update_batch_completion
+from linkedin_sdr.models.batch_value import find_pending_batches, update_status, get_batch_value_by_url
+from linkedin_sdr.models.leads import get_lead, get_provider_id, add_lead
+from linkedin_sdr.unipile_service import send_connection_request
 
 router = APIRouter()
 

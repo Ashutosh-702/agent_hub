@@ -3,8 +3,8 @@ import os
 from typing import Dict, Any
 
 # Import constants and handlers 
-from ai_agents.linkedin_sdr.constants import LinkedInSDRServices, LINKEDIN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING
-from ai_agents.linkedin_sdr.handlers import linkedin_batch_processing_handler
+from linkedin_sdr.constants import LinkedInSDRServices, LINKEDIN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING
+from linkedin_sdr.handlers import linkedin_batch_processing_handler
 
 # Global Kafka Configuration Constants 
 KAFKA_SERIALIZATION_FORMAT = "json"

@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional
-from ai_agents.linkedin_sdr.database import batches_collection
+from linkedin_sdr.database import batches_collection
 
 async def create_batch(account_id: str) -> str:
     """
