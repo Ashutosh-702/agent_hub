@@ -34,10 +34,10 @@ RUN git clone --recurse-submodules -b main https://github.com/google/crc32c.git 
     make all install
 
 # Set the working directory (Following Vector's Pattern)
-WORKDIR /srv
+WORKDIR /srv/linkedin_sdr
 
 # Copy the requirements file from LinkedIn SDR subdirectory (Copy requirements first for better Docker caching)
-COPY ./ai_agents/linkedin_sdr/requirements.txt ./linkedin_sdr/requirements.txt
+COPY ./ai_agents/linkedin_sdr/requirements.txt .
 
 ARG AZURE_PRIVATE_TOKEN_BASE64
 
@@ -57,10 +57,10 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Upgrade pip and install Python dependencies (Following Vector's Pattern)
 RUN pip install --upgrade --no-cache-dir pip wheel && \
     pip install --upgrade --no-cache-dir setuptools && \
-    pip install --no-cache-dir -r linkedin_sdr/requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the LinkedIn SDR application code from subdirectory
-COPY ./ai_agents/linkedin_sdr/ ./linkedin_sdr/
+COPY ./ai_agents/linkedin_sdr/ .
 
 # Store the current Git commit hash and remove the .git directory (Following Vector's Pattern)
 # Handle case where git repo might not be available in CI/CD context
@@ -87,10 +87,10 @@ RUN apk update && apk upgrade && \
 RUN pip install --upgrade --no-cache-dir pip setuptools
 
 # Set the working directory
-WORKDIR /srv
+WORKDIR /srv/linkedin_sdr
 
 # Copy application files and the virtual environment from the builder stage (Following Vector's Pattern)
-COPY --from=builder /srv /srv
+COPY --from=builder /srv/linkedin_sdr /srv/linkedin_sdr
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /usr/local/lib/libcrc32c* /usr/local/lib/
 COPY --from=builder /usr/local/include/crc32c /usr/local/include/crc32c
@@ -103,9 +103,9 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 EXPOSE 80
 
 # Make the ci-test.sh script executable and set permissions for the log directory (Following Vector's Pattern)
-RUN chmod +x linkedin_sdr/ci-test.sh && \
+RUN chmod +x ci-test.sh && \
     mkdir -p /var/log/fynd && chmod 777 /var/log/fynd && \
     mkdir -p /mnt/artifacts && chmod 777 /mnt/artifacts
 
 # Define the entrypoint (Following Vector's Pattern)
-ENTRYPOINT ["python", "linkedin_sdr/main.py"] 
+ENTRYPOINT ["python", "main.py"] 
