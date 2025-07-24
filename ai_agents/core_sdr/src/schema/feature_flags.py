@@ -92,4 +92,3 @@ class FeatureFlags:
         self._flags_cache = None
         self._load_flags()
     
-    # Unused methods removed: get_all_flags() and log_status() - not needed with MCP integration

@@ -261,5 +261,3 @@ Only return the exact number of matching companies with their name and descripti
                 "output_format": search_request.output_format
             }
         )
-
-    # explain_query method removed - unnecessary with Agent SDK automation 
