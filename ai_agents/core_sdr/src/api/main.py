@@ -32,7 +32,7 @@ class SearchRequestAPI(BaseModel):
     query: str = Field(..., min_length=3, max_length=500, description="Natural language search query")
     max_results: int = Field(default=20, ge=1, le=100, description="Maximum number of results")
     timeout: int = Field(default=30, ge=5, le=300, description="Timeout in seconds")
-    output_format: str = Field(default="json", regex="^(json|csv|summary)$", description="Output format")
+    output_format: str = Field(default="json", pattern="^(json|csv|summary)$", description="Output format")
 
 
 class SearchResponseAPI(BaseModel):
@@ -152,7 +152,7 @@ async def search_companies(
         request_data = request.dict()
         
         # Process search request
-        response = orchestrator.process_search_request(request_data)
+        response = await orchestrator.process_search_request(request_data)
         
         # Log successful search in background
         background_tasks.add_task(
@@ -187,7 +187,7 @@ async def search_companies_formatted(
         request_data = request.dict()
         
         # Process search request
-        response = orchestrator.process_search_request(request_data)
+        response = await orchestrator.process_search_request(request_data)
         
         # Format response
         formatted_output = orchestrator.format_response(response, request.output_format)
@@ -324,7 +324,7 @@ async def run_demo(orchestrator: LeadGenerationOrchestrator = Depends(get_orches
             'output_format': 'json'
         }
         
-        response = orchestrator.process_search_request(request_data)
+        response = await orchestrator.process_search_request(request_data)
         
         return {
             "demo_query": demo_query,

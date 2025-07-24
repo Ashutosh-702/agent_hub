@@ -1,5 +1,4 @@
-from .dsl_builder import DSLQueryBuilder
-from .entity_extractor import EntityExtractor
 from .query_parser import QueryParser
+from .agent_mcp_query_processor import AgentMCPQueryProcessor
 
-__all__ = ['QueryParser', 'EntityExtractor', 'DSLQueryBuilder']
+__all__ = ['QueryParser', 'AgentMCPQueryProcessor']

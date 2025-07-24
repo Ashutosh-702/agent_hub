@@ -12,7 +12,7 @@ import json
 import logging
 import os
 import sys
-
+import asyncio
 import click
 from click import Context
 from dotenv import load_dotenv
@@ -103,7 +103,7 @@ def search(ctx, query, output_format, max_results, timeout, output, interactive)
     try:
         # Process search request
         with click.progressbar(length=1, label='Searching companies...') as bar:
-            response = orchestrator.process_search_request(request_data)
+            response = asyncio.run(orchestrator.process_search_request(request_data))
             bar.update(1)
         
         # Format response
@@ -141,7 +141,7 @@ def explain(ctx: Context, query):
     try:
         explanation = orchestrator.explain_query(query)
         print (f"\nExplanation for query: {explanation.keys()}\n")
-        return
+        return # TODO: not to work with /explain
         click.echo(f"Query: {explanation['original_query']}")
         click.echo("\nExtracted Entities:")
         for entity_type, value in explanation['extracted_entities'].items():

@@ -19,7 +19,7 @@ class LLMDSLGenerator:
         self.schema_manager = schema_manager or SchemaManager()
         # Load LLM config from schema manager
         llm_config = self.schema_manager.config.get("llm_config", {})
-        self.model = model or llm_config.get("model", "gpt-4o")
+        self.model = model or llm_config.get("model", "o3")
         self.temperature = llm_config.get("temperature", 0.1)
         self.max_tokens = llm_config.get("max_tokens", 1500)
         self.reasoning_effort = llm_config.get("reasoning_effort", "medium")

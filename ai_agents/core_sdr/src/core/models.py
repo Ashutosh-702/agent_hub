@@ -74,3 +74,14 @@ class CacheEntry(BaseModel):
     timestamp: float
     credits_used: int
     total_found: int
+
+
+# New models for Agent SDK + Coresignal MCP workflow
+class CompanySearchResult(BaseModel):
+    """Individual company result from Coresignal MCP"""
+    name: str = Field(..., description="Company name")
+    description: str = Field(..., description="Brief company description")
+
+class CoreSignalMCPResponse(BaseModel):
+    """Response format for Agent SDK with Coresignal MCP"""
+    companies: List[CompanySearchResult] = Field(default_factory=list, description="List of companies found")

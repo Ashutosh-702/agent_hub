@@ -62,11 +62,12 @@ class LeadGenerationOrchestrator:
             'total_searches': 0,
             'cache_hits': 0,
             'cache_misses': 0,
-            'total_credits_used': 0,
+            'total_credits_used': 0,  # Legacy DSL workflow
+            'total_tokens_used': 0,   # New Agent SDK workflow
             'total_processing_time': 0
         }
     
-    def process_search_request(self, request_data: Dict[str, Any]) -> SearchResponse:
+    async def process_search_request(self, request_data: Dict[str, Any]) -> SearchResponse:
         """
         Process a complete search request through all 10 steps.
         
@@ -106,46 +107,21 @@ class LeadGenerationOrchestrator:
             logger.info(f"Cache miss for query: {search_request.query}")
             self.stats['cache_misses'] += 1
             
-            # Step 4: Query Parsing (NL → DSL)
-            entities, dsl_query = self._parse_query(search_request)
-            logger.debug(f"Parsed entities: {entities}")
-            logger.info(f"Generated DSL query: {dsl_query.dict()}")
+            response = await self._process_with_agent_mcp(search_request)
+            logger.info(f"Agent MCP returned {len(response.results.get('companies', []))} companies")
             
-            # Step 5: CoreSignal Search API
-            company_ids, total_found = self._search_companies(dsl_query)
-            logger.info(f"Found {total_found} companies, got {len(company_ids)} IDs")
             
-            # Step 6: Process Search Results
-            limited_ids = self._limit_results(company_ids, search_request.max_results)
+            tokens_used = response.metadata.get('tokens_used', 0)
             
-            # Step 7: Company Collection
-            companies = self._collect_companies(limited_ids)
-            logger.info(f"Collected {len(companies)} companies")
-            
-            # Step 8: Format Results (handled by caller, but we prepare the data)
-            # Results are formatted later based on output_format
-            
-            # Step 9: Update Caches
-            credits_used = self.coresignal_client.credits_used
-            self._update_cache(search_request.query, cache_params, dsl_query.dict(), 
-                             companies, credits_used, total_found)
-            
-            # Step 10: Return to User
             processing_time = time.time() - start_time
-            response = self._create_response(
-                search_id=search_id,
-                original_query=search_request.query,
-                entities=entities,
-                dsl_query=dsl_query,
-                companies=companies,
-                total_found=total_found,
-                credits_used=credits_used,
-                processing_time=processing_time,
-                cached=False
-            )
+            response.metadata.update({
+                'processing_time': processing_time,
+                'cached': False,
+                'search_id': search_id
+            })
             
             # Update statistics
-            self._update_stats(credits_used, processing_time)
+            self._update_stats(tokens_used, processing_time)
             
             logger.info(f"Completed search request {search_id} in {processing_time:.2f}s")
             return response
@@ -161,36 +137,35 @@ class LeadGenerationOrchestrator:
         except Exception as e:
             raise LeadGenerationError(f"Input validation failed: {str(e)}")
     
-    def _parse_query(self, search_request: SearchRequest) -> tuple[ParsedEntity, DSLQuery]:
-        """Step 4: Query Parsing (NL → DSL)"""
+    async def _process_with_agent_mcp(self, search_request: SearchRequest) -> SearchResponse:
+        """Step 4-7: Process query using Agent SDK + Coresignal MCP"""
         try:
-            # Current QueryParser only returns DSLQuery, not entities
-            dsl_query = self.query_parser.parse_query(
+            return await self.query_parser.parse_query(
                 search_request.query,
-                search_request.max_results
+                search_request.max_results,
+                search_request.timeout,
+                search_request.output_format
             )
-            
-            # Create placeholder entities for now
-            # TODO: Either extract entities from DSL or modify QueryParser to return both
-            entities = ParsedEntity()
-            
-            return entities, dsl_query
         except Exception as e:
-            raise LeadGenerationError(f"Query parsing failed: {str(e)}")
+            raise LeadGenerationError(f"Agent MCP processing failed: {str(e)}")
     
+    # Legacy methods - deprecated in favor of Agent SDK + MCP workflow
     def _search_companies(self, dsl_query: DSLQuery) -> tuple[List[str], int]:
-        """Step 5: CoreSignal Search API"""
+        """Step 5: CoreSignal Search API - DEPRECATED: Use Agent SDK + MCP instead"""
+        logger.warning("_search_companies is deprecated. Use Agent SDK + MCP workflow instead.")
         try:
             return self.coresignal_client.search_companies(dsl_query)
         except CoreSignalAPIError as e:
             raise LeadGenerationError(f"Company search failed: {str(e)}")
     
     def _limit_results(self, company_ids: List[str], max_results: int) -> List[str]:
-        """Step 6: Process Search Results"""
+        """Step 6: Process Search Results - DEPRECATED: Handled by Agent SDK"""
+        logger.warning("_limit_results is deprecated. Limiting handled by Agent SDK.")
         return company_ids[:max_results]
     
     def _collect_companies(self, company_ids: List[str]) -> List[Company]:
-        """Step 7: Company Collection"""
+        """Step 7: Company Collection - DEPRECATED: Handled by Coresignal MCP"""
+        logger.warning("_collect_companies is deprecated. Collection handled by Coresignal MCP.")
         if not company_ids:
             return []
         
@@ -205,28 +180,15 @@ class LeadGenerationOrchestrator:
             # Return whatever we could collect
             return []
     
-    def _update_cache(self, query: str, params: Dict[str, Any], dsl_query: Dict[str, Any],
-                     companies: List[Company], credits_used: int, total_found: int):
-        """Step 9: Update Caches"""
-        try:
-            self.cache_manager.set(
-                query=query,
-                params=params,
-                dsl_query=dsl_query,
-                results=companies,
-                credits_used=credits_used,
-                total_found=total_found
-            )
-        except Exception as e:
-            logger.warning(f"Cache update failed: {str(e)}")
-            # Don't fail the entire request if caching fails
+
     
     def _create_response(self, search_id: str, original_query: str, 
                         entities: ParsedEntity, dsl_query: DSLQuery,
                         companies: List[Company], total_found: int,
                         credits_used: int, processing_time: float,
                         cached: bool) -> SearchResponse:
-        """Step 10: Create final response"""
+        """Step 10: Create final response - DEPRECATED: Only used for legacy cache data"""
+        logger.warning("_create_response is deprecated. New workflow returns SearchResponse directly.")
         
         return SearchResponse(
             search_id=search_id,
@@ -272,10 +234,10 @@ class LeadGenerationOrchestrator:
             }
         )
     
-    def _update_stats(self, credits_used: int, processing_time: float):
+    def _update_stats(self, tokens_or_credits_used: int, processing_time: float):
         """Update processing statistics"""
         self.stats['total_searches'] += 1
-        self.stats['total_credits_used'] += credits_used
+        self.stats['total_tokens_used'] += tokens_or_credits_used  # For MCP workflow
         self.stats['total_processing_time'] += processing_time
     
     def format_response(self, response: SearchResponse, format_type: str) -> str:

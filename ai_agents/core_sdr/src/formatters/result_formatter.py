@@ -137,10 +137,9 @@ class SummaryFormatter(ResultFormatter):
         lines = []
         
         # Add header with search info
-        total_found = metadata.get('total_found', len(companies))
         returned = len(companies)
         
-        lines.append(f"Found {total_found} companies, showing {returned}:")
+        lines.append(f"Found {returned} companies:")
         lines.append("=" * 50)
         
         # Add each company summary
@@ -161,47 +160,59 @@ class SummaryFormatter(ResultFormatter):
         
         return "\n".join(lines)
     
-    def _format_company_summary(self, company: Company) -> str:
+    def _format_company_summary(self, company) -> str:
         """Format a single company as summary text."""
         parts = []
         
-        # Company name (required)
-        name = company.company_name or f"Company ID: {company.id}"
-        parts.append(f"**{name}**")
-        
-        # Industry and location
-        details = []
-        if company.industry:
-            details.append(company.industry)
-        if company.hq_location:
-            details.append(company.hq_location)
-        
-        if details:
-            parts.append(f"({', '.join(details)})")
-        
-        # Employee count
-        if company.employees_count:
-            parts.append(f"• {company.employees_count:,} employees")
-        
-        # Founded year
-        if company.founded_year:
-            parts.append(f"• Founded: {company.founded_year}")
-        
-        # Website
-        if company.website:
-            parts.append(f"• {company.website}")
-        
-        # Technologies (top 3)
-        if company.technologies:
-            tech_list = ', '.join(company.technologies[:3])
-            if len(company.technologies) > 3:
-                tech_list += f" (+{len(company.technologies) - 3} more)"
-            parts.append(f"• Tech: {tech_list}")
-        
-        # Public status
-        if company.is_public is not None:
-            status = "Public" if company.is_public else "Private"
-            parts.append(f"• {status}")
+        # Handle both dict format (from MCP) and Company object format
+        if isinstance(company, dict):
+            # Simple MCP format: {"name": "...", "description": "..."}
+            name = company.get('name', 'Unknown Company')
+            parts.append(f"**{name}**")
+            
+            # Add description if available
+            if company.get('description'):
+                parts.append(f"• {company['description']}")
+                
+        else:
+            # Full Company object format
+            # Company name (required)
+            name = company.company_name or f"Company ID: {company.id}"
+            parts.append(f"**{name}**")
+            
+            # Industry and location
+            details = []
+            if company.industry:
+                details.append(company.industry)
+            if company.hq_location:
+                details.append(company.hq_location)
+            
+            if details:
+                parts.append(f"({', '.join(details)})")
+            
+            # Employee count
+            if company.employees_count:
+                parts.append(f"• {company.employees_count:,} employees")
+            
+            # Founded year
+            if company.founded_year:
+                parts.append(f"• Founded: {company.founded_year}")
+            
+            # Website
+            if company.website:
+                parts.append(f"• {company.website}")
+            
+            # Technologies (top 3)
+            if company.technologies:
+                tech_list = ', '.join(company.technologies[:3])
+                if len(company.technologies) > 3:
+                    tech_list += f" (+{len(company.technologies) - 3} more)"
+                parts.append(f"• Tech: {tech_list}")
+            
+            # Public status
+            if company.is_public is not None:
+                status = "Public" if company.is_public else "Private"
+                parts.append(f"• {status}")
         
         return " ".join(parts)
 
@@ -259,8 +270,16 @@ def format_search_response(search_response: SearchResponse,
     formatter = ResultFormatterFactory.create_formatter(format_type, **formatter_kwargs)
     
     companies = search_response.results.get('companies', [])
+    
+    # Check if we have simple MCP format (name/description only) or full Company data
     if companies and isinstance(companies[0], dict):
-        # Convert dict to Company objects if needed
-        companies = [Company(**company) for company in companies]
+        # Check if it's the simple MCP format
+        first_company = companies[0]
+        if 'name' in first_company and 'description' in first_company and len(first_company) == 2:
+            # Keep as simple dicts for MCP format - formatter will handle it
+            pass
+        else:
+            # Convert dict to Company objects for full format
+            companies = [Company(**company) for company in companies]
     
     return formatter.format(companies, search_response.metadata)
