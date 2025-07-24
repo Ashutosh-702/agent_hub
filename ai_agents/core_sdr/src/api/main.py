@@ -52,7 +52,7 @@ class StatsResponse(BaseModel):
     total_searches: int
     cache_hits: int
     cache_misses: int
-    total_credits_used: int
+    total_tokens_used: int  # Agent SDK + MCP workflow uses tokens
     total_processing_time: float
     api_usage: Dict[str, Any]
 
@@ -154,14 +154,6 @@ async def search_companies(
         # Process search request
         response = await orchestrator.process_search_request(request_data)
         
-        # Log successful search in background
-        background_tasks.add_task(
-            log_search_request,
-            request.query,
-            response.metadata.get('credits_used', 0),
-            response.metadata.get('processing_time', 0)
-        )
-        
         return SearchResponseAPI(**response.dict())
         
     except LeadGenerationError as e:
@@ -171,79 +163,6 @@ async def search_companies(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.post("/search/formatted")
-async def search_companies_formatted(
-    request: SearchRequestAPI,
-    background_tasks: BackgroundTasks,
-    orchestrator: LeadGenerationOrchestrator = Depends(get_orchestrator)
-):
-    """
-    Search for companies and return formatted results.
-    
-    Returns results in the requested format (JSON, CSV, or summary).
-    """
-    try:
-        # Convert API request to internal format
-        request_data = request.dict()
-        
-        # Process search request
-        response = await orchestrator.process_search_request(request_data)
-        
-        # Format response
-        formatted_output = orchestrator.format_response(response, request.output_format)
-        
-        # Log successful search in background
-        background_tasks.add_task(
-            log_search_request,
-            request.query,
-            response.metadata.get('credits_used', 0),
-            response.metadata.get('processing_time', 0)
-        )
-        
-        # Return appropriate response type
-        if request.output_format == "json":
-            return response.dict()
-        elif request.output_format == "csv":
-            return PlainTextResponse(formatted_output, media_type="text/csv")
-        else:  # summary
-            return PlainTextResponse(formatted_output, media_type="text/plain")
-        
-    except LeadGenerationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Formatted search request failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@app.get("/search/{search_id}")
-async def get_search_result(search_id: str):
-    """Get cached search result by ID (if implemented in cache)."""
-    # This would require extending the cache system to store by search_id
-    raise HTTPException(status_code=501, detail="Search result retrieval not implemented")
-
-
-@app.post("/explain")
-async def explain_query(
-    query: Dict[str, str],
-    orchestrator: LeadGenerationOrchestrator = Depends(get_orchestrator)
-):
-    """
-    Explain how a query would be parsed without executing it.
-    
-    Request body: {"query": "your search query"}
-    """
-    try:
-        if "query" not in query:
-            raise HTTPException(status_code=400, detail="Query field is required")
-        
-        explanation = orchestrator.explain_query(query["query"])
-        return explanation
-        
-    except LeadGenerationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Query explanation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/stats", response_model=StatsResponse)
@@ -269,88 +188,14 @@ async def clear_cache(orchestrator: LeadGenerationOrchestrator = Depends(get_orc
         raise HTTPException(status_code=500, detail=f"Cache clear failed: {str(e)}")
 
 
-@app.get("/config/industries")
-async def get_industries():
-    """Get available industry categories."""
-    try:
-        import json
-        with open("config/industries.json") as f:
-            industries = json.load(f)
-        return industries
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Industries configuration not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load industries: {str(e)}")
+# Legacy config endpoints removed - Agent SDK + MCP handles entity recognition automatically
+# No longer need manual industry/technology/location mappings
 
 
-@app.get("/config/technologies")
-async def get_technologies():
-    """Get available technology categories."""
-    try:
-        import json
-        with open("config/technologies.json") as f:
-            technologies = json.load(f)
-        return technologies
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Technologies configuration not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load technologies: {str(e)}")
+# run_demo endpoint removed - unused test functionality
 
 
-@app.get("/config/locations")
-async def get_locations():
-    """Get available location mappings."""
-    try:
-        import json
-        with open("config/locations.json") as f:
-            locations = json.load(f)
-        return locations
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Locations configuration not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load locations: {str(e)}")
-
-
-@app.get("/demo")
-async def run_demo(orchestrator: LeadGenerationOrchestrator = Depends(get_orchestrator)):
-    """Run a demo search to test the system."""
-    demo_query = "AI startups in San Francisco with 10+ employees"
-    
-    try:
-        request_data = {
-            'query': demo_query,
-            'max_results': 3,
-            'timeout': 30,
-            'output_format': 'json'
-        }
-        
-        response = await orchestrator.process_search_request(request_data)
-        
-        return {
-            "demo_query": demo_query,
-            "results": response.dict(),
-            "message": "Demo completed successfully"
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Demo failed: {str(e)}")
-
-
-# Background task functions
-async def log_search_request(query: str, credits_used: int, processing_time: float):
-    """Log search request for analytics (background task)."""
-    logger.info(f"Search completed: query='{query}', credits={credits_used}, time={processing_time:.2f}s")
-
-
-# Error handlers
-@app.exception_handler(ValueError)
-async def value_error_handler(request, exc):
-    return HTTPException(status_code=400, detail=str(exc))
-
-
-@app.exception_handler(FileNotFoundError)
-async def file_not_found_handler(request, exc):
-    return HTTPException(status_code=404, detail="Resource not found")
+# Unused background tasks and error handlers removed
 
 
 if __name__ == "__main__":

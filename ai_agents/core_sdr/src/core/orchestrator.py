@@ -4,10 +4,9 @@ import uuid
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from .models import SearchRequest, SearchResponse, Company, ParsedEntity, DSLQuery
+from .models import SearchRequest, SearchResponse, Company
 from .validator import InputValidator
 from ..cache import CacheManager
-from ..clients import CoreSignalClient, CoreSignalAPIError
 from ..formatters import format_search_response
 from ..parsers import QueryParser
 
@@ -44,26 +43,22 @@ class LeadGenerationOrchestrator:
                  cache_ttl_hours: int = 24):
         
         self.config_dir = Path(config_dir)
+        self.coresignal_api_key = coresignal_api_key  # Store for health check validation
         
         # Initialize components
         self.validator = InputValidator()
         self.query_parser = QueryParser(config_dir)
-        self.coresignal_client = CoreSignalClient(
-            api_key=coresignal_api_key,
-            base_url=coresignal_base_url
-        )
         self.cache_manager = CacheManager(
             mongo_uri=mongo_uri,
             default_ttl=cache_ttl_hours * 3600
         )
         
-        # Track processing statistics
+        # Track processing statistics for Agent SDK + MCP workflow
         self.stats = {
             'total_searches': 0,
             'cache_hits': 0,
             'cache_misses': 0,
-            'total_credits_used': 0,  # Legacy DSL workflow
-            'total_tokens_used': 0,   # New Agent SDK workflow
+            'total_tokens_used': 0,   # Agent SDK + MCP workflow
             'total_processing_time': 0
         }
     
@@ -149,66 +144,11 @@ class LeadGenerationOrchestrator:
         except Exception as e:
             raise LeadGenerationError(f"Agent MCP processing failed: {str(e)}")
     
-    # Legacy methods - deprecated in favor of Agent SDK + MCP workflow
-    def _search_companies(self, dsl_query: DSLQuery) -> tuple[List[str], int]:
-        """Step 5: CoreSignal Search API - DEPRECATED: Use Agent SDK + MCP instead"""
-        logger.warning("_search_companies is deprecated. Use Agent SDK + MCP workflow instead.")
-        try:
-            return self.coresignal_client.search_companies(dsl_query)
-        except CoreSignalAPIError as e:
-            raise LeadGenerationError(f"Company search failed: {str(e)}")
-    
-    def _limit_results(self, company_ids: List[str], max_results: int) -> List[str]:
-        """Step 6: Process Search Results - DEPRECATED: Handled by Agent SDK"""
-        logger.warning("_limit_results is deprecated. Limiting handled by Agent SDK.")
-        return company_ids[:max_results]
-    
-    def _collect_companies(self, company_ids: List[str]) -> List[Company]:
-        """Step 7: Company Collection - DEPRECATED: Handled by Coresignal MCP"""
-        logger.warning("_collect_companies is deprecated. Collection handled by Coresignal MCP.")
-        if not company_ids:
-            return []
-        
-        try:
-            # Use streaming collection for large batches
-            if len(company_ids) > 20:
-                return self.coresignal_client.collect_companies_streaming(company_ids)
-            else:
-                return self.coresignal_client.collect_companies_batch(company_ids)
-        except Exception as e:
-            logger.warning(f"Company collection partially failed: {str(e)}")
-            # Return whatever we could collect
-            return []
+    # Legacy methods removed - replaced by Agent SDK + MCP workflow
     
 
     
-    def _create_response(self, search_id: str, original_query: str, 
-                        entities: ParsedEntity, dsl_query: DSLQuery,
-                        companies: List[Company], total_found: int,
-                        credits_used: int, processing_time: float,
-                        cached: bool) -> SearchResponse:
-        """Step 10: Create final response - DEPRECATED: Only used for legacy cache data"""
-        logger.warning("_create_response is deprecated. New workflow returns SearchResponse directly.")
-        
-        return SearchResponse(
-            search_id=search_id,
-            query={
-                "original": original_query,
-                "parsed_entities": entities.dict(exclude_none=True),
-                "dsl": dsl_query.dict()
-            },
-            results={
-                "total_found": total_found,
-                "returned": len(companies),
-                "companies": [company.dict() for company in companies]
-            },
-            metadata={
-                "credits_used": credits_used,
-                "processing_time": processing_time,
-                "cached": cached,
-                "timestamp": time.time()
-            }
-        )
+    # _create_response method removed - deprecated legacy method not used in MCP workflow
     
     def _create_response_from_cache(self, cached_result, search_id: str) -> SearchResponse:
         """Create response from cached data"""
@@ -256,25 +196,12 @@ class LeadGenerationOrchestrator:
         except Exception as e:
             raise LeadGenerationError(f"Response formatting failed: {str(e)}")
     
-    def explain_query(self, query: str) -> Dict[str, Any]:
-        """
-        Explain how a query would be parsed without executing it.
-        
-        Args:
-            query: Natural language query
-            
-        Returns:
-            Dictionary with parsing explanation
-        """
-        try:
-            return self.query_parser.explain_parse(query)
-        except Exception as e:
-            raise LeadGenerationError(f"Query explanation failed: {str(e)}")
+    # explain_query method removed - Agent SDK handles query parsing automatically
     
     def get_stats(self) -> Dict[str, Any]:
         """Get processing statistics"""
         stats = self.stats.copy()
-        stats['api_usage'] = self.coresignal_client.get_api_usage()
+        # Agent SDK + MCP usage is tracked directly in stats['total_tokens_used']
         return stats
     
     def clear_cache(self) -> bool:
@@ -298,10 +225,9 @@ class LeadGenerationOrchestrator:
             'timestamp': time.time()
         }
         
-        # Check configuration files
+        # Check essential configuration files (MCP integration requires fewer configs)
         try:
-            required_configs = ['query_mappings.json', 'industries.json', 
-                              'technologies.json', 'locations.json']
+            required_configs = ['system_config.json']  # Only essential system config needed
             for config_file in required_configs:
                 config_path = self.config_dir / config_file
                 if not config_path.exists():
@@ -314,13 +240,13 @@ class LeadGenerationOrchestrator:
             health['components']['config'] = f'error: {str(e)}'
             health['status'] = 'unhealthy'
         
-        # Check CoreSignal API connection (simple validation)
+        # Check CoreSignal API key configuration
         try:
-            if not self.coresignal_client.api_key:
+            if not self.coresignal_api_key:
                 health['components']['coresignal'] = 'missing API key'
                 health['status'] = 'unhealthy'
             else:
-                health['components']['coresignal'] = 'configured'
+                health['components']['coresignal'] = 'API key configured'
         except Exception as e:
             health['components']['coresignal'] = f'error: {str(e)}'
             health['status'] = 'unhealthy'

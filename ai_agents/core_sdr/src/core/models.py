@@ -27,16 +27,7 @@ class SearchRequest(BaseModel):
         return v.strip()
 
 
-class ParsedEntity(BaseModel):
-    location: Optional[Dict[str, str]] = None
-    industry: Optional[List[str]] = None
-    technology: Optional[List[str]] = None
-    employees: Optional[Dict[str, int]] = None
-    revenue: Optional[Dict[str, float]] = None
-    founded: Optional[Dict[str, int]] = None
-    company_type: Optional[str] = None
-    is_public: Optional[bool] = None
-    is_b2b: Optional[bool] = None
+# ParsedEntity model removed - no longer needed with Agent SDK + MCP integration
 
 
 class DSLQuery(BaseModel):

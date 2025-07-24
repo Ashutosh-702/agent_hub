@@ -262,21 +262,4 @@ Only return the exact number of matching companies with their name and descripti
             }
         )
 
-    def explain_query(self, query: str) -> Dict[str, Any]:
-        """
-        Explain what the agent would search for without executing.
-        Useful for debugging and transparency.
-        """
-        return {
-            "original_query": query,
-            "processing_method": "agent_sdk_with_coresignal_mcp",
-            "model": self.model,
-            "reasoning_effort": self.reasoning_effort,
-            "explanation": f"Will use Agent SDK with o3 model to interpret '{query}' and search Coresignal database via MCP",
-            "expected_actions": [
-                "Parse natural language query with high reasoning",
-                "Identify search criteria (industry, location, size, etc.)",
-                "Execute Coresignal MCP search commands", 
-                "Return structured company list with names and descriptions"
-            ]
-        } 
+    # explain_query method removed - unnecessary with Agent SDK automation 

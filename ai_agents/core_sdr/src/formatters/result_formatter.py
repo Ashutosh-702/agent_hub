@@ -109,12 +109,7 @@ class CSVFormatter(ResultFormatter):
         
         return output.getvalue()
     
-    def _create_empty_csv(self) -> str:
-        """Create empty CSV with headers only."""
-        output = StringIO()
-        writer = csv.DictWriter(output, fieldnames=self.fields)
-        writer.writeheader()
-        return output.getvalue()
+    # _create_empty_csv method removed - unused helper function
 
 
 class SummaryFormatter(ResultFormatter):

@@ -2,7 +2,6 @@ from .models import (
     SearchRequest,
     SearchResponse,
     Company,
-    ParsedEntity,
     DSLQuery,
     CacheEntry
 )
@@ -13,7 +12,6 @@ __all__ = [
     'SearchRequest',
     'SearchResponse', 
     'Company', 
-    'ParsedEntity', 
     'DSLQuery', 
     'CacheEntry',
     'InputValidator',

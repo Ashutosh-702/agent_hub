@@ -92,21 +92,4 @@ class FeatureFlags:
         self._flags_cache = None
         self._load_flags()
     
-    def get_all_flags(self) -> Dict[str, bool]:
-        """Get all current feature flag values."""
-        if self._flags_cache is None:
-            self._load_flags()
-        return self._flags_cache.copy()
-    
-    def log_status(self) -> None:
-        """Log current feature flag status."""
-        flags = self.get_all_flags()
-        logger.info("Feature Flag Status:")
-        for flag, enabled in flags.items():
-            status = "ENABLED" if enabled else "DISABLED"
-            logger.info(f"  {flag}: {status}")
-            
-        # Log derived flags
-        logger.info("Derived Flags:")
-        logger.info(f"  API-driven updates: {'ENABLED' if self.api_driven_updates_enabled() else 'DISABLED'}")
-        logger.info(f"  Scheduled updates: {'ENABLED' if self.scheduled_updates_enabled() else 'DISABLED'}")
+    # Unused methods removed: get_all_flags() and log_status() - not needed with MCP integration

@@ -132,31 +132,7 @@ def search(ctx, query, output_format, max_results, timeout, output, interactive)
         sys.exit(1)
 
 
-@cli.command()
-@click.argument('query')
-@click.pass_context
-def explain(ctx: Context, query):
-    """Explain how a query would be parsed without executing it."""
-    orchestrator = ctx.obj['orchestrator']
-    try:
-        explanation = orchestrator.explain_query(query)
-        print (f"\nExplanation for query: {explanation.keys()}\n")
-        return # TODO: not to work with /explain
-        click.echo(f"Query: {explanation['original_query']}")
-        click.echo("\nExtracted Entities:")
-        for entity_type, value in explanation['extracted_entities'].items():
-            if value:
-                click.echo(f"  {entity_type}: {value}")
-        
-        click.echo(f"\nInterpretation: {explanation['interpretation']}")
-        
-        click.echo("\nGenerated DSL Query:")
-        click.echo(json.dumps(explanation['generated_dsl'], indent=2))
-        
-    except LeadGenerationError as e:
-        click.echo(f"Explanation error: {str(e)}", err=True)
-        sys.exit(1)
-
+# explain command removed - Agent SDK handles query parsing automatically
 
 @cli.command()
 @click.pass_context
@@ -200,14 +176,18 @@ def stats(ctx):
             cache_rate = (stats['cache_hits'] / stats['total_searches']) * 100
             click.echo(f"  Cache hit rate: {cache_rate:.1f}%")
         
-        click.echo(f"  Total credits used: {stats['total_credits_used']}")
+        click.echo(f"  Total tokens used: {stats['total_tokens_used']}")
         click.echo(f"  Total processing time: {stats['total_processing_time']:.1f}s")
         
         if 'api_usage' in stats:
             api_usage = stats['api_usage']
-            click.echo(f"\nAPI Usage:")
-            click.echo(f"  Requests made: {api_usage['requests_made']}")
-            click.echo(f"  Credits used: {api_usage['credits_used']}")
+            click.echo(f"\nAgent SDK + MCP Usage:")
+            if 'requests_made' in api_usage:
+                click.echo(f"  Requests made: {api_usage['requests_made']}")
+            if 'tokens_used' in api_usage:
+                click.echo(f"  Tokens consumed: {api_usage['tokens_used']}")
+            elif 'credits_used' in api_usage:
+                click.echo(f"  Legacy credits: {api_usage['credits_used']} (from cache/fallback)")
         
     except Exception as e:
         click.echo(f"Stats error: {str(e)}", err=True)
