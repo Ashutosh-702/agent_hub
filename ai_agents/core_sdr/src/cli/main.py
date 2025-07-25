@@ -8,18 +8,16 @@ Usage:
     python -m core_sdr cli explain "Public companies using AWS"
     python -m core_sdr cli health
 """
-import json
+
 import logging
 import os
 import sys
-import asyncio
-import click
+import asyncclick as click
 from click import Context
 from dotenv import load_dotenv
 
 from ..core import LeadGenerationOrchestrator, LeadGenerationError
 
-# Load environment variables
 load_dotenv()
 
 
@@ -30,14 +28,12 @@ def cli(ctx: Context, verbose):
     """Lead Generation CLI Tool"""
     ctx.ensure_object(dict)
     
-    # Set up logging
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         level=level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # Get API configuration
     api_key = os.getenv('CORESIGNAL_API_KEY')
     if not api_key:
         click.echo("Error: CORESIGNAL_API_KEY environment variable not set", err=True)
@@ -48,7 +44,6 @@ def cli(ctx: Context, verbose):
     mongo_uri = os.getenv('MONGODB_URI')
     cache_ttl_hours = int(os.getenv('CACHE_TTL_HOURS', '24'))
     
-    # Initialize orchestrator
     try:
         orchestrator = LeadGenerationOrchestrator(
             coresignal_api_key=api_key,
@@ -78,11 +73,10 @@ def cli(ctx: Context, verbose):
 @click.option('--interactive', '-i', is_flag=True, 
               help='Interactive mode - prompt for query')
 @click.pass_context
-def search(ctx, query, output_format, max_results, timeout, output, interactive):
+async def search(ctx, query, output_format, max_results, timeout, output, interactive):
     """Search for companies using natural language query."""
     orchestrator = ctx.obj['orchestrator']
     
-    # Get query from user if not provided
     if interactive or not query:
         query = click.prompt('Enter your search query', type=str)
     
@@ -90,7 +84,6 @@ def search(ctx, query, output_format, max_results, timeout, output, interactive)
         click.echo("Error: Query is required", err=True)
         return
     
-    # Prepare request data
     request_data = {
         'query': query,
         'max_results': max_results,
@@ -99,15 +92,11 @@ def search(ctx, query, output_format, max_results, timeout, output, interactive)
     }
     
     try:
-        # Process search request
-        with click.progressbar(length=1, label='Searching companies...') as bar:
-            response = asyncio.run(orchestrator.process_search_request(request_data))
-            bar.update(1)
+        response = await orchestrator.process_search_request(request_data)
+            
         
-        # Format response
         formatted_output = orchestrator.format_response(response, output_format)
         
-        # Output results
         if output:
             with open(output, 'w') as f:
                 f.write(formatted_output)
@@ -115,7 +104,6 @@ def search(ctx, query, output_format, max_results, timeout, output, interactive)
         else:
             click.echo(formatted_output)
         
-        # Show summary stats
         if output_format != 'summary':
             metadata = response.metadata
             click.echo(f"\nSummary: {response.results['returned']} companies found "

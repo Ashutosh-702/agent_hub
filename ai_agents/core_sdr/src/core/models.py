@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field, field_validator
 
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=3, max_length=500, description="Natural language search query")
-    max_results: int = Field(default=20, ge=1, le=100, description="Maximum number of results to return")
     timeout: int = Field(default=30, ge=5, le=300, description="Timeout in seconds")
     output_format: Literal["json", "csv", "summary"] = Field(default="json", description="Output format")
     

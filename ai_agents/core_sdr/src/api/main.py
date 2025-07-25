@@ -138,7 +138,6 @@ async def health_check(orchestrator: LeadGenerationOrchestrator = Depends(get_or
 @app.post("/search", response_model=SearchResponseAPI)
 async def search_companies(
     request: SearchRequestAPI,
-    background_tasks: BackgroundTasks,
     orchestrator: LeadGenerationOrchestrator = Depends(get_orchestrator)
 ):
     """
@@ -185,17 +184,6 @@ async def clear_cache(orchestrator: LeadGenerationOrchestrator = Depends(get_orc
             raise HTTPException(status_code=500, detail="Failed to clear cache")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cache clear failed: {str(e)}")
-
-
-# Legacy config endpoints removed - Agent SDK + MCP handles entity recognition automatically
-# No longer need manual industry/technology/location mappings
-
-
-# run_demo endpoint removed - unused test functionality
-
-
-# Unused background tasks and error handlers removed
-
 
 if __name__ == "__main__":
     import uvicorn

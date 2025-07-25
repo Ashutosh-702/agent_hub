@@ -89,7 +89,6 @@ You must behave like an efficient search operator
             user_prompt = self._build_user_prompt(search_request)
             
             logger.info(f"Starting Agent SDK search for: {search_request.query}")
-            logger.debug(f"Max results: {search_request.max_results}")
             
             result = await Runner.run(
                 starting_agent=agent,
@@ -146,25 +145,13 @@ You must behave like an efficient search operator
             raise Exception(f"Coresignal MCP setup failed: {str(e)}")
 
     def _build_user_prompt(self, search_request: SearchRequest) -> str:
-        numbers_in_query = re.findall(r'\b(\d+)\b', search_request.query)
-
-        if numbers_in_query:
-            requested_count = int(numbers_in_query[0])
-            target_count = min(requested_count, search_request.max_results)
-            logger.info(f"Detected number '{requested_count}' in query, targeting {target_count} companies")
-        else:
-            requested_count = search_request.max_results
-            target_count = search_request.max_results
-            logger.info(f"No specific number in query, using max_results: {target_count}")
-
         return f"""
 Using the system instructions provided earlier, complete the following task:\n
 Query: "{search_request.query}"
 
-Find {requested_count} companies matching this query: "{search_request.query}".
+Find companies matching this query: "{search_request.query}".
 
-Only return the exact number of matching companies with their name and description. Stop after retrieving them. No 
-retries, summaries, or commentary.
+Return matching companies with their name and description. No retries, summaries, or commentary.
 """
 
     def _convert_to_search_response(self,
@@ -183,7 +170,6 @@ retries, summaries, or commentary.
             search_id="mcp_" + str(hash(search_request.query))[:8],
             query={
                 "original_query": search_request.query,
-                "max_results": search_request.max_results,
                 "search_method": "agent_sdk_coresignal_mcp"
             },
             results={
@@ -205,7 +191,6 @@ retries, summaries, or commentary.
             search_id="error_" + str(hash(search_request.query))[:8],
             query={
                 "original_query": search_request.query,
-                "max_results": search_request.max_results,
                 "search_method": "agent_sdk_coresignal_mcp"
             },
             results={

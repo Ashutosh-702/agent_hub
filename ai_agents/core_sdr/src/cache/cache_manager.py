@@ -36,7 +36,7 @@ class MongoCache:
         try:
             self.client = MongoClient(
                 self.mongo_uri,
-                serverSelectionTimeoutMS=5000,  # 5 second timeout
+                serverSelectionTimeoutMS=5000,
                 connectTimeoutMS=5000,
                 socketTimeoutMS=5000
             )
@@ -202,22 +202,18 @@ class CacheManager:
             CacheEntry if found, None otherwise
         """
         cache_key = self._generate_cache_key(query, params)
-        logger.debug(f"Looking for cache key: {cache_key} for query: '{query}'")
         data = self.cache.get(cache_key)
         
         if data:
-            logger.debug(f"Cache hit! Found cached data for key: {cache_key}")
             try:
                 return CacheEntry(**data)
             except Exception as e:
                 logger.warning(f"Failed to deserialize cache entry: {str(e)}")
-        else:
-            logger.debug(f"Cache miss for key: {cache_key}")
         
         return None
     
     def set(self, query: str, params: Dict[str, Any], 
-            dsl_query: Dict[str, Any], results: List[Company], 
+            dsl_query: Dict[str, Any], results: List[Dict[str, Any]], 
             credits_used: int, total_found: int):
         """
         Cache search results.
@@ -231,7 +227,6 @@ class CacheManager:
             total_found: Total number of results found
         """
         cache_key = self._generate_cache_key(query, params)
-        logger.info(f"Storing cache entry with key: {cache_key} for query: '{query}' with {len(results)} results")
         
         cache_entry = CacheEntry(
             key=cache_key,
@@ -245,7 +240,6 @@ class CacheManager:
         
         cache_data = cache_entry.dict()
         self.cache.set(cache_key, cache_data, self.default_ttl)
-        logger.info(f"Successfully stored cache entry with key: {cache_key}")
     
     def delete(self, query: str, params: Dict[str, Any]) -> bool:
         """Delete cached entry for a query."""

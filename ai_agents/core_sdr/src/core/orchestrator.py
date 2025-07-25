@@ -2,7 +2,7 @@ import logging
 import time
 import uuid
 from typing import Dict, Any, Optional
-
+import re
 from .models import SearchRequest, SearchResponse
 from .validator import InputValidator
 from ..cache import CacheManager
@@ -48,6 +48,10 @@ class LeadGenerationOrchestrator:
             mongo_uri=mongo_uri,
             default_ttl=cache_ttl_hours * 3600
         )
+        
+        cache_stats = self.cache_manager.get_cache_stats()
+        logger.info(f"Cache initialized: {cache_stats.get('cache_type', 'unknown')} - Connected: {self.cache_manager.is_connected()}")
+        
         self.stats = {
             'total_searches': 0,
             'cache_hits': 0,
@@ -76,19 +80,83 @@ class LeadGenerationOrchestrator:
             logger.info(f"Processing search request {search_id}")
             search_request = self._validate_input(request_data)
             logger.debug(f"Validated input: {search_request.query}")
+            
+            numbers_in_query = re.findall(r'\b(\d+)\b', search_request.query)
+            requested_count = int(numbers_in_query[0]) if numbers_in_query else 5
+            
+            base_query = re.sub(r'\b\d+\b', '', search_request.query).strip()
+            base_query = re.sub(r'\s+', ' ', base_query) 
+            
             cache_params = {
-                'max_results': search_request.max_results,
                 'timeout': search_request.timeout,
                 'output_format': search_request.output_format
             }
             
-            cached_result = self.cache_manager.get(search_request.query, cache_params)
-            if cached_result:
-                logger.info(f"Cache hit for query: {search_request.query}")
-                self.stats['cache_hits'] += 1
-                return self._create_response_from_cache(cached_result, search_id)
+            cached_result = self.cache_manager.get(base_query, cache_params)
             
-            logger.info(f"Cache miss for query: {search_request.query}")
+            if cached_result:
+                cached_count = len(cached_result.results)
+                
+                if cached_count >= requested_count:
+                    logger.info(f"Cache hit - returning {requested_count} companies")
+                    self.stats['cache_hits'] += 1
+                    return self._create_response_from_cache(cached_result, search_id, requested_count)
+                else:
+                    logger.info(f"Partial cache hit - have {cached_count}, getting more from agent")
+                    self.stats['cache_hits'] += 1
+                    remaining_request = SearchRequest(
+                        query=search_request.query,
+                        timeout=search_request.timeout,
+                        output_format=search_request.output_format
+                    )
+                    
+                    new_response = await self._process_with_agent_mcp(remaining_request)
+                    new_companies = new_response.results.get('companies', [])
+                    cached_names = {company.get('name', '').lower().strip() for company in cached_result.results}
+                    unique_new_companies = [
+                        company for company in new_companies 
+                        if company.get('name', '').lower().strip() not in cached_names
+                    ]
+                    all_companies = cached_result.results + unique_new_companies
+                    logger.info(f"Combined {cached_count} cached + {len(unique_new_companies)} new = {len(all_companies)} total")
+                    
+                    try:
+                        self.cache_manager.set(
+                            query=base_query,
+                            params=cache_params,
+                            dsl_query=new_response.query,
+                            results=all_companies,
+                            credits_used=cached_result.credits_used + new_response.metadata.get('tokens_used', 0),
+                            total_found=len(all_companies)
+                        )
+                        logger.info(f"Updated cache with {len(all_companies)} total companies")
+                    except Exception as cache_error:
+                        logger.warning(f"Failed to update cache: {cache_error}")
+                    
+                    
+                    final_companies = all_companies[:requested_count]
+                    
+                    
+                    return SearchResponse(
+                        search_id=search_id,
+                        query=new_response.query,
+                        results={
+                            "total_found": len(all_companies),
+                            "returned": len(final_companies),
+                            "companies": final_companies
+                        },
+                        metadata={
+                            "credits_used": new_response.metadata.get('tokens_used', 0),
+                            "processing_time": time.time() - start_time,
+                            "cached": True,
+                            "partial_cache": True,
+                            "cached_results": cached_count,
+                            "new_results": len(new_companies),
+                            "timestamp": time.time()
+                        }
+                    )
+            
+            logger.info(f"Cache miss")
             self.stats['cache_misses'] += 1
             
             response = await self._process_with_agent_mcp(search_request)
@@ -99,14 +167,14 @@ class LeadGenerationOrchestrator:
                 try:
                     companies = response.results['companies']
                     self.cache_manager.set(
-                        query=search_request.query,
+                        query=base_query,
                         params=cache_params,
                         dsl_query=response.query, 
                         results=companies,
                         credits_used=response.metadata.get('tokens_used', 0),
                         total_found=len(companies)
                     )
-                    logger.debug(f"Cached successful result with {len(companies)} companies")
+                    logger.debug(f"Cached {len(companies)} companies")
                     
                 except Exception as cache_error:
                     logger.warning(f"Failed to cache results: {cache_error}")
@@ -146,8 +214,13 @@ class LeadGenerationOrchestrator:
             raise LeadGenerationError(f"Agent MCP processing failed: {str(e)}")
     
     
-    def _create_response_from_cache(self, cached_result, search_id: str) -> SearchResponse:
+    def _create_response_from_cache(self, cached_result, search_id: str, requested_count: int = None) -> SearchResponse:
         """Create response from cached data"""
+        
+        if requested_count is not None:
+            companies = cached_result.results[:requested_count]
+        else:
+            companies = cached_result.results
         
         return SearchResponse(
             search_id=search_id,
@@ -158,8 +231,8 @@ class LeadGenerationOrchestrator:
             },
             results={
                 "total_found": cached_result.total_found,
-                "returned": len(cached_result.results),
-                "companies": cached_result.results  # Results are already in dict format
+                "returned": len(companies),
+                "companies": companies 
             },
             metadata={
                 "credits_used": cached_result.credits_used,
