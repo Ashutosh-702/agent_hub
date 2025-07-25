@@ -1,7 +1,7 @@
 import re
 from typing import Optional, Literal, Dict, Any, List
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class SearchRequest(BaseModel):
@@ -10,7 +10,7 @@ class SearchRequest(BaseModel):
     timeout: int = Field(default=30, ge=5, le=300, description="Timeout in seconds")
     output_format: Literal["json", "csv", "summary"] = Field(default="json", description="Output format")
     
-    @validator('query')
+    @field_validator('query')
     def validate_query(cls, v):
         # Check for potential injection patterns
         dangerous_patterns = [
