@@ -103,6 +103,11 @@ async def search(ctx, query, output_format, max_results, timeout, output, intera
             click.echo(f"Results saved to {output}")
         else:
             click.echo(formatted_output)
+        stats = orchestrator.get_stats()
+        click.echo(f"\n--- Instance Stats ---")
+        click.echo(f"Searches in this session: {stats['total_searches']}")
+        click.echo(f"Cache hits: {stats['cache_hits']}")
+        click.echo(f"Cache misses: {stats['cache_misses']}")
         
         if output_format != 'summary':
             metadata = response.metadata

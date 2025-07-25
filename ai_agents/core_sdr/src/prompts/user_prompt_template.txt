@@ -1,0 +1,7 @@
+Using the system instructions provided earlier, complete the following task:
+
+Query: "{query}"
+
+Find companies matching this query: "{query}".
+
+Return matching companies with their name and description. No retries, summaries, or commentary. 

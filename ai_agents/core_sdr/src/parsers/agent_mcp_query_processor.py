@@ -31,30 +31,25 @@ class AgentMCPQueryProcessor:
         self.model = "o3"
         self.reasoning_effort = Reasoning(effort="low")
         
-        self.system_instructions = self._build_system_instructions()
+        self.system_instructions = self._load_prompt("system_instructions.txt")
+        self.user_prompt_template = self._load_prompt("user_prompt_template.txt")
 
         logger.info(f"AgentMCPQueryProcessor initialized with {self.model} model and Coresignal MCP")
 
-    def _build_system_instructions(self) -> str:
-        return """You are a structured search assistant. Interpret natural language queries, extract filters, use the appropriate tool, and return the required number of matching companies efficiently.
-                Also use the Coresignal MCP to search for companies based on the query. 
-        CRITICAL: ONLY one search call is allowed per query.
-Important Instructions:
-- Immediately extract the intent and filters from the query.
-- Select and invoke a tool on the first reasoning turn — do not loop through tools or retry.
-- Stop after you retrieve the required number of companies.
-- Never ask clarifying questions or perform additional reasoning once the result is available.
-- Do not generate summaries, explanations, or additional commentary.
-- Keep responses strictly minimal and structured.
-
-Output Constraints:
-- Do not return more companies than requested.
-- Descriptions should avoid fluff, intros, or generic phrases.
-- Do not use bullet points, markdown, headings, or extra fields.
-- Do not include reasoning, notes, or conclusions — only the list of company objects.
-
-You must behave like an efficient search operator
-"""
+    def _load_prompt(self, filename: str) -> str:
+        """Load prompt from file"""
+        prompt_dir = os.path.join(os.path.dirname(__file__), '..', 'prompts')
+        prompt_path = os.path.join(prompt_dir, filename)
+        
+        try:
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            logger.error(f"Prompt file not found: {prompt_path}")
+            raise
+        except Exception as e:
+            logger.error(f"Error loading prompt file {filename}: {e}")
+            raise
 
     async def process_query(self, search_request: SearchRequest) -> SearchResponse:
         """
@@ -145,14 +140,7 @@ You must behave like an efficient search operator
             raise Exception(f"Coresignal MCP setup failed: {str(e)}")
 
     def _build_user_prompt(self, search_request: SearchRequest) -> str:
-        return f"""
-Using the system instructions provided earlier, complete the following task:\n
-Query: "{search_request.query}"
-
-Find companies matching this query: "{search_request.query}".
-
-Return matching companies with their name and description. No retries, summaries, or commentary.
-"""
+        return self.user_prompt_template.format(query=search_request.query)
 
     def _convert_to_search_response(self,
                                     mcp_response: CoreSignalMCPResponse,
