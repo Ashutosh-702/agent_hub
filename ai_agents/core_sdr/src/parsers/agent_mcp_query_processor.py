@@ -6,10 +6,9 @@ Uses OpenAI Agent SDK with o3 model and Coresignal MCP for company search.
 """
 import logging
 import os
-from typing import Dict, Any, Optional
-
+import re
 from agents import Agent, Runner, ModelSettings
-from agents.mcp.server import MCPServerStdio, MCPServerSse
+from agents.mcp.server import MCPServerSse
 from openai.types import Reasoning
 
 from ..core.models import CoreSignalMCPResponse, SearchRequest, SearchResponse
@@ -20,13 +19,8 @@ logger = logging.getLogger(__name__)
 class AgentMCPQueryProcessor:
     """
     Processes natural language queries using Agent SDK with Coresignal MCP.
-    Replaces EntityExtractor + DSLBuilder + LLMDSLGenerator entirely.
     """
-
-    def __init__(self, config_dir: str = "config"):
-        self.config_dir = config_dir
-
-        # Validate environment
+    def __init__(self):
         self.api_key = os.getenv('OPENAI_API_KEY')
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
@@ -34,23 +28,17 @@ class AgentMCPQueryProcessor:
         self.coresignal_api_key = os.getenv('CORESIGNAL_API_KEY')
         if not self.coresignal_api_key:
             raise ValueError("CORESIGNAL_API_KEY environment variable not set")
-
-        # Model configuration - use faster model for better performance
-        self.model = "o3"  # Much faster than o3
-        self.reasoning_effort = "low"
-
-        # System instructions for the agent
+        self.model = "o3"
+        self.reasoning_effort = Reasoning(effort="low")
+        
         self.system_instructions = self._build_system_instructions()
 
         logger.info(f"AgentMCPQueryProcessor initialized with {self.model} model and Coresignal MCP")
 
     def _build_system_instructions(self) -> str:
-        return """You are a structured search assistant for a company intelligence platform. Your role is to 
-        interpret natural language queries and retrieve matching companies using available tools.
-
-Your task is to extract structured filters from the query, call the most relevant tool, and return only the required 
-number of companies efficiently.
-CRITICAL: ONLY one search call is allowed per query.
+        return """You are a structured search assistant. Interpret natural language queries, extract filters, use the appropriate tool, and return the required number of matching companies efficiently.
+                Also use the Coresignal MCP to search for companies based on the query. 
+        CRITICAL: ONLY one search call is allowed per query.
 Important Instructions:
 - Immediately extract the intent and filters from the query.
 - Select and invoke a tool on the first reasoning turn — do not loop through tools or retry.
@@ -84,43 +72,37 @@ You must behave like an efficient search operator
         try:
             logger.info(f"Processing query: {search_request.query}")
 
-            # Set up Coresignal MCP server
             coresignal_mcp = await self._setup_coresignal_mcp()
-
-            # Create agent with optimized settings for speed
+            
             agent = Agent(
                 name="CompanySearchAgent",
                 model=self.model,
                 model_settings=ModelSettings(
-                    reasoning=Reasoning(effort="low")
+                    reasoning=self.reasoning_effort,
+                    extra_body={"service_tier":"flex"}
                 ),
                 mcp_servers=[coresignal_mcp],
                 instructions=self.system_instructions,
                 output_type=CoreSignalMCPResponse
             )
-
-            # Build user prompt
+            
             user_prompt = self._build_user_prompt(search_request)
-
-            # Log the request
+            
             logger.info(f"Starting Agent SDK search for: {search_request.query}")
             logger.debug(f"Max results: {search_request.max_results}")
-
-            # Run the agent with minimal turns
+            
             result = await Runner.run(
                 starting_agent=agent,
-                input=user_prompt,
+                input=user_prompt
             )
-
-            # Log token usage if available
+            
             total_tokens = 0
             if hasattr(result, 'usage_summary') and result.usage_summary:
                 input_tokens = getattr(result.usage_summary, 'input_tokens', 0)
                 output_tokens = getattr(result.usage_summary, 'output_tokens', 0)
                 total_tokens = input_tokens + output_tokens
                 logger.info(f"API Usage: {total_tokens:,} tokens (input: {input_tokens:,}, output: {output_tokens:,})")
-
-            # Process the structured response
+            
             mcp_response = result.final_output
             if not isinstance(mcp_response, CoreSignalMCPResponse):
                 if hasattr(mcp_response, 'model_dump'):
@@ -128,19 +110,16 @@ You must behave like an efficient search operator
                 else:
                     mcp_data = dict(mcp_response) if hasattr(mcp_response, '__dict__') else {}
                 mcp_response = CoreSignalMCPResponse(**mcp_data)
-
-            # Convert to SearchResponse format
+            
             search_response = self._convert_to_search_response(
                 mcp_response, search_request, total_tokens
             )
 
             logger.info(f"Successfully processed query and found {len(mcp_response.companies)} companies")
-            # Cleanup MCP connection
             try:
                 await coresignal_mcp.cleanup()
             except Exception as cleanup_error:
                 logger.warning(f"MCP cleanup error: {cleanup_error}")
-
             return search_response
 
         except Exception as e:
@@ -167,8 +146,6 @@ You must behave like an efficient search operator
             raise Exception(f"Coresignal MCP setup failed: {str(e)}")
 
     def _build_user_prompt(self, search_request: SearchRequest) -> str:
-        # Parse the query for any specific number mentioned
-        import re
         numbers_in_query = re.findall(r'\b(\d+)\b', search_request.query)
 
         if numbers_in_query:
@@ -195,8 +172,6 @@ retries, summaries, or commentary.
                                     search_request: SearchRequest,
                                     total_tokens: int) -> SearchResponse:
         """Convert CoreSignalMCPResponse to SearchResponse format"""
-
-        # Convert companies to simple name + description format
         companies_data = []
         for company in mcp_response.companies:
             companies_data.append({

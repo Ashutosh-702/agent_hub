@@ -3,15 +3,15 @@ import json
 import logging
 import time
 from typing import Dict, Any, Optional, List
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+from ..core.models import CacheEntry, Company
 
 try:
-    from pymongo import MongoClient
-    from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
     MONGO_AVAILABLE = True
 except ImportError:
     MONGO_AVAILABLE = False
 
-from ..core.models import CacheEntry, Company
 
 logger = logging.getLogger(__name__)
 
@@ -202,13 +202,17 @@ class CacheManager:
             CacheEntry if found, None otherwise
         """
         cache_key = self._generate_cache_key(query, params)
+        logger.debug(f"Looking for cache key: {cache_key} for query: '{query}'")
         data = self.cache.get(cache_key)
         
         if data:
+            logger.debug(f"Cache hit! Found cached data for key: {cache_key}")
             try:
                 return CacheEntry(**data)
             except Exception as e:
                 logger.warning(f"Failed to deserialize cache entry: {str(e)}")
+        else:
+            logger.debug(f"Cache miss for key: {cache_key}")
         
         return None
     
@@ -227,6 +231,7 @@ class CacheManager:
             total_found: Total number of results found
         """
         cache_key = self._generate_cache_key(query, params)
+        logger.info(f"Storing cache entry with key: {cache_key} for query: '{query}' with {len(results)} results")
         
         cache_entry = CacheEntry(
             key=cache_key,
@@ -240,6 +245,7 @@ class CacheManager:
         
         cache_data = cache_entry.dict()
         self.cache.set(cache_key, cache_data, self.default_ttl)
+        logger.info(f"Successfully stored cache entry with key: {cache_key}")
     
     def delete(self, query: str, params: Dict[str, Any]) -> bool:
         """Delete cached entry for a query."""

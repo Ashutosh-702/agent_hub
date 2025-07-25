@@ -2,8 +2,9 @@ from .models import (
     SearchRequest,
     SearchResponse,
     Company,
-    DSLQuery,
-    CacheEntry
+    CacheEntry,
+    CompanySearchResult,
+    CoreSignalMCPResponse
 )
 from .orchestrator import LeadGenerationOrchestrator, LeadGenerationError
 from .validator import InputValidator
@@ -11,10 +12,11 @@ from .validator import InputValidator
 __all__ = [
     'SearchRequest',
     'SearchResponse', 
-    'Company', 
-    'DSLQuery', 
+    'Company',
     'CacheEntry',
     'InputValidator',
     'LeadGenerationOrchestrator',
-    'LeadGenerationError'
+    'LeadGenerationError',
+    'CompanySearchResult',
+    'CoreSignalMCPResponse'
 ]

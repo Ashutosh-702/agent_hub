@@ -24,10 +24,9 @@ load_dotenv()
 
 
 @click.group()
-@click.option('--config-dir', default='config', help='Configuration directory')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.pass_context
-def cli(ctx: Context, config_dir, verbose):
+def cli(ctx: Context, verbose):
     """Lead Generation CLI Tool"""
     ctx.ensure_object(dict)
     
@@ -54,7 +53,6 @@ def cli(ctx: Context, config_dir, verbose):
         orchestrator = LeadGenerationOrchestrator(
             coresignal_api_key=api_key,
             coresignal_base_url=base_url,
-            config_dir=config_dir,
             mongo_uri=mongo_uri,
             cache_ttl_hours=cache_ttl_hours
         )
@@ -130,9 +128,6 @@ def search(ctx, query, output_format, max_results, timeout, output, interactive)
     except Exception as e:
         click.echo(f"Unexpected error: {str(e)}", err=True)
         sys.exit(1)
-
-
-# explain command removed - Agent SDK handles query parsing automatically
 
 @cli.command()
 @click.pass_context
@@ -249,9 +244,8 @@ def demo(ctx, interactive):
             response = orchestrator.process_search_request(request_data)
             formatted_output = orchestrator.format_response(response, 'summary')
             
-            # Show just the first few lines
             lines = formatted_output.split('\n')
-            for line in lines[:8]:  # Show first 8 lines
+            for line in lines[:8]:
                 click.echo(f"   {line}")
             
             if len(lines) > 8:

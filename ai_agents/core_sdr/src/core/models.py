@@ -12,7 +12,6 @@ class SearchRequest(BaseModel):
     
     @field_validator('query')
     def validate_query(cls, v):
-        # Check for potential injection patterns
         dangerous_patterns = [
             r'<script', r'javascript:', r'eval\(', r'exec\(',
             r'DROP\s+TABLE', r'DELETE\s+FROM', r'INSERT\s+INTO',
@@ -25,17 +24,7 @@ class SearchRequest(BaseModel):
                 raise ValueError("Query contains potentially dangerous patterns")
         
         return v.strip()
-
-
-# ParsedEntity model removed - no longer needed with Agent SDK + MCP integration
-
-
-class DSLQuery(BaseModel):
-    query: Dict[str, Any]
-    size: int = 20
-    from_: int = Field(default=0, alias="from")
-
-
+    
 class SearchResponse(BaseModel):
     search_id: str
     query: Dict[str, Any]
@@ -61,13 +50,11 @@ class CacheEntry(BaseModel):
     key: str
     query: str
     dsl_query: Dict[str, Any]
-    results: List[Company]
+    results: List[Dict[str, Any]]
     timestamp: float
     credits_used: int
     total_found: int
 
-
-# New models for Agent SDK + Coresignal MCP workflow
 class CompanySearchResult(BaseModel):
     """Individual company result from Coresignal MCP"""
     name: str = Field(..., description="Company name")

@@ -52,7 +52,7 @@ class StatsResponse(BaseModel):
     total_searches: int
     cache_hits: int
     cache_misses: int
-    total_tokens_used: int  # Agent SDK + MCP workflow uses tokens
+    total_tokens_used: int
     total_processing_time: float
     api_usage: Dict[str, Any]
 
@@ -84,7 +84,6 @@ def initialize_orchestrator():
     orchestrator = LeadGenerationOrchestrator(
         coresignal_api_key=api_key,
         coresignal_base_url=base_url,
-        config_dir="config",
         mongo_uri=mongo_uri,
         cache_ttl_hours=cache_ttl_hours
     )

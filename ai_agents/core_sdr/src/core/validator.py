@@ -27,7 +27,3 @@ class InputValidator:
         except ValidationError as e:
             raise ValidationError(f"Input validation failed: {e}")
     
-    # Unused validation methods removed - MCP handles validation automatically:
-    # - sanitize_query() - Agent SDK handles query sanitization
-    # - validate_api_key() - MCP handles API key validation  
-    # - normalize_output_format() - Format normalization not needed
