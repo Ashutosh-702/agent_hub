@@ -44,7 +44,3 @@ class QueryParser:
         
         # Process using Agent MCP processor
         return await self.agent_processor.process_query(search_request)
-    
-    # parse_query_with_context method removed - unused context functionality
-    
-    # explain methods removed - Agent SDK handles query parsing automatically
