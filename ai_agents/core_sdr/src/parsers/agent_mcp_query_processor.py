@@ -6,11 +6,10 @@ Uses OpenAI Agent SDK with o3 model and Coresignal MCP for company search.
 """
 import logging
 import os
-import re
 from agents import Agent, Runner, ModelSettings
 from agents.mcp.server import MCPServerSse
 from openai.types import Reasoning
-
+from typing import Dict, List, Optional
 from ..core.models import CoreSignalMCPResponse, SearchRequest, SearchResponse
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ class AgentMCPQueryProcessor:
     """
     Processes natural language queries using Agent SDK with Coresignal MCP.
     """
-    def __init__(self):
+    def __init__(self,system_instructions: str ):
         self.api_key = os.getenv('OPENAI_API_KEY')
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
@@ -31,7 +30,9 @@ class AgentMCPQueryProcessor:
         self.model = "o3"
         self.reasoning_effort = Reasoning(effort="low")
         
-        self.system_instructions = self._load_prompt("system_instructions.txt")
+        self.system_instructions = system_instructions or self._load_prompt("system_search.txt")
+
+
         self.user_prompt_template = self._load_prompt("user_prompt_template.txt")
 
         logger.info(f"AgentMCPQueryProcessor initialized with {self.model} model and Coresignal MCP")
@@ -51,7 +52,7 @@ class AgentMCPQueryProcessor:
             logger.error(f"Error loading prompt file {filename}: {e}")
             raise
 
-    async def process_query(self, search_request: SearchRequest) -> SearchResponse:
+    async def process_query(self, search_request: SearchRequest, cached_company_ids: Optional[List[str]] = None) -> SearchResponse:
         """
         Process a search request using Agent SDK with Coresignal MCP.
         
@@ -81,8 +82,10 @@ class AgentMCPQueryProcessor:
                 output_type=CoreSignalMCPResponse
             )
             
-            user_prompt = self._build_user_prompt(search_request)
-            
+            user_prompt = self._build_user_prompt(search_request,cached_company_ids)
+            if cached_company_ids:
+                logger.info(f"Collecting cached_company_ids: {cached_company_ids}")
+                user_prompt += f"\nCached company IDs to collect: {', '.join(cached_company_ids)}"
             logger.info(f"Starting Agent SDK search for: {search_request.query}")
             
             result = await Runner.run(
@@ -139,8 +142,15 @@ class AgentMCPQueryProcessor:
             logger.error(f"Failed to setup Coresignal MCP: {str(e)}")
             raise Exception(f"Coresignal MCP setup failed: {str(e)}")
 
-    def _build_user_prompt(self, search_request: SearchRequest) -> str:
-        return self.user_prompt_template.format(query=search_request.query)
+    def _build_user_prompt(self, search_request: SearchRequest,cached_company_ids: Optional[List[str]] = None) -> str:
+        prompt = self.user_prompt_template.format(query=search_request.query)
+        if cached_company_ids:
+            prompt += (
+            "\n\nNote: The following company IDs were already cached and must be collected using coresignal mcp with their name and description: "
+            f"{', '.join(cached_company_ids)}"
+        )
+    
+        return prompt
 
     def _convert_to_search_response(self,
                                     mcp_response: CoreSignalMCPResponse,
@@ -148,8 +158,14 @@ class AgentMCPQueryProcessor:
                                     total_tokens: int) -> SearchResponse:
         """Convert CoreSignalMCPResponse to SearchResponse format"""
         companies_data = []
+        
         for company in mcp_response.companies:
+            company_id = company.company_id or "unknown"
+            if not company.company_id:
+                logger.warning(f"Skipping company with missing ID: {company.name}")
+                continue
             companies_data.append({
+                "company_id": company_id, 
                 "name": company.name,
                 "description": company.description
             })

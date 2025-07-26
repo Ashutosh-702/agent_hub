@@ -49,13 +49,14 @@ class CacheEntry(BaseModel):
     key: str
     query: str
     dsl_query: Dict[str, Any]
-    results: List[Dict[str, Any]]
+    results: List[str]
     timestamp: float
     credits_used: int
     total_found: int
 
 class CompanySearchResult(BaseModel):
     """Individual company result from Coresignal MCP"""
+    company_id: str = Field(..., description="Unique identifier for the company")
     name: str = Field(..., description="Company name")
     description: str = Field(..., description="Brief company description")
 

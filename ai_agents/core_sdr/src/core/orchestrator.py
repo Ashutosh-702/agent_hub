@@ -1,14 +1,13 @@
 import logging
 import time
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional,List
 import re
 from .models import SearchRequest, SearchResponse
 from .validator import InputValidator
 from ..cache import CacheManager
 from ..formatters import format_search_response
 from ..parsers import AgentMCPQueryProcessor
-
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +47,10 @@ class LeadGenerationOrchestrator:
             mongo_uri=mongo_uri,
             default_ttl=cache_ttl_hours * 3600
         )
-        
+        loader = AgentMCPQueryProcessor(system_instructions="")
+        self.search_prompt = loader._load_prompt("system_search.txt")
+        self.collect_prompt = loader._load_prompt("system_collect.txt")
+        self.hybrid_prompt = loader._load_prompt("system_hybrid.txt")
         cache_stats = self.cache_manager.get_cache_stats()
         logger.info(f"Cache initialized: {cache_stats.get('cache_type', 'unknown')} - Connected: {self.cache_manager.is_connected()}")
         
@@ -100,7 +102,10 @@ class LeadGenerationOrchestrator:
                 if cached_count >= requested_count:
                     logger.info(f"Cache hit - returning {requested_count} companies")
                     self.stats['cache_hits'] += 1
-                    return self._create_response_from_cache(cached_result, search_id, requested_count)
+                    logger.info(f"Full cache hit for query: {search_request.query}")
+                    logger.info(f"Cached company IDs: {cached_result.results}")
+
+                    return await self._create_response_from_cache(cached_result, search_id, requested_count)
                 else:
                     logger.info(f"Partial cache hit - have {cached_count}, getting more from agent")
                     self.stats['cache_hits'] += 1
@@ -110,22 +115,24 @@ class LeadGenerationOrchestrator:
                         output_format=search_request.output_format
                     )
                     
-                    new_response = await self._process_with_agent_mcp(remaining_request)
+                    cached_company_ids = cached_result.results
+                    new_response = await self._process_with_agent_mcp(remaining_request,cached_company_ids)
                     new_companies = new_response.results.get('companies', [])
-                    cached_names = {company.get('name', '').lower().strip() for company in cached_result.results}
+                    # cached_names = {company.get('name', '').lower().strip() for company in cached_result.results}
                     unique_new_companies = [
                         company for company in new_companies 
-                        if company.get('name', '').lower().strip() not in cached_names
+                        if company.get('company_id', '') not in cached_company_ids
                     ]
-                    all_companies = cached_result.results + unique_new_companies
-                    logger.info(f"Combined {cached_count} cached + {len(unique_new_companies)} new = {len(all_companies)} total")
-                    
+                    all_companies = cached_company_ids + [company.get('company_id') for company in unique_new_companies]
+                    logger.info(f"Combined {len(cached_company_ids)} cached + {len(unique_new_companies)} new = {len(all_companies)} total")
+                    companies = new_response.results['companies']
+                    company_ids = [c["company_id"] for c in companies]
                     try:
                         self.cache_manager.set(
                             query=base_query,
                             params=cache_params,
                             dsl_query=new_response.query,
-                            results=all_companies,
+                            results=company_ids,
                             credits_used=cached_result.credits_used + new_response.metadata.get('tokens_used', 0),
                             total_found=len(all_companies)
                         )
@@ -135,15 +142,19 @@ class LeadGenerationOrchestrator:
                     
                     
                     final_companies = all_companies[:requested_count]
-                    
+                    lookup = {c["company_id"]: c for c in new_companies}
+
+                    final_company_list = [
+                        lookup.get(c, c) if isinstance(c, str) else c for c in final_companies
+                    ]
                     
                     return SearchResponse(
                         search_id=search_id,
                         query=new_response.query,
                         results={
                             "total_found": len(all_companies),
-                            "returned": len(final_companies),
-                            "companies": final_companies
+                            "returned": len(final_company_list),
+                            "companies": final_company_list
                         },
                         metadata={
                             "credits_used": new_response.metadata.get('tokens_used', 0),
@@ -166,11 +177,12 @@ class LeadGenerationOrchestrator:
     
                 try:
                     companies = response.results['companies']
+                    company_ids = [c["company_id"] for c in companies]
                     self.cache_manager.set(
                         query=base_query,
                         params=cache_params,
                         dsl_query=response.query, 
-                        results=companies,
+                        results=company_ids,
                         credits_used=response.metadata.get('tokens_used', 0),
                         total_found=len(companies)
                     )
@@ -203,24 +215,42 @@ class LeadGenerationOrchestrator:
         except Exception as e:
             raise LeadGenerationError(f"Input validation failed: {str(e)}")
     
-    async def _process_with_agent_mcp(self, search_request: SearchRequest) -> SearchResponse:
+    async def _process_with_agent_mcp(self, search_request: SearchRequest, cached_company_ids: Optional[List[str]] = None) -> SearchResponse:
         """Process query using Agent SDK + Coresignal MCP"""
         try:
-            self.agent_processor = AgentMCPQueryProcessor()
+            requested_count=0
+            match = re.search(r'\b(\d+)\b', search_request.query)
+            if match:
+                requested_count = int(match.group(1))
+            if cached_company_ids and len(cached_company_ids) >= requested_count:
+                system_instructions = self.collect_prompt
+            elif cached_company_ids:
+                system_instructions = self.hybrid_prompt
+            else:
+                system_instructions = self.search_prompt
+            self.agent_processor = AgentMCPQueryProcessor(system_instructions=system_instructions)
             return await self.agent_processor.process_query(
-                search_request
+                search_request, cached_company_ids
             )
         except Exception as e:
             raise LeadGenerationError(f"Agent MCP processing failed: {str(e)}")
     
     
-    def _create_response_from_cache(self, cached_result, search_id: str, requested_count: int = None) -> SearchResponse:
+    async def _create_response_from_cache(self, cached_result, search_id: str, requested_count: int = None) -> SearchResponse:
         """Create response from cached data"""
         
         if requested_count is not None:
-            companies = cached_result.results[:requested_count]
+            raw_ids = cached_result.results[:requested_count]
         else:
-            companies = cached_result.results
+            raw_ids = cached_result.results
+
+        search_request = SearchRequest(
+            query=cached_result.query,
+            timeout=30,
+            output_format="summary"
+        )
+        response = await self._process_with_agent_mcp(search_request, cached_company_ids=raw_ids)
+        companies = response.results["companies"]
         
         return SearchResponse(
             search_id=search_id,

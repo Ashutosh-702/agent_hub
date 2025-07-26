@@ -213,7 +213,7 @@ class CacheManager:
         return None
     
     def set(self, query: str, params: Dict[str, Any], 
-            dsl_query: Dict[str, Any], results: List[Dict[str, Any]], 
+            dsl_query: Dict[str, Any], results: List[str], 
             credits_used: int, total_found: int):
         """
         Cache search results.

@@ -173,7 +173,7 @@ class SummaryFormatter(ResultFormatter):
             # Full Company object format
             # Company name (required)
             name = company.company_name or f"Company ID: {company.id}"
-            parts.append(f"**{name}**")
+            parts.append(f"**{name}** - {company.description or 'No description available'}")
             
             # Industry and location
             details = []
@@ -275,6 +275,13 @@ def format_search_response(search_response: SearchResponse,
             pass
         else:
             # Convert dict to Company objects for full format
-            companies = [Company(**company) for company in companies]
+            # companies = [Company(**company) for company in companies]
+            companies = [Company(
+                            id=company["company_id"],
+                            company_name=company.get("name"),
+                            description=company.get("description")
+                        )
+                        for company in companies
+                    ]
     
     return formatter.format(companies, search_response.metadata)
