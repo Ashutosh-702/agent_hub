@@ -1,0 +1,9 @@
+openai
+pydantic
+pymongo
+fastapi
+python-dotenv
+asyncclick
+openai-agents
+uvicorn
+click
