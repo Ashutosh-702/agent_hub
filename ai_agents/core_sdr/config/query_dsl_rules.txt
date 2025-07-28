@@ -1,0 +1,235 @@
+Elasticsearch Query DSL — Complete Specification (Plain Text)
+
+1. Introduction
+---------------
+Elasticsearch DSL (Domain-Specific Language) is a JSON-based query language for performing searches and filtering operations on structured and unstructured data within Elasticsearch.
+
+It supports:
+- Full-text search
+- Structured filters
+- Logical combinations (AND/OR)
+- Relevance scoring
+- Range queries, and more
+
+2. Query Structure
+------------------
+All queries must begin with a "query" key. Inside it, you define how matching should happen.
+
+{
+  "query": {
+    "bool": {
+      "must": [...],
+      "should": [...],
+      "minimum_should_match": 1
+    }
+  }
+}
+
+- "must": All clauses here must match (AND logic)
+- "should": Clauses that are optional (OR logic). Use "minimum_should_match" to enforce how many must match
+- "minimum_should_match": Ensures a minimum number of "should" conditions are satisfied
+
+3. Match Types (Full-Text Search)
+---------------------------------
+
+match:
+Used for full-text search on analyzed fields.
+
+{ "match": { "description": "machine learning" } }
+
+match_phrase:
+Searches for exact phrases in the field.
+
+{ "match_phrase": { "description": "machine learning engineer" } }
+
+match_phrase_prefix:
+Allows the last term in the phrase to be a prefix.
+
+{ "match_phrase_prefix": { "title": "software eng" } }
+
+multi_match:
+Searches across multiple fields.
+
+{
+  "multi_match": {
+    "query": "deep learning",
+    "fields": ["title", "description", "tags"]
+  }
+}
+
+query_string:
+Supports advanced query syntax like AND, OR, wildcards, parentheses.
+
+{
+  "query_string": {
+    "query": "ai AND (robotics OR automation)",
+    "fields": ["title", "description"]
+  }
+}
+
+4. Exact Matching
+-----------------
+
+term:
+Used for exact match on fields of type keyword, boolean, long, double.
+
+{ "term": { "is_public": true } }
+
+terms:
+Match against a list of exact values.
+
+{ "terms": { "industry": ["retail", "fmcg", "ecommerce"] } }
+
+5. Range Queries
+----------------
+
+Used for numeric, date, or keyword ranges.
+
+{
+  "range": {
+    "employees_count": {
+      "gte": 500,
+      "lte": 5000
+    }
+  }
+}
+
+Also works for date fields:
+
+{
+  "range": {
+    "ipo_date": {
+      "lte": "2020-01-01"
+    }
+  }
+}
+
+6. Boolean Logic
+----------------
+
+Elasticsearch supports combining queries using "bool".
+
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "description": "AI" }},
+        { "term": { "is_b2b": true }}
+      ],
+      "should": [
+        { "match": { "hq_city": "Bangalore" }},
+        { "match": { "hq_city": "Mumbai" }}
+      ],
+      "minimum_should_match": 1
+    }
+  }
+}
+
+- must: filters that must match (AND)
+- should: alternative filters (OR)
+- minimum_should_match: how many "should" conditions must match
+
+7. Common Query Use-Cases
+--------------------------
+
+Find text in multiple fields:
+
+{
+  "multi_match": {
+    "query": "artificial intelligence",
+    "fields": ["title", "summary", "description"]
+  }
+}
+
+Find companies in a range:
+
+{
+  "range": {
+    "employees_count": {
+      "gte": 1000
+    }
+  }
+}
+
+Filter by boolean and text:
+
+{
+  "bool": {
+    "must": [
+      { "match": { "description": "AI" }},
+      { "term": { "is_public": true }}
+    ]
+  }
+}
+
+8. Valid Query Field Types and Their Mapping
+--------------------------------------------
+
+Field Type    | Query Types            | Example Usage
+------------- | ---------------------- | ----------------------------------------
+text          | match, match_phrase    | Company descriptions, industries
+keyword       | term, terms, match     | Tags, categories, enums
+boolean       | term                   | true/false flags
+long, double  | term, range            | employee counts, revenue
+date          | range                  | IPO date, funding date
+
+9. Best Practices
+-----------------
+
+- Always wrap filters inside a "bool" query.
+- Use "must" for required filters.
+- Use "should" when handling synonyms or fallback terms.
+- Use "minimum_should_match" when using "should" clauses.
+- Avoid combining "must" and "must_not" unless necessary.
+- Use analyzers carefully; some fields may not support "match".
+
+10. Sample Full Query (End-to-End)
+----------------------------------
+
+Prompt:
+"Find public AI companies in India with more than 500 employees, located in Mumbai or Bangalore"
+
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "description": "AI" }},
+        { "term": { "is_public": true }},
+        { "match": { "hq_country": "India" }},
+        { "range": { "employees_count": { "gte": 500 }}}
+      ],
+      "should": [
+        { "match": { "hq_location": "Mumbai" }},
+        { "match": { "hq_location": "Bangalore" }}
+      ],
+      "minimum_should_match": 1
+    }
+  }
+}
+
+11. What Not to Include in DSL Payload
+--------------------------------------
+
+- Do not add "items_per_page", "size", "from", or "sort".
+- Do not include "_source", "_score", or "_id".
+- Do not use fields not present in the schema or index mapping.
+- Do not include markdown formatting or comments.
+- Do not include any explanation alongside the JSON.
+
+12. Output Format Rules
+-----------------------
+
+- Must be a single valid JSON object.
+- Must contain only the top-level "query" key.
+- Must use correct syntax and nesting.
+- Must not include pagination.
+- Must not include any extra keys or wrappers.
+
+
+
+
+- When the user mentions a geographic location, use multiple location fields to improve the quality of search.
+
+- Avoid generating trivial queries with only 1 clause unless the prompt provides only 1 constraint.
+
+- The goal is not just syntactic validity, but semantic richness — use as much meaningful structure from the prompt as the schema allows. 

@@ -7,8 +7,10 @@ Usage:
     python -m core_sdr cli search --query "SaaS companies in NYC" --format csv --max-results 50
     python -m core_sdr cli explain "Public companies using AWS"
     python -m core_sdr cli health
+    python -m core_sdr cli dsl "give 1 company in Mumbai"
 """
 
+import json
 import logging
 import os
 import sys
@@ -17,9 +19,11 @@ from click import Context
 from dotenv import load_dotenv
 
 from ..core import LeadGenerationOrchestrator, LeadGenerationError
+from ..parsers.dsl_query_processor import SimpleDSLProcessor
+from ..api.coresignal_api import search_api
 
 load_dotenv()
-
+logger = logging.getLogger(__name__)
 
 @click.group()
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
@@ -122,6 +126,34 @@ async def search(ctx, query, output_format, max_results, timeout, output, intera
         click.echo(f"Unexpected error: {str(e)}", err=True)
         sys.exit(1)
 
+
+@cli.command()
+@click.argument('query', required=False)
+@click.pass_context
+async def dsl(ctx,query):
+    """Generate Elasticsearch DSL query from natural language."""
+    openai_key = os.getenv('OPENAI_API_KEY')
+    if not openai_key:
+        click.echo("Error: OPENAI_API_KEY environment variable not set", err=True)
+        sys.exit(1)
+    if not query:
+        click.echo("Error: Query is required for DSL generation", err=True)
+        return
+    
+    try:
+        processor = SimpleDSLProcessor()
+        click.echo(f"Generating DSL for: {query}")
+        dsl_query = await processor.process_query(query)
+        # print(query)
+        company_ids = search_api(dsl_query, query)
+        
+        logger.info(f"Generated DSL query: {json.dumps(dsl_query, indent=2)}")
+        logger.info(f"Found company IDs: {company_ids}")
+    except Exception as e:
+        click.echo(f"DSL generation error: {str(e)}", err=True)
+        sys.exit(1)
+
+
 @cli.command()
 @click.pass_context
 def health(ctx):
@@ -207,7 +239,7 @@ def clear_cache(ctx, confirm):
 @cli.command()
 @click.option('--interactive', '-i', is_flag=True, help='Interactive mode')
 @click.pass_context
-def demo(ctx, interactive):
+async def demo(ctx, interactive):
     """Run demo searches to test the system."""
     orchestrator = ctx.obj['orchestrator']
     
@@ -234,7 +266,7 @@ def demo(ctx, interactive):
                 'output_format': 'summary'
             }
             
-            response = orchestrator.process_search_request(request_data)
+            response = await orchestrator.process_search_request(request_data)
             formatted_output = orchestrator.format_response(response, 'summary')
             
             lines = formatted_output.split('\n')

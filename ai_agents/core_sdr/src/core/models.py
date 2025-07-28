@@ -60,6 +60,10 @@ class CompanySearchResult(BaseModel):
     name: str = Field(..., description="Company name")
     description: str = Field(..., description="Brief company description")
 
+class DSLQuery(BaseModel):
+    """Elasticsearch DSL query payload"""
+    query: Dict[str, Any] = Field(..., description="Elasticsearch DSL query payload")
+
 class CoreSignalMCPResponse(BaseModel):
     """Response format for Agent SDK with Coresignal MCP"""
     companies: List[CompanySearchResult] = Field(default_factory=list, description="List of companies found")
