@@ -46,12 +46,17 @@ def collect_api(company_id: int) -> Dict[str, Any]:
     else:
         raise Exception(f"Collect API failed: {response.status_code} - {response.text}")
 
-def collect_companies_from_search(dsl_query: Dict[str, Any], user_query: str) -> List[Dict[str, Any]]:
-    company_ids = search_api(dsl_query, user_query)
-    
+def collect_companies_from_search(dsl_query: Dict[str, Any], user_query: str) -> List[str]:
+    try:
+        company_ids = search_api(dsl_query, user_query)
+    except Exception as e:
+        raise Exception(f"Error searching companies: {str(e)}")
     companies = []
-    for company_id in company_ids:
-        company_data = collect_api(company_id)
-        companies.append(company_data)
-    
-    return companies 
+    try:
+        for company_id in company_ids:
+            company_data = collect_api(company_id)
+            companies.append(company_data["company_name"])
+            print(type(company_data))
+    except Exception as e:
+        raise Exception(f"Error collecting company data: {str(e)}")
+    return companies
