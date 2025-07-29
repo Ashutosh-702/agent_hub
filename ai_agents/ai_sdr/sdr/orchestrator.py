@@ -82,7 +82,7 @@ class WorkflowOrchestrator:
                 df = await _read_google_sheet(sheet_url, worksheet_name)
 
             elif source_type == 'csv':
-                file_path = data_source.get('file_path', 'companies.csv')
+                file_path = data_source.get('file_path', 'ai_agents/data/company_names.csv')
                 df = await _read_csv_file(file_path)
 
             else:

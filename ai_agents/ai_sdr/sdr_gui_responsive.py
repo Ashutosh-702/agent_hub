@@ -201,7 +201,7 @@ class ResponsiveConfigurationTab(QWidget):
         csv_input_layout = QHBoxLayout()
         csv_input_layout.setSpacing(8)
         self.csv_file_path = QLineEdit()
-        self.csv_file_path.setPlaceholderText("companies.csv")
+        self.csv_file_path.setPlaceholderText("ai_agents/data/company_names.csv")
         self.csv_file_path.setMinimumWidth(150)
         csv_browse_btn = QPushButton("Browse")
         csv_browse_btn.clicked.connect(self.browse_csv_file)
@@ -378,7 +378,7 @@ CLEARBIT_API_KEY=your-clearbit-api-key-here
 
 # Data Source Configuration
 DATA_SOURCE_TYPE=csv
-CSV_FILE_PATH=companies.csv
+CSV_FILE_PATH=ai_agents/data/company_names.csv
 GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/your-sheet-id/edit
 GOOGLE_WORKSHEET_NAME=Sheet1
 
@@ -485,7 +485,7 @@ HUBSPOT_OWNER_EMAIL=your-email@company.com
         self.hubspot_key.setText(self.settings.value("hubspot_key", ""))
         self.clearbit_key.setText(self.settings.value("clearbit_key", ""))
         self.data_source_type.setCurrentText(self.settings.value("data_source_type", "csv"))
-        self.csv_file_path.setText(self.settings.value("csv_file_path", "companies.csv"))
+        self.csv_file_path.setText(self.settings.value("csv_file_path", "ai_agents/data/company_names.csv"))
         self.sheet_url.setText(self.settings.value("sheet_url", ""))
         self.worksheet_name.setText(self.settings.value("worksheet_name", "Sheet1"))
         self.max_companies.setValue(int(self.settings.value("max_companies", 100)))
@@ -509,7 +509,7 @@ HUBSPOT_OWNER_EMAIL=your-email@company.com
                 "hubspot_key": os.getenv("HUBSPOT_API_KEY", ""),
                 "clearbit_key": os.getenv("CLEARBIT_API_KEY", ""),
                 "data_source_type": os.getenv("DATA_SOURCE_TYPE", "csv"),
-                "csv_file_path": os.getenv("CSV_FILE_PATH", "companies.csv"),
+                "csv_file_path": os.getenv("CSV_FILE_PATH", "ai_agents/data/company_names.csv"),
                 "sheet_url": os.getenv("GOOGLE_SHEET_URL", ""),
                 "worksheet_name": os.getenv("GOOGLE_WORKSHEET_NAME", "Sheet1"),
                 "max_companies": int(os.getenv("MAX_COMPANIES", "100")),
@@ -530,7 +530,7 @@ HUBSPOT_OWNER_EMAIL=your-email@company.com
         self.hubspot_key.setText(os.getenv("HUBSPOT_API_KEY", ""))
         self.clearbit_key.setText(os.getenv("CLEARBIT_API_KEY", ""))
         self.data_source_type.setCurrentText(os.getenv("DATA_SOURCE_TYPE", "csv"))
-        self.csv_file_path.setText(os.getenv("CSV_FILE_PATH", "companies.csv"))
+        self.csv_file_path.setText(os.getenv("CSV_FILE_PATH", "ai_agents/data/company_names.csv"))
         self.sheet_url.setText(os.getenv("GOOGLE_SHEET_URL", ""))
         self.worksheet_name.setText(os.getenv("GOOGLE_WORKSHEET_NAME", ""))
         self.max_companies.setValue(int(os.getenv("MAX_COMPANIES", "100")))
@@ -582,7 +582,7 @@ HUBSPOT_OWNER_EMAIL=your-email@company.com
             
             # Reset to defaults
             self.data_source_type.setCurrentText("csv")
-            self.csv_file_path.setText("companies.csv")
+            self.csv_file_path.setText("ai_agents/data/company_names.csv")
             self.sheet_url.clear()
             self.worksheet_name.setText("Sheet1")
             self.max_companies.setValue(100)
@@ -608,7 +608,7 @@ HUBSPOT_OWNER_EMAIL=your-email@company.com
             "openai_api_key": self.openai_key.text(),
             "data_source": {
                 "type": self.data_source_type.currentText(),
-                "file_path": self.csv_file_path.text() or "companies.csv",
+                "file_path": self.csv_file_path.text() or "ai_agents/data/company_names.csv",
                 "sheet_url": self.sheet_url.text(),
                 "worksheet_name": self.worksheet_name.text()
             },

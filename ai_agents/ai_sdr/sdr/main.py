@@ -200,7 +200,7 @@ def load_configuration(run_directories: Dict[str, str], cli_config: Dict[str, An
         "openai_api_key": openai_api_key,
         "data_source": {
             "type": data_source_type,
-            "file_path": get_config_value("CSV_FILE_PATH", "CSV_FILE_PATH", "companies.csv"),
+            "file_path": get_config_value("CSV_FILE_PATH", "CSV_FILE_PATH", "ai_agents/data/company_names.csv"),
             "sheet_url": get_config_value("GOOGLE_SHEET_URL", "GOOGLE_SHEET_URL"),
             "worksheet_name": get_config_value("GOOGLE_WORKSHEET_NAME", "GOOGLE_WORKSHEET_NAME")
         },

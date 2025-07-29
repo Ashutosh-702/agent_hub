@@ -247,7 +247,7 @@ async def company_list_retriever(state: WorkflowState, config: Dict[str, Any]) -
             df = await _read_google_sheet(sheet_url, worksheet_name)
 
         elif source_type == 'csv':
-            file_path = data_source.get('file_path', 'companies.csv')
+            file_path = data_source.get('file_path', 'ai_agents/data/company_names.csv')
             clean_log(f"Reading from CSV file: {file_path}")
             detailed_log(f"Reading from CSV file: {file_path}")
             df = await _read_csv_file(file_path)

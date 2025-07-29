@@ -14,9 +14,9 @@ import sys
 import asyncclick as click
 from click import Context
 from dotenv import load_dotenv
-from ai_agents.core_sdr.src.parsers.company_name_uploader import upload_company_name
+from ai_agents.core_sdr.src.parsers.company_name_uploader import upload_company_name_to_csv,update_history
 from ai_agents.core_sdr.src.parsers.dsl_query_processor import SimpleDSLProcessor
-from ai_agents.core_sdr.src.api.coresignal_api import search_api,collect_companies_from_search
+from ai_agents.core_sdr.src.api.coresignal_api import collect_companies_from_search
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -57,11 +57,10 @@ async def dsl(ctx, query):
         else:
             dsl_data = dsl_result
         company_data =collect_companies_from_search(dsl_data, query)
-        upload_company_name(company_data)
-        
-        logger.info(f"Generated DSL query: {json.dumps(dsl_data, indent=2)}")
+        upload_company_name_to_csv(company_data)
+        update_history(company_data, query)
     except Exception as e:
-        click.echo(f"DSL generation error: {str(e)}", err=True)
+        click.echo(f"Processing error: {str(e)}", err=True)
         sys.exit(1)
 
 

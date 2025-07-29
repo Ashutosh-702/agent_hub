@@ -120,3 +120,7 @@ ai_sdr/sdr/config/custom_prompts.json
 # Project specific
 *.bak
 *.backup
+
+#core_sdr
+data/
+history/

@@ -213,7 +213,7 @@ class OrchestratedCLIApp:
         
         # File path or Google Sheet URL
         if self.config["DATA_SOURCE_TYPE"] in ["csv", "excel"]:
-            current_path = existing_config.get("CSV_FILE_PATH", "companies.csv")
+            current_path = existing_config.get("CSV_FILE_PATH", "ai_agents/data/company_names.csv")
             self.config["CSV_FILE_PATH"] = self.get_input(
                 f"Enter path to your {self.config['DATA_SOURCE_TYPE'].upper()} file",
                 current_path
