@@ -8,18 +8,12 @@ into targeted company searches using the CoreSignal API.
 __version__ = "1.0.0"
 __author__ = "Lead Generation Team"
 
-from .src.core import (
-    LeadGenerationOrchestrator,
-    LeadGenerationError,
-    SearchRequest,
-    SearchResponse,
-    Company
+from ai_agents.core_sdr.src.parsers.dsl_query_processor import (
+    SimpleDSLProcessor,
+    DSLQuery,
 )
 
 __all__ = [
-    'LeadGenerationOrchestrator',
-    'LeadGenerationError', 
-    'SearchRequest',
-    'SearchResponse',
-    'Company'
+    "SimpleDSLProcessor",
+    "DSLQuery",
 ]

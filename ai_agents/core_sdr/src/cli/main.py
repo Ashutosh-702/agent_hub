@@ -15,8 +15,8 @@ import asyncclick as click
 from click import Context
 from dotenv import load_dotenv
 
-from ..parsers.dsl_query_processor import SimpleDSLProcessor
-from ..api.coresignal_api import search_api
+from ai_agents.core_sdr.src.parsers.dsl_query_processor import SimpleDSLProcessor
+from ai_agents.core_sdr.src.api.coresignal_api import search_api
 
 load_dotenv()
 logger = logging.getLogger(__name__)
