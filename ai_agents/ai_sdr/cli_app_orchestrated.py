@@ -15,7 +15,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 import json
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict
 from pathlib import Path
 from datetime import datetime
 
@@ -26,7 +26,7 @@ sys.path.insert(0, str(project_root))
 def setup_basic_logging():
     """Setup basic logging for launcher errors"""
     try:
-        from sdr.logging_config import clean_log, prompt_log
+        from ai_agents.ai_sdr.sdr.logging_config import clean_log, prompt_log
         return clean_log, prompt_log
     except ImportError:
         # Fallback to print if logging not available
@@ -34,9 +34,9 @@ def setup_basic_logging():
         return fallback, print
 
 try:
-    from sdr.main_orchestrated import main as run_orchestrated_workflow
-    from sdr.validate_models import main as validate_models
-    from sdr.logging_config import clean_log, prompt_log
+    from ai_agents.ai_sdr.sdr.main_orchestrated import main as run_orchestrated_workflow
+    from ai_agents.ai_sdr.sdr.validate_models import main as validate_models
+    from ai_agents.ai_sdr.sdr.logging_config import clean_log, prompt_log
 except ImportError as e:
     log, prompt_log = setup_basic_logging()
     prompt_log(f"❌ Import error: {e}")

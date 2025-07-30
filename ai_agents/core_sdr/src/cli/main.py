@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import sys
+from typing import Dict, Any
 import asyncclick as click
 from click import Context
 from dotenv import load_dotenv
@@ -49,16 +50,11 @@ async def dsl(ctx, query):
         return
     
     try:
-        processor = SimpleDSLProcessor()
         click.echo(f"Generating DSL for: {query}")
-        dsl_result = await processor.process_query(query)
-        if isinstance(dsl_result, str):
-            dsl_data = json.loads(dsl_result)
-        else:
-            dsl_data = dsl_result
-        company_data =collect_companies_from_search(dsl_data, query)
-        upload_company_name_to_csv(company_data)
-        update_history(company_data, query)
+        click.echo("Core SDR running successfully")
+        results = await process_company_search(query)
+        click.echo(f"Found {len(results['companies'])} companies")
+        click.echo(f"Results saved to: {results['csv_path']}")
     except Exception as e:
         click.echo(f"Processing error: {str(e)}", err=True)
         sys.exit(1)
@@ -95,6 +91,24 @@ def health(ctx):
         click.echo(f"Health check error: {str(e)}", err=True)
         sys.exit(1)
 
+
+async def process_company_search(query: str) -> Dict[str, Any]:
+    """Core function to process company search"""
+    processor = SimpleDSLProcessor()
+    dsl_result = await processor.process_query(query)
+    if isinstance(dsl_result, str):
+        dsl_data = json.loads(dsl_result)
+    else:
+        dsl_data = dsl_result
+    company_data = collect_companies_from_search(dsl_data, query)
+    upload_company_name_to_csv(company_data)
+    update_history(company_data, query)
+    
+    return {
+        "companies": company_data,
+        "csv_path": 'ai_agents/data/company_names.csv',
+        "query": query
+    }
 
 if __name__ == '__main__':
     cli()

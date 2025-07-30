@@ -47,7 +47,7 @@ setup(
         'console_scripts': [
             'sdr-workflow=ai_agents.ai_sdr.sdr.main:main',
             'sdr-orchestrated=ai_agents.ai_sdr.sdr.main_orchestrated:main',
-            'leadgen=ai_agents.core_sdr.src.cli.main:cli',
+            'leadgen=ai_agents.leadgen.cli:cli',
         ],
     },
     classifiers=[
