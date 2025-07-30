@@ -1,0 +1,42 @@
+.container {
+  padding: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+  font-family: sans-serif;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+input,
+select {
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+button {
+  padding: 0.75rem;
+  font-size: 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.success {
+  margin-top: 1rem;
+  color: green;
+}
+
+.error {
+  margin-top: 1rem;
+  color: red;
+}
