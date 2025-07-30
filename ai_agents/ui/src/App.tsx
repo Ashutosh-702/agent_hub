@@ -1,37 +1,42 @@
-import { useState } from "react";
-import axios from "axios";
+import { useState, useRef, useEffect } from "react";
 import "./App.css";
 
 function App() {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("company");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
+  const [logs, setLogs] = useState<string[]>([]);
+  const [streaming, setStreaming] = useState(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setSuccess(false);
-    setError("");
+    setLogs([]);
+    setStreaming(true);
 
-    try {
-      const res = await axios.post("http://localhost:8000/api/v1/search", {
-        query,
-        mode,
-      });
+    const url = `http://localhost:8000/api/v1/search/stream?query=${encodeURIComponent(
+      query
+    )}&mode=${mode}`;
 
-      if (res.data.status === "success") {
-        setSuccess(true);
-      } else {
-        setError(res.data.message || "Unknown error.");
-      }
-    } catch (err) {
-      setError("Failed to connect to backend.");
-    } finally {
-      setLoading(false);
-    }
+    const source = new EventSource(url);
+    eventSourceRef.current = source;
+
+    source.onmessage = (event) => {
+      setLogs((prev) => [...prev, event.data]);
+    };
+
+    source.onerror = () => {
+      source.close();
+      setStreaming(false);
+    };
   };
+
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   return (
     <div className="container">
@@ -51,13 +56,18 @@ function App() {
           <option value="company-employee">Company + Employee</option>
         </select>
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Running..." : "Run"}
+        <button type="submit" disabled={streaming}>
+          {streaming ? "Running..." : "Run"}
         </button>
       </form>
 
-      {success && <p className="success">✅ Done.</p>}
-      {error && <p className="error">{error}</p>}
+      {logs.length > 0 && (
+        <pre className="log-box">
+          {logs.map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
+        </pre>
+      )}
     </div>
   );
 }
