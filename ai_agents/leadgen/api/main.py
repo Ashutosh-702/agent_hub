@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 import subprocess
+from ai_agents.ai_sdr.sdr.main_orchestrated import main as run_orchestrated_workflow
 import os
 from openai import OpenAI
 app = FastAPI()
@@ -21,6 +22,31 @@ class SearchRequest(BaseModel):
 class EnhanceRequest(BaseModel):
     query: str
 
+class OrchestratedConfig(BaseModel):
+    config: dict
+
+@app.post("/api/v1/orchestrated/run")
+async def run_orchestrated(config: OrchestratedConfig):
+    try:
+        api_key = config.config.get("openai_api_key")
+        if not api_key:
+            return {"status": "error", "message": "OpenAI API key is required"}
+        data_source = config.config.get('data_source', {})
+        if data_source and 'type' in data_source and data_source['type'] == 'csv':
+            file_path = data_source['file_path']
+            if not os.path.exists(file_path):
+                return {"status": "error", "message": f"CSV file not found: {file_path}"}
+        
+        try:
+            client = OpenAI(api_key=api_key)
+            client.models.list()
+        except Exception as e:
+            return {"status": "error", "message": f"Invalid OpenAI API key: {str(e)}"}
+        
+        await run_orchestrated_workflow(config.config)
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 @app.post("/api/v1/enhance")
 async def enhance_query(req: EnhanceRequest):
     prompt = req.query.strip()

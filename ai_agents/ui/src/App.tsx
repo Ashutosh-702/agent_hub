@@ -8,7 +8,54 @@ function App() {
   const [logs, setLogs] = useState<string[]>([]);
   const [streaming, setStreaming] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const [orchestratedConfig, setOrchestratedConfig] = useState({
+    openai_api_key: "",
+    data_source: { 
+    type: "csv",
+    file_path: "ai_agents/data/company_names.csv"
+  },
+    browser_timeout: "30",
+    max_companies: "3",
+    parallel_processing: "false"
+  });
+  const [configStatus, setConfigStatus] = useState("");
+  const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setOrchestratedConfig((prev) => ({ ...prev, [name]: value }));
+  };
+  const handleOrchestratedSubmit = async () => {
+  setConfigStatus("Running orchestrated workflow...");
 
+  if (!orchestratedConfig.openai_api_key) {
+    setConfigStatus("❌ Error: OpenAI API key is required");
+    return;
+  }
+
+  try {
+    const response = await axios.post("http://localhost:8000/api/v1/orchestrated/run", {
+      config: {
+        openai_api_key: orchestratedConfig.openai_api_key,
+        data_source: orchestratedConfig.data_source,
+        browser_timeout: parseInt(orchestratedConfig.browser_timeout),
+        max_companies: parseInt(orchestratedConfig.max_companies),
+        parallel_processing: orchestratedConfig.parallel_processing === "true"
+      }
+    });
+
+    if (response.data.status === "success") {
+      setConfigStatus("✅ Workflow started successfully.");
+    } else {
+      setConfigStatus(`❌ Error: ${response.data.message}`);
+    }
+  } catch (error: any) {
+    if (error.response?.data?.message) {
+      setConfigStatus(`❌ Error: ${error.response.data.message}`);
+    } else {
+      setConfigStatus("❌ Request failed.");
+      console.error(error);
+    }
+  }
+};
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLogs([]);
@@ -82,6 +129,54 @@ function App() {
           {streaming ? "Running..." : "Run"}
         </button>
       </form>
+      <h2>Run Orchestrated SDR</h2>
+  <div className="orchestrated-config">
+  <input
+    name="openai_api_key"
+    placeholder="OpenAI API Key"
+    value={orchestratedConfig.openai_api_key}
+    onChange={handleConfigChange}
+  />
+  <input
+    name="data_source.file_path" 
+    placeholder="CSV File Path"
+    value={orchestratedConfig.data_source.file_path}
+    onChange={(e) => setOrchestratedConfig(prev => ({
+      ...prev,
+      data_source: {
+        ...prev.data_source,
+        file_path: e.target.value
+      }
+    }))}
+  />
+  <input
+    name="browser_timeout"
+    type="number" 
+    placeholder="Browser Timeout"
+    value={orchestratedConfig.browser_timeout}
+    onChange={handleConfigChange}
+  />
+  <input
+    name="max_companies"
+    type="number" 
+    placeholder="Max Companies"
+    value={orchestratedConfig.max_companies}
+    onChange={handleConfigChange}
+  />
+  <select 
+    name="parallel_processing" 
+    value={orchestratedConfig.parallel_processing.toString()} 
+    onChange={handleConfigChange}
+  >
+    <option value="false">Sequential</option>
+    <option value="true">Parallel</option>
+  </select>
+  <button type="button" onClick={handleOrchestratedSubmit}>
+    Run Orchestrated Workflow
+  </button>
+  {configStatus && <p>{configStatus}</p>}
+</div>
+
 
       {logs.length > 0 && (
         <pre className="log-box">
