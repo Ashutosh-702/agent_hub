@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import axios from "axios";
 import "./App.css";
 
 function App() {
@@ -30,6 +31,21 @@ function App() {
     };
   };
 
+  const handleEnhance = async () => {
+    try {
+      const response = await axios.post("http://localhost:8000/api/v1/enhance", {
+        query,
+      });
+
+      if (response.data.enhanced) {
+        console.log("Enhanced query:", response.data.enhanced);
+        setQuery(response.data.enhanced);
+      }
+    } catch (error) {
+      console.error("Enhance failed:", error);
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (eventSourceRef.current) {
@@ -43,13 +59,19 @@ function App() {
       <h1>Agent Hub</h1>
 
       <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Enter your query"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          required
-        />
+        <div className="query-row">
+          <input
+            type="text"
+            placeholder="Enter your query"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            required
+            className="query-input"
+          />
+          <button type="button" onClick={handleEnhance} className="enhance-button">
+            ✨ Enhance
+          </button>
+        </div>
 
         <select value={mode} onChange={(e) => setMode(e.target.value)}>
           <option value="company">Company only</option>

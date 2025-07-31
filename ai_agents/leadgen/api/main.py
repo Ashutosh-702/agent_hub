@@ -1,11 +1,13 @@
-from fastapi import FastAPI, Request
+from dotenv import load_dotenv
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 import subprocess
-
+import os
+from openai import OpenAI
 app = FastAPI()
-
+load_dotenv()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -16,16 +18,52 @@ app.add_middleware(
 class SearchRequest(BaseModel):
     query: str
     mode: str
+class EnhanceRequest(BaseModel):
+    query: str
 
-@app.post("/api/v1/search")
-async def search(request: SearchRequest):
+@app.post("/api/v1/enhance")
+async def enhance_query(req: EnhanceRequest):
+    prompt = req.query.strip()
     try:
-        cmd = f'leadgen dsl --{request.mode} "{request.query}"'
-        result = subprocess.run(cmd, shell=True, text=True)
-        return {"status": "success", "message": "Search completed"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[
+                {
+                    "role": "developer",
+                    "content": (
+                        """
+                       You are a prompt enhancement assistant.
 
+Your task is to take shorthand or vague user prompts and rewrite them into clear, detailed, single-sentence instructions optimized for another LLM agent to convert into a structured DSL (Domain-Specific Language) query.
+
+Your rewritten output must:
+- Clearly mention the number of companies asked for in numeric form. If the user does not specify, assume they want 1 companies.
+- Include implied company filters such as industry, region, size, business model (B2B/B2C), category tags, and any other metadata if clearly implied
+- Avoid ambiguity by expanding abbreviations or fragmentary phrases (e.g., "SaaS" → "software as a service companies")
+- Use complete, fluent, factual language in one sentence
+- Focus strictly on company-level metadata — do not add contact, employee, or hiring details
+- Never ask a question or include example results — only describe the intended search
+
+Do not invent fields that are not implied. Do not return bullet points or multi-line output. Your response should be a single, precise sentence.
+
+                        """
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0,
+            max_tokens=100
+        )
+        print("OpenAI response:", response)
+        enhanced = response.choices[0].message.content
+        return {"enhanced": enhanced}   
+    
+    except Exception as e:
+        return {"enhanced": prompt, "error": str(e)}
 @app.get("/api/v1/search/stream")
 async def stream_logs(query: str, mode: str):
     async def event_generator():

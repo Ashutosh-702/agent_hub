@@ -11,7 +11,34 @@ form {
   gap: 1rem;
 }
 
-input,
+.query-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.query-input {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+.enhance-button {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  background-color: #0040ff;
+  color: white;
+  border: 1px solid #0040ff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.enhance-button:hover {
+  background-color: #005eff;
+}
+
 select {
   padding: 0.5rem;
   font-size: 1rem;
@@ -31,12 +58,13 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.success {
+.log-box {
   margin-top: 1rem;
-  color: green;
-}
-
-.error {
-  margin-top: 1rem;
-  color: red;
+  background-color: #111;
+  color: #0f0;
+  padding: 1rem;
+  font-family: monospace;
+  border-radius: 4px;
+  max-height: 300px;
+  overflow-y: auto;
 }
