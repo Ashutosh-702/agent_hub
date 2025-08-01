@@ -8,8 +8,9 @@ from ai_agents.ai_sdr.sdr.main_orchestrated import main as run_orchestrated_work
 import json
 import os
 from openai import OpenAI
-app = FastAPI()
 load_dotenv()
+app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -29,21 +30,41 @@ class OrchestratedConfig(BaseModel):
 @app.post("/api/v1/orchestrated/run")
 async def run_orchestrated(config: OrchestratedConfig):
     try:
-        api_key = config.config.get("openai_api_key")
-        if not api_key:
-            return {"status": "error", "message": "OpenAI API key is required"}
-        data_source = config.config.get('data_source', {})
-        if data_source and 'type' in data_source and data_source['type'] == 'csv':
-            file_path = data_source['file_path']
-            if not os.path.exists(file_path):
-                return {"status": "error", "message": f"CSV file not found: {file_path}"}
+        # api_key = config.config.get("openai_api_key")
+        # api_key = os.getenv("OPENAI_API_KEY")
+        # if not api_key:
+        #     return {"status": "error", "message": "OpenAI API key is required"}
+        # data_source = config.config.get('data_source', {})
+        # if data_source and 'type' in data_source and data_source['type'] == 'csv':
+        #     file_path = data_source['file_path']
+        #     if not os.path.exists(file_path):
+        #         return {"status": "error", "message": f"CSV file not found: {file_path}"}
+            
+        query = config.config.get("query")
+        if query:
+            print(f"🛠️ Running DSL to generate company list: {query}")
+            try:
+                subprocess.run(
+                    ["leadgen", "dsl", "--company", query],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                print("✅ DSL query completed.")
+            except subprocess.CalledProcessError as e:
+                print("❌ DSL query failed:", e.stderr)
+                return {"status": "error", "message": "DSL query failed."}
         search_query = config.config.get("search_query")
         target_executives = config.config.get("target_executives")
 
         config.config.setdefault("custom_prompts", {})
 
         if search_query:
-            web_enrichment_prompt = f"""Relevance Criteria: {search_query}
+            web_enrichment_prompt = f"""Relevance Criteria (for judgment only):
+
+Evaluate whether the following company matches this criteria:
+
+{search_query}
 
         Begin your research now using the web search tool to determine if companies match these criteria."""
             config.config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
@@ -55,11 +76,11 @@ async def run_orchestrated(config: OrchestratedConfig):
         print("🧪 Final config being passed to orchestrator:")
         print(json.dumps(config.config, indent=2))
 
-        try:
-            client = OpenAI(api_key=api_key)
-            client.models.list()
-        except Exception as e:
-            return {"status": "error", "message": f"Invalid OpenAI API key: {str(e)}"}
+        # try:
+        #     client = OpenAI(api_key=api_key)
+        #     client.models.list()
+        # except Exception as e:
+        #     return {"status": "error", "message": f"Invalid OpenAI API key: {str(e)}"}
         
         
         await run_orchestrated_workflow(config.config)

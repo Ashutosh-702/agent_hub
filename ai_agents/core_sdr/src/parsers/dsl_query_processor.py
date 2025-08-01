@@ -64,7 +64,7 @@ class SimpleDSLProcessor:
     def _build_system_instructions(self):
         """Build system instructions like test.py"""
         return f"""
-You are an assistant that generates Elasticsearch DSL query payloads from user prompts.
+You are an assistant that generates Elasticsearch DSL query payloads from user prompts. User prompts may contain extra information that is not relevant to the query, so you must focus on extracting only the necessary fields.
 
 You must use the schema provided below. Each entry contains:
 -Parameters: The exact Elasticsearch field name to be used in the query.
@@ -80,7 +80,7 @@ You must generate a valid Elasticsearch DSL query payload that should adhere to 
 {self.query_dsl_instructions}
 
 For each parameter in the schema, The type should be strictly followed.
-
+Also the results should exclude any company from education industry
 IMPORTANT: Follow section 12 "Output Format Rules" exactly:
 - Must be a single valid JSON object
 - Must contain only the top-level "query" key  
@@ -124,7 +124,7 @@ IMPORTANT: Follow section 12 "Output Format Rules" exactly:
             
             dsl_query_result = result.final_output
             logger.info(f"Raw agent output: {dsl_query_result}")
-            
+            print("Raw agent output:", dsl_query_result)
             return dsl_query_result
            
 

@@ -94,7 +94,7 @@ class WorkflowOrchestrator:
             companies = _normalize_company_data(df)
 
             # Apply max companies limit if configured
-            max_companies = self.config.get('max_companies')
+            max_companies = int(self.config.get('max_companies'))
             if max_companies and 0 < max_companies < len(companies):
                 companies = companies[:max_companies]
                 logger.info(f"Limited to {max_companies} companies")

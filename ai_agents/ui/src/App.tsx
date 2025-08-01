@@ -7,6 +7,7 @@ function App() {
   const [mode, setMode] = useState("company");
   const [logs, setLogs] = useState<string[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const [orchestratedConfig, setOrchestratedConfig] = useState({
     openai_api_key: "",
@@ -39,20 +40,23 @@ function App() {
   } else {
       setOrchestratedConfig(prev => ({ ...prev, [name]: value }));
     }
-  };
+  };  
   const handleOrchestratedSubmit = async () => {
+    setIsRunning(true);
   setConfigStatus("Running orchestrated workflow...");
 
-  if (!orchestratedConfig.openai_api_key) {
-    setConfigStatus("❌ Error: OpenAI API key is required");
-    return;
-  }
+  // if (!orchestratedConfig.openai_api_key) {
+  //   setConfigStatus("❌ Error: OpenAI API key is required");
+  //   return;
+  // }
 
   try {
     const response = await axios.post("http://localhost:8000/api/v1/orchestrated/run", {
       config: {
         openai_api_key: orchestratedConfig.openai_api_key,
-        search_query: orchestratedConfig.search_query,
+        // search_query: orchestratedConfig.search_query,
+        query,
+        search_query:query,
         target_executives: orchestratedConfig.target_executives,
         data_source: orchestratedConfig.data_source,
         browser_timeout: parseInt(orchestratedConfig.browser_timeout),
@@ -73,6 +77,9 @@ function App() {
       setConfigStatus("❌ Request failed.");
       console.error(error);
     }
+  }
+  finally {
+    setIsRunning(false);
   }
 };
   const handleSubmit = (e: React.FormEvent) => {
@@ -124,6 +131,7 @@ function App() {
     <div className="container">
       <h1>Agent Hub</h1>
 
+    <div className="orchestrated-config">
       <form onSubmit={handleSubmit}>
         <div className="query-row">
           <input
@@ -139,24 +147,23 @@ function App() {
           </button>
         </div>
 
-        <select value={mode} onChange={(e) => setMode(e.target.value)}>
+        {/* <select value={mode} onChange={(e) => setMode(e.target.value)}>
           <option value="company">Company only</option>
           <option value="company-employee">Company + Employee</option>
-        </select>
+        </select> */}
 
-        <button type="submit" disabled={streaming}>
+        {/* <button type="submit" disabled={streaming}>
           {streaming ? "Running..." : "Run"}
-        </button>
+        </button> */}
       </form>
-      <h2>Run Orchestrated SDR</h2>
-  <div className="orchestrated-config">
-  <input
+      {/* <h2>Run Orchestrated SDR</h2> */}
+  {/* <input
     name="openai_api_key"
     placeholder="OpenAI API Key"
     value={orchestratedConfig.openai_api_key}
     onChange={handleConfigChange}
-  />
-  <input
+  /> */}
+  {/* <input
     name="data_source.file_path" 
     placeholder="CSV File Path"
     value={orchestratedConfig.data_source.file_path}
@@ -181,14 +188,14 @@ function App() {
     placeholder="Max Companies"
     value={orchestratedConfig.max_companies}
     onChange={handleConfigChange}
-  />
-  <textarea
+  /> */}
+  {/* <textarea
           name="search_query"
           placeholder="Enter your search query (e.g., 'Find 1 company in Dubai that sells electronics')"
           value={orchestratedConfig.search_query}
           onChange={handleConfigChange}
           rows={3}
-        />
+        /> */}
     <textarea
       name="target_executives"
       placeholder="Enter target executive roles (e.g., Founder, CEO, Head of Marketing)"
@@ -196,16 +203,16 @@ function App() {
       onChange={handleConfigChange}
       rows={3}
     />
-  <select 
+  {/* <select 
     name="parallel_processing" 
     value={orchestratedConfig.parallel_processing.toString()} 
     onChange={handleConfigChange}
   >
     <option value="false">Sequential</option>
     <option value="true">Parallel</option>
-  </select>
-  <button type="button" onClick={handleOrchestratedSubmit}>
-    Run Orchestrated Workflow
+  </select> */}
+  <button type="button" onClick={handleOrchestratedSubmit} disabled={isRunning}>
+    {!isRunning ? "Run Orchestrated Workflow" : "Running"}
   </button>
   {configStatus && <p>{configStatus}</p>}
 </div>
