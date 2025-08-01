@@ -33,15 +33,23 @@ async def main(cli_config=None):
     try:
         # For main_orchestrated.py, always use defaults (no interactive prompts)
         # Interactive configuration should be done via cli_app_orchestrated.py
-        custom_prompts = {}
+        # custom_prompts = {}
             
         # Load configuration
+        if "web_enricher_user_prompt" in cli_config.get("custom_prompts", {}):
+            print("✅ Final prompt is here:", cli_config.get("custom_prompts", {})["web_enricher_user_prompt"])
+        else:
+            print("❌ No custom prompt is here even.")
         config = load_configuration(run_directories, cli_config)
-        
+        if "web_enricher_user_prompt" in config["custom_prompts"]:
+            print("✅ Final prompt injected:", config["custom_prompts"]["web_enricher_user_prompt"])
+        else:
+            print("❌ No custom prompt injected.")
         # Add custom prompts to config if obtained
-        if custom_prompts:
-            config["custom_prompts"] = custom_prompts
-        
+        # if custom_prompts:
+        #     config["custom_prompts"] = custom_prompts
+        if cli_config and "custom_prompts" in cli_config:
+            config["custom_prompts"] = cli_config["custom_prompts"]
         # Initialize OpenAI client
         api_key = config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
         if not api_key:

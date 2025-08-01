@@ -56,6 +56,8 @@ class WorkflowOrchestrator:
         self.config = config
         self.single_company_workflow = compile_single_company_workflow()
         self.result = OrchestratorResult()
+        print("Loaded web_enricher_user_prompt:", self.config.get("custom_prompts", {}).get("web_enricher_user_prompt", "[None]"))
+
 
     async def fetch_companies(self) -> List[Company]:
         """

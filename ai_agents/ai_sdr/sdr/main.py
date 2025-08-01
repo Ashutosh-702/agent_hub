@@ -185,7 +185,10 @@ def load_configuration(run_directories: Dict[str, str], cli_config: Dict[str, An
     # Get prompts configuration - use empty dict as default since user removed prompt input
     custom_prompts = {}
     # Load custom prompts from file if CLI configured them
-    if cli_config:
+    if cli_config and "custom_prompts" in cli_config:
+        custom_prompts = cli_config["custom_prompts"]
+        clean_log(f"Using {len(custom_prompts)} custom prompts from CLI configuration")
+    elif cli_config:
         custom_prompts_file = "sdr/config/custom_prompts.json"
         if os.path.exists(custom_prompts_file):
             try:

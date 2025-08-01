@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 import subprocess
 from ai_agents.ai_sdr.sdr.main_orchestrated import main as run_orchestrated_workflow
+import json
 import os
 from openai import OpenAI
 app = FastAPI()
@@ -36,12 +37,39 @@ async def run_orchestrated(config: OrchestratedConfig):
             file_path = data_source['file_path']
             if not os.path.exists(file_path):
                 return {"status": "error", "message": f"CSV file not found: {file_path}"}
-        
+        # search_query = config.config.get('search_query')
+        # if search_query:
+        #     if 'custom_prompts' not in config.config:
+        #         config.config['custom_prompts'] = {}
+        #     web_enrichment_prompt = f"""Relevance Criteria: {search_query}
+
+        # Begin your research now using the web search tool to determine if companies match these criteria."""
+        #     config.config['custom_prompts']['web_enricher_user_prompt'] = web_enrichment_prompt
+        #     custom_prompts_file = "ai_agents/ai_sdr/sdr/config/custom_prompts.json"
+        #     os.makedirs(os.path.dirname(custom_prompts_file), exist_ok=True)
+        #     with open(custom_prompts_file, 'w', encoding='utf-8') as f:
+        #         json.dump(config.config['custom_prompts'], f, indent=2, ensure_ascii=False)
+        #     print(f"Saved custom prompts to {custom_prompts_file}")
+        search_query = config.config.get('search_query')
+        print("SEARCH_QUERY",search_query)
+        if search_query:
+            web_enrichment_prompt = f"""Relevance Criteria: {search_query}
+
+Begin your research now using the web search tool to determine if companies match these criteria."""
+
+            config.config.setdefault("custom_prompts", {})
+            config.config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
+
+            print("✅ Injected custom prompt:", config.config["custom_prompts"]["web_enricher_user_prompt"])
+        print("🧪 Final config being passed to orchestrator:")
+        print(json.dumps(config.config, indent=2))
+
         try:
             client = OpenAI(api_key=api_key)
             client.models.list()
         except Exception as e:
             return {"status": "error", "message": f"Invalid OpenAI API key: {str(e)}"}
+        
         
         await run_orchestrated_workflow(config.config)
         return {"status": "success"}

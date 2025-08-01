@@ -14,14 +14,30 @@ function App() {
     type: "csv",
     file_path: "ai_agents/data/company_names.csv"
   },
-    browser_timeout: "30",
-    max_companies: "3",
-    parallel_processing: "false"
+  browser_timeout: "30",
+  max_companies: "3",
+  parallel_processing: "false",
+  search_query: ""
   });
   const [configStatus, setConfigStatus] = useState("");
-  const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setOrchestratedConfig((prev) => ({ ...prev, [name]: value }));
+    if (name === "file_path") {
+      setOrchestratedConfig(prev => ({
+        ...prev,
+        data_source: {
+          ...prev.data_source,
+          file_path: value
+        }
+      }));
+    } else if (name === "search_query") {
+      setOrchestratedConfig(prev => ({
+        ...prev,
+        search_query: value
+      }));
+    } else {
+      setOrchestratedConfig(prev => ({ ...prev, [name]: value }));
+    }
   };
   const handleOrchestratedSubmit = async () => {
   setConfigStatus("Running orchestrated workflow...");
@@ -35,6 +51,7 @@ function App() {
     const response = await axios.post("http://localhost:8000/api/v1/orchestrated/run", {
       config: {
         openai_api_key: orchestratedConfig.openai_api_key,
+        search_query: orchestratedConfig.search_query,
         data_source: orchestratedConfig.data_source,
         browser_timeout: parseInt(orchestratedConfig.browser_timeout),
         max_companies: parseInt(orchestratedConfig.max_companies),
@@ -163,6 +180,13 @@ function App() {
     value={orchestratedConfig.max_companies}
     onChange={handleConfigChange}
   />
+  <textarea
+          name="search_query"
+          placeholder="Enter your search query (e.g., 'Find 1 company in Dubai that sells electronics')"
+          value={orchestratedConfig.search_query}
+          onChange={handleConfigChange}
+          rows={3}
+        />
   <select 
     name="parallel_processing" 
     value={orchestratedConfig.parallel_processing.toString()} 
