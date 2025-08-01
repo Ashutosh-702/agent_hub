@@ -17,7 +17,8 @@ function App() {
   browser_timeout: "30",
   max_companies: "3",
   parallel_processing: "false",
-  search_query: ""
+  search_query: "",
+  target_executives: "Founder/CEO"
   });
   const [configStatus, setConfigStatus] = useState("");
   const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -30,12 +31,12 @@ function App() {
           file_path: value
         }
       }));
-    } else if (name === "search_query") {
-      setOrchestratedConfig(prev => ({
-        ...prev,
-        search_query: value
-      }));
-    } else {
+    } else if (name === "search_query" || name === "target_executives") {
+    setOrchestratedConfig(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  } else {
       setOrchestratedConfig(prev => ({ ...prev, [name]: value }));
     }
   };
@@ -52,6 +53,7 @@ function App() {
       config: {
         openai_api_key: orchestratedConfig.openai_api_key,
         search_query: orchestratedConfig.search_query,
+        target_executives: orchestratedConfig.target_executives,
         data_source: orchestratedConfig.data_source,
         browser_timeout: parseInt(orchestratedConfig.browser_timeout),
         max_companies: parseInt(orchestratedConfig.max_companies),
@@ -187,6 +189,13 @@ function App() {
           onChange={handleConfigChange}
           rows={3}
         />
+    <textarea
+      name="target_executives"
+      placeholder="Enter target executive roles (e.g., Founder, CEO, Head of Marketing)"
+      value={orchestratedConfig.target_executives || ""}
+      onChange={handleConfigChange}
+      rows={3}
+    />
   <select 
     name="parallel_processing" 
     value={orchestratedConfig.parallel_processing.toString()} 
