@@ -53,7 +53,7 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+.orchestrated-config button:disabled {
   background-color: #999;
   cursor: not-allowed;
 }
@@ -95,6 +95,3 @@ button:disabled {
   cursor: pointer;
 }
 
-.orchestrated-config button:hover {
-  background-color: #218838;
-}

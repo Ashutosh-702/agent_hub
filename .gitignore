@@ -124,3 +124,4 @@ ai_sdr/sdr/config/custom_prompts.json
 #core_sdr
 data/
 history/
+ui2/

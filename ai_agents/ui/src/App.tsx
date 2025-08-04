@@ -45,16 +45,11 @@ function App() {
     setIsRunning(true);
   setConfigStatus("Running orchestrated workflow...");
 
-  // if (!orchestratedConfig.openai_api_key) {
-  //   setConfigStatus("❌ Error: OpenAI API key is required");
-  //   return;
-  // }
 
   try {
     const response = await axios.post("http://localhost:8000/api/v1/orchestrated/run", {
       config: {
         openai_api_key: orchestratedConfig.openai_api_key,
-        // search_query: orchestratedConfig.search_query,
         query,
         search_query:query,
         target_executives: orchestratedConfig.target_executives,
@@ -146,56 +141,7 @@ function App() {
             ✨ Enhance
           </button>
         </div>
-
-        {/* <select value={mode} onChange={(e) => setMode(e.target.value)}>
-          <option value="company">Company only</option>
-          <option value="company-employee">Company + Employee</option>
-        </select> */}
-
-        {/* <button type="submit" disabled={streaming}>
-          {streaming ? "Running..." : "Run"}
-        </button> */}
       </form>
-      {/* <h2>Run Orchestrated SDR</h2> */}
-  {/* <input
-    name="openai_api_key"
-    placeholder="OpenAI API Key"
-    value={orchestratedConfig.openai_api_key}
-    onChange={handleConfigChange}
-  /> */}
-  {/* <input
-    name="data_source.file_path" 
-    placeholder="CSV File Path"
-    value={orchestratedConfig.data_source.file_path}
-    onChange={(e) => setOrchestratedConfig(prev => ({
-      ...prev,
-      data_source: {
-        ...prev.data_source,
-        file_path: e.target.value
-      }
-    }))}
-  />
-  <input
-    name="browser_timeout"
-    type="number" 
-    placeholder="Browser Timeout"
-    value={orchestratedConfig.browser_timeout}
-    onChange={handleConfigChange}
-  />
-  <input
-    name="max_companies"
-    type="number" 
-    placeholder="Max Companies"
-    value={orchestratedConfig.max_companies}
-    onChange={handleConfigChange}
-  /> */}
-  {/* <textarea
-          name="search_query"
-          placeholder="Enter your search query (e.g., 'Find 1 company in Dubai that sells electronics')"
-          value={orchestratedConfig.search_query}
-          onChange={handleConfigChange}
-          rows={3}
-        /> */}
     <textarea
       name="target_executives"
       placeholder="Enter target executive roles (e.g., Founder, CEO, Head of Marketing)"
@@ -203,14 +149,6 @@ function App() {
       onChange={handleConfigChange}
       rows={3}
     />
-  {/* <select 
-    name="parallel_processing" 
-    value={orchestratedConfig.parallel_processing.toString()} 
-    onChange={handleConfigChange}
-  >
-    <option value="false">Sequential</option>
-    <option value="true">Parallel</option>
-  </select> */}
   <button type="button" onClick={handleOrchestratedSubmit} disabled={isRunning}>
     {!isRunning ? "Run Orchestrated Workflow" : "Running"}
   </button>

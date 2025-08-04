@@ -8,6 +8,8 @@ from ai_agents.ai_sdr.sdr.main_orchestrated import main as run_orchestrated_work
 import json
 import os
 from openai import OpenAI
+from ai_agents.leadgen.prompt_enhancer import analyze_prompt, enhance_prompt
+
 load_dotenv()
 app = FastAPI()
 
@@ -30,22 +32,34 @@ class OrchestratedConfig(BaseModel):
 @app.post("/api/v1/orchestrated/run")
 async def run_orchestrated(config: OrchestratedConfig):
     try:
-        # api_key = config.config.get("openai_api_key")
-        # api_key = os.getenv("OPENAI_API_KEY")
-        # if not api_key:
-        #     return {"status": "error", "message": "OpenAI API key is required"}
-        # data_source = config.config.get('data_source', {})
-        # if data_source and 'type' in data_source and data_source['type'] == 'csv':
-        #     file_path = data_source['file_path']
-        #     if not os.path.exists(file_path):
-        #         return {"status": "error", "message": f"CSV file not found: {file_path}"}
-            
-        query = config.config.get("query")
+        query=input("Describe me what kind of companies do you want to target: ").strip()
+        # target_executives=input("Enter target executives (e.g., Founders, CEOs): ").strip()
         if query:
-            print(f"🛠️ Running DSL to generate company list: {query}")
+            print("🔍 Give me a minute, Checking the quality of the prompt...")
+            analysis_result = analyze_prompt(query)
+            questions = analysis_result.get("questions", [])
+            enhanced_input = analysis_result.get("enhanced_initial_input", {})
+            enhanced_query = enhanced_input.get("enhanced", query)
+
+            answers = {}
+
+            if questions:
+                print("\nPrompt is incomplete. Please answer the following questions:")
+                for q in questions:
+                    print(f"\n{q['question']}")
+                    if q.get("options"):
+                        print("Options:", ", ".join(q["options"]))
+                    answer = input("> ").strip()
+                    answers[q["id"]] = answer
+                print("📥 Enhancing prompt with your answers...")
+                enhanced_result = enhance_prompt(query, answers)
+                enhanced_query = enhanced_result.get("enhanced_prompt", query)
+
+            print("✨ Final enhanced prompt:", enhanced_query)
+            print(f"🛠️ Running DSL to generate company list: {enhanced_query}")
             try:
                 subprocess.run(
-                    ["leadgen", "dsl", "--company", query],
+                    ["leadgen", "dsl", "--company", enhanced_query],
                     check=True,
                     capture_output=True,
                     text=True
@@ -55,8 +69,8 @@ async def run_orchestrated(config: OrchestratedConfig):
                 print("❌ DSL query failed:", e.stderr)
                 return {"status": "error", "message": "DSL query failed."}
         search_query = config.config.get("search_query")
+        search_query = enhanced_query
         target_executives = config.config.get("target_executives")
-
         config.config.setdefault("custom_prompts", {})
 
         if search_query:
@@ -66,23 +80,14 @@ Evaluate whether the following company matches this criteria:
 
 {search_query}
 
-        Begin your research now using the web search tool to determine if companies match these criteria."""
+Begin your research now using the web search tool to determine if companies match these criteria."""
             config.config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
 
         if target_executives:
-            
             config.config["custom_prompts"]["prospect_enricher_target_executives"] = target_executives
 
         print("🧪 Final config being passed to orchestrator:")
         print(json.dumps(config.config, indent=2))
-
-        # try:
-        #     client = OpenAI(api_key=api_key)
-        #     client.models.list()
-        # except Exception as e:
-        #     return {"status": "error", "message": f"Invalid OpenAI API key: {str(e)}"}
-        
-        
         await run_orchestrated_workflow(config.config)
         return {"status": "success"}
     except Exception as e:
@@ -130,6 +135,30 @@ Do not invent fields that are not implied. Do not return bullet points or multi-
     
     except Exception as e:
         return {"enhanced": prompt, "error": str(e)}
+
+@app.post("/api/v1/prompt/enhance")
+async def enhance_prompt_endpoint(request: dict):
+    try:
+        prompt = request.get("prompt", "")
+        answers = request.get("answers")
+        
+        if answers is None:
+            result = analyze_prompt(prompt)
+            return {
+                "questions": result.get('questions', []),
+                "enhanced_initial_input": result.get('enhanced_initial_input', {}),
+                "relevance_criteria_template": result.get('relevance_criteria_template', {}),
+                "extracted_criteria": result.get('enhanced_initial_input', {}).get('extracted_criteria', {})
+            }
+        else:
+            result = enhance_prompt(prompt, answers)
+            return {
+                "enhanced_prompt": result.get('enhanced_prompt', prompt)
+            }
+            
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/api/v1/search/stream")
 async def stream_logs(query: str, mode: str):
     async def event_generator():
