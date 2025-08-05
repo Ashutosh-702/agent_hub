@@ -9,6 +9,7 @@ import json
 import os
 from openai import OpenAI
 from ai_agents.leadgen.prompt_enhancer import analyze_prompt, enhance_prompt
+from ai_agents.leadgen.workflow.prompt_reader import submit_company_data
 
 load_dotenv()
 app = FastAPI()
@@ -28,49 +29,37 @@ class EnhanceRequest(BaseModel):
 
 class OrchestratedConfig(BaseModel):
     config: dict
+class FormSubmission(BaseModel):
+    prompt: str          
+    industry: str        
+    is_b2b: str          
+    employee_count: str  
+    hq: str 
+
 
 @app.post("/api/v1/orchestrated/run")
 async def run_orchestrated(config: OrchestratedConfig):
     try:
-        query=input("Describe me what kind of companies do you want to target: ").strip()
-        # target_executives=input("Enter target executives (e.g., Founders, CEOs): ").strip()
+        query=config.config.get("query", "")
+        print(f"🔍 Running orchestrated workflow with Prompt: {query}")
         if query:
-            print("🔍 Give me a minute, Checking the quality of the prompt...")
-            analysis_result = analyze_prompt(query)
-            questions = analysis_result.get("questions", [])
-            enhanced_input = analysis_result.get("enhanced_initial_input", {})
-            enhanced_query = enhanced_input.get("enhanced", query)
-
-            answers = {}
-
-            if questions:
-                print("\nPrompt is incomplete. Please answer the following questions:")
-                for q in questions:
-                    print(f"\n{q['question']}")
-                    if q.get("options"):
-                        print("Options:", ", ".join(q["options"]))
-                    answer = input("> ").strip()
-                    answers[q["id"]] = answer
-                print("📥 Enhancing prompt with your answers...")
-                enhanced_result = enhance_prompt(query, answers)
-                enhanced_query = enhanced_result.get("enhanced_prompt", query)
-
-            print("✨ Final enhanced prompt:", enhanced_query)
-            print(f"🛠️ Running DSL to generate company list: {enhanced_query}")
             try:
-                subprocess.run(
-                    ["leadgen", "dsl", "--company", enhanced_query],
+                print("🧾 Running DSL query api...")
+                result = subprocess.run(
+                    ["leadgen", "dsl", "--company", query],
                     check=True,
                     capture_output=True,
                     text=True
                 )
                 print("✅ DSL query completed.")
+                print("🧾 DSL STDOUT:")
+                print(result.stdout)
             except subprocess.CalledProcessError as e:
                 print("❌ DSL query failed:", e.stderr)
                 return {"status": "error", "message": "DSL query failed."}
         search_query = config.config.get("search_query")
-        search_query = enhanced_query
         target_executives = config.config.get("target_executives")
+        # target_executives = input("List the job titles or executive roles you want to target (e.g., CEO, CTO, VP of Sales): ").strip()
         config.config.setdefault("custom_prompts", {})
 
         if search_query:
@@ -180,3 +169,24 @@ async def stream_logs(query: str, mode: str):
         process.wait()
 
     return EventSourceResponse(event_generator())
+
+
+
+@app.post("/api/v1/sheets/upload_data_from_form")
+async def upload_data_from_form(data: FormSubmission):
+    try:
+        sheet_data = {
+            "prompt": data.prompt,
+            "industry": data.industry,
+            "is_b2b": data.is_b2b,
+            "employee_count": data.employee_count,
+            "hq": data.hq,
+        }
+        response = submit_company_data(sheet_data)
+        if response.get("status") == "error":
+            print(f"Error while submitting data to Google Sheets: {response.get('message', 'Failed to submit data to Google Sheets.')}")
+            return {"status": "error", "message": response.get("message", "Failed to submit data to Google Sheets.")}
+        print(f"📤 Data submitted to Google Sheets: {response}")
+        return response
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

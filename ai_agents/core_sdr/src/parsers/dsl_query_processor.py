@@ -62,7 +62,7 @@ class SimpleDSLProcessor:
             raise
 
     def _build_system_instructions(self):
-        """Build system instructions like test.py"""
+        """Build system instructions"""
         return f"""
 You are an assistant that generates Elasticsearch DSL query payloads from user prompts. User prompts may contain extra information that is not relevant to the query, so you must focus on extracting only the necessary fields.
 
@@ -87,6 +87,8 @@ IMPORTANT: Follow section 12 "Output Format Rules" exactly:
 - Must use correct syntax and nesting
 - Must not include pagination
 - Must not include any extra keys or wrappers
+- Also instead of using match_phrase, use match for text fields
+- Do not use iso codes, only stick to region/country/city unless directly specified in the prompt
 """
 
     async def process_query(self, user_query: str) -> Dict[str, Any]:
