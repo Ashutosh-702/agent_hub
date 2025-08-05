@@ -62,9 +62,13 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     if "page_size" in payload_values and payload_values["page_size"]:
         payload_query["pages"]["size"] = payload_values["page_size"]
     
-    if "industry" in payload_values and payload_values["industry"]:
-        payload_query["filters"]["companies"]["include"]["mainIndustriesIds"] = payload_values["industry"]
+    if "mainIndustriesIds" in payload_values and payload_values["mainIndustriesIds"]:
+        payload_query["filters"]["companies"]["include"]["mainIndustriesIds"] = payload_values["mainIndustriesIds"]
     
+    if "subIndustriesIds" in payload_values and payload_values["subIndustriesIds"]:
+        payload_query["filters"]["companies"]["include"]["subIndustriesIds"] = payload_values["subIndustriesIds"]
+
+
     if "location" in payload_values and payload_values["location"]:
         payload_query["filters"]["companies"]["include"]["locations"] = [
             {"country": payload_values["location"]}
@@ -148,7 +152,6 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[
             page_payload = payload_values.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
             
-            # Make API call for this page
             page_response = lusha_search_api(payload_values=page_payload)
             
             if page_response and "data" in page_response:
