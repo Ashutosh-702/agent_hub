@@ -31,19 +31,34 @@ def prompt_fetcher() -> List[Dict[str, Any]]:
     for i, row in enumerate(records):
         status = str(row.get("Status", "")).strip().lower()
         if status in ["false", "no", "0",""]:
-            prompt = row.get("Prompt", "")
-            industry = row.get("Industry", "")
-            is_b2b = row.get("is_B2B", "")
-            hq = row.get("Headquarters", "")
-            employee_count = row.get("Employee Count", "")
+            web_prompt = row.get("web_prompt", ""),
+            persona_prompt = row.get("persona_prompt", ""),
+            industry = row.get("industry", ""),
+            employee_count = row.get("employee_count", ""),
+            currency = row.get("currency", ""),
+            revenue_min = row.get("revenue_min", ""),
+            revenue_max = row.get("revenue_max", ""),
+            location = row.get("location", ""),
+            keywords = row.get("keywords", ""),
+            categories = row.get("categories", ""),
+            hubspot_email = row.get("hubspot_email", ""),
+            product_name = row.get("product_name", ""),
+            business_team = row.get("business_team", ""),
             row_index = i + 2  
             prompts.append({
-                "prompt": prompt,
+                "web_prompt": web_prompt,
+                "persona_prompt": persona_prompt,
                 "industry": industry,
-                "is_b2b": is_b2b,
                 "employee_count": employee_count,
-                "hq": hq,
-                "row_index": row_index
+                "currency": currency,
+                "revenue_min": revenue_min,
+                "revenue_max": revenue_max,
+                "location": location,
+                "keywords": keywords,
+                "categories": categories,
+                "hubspot_email": hubspot_email,
+                "product_name": product_name,
+                "business_team": business_team,
             })
 
     print(f"✅ Found {len(prompts)} prompts with status FALSE.",prompts)
@@ -76,12 +91,19 @@ def submit_company_data(config: Dict[str, Any]) -> Dict[str, Any]:
         sheet = spreadsheet.sheet1
 
         row = [
-            config.get("prompt", ""),          
-            config.get("industry", ""),        
-            config.get("is_b2b", ""),  
-            config.get("employee_count", ""),  
-            config.get("hq", ""),
-            # config.get("",""),
+            config.get("web_prompt", ""),
+            config.get("persona_prompt", ""),
+            config.get("industry", ""),
+            config.get("employee_count", ""),
+            config.get("currency", ""),
+            config.get("revenue_min", ""),
+            config.get("revenue_max", ""),
+            config.get("location", ""),
+            config.get("keywords", ""),
+            config.get("categories", ""),
+            config.get("hubspot_email", ""),
+            config.get("product_name", ""),
+            config.get("business_team", ""),
             "False"     
         ]
         sheet.append_row(row)

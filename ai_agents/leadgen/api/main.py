@@ -25,16 +25,24 @@ class SearchRequest(BaseModel):
     query: str
     mode: str
 class EnhanceRequest(BaseModel):
-    query: str
+    query: str  
 
 class OrchestratedConfig(BaseModel):
     config: dict
 class FormSubmission(BaseModel):
-    prompt: str          
-    industry: str        
-    is_b2b: str          
-    employee_count: str  
-    hq: str 
+    web_prompt: str              
+    persona_prompt: str         
+    industry: str
+    employee_count: str
+    revenue_min: str
+    revenue_max: str
+    location: str
+    keywords: str
+    categories: str
+    currency: str
+    hubspot_email: str
+    product_name: str
+    business_team: str
 
 
 @app.post("/api/v1/orchestrated/run")
@@ -176,17 +184,28 @@ async def stream_logs(query: str, mode: str):
 async def upload_data_from_form(data: FormSubmission):
     try:
         sheet_data = {
-            "prompt": data.prompt,
+            "web_prompt": data.web_prompt,
+            "persona_prompt": data.persona_prompt,
             "industry": data.industry,
-            "is_b2b": data.is_b2b,
             "employee_count": data.employee_count,
-            "hq": data.hq,
+            "revenue_min": data.revenue_min,
+            "revenue_max": data.revenue_max,
+            "location": data.location,
+            "keywords": data.keywords,
+            "categories": data.categories,
+            "currency": data.currency,
+            "hubspot_email": data.hubspot_email,
+            "product_name": data.product_name,
+            "business_team": data.business_team,
         }
+
         response = submit_company_data(sheet_data)
         if response.get("status") == "error":
             print(f"Error while submitting data to Google Sheets: {response.get('message', 'Failed to submit data to Google Sheets.')}")
             return {"status": "error", "message": response.get("message", "Failed to submit data to Google Sheets.")}
+
         print(f"📤 Data submitted to Google Sheets: {response}")
         return response
+
     except Exception as e:
         return {"status": "error", "message": str(e)}
