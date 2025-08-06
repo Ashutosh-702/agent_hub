@@ -127,14 +127,22 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
     revenue_max = sheets_data.get("revenue_max") 
     currency = sheets_data.get("currency", "USD")
     
+
+    print(f"revenue_min_check: {revenue_min}, revenue_max_check: {revenue_max}, currency: {currency}")
+    ## here value is coming in this way
+    ## revenue_min_check: (1,), revenue_max_check: (2,), currency: ('USD',)
     if revenue_min and revenue_max:
         try:
-            min_actual = convert_revenue_to_actual(revenue_min, currency)
-            max_actual = convert_revenue_to_actual(revenue_max, currency)
-            
-            if min_actual > 0 and max_actual > 0:
+            min_value = revenue_min[0] if isinstance(revenue_min, tuple) else revenue_min
+            max_value = revenue_max[0] if isinstance(revenue_max, tuple) else revenue_max
+            currency_value = currency[0] if isinstance(currency, tuple) else currency
+        
+            min_actual = convert_revenue_to_actual(min_value, currency_value)
+            max_actual = convert_revenue_to_actual(max_value, currency_value)
+            print(f"min_actual: {min_actual}, max_actual: {max_actual}")
+            if min_actual > 0 or max_actual > 0:
                 lusha_config["revenue"] = {
-                    "min": min_actual,
+                    "min": min_actual if min_actual > 0 else 1,
                     "max": max_actual
                 }
         except Exception as e:
