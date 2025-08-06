@@ -7,9 +7,7 @@ from typing import List, Dict, Any
 LUSHA_API_KEY = os.getenv("LUSHA_API_KEY")
 def lusha_search_api(payload_values: Dict[str, Any]) -> List[int]:
     payload_query =  build_payload(payload_values=payload_values)
-    print(f"Payload Values_new: {payload_query}")
     print(f"Payload Query: {json.dumps(payload_query, indent=2)}")
-
     url = f"https://api.lusha.com/prospecting/company/search"
     headers = {
         'accept': 'application/json',
@@ -24,7 +22,7 @@ def lusha_search_api(payload_values: Dict[str, Any]) -> List[int]:
 def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     """Build the API payload from input values."""
     # payload_values = {industry: [12,23,23], location: india, revenue: {min:100000, max: 1000000}, size: {min: 10, max: 100}}
-    print(f"Building payload: {payload_values}")
+
     payload_query = {
         "pages": {
             "page": 0,
@@ -67,27 +65,13 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     if "sizes" in payload_values and payload_values["sizes"]:
         sizes = payload_values["sizes"]
         if isinstance(sizes, list) and len(sizes) > 0:
-            payload_query["filters"]["companies"]["include"]["sizes"] = [sizes[0]]  # First size only
+            payload_query["filters"]["companies"]["include"]["sizes"] = sizes  # First size only
     if "pages" in payload_values:
         pages = payload_values["pages"]
         if "page" in pages:
             payload_query["pages"]["page"] = pages["page"]
         if "size" in pages:
             payload_query["pages"]["size"] = pages["size"]
-    if "empmin" in payload_values:
-        payload_query["filters"]["companies"]["include"]["employeeCount"] = {
-            "min": payload_values["empmin"],
-            "max": payload_values["empmax"]
-        }
-    if "location-country" in payload_values:
-        payload_query["filters"]["companies"]["include"]["locationCountry"] = {
-            "match": payload_values["location-country"]
-        }
-    if "revenue" in payload_values:
-        payload_query["filters"]["companies"]["include"]["revenue"] = {
-            "min": payload_values["revenue"]["min"],
-            "max": payload_values["revenue"]["max"]
-        }
     
     
     return payload_query
@@ -130,6 +114,7 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[
                 break
         
         print(f"Collected {len(all_companies)} companies from {total_pages} pages")
+        print(f"all_companies: {all_companies}")
         return all_companies
     except Exception as e:
         raise Exception(f"Error searching companies: {str(e)}")
