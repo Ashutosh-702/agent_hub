@@ -6,7 +6,8 @@ from typing import List, Dict, Any
 
 LUSHA_API_KEY = os.getenv("LUSHA_API_KEY")
 def lusha_search_api(payload_values: Dict[str, Any]) -> List[int]:
-    # payload_query =  build_payload(payload_values=payload_values)
+    payload_query =  build_payload(payload_values=payload_values)
+    print(f"Payload Query: {json.dumps(payload_query, indent=2)}")
     static_payload_query = {
         "pages": { "page": 0, "size": 20 },
         "filters": {
@@ -38,7 +39,7 @@ def lusha_search_api(payload_values: Dict[str, Any]) -> List[int]:
         "api_key": f"{os.getenv('LUSHA_API_KEY')}",
         'Content-Type': 'application/json'
     }
-    response = requests.post(url, headers=headers, json=static_payload_query)
+    response = requests.post(url, headers=headers, json=payload_query)
     if response.status_code == 201:
        return response.json()
     else:
@@ -50,7 +51,7 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     payload_query = {
         "pages": {
             "page": 0,
-            "size": 20  # Default size
+            "size": 1  # Default size
         },
         "filters": {
             "companies": {
@@ -69,10 +70,8 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
         payload_query["filters"]["companies"]["include"]["subIndustriesIds"] = payload_values["subIndustriesIds"]
 
 
-    if "location" in payload_values and payload_values["location"]:
-        payload_query["filters"]["companies"]["include"]["locations"] = [
-            {"country": payload_values["location"]}
-        ]
+    if "locations" in payload_values and isinstance(payload_values["locations"], list):
+        payload_query["filters"]["companies"]["include"]["locations"] = [{"country": country} for country in payload_values["locations"]]
 
     if "revenue" in payload_values and payload_values["revenue"]:
         revenue = payload_values["revenue"]
@@ -84,16 +83,20 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
                 }
             ]
     
-    if "size" in payload_values and payload_values["size"]:
-        size = payload_values["size"]
-        if "min" in size and "max" in size:
-            payload_query["filters"]["companies"]["include"]["sizes"] = [
-                {
-                    "min": size["min"],
-                    "max": size["max"]
-                }
-            ]
+    # if "size" in payload_values and payload_values["size"]:
+    #     size = payload_values["size"]
+    #     if "min" in size and "max" in size:
+    #         payload_query["filters"]["companies"]["include"]["sizes"] = [
+    #             {
+    #                 "min": size["min"],
+    #                 "max": size["max"]
+    #             }
+    #         ]
 
+    if "sizes" in payload_values and isinstance(payload_values["sizes"], list):
+        payload_query["filters"]["companies"]["include"]["sizes"] = [
+            {"min": s["min"], "max": s["max"]} for s in payload_values["sizes"]
+        ]
     if "pages" in payload_values:
         pages = payload_values["pages"]
         if "page" in pages:

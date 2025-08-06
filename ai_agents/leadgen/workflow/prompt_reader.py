@@ -59,6 +59,7 @@ def prompt_fetcher() -> List[Dict[str, Any]]:
                 "hubspot_email": hubspot_email,
                 "product_name": product_name,
                 "business_team": business_team,
+                "row_index": row_index
             })
 
     print(f"✅ Found {len(prompts)} prompts with status FALSE.",prompts)

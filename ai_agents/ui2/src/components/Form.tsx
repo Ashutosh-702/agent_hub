@@ -4,9 +4,11 @@ import Select from 'react-select';
 const AutoResizeTextarea = ({
   value,
   onChange,
+  placeholder,
 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -22,7 +24,7 @@ const AutoResizeTextarea = ({
     <textarea
     ref={textareaRef}
     className="text-input"
-    placeholder="Enter the criteria for relevance"
+    placeholder={placeholder}
     value={value}
     onChange={onChange}
     name="prompt"
@@ -45,6 +47,7 @@ const businessModelOptions = businessModels.map(model => ({ value: model, label:
 export const Form = () => {
   const [form, setForm] = useState({
     prompt: '',
+    prospects: '',
     industry: '',
     businessModel: '',
     employeeCount: '',
@@ -77,7 +80,8 @@ export const Form = () => {
     industry: form.industry,
     is_b2b: form.businessModel,        
     employee_count: form.employeeCount,
-    hq: form.location
+    hq: form.location,
+    prospects: form.prospects,
   };
 
   const response = await fetch(url, {
@@ -90,6 +94,7 @@ export const Form = () => {
     setSubmitted(true);
     setForm({
       prompt: '',
+      prospects: '',
       industry: '',
       businessModel: '',
       employeeCount: '',
@@ -123,6 +128,26 @@ export const Form = () => {
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, prompt: e.target.value }))
               }
+              placeholder="Enter the criteria for relevance"
+            />
+            <button
+              type="button"
+              onClick={handleNext}
+              disabled={!form.prompt.trim()}
+              className="next-button"
+            >
+              Next
+            </button>
+          </div>
+        )}
+        {step === 2 && (
+          <div className="step">
+            <AutoResizeTextarea
+              value={form.prospects}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, prospects: e.target.value }))
+              }
+              placeholder='Enter the target executives you want to reach out to'
             />
             <button
               type="button"
@@ -135,7 +160,7 @@ export const Form = () => {
           </div>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <div className="step">
                           <Select
                 options={industryOptions}
@@ -160,7 +185,7 @@ export const Form = () => {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="step">
             <Select
               options={businessModelOptions}
@@ -184,7 +209,7 @@ export const Form = () => {
           </div>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <div className="step">
             <Select
                 options={employeeCountOptions}
@@ -208,7 +233,7 @@ export const Form = () => {
           </div>
         )}
 
-        {step === 5 && (
+        {step === 6 && (
           <div className="step">
             <Select
   options={locationOptions}
@@ -233,7 +258,7 @@ export const Form = () => {
           </div>
         )}
 
-        {step === 6 && (
+        {step === 7 && (
           <div className="step">
             <button type="submit" className="submit-button">
               Submit
