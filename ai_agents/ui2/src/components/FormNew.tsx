@@ -8,7 +8,7 @@ const industries = ["Real Estate","Design Services","Retail","Chemical Manufactu
 
 
 const employeeCounts = ['1-10', '11-50', '51-200', '201+'];
-
+const optionalQuestions = new Set([8,9]);
 const regions = [
   'North America',
   'South America', 
@@ -60,7 +60,7 @@ const AutoResizeTextarea = ({
     const el = textareaRef.current;
     if (el) {
       el.style.height = 'auto';
-      el.style.height = `${el.scrollHeight}px`;
+      el.style.height = `${Math.max(el.scrollHeight,450)}px`;
     }
   }, [value]);
 
@@ -73,37 +73,38 @@ const AutoResizeTextarea = ({
       onChange={onChange}
       name={name}
       rows={1}
+      style={{minHeight:'450px'}}
     />
   );
 };
 
 const stepQuestions = [
   // SDR Company Relevance Prompt (7)
-  "Please provide a comprehensive and detailed outline of the relevance criteria for companies you aim to target. The more specific and exhaustive your criteria, the higher the likelihood that we can identify and prioritize the most relevant companies for outreach.",
-  "Please provide mandatory criterias that a company must have to qualify as a relevant company for outreach. The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.",
-  "Please share qualifying business models that are relevant to this outreach campaign. The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.",
-  "What are the key positive indicators that signal a company is a strong fit for your target profile? Please specify any attributes, characteristics, or patterns that, if present, confirm the company aligns with what you're looking for. The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.",
-  "What are some exclusion criteria that the AI should apply to immediately disqualify a company as not relevant? Please specify any attributes or red flags that should lead to automatic exclusion. The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.",
-  "Please share a few reference companies along with the specific characteristics that make them relevant. This will help the AI better understand and identify similar companies during the targeting process. The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.",
-  "Do you have any additional validations that need to be ensured to ensure the company is relevant?",
-
+  // "Please provide a comprehensive and detailed outline of the relevance criteria for companies you aim to target. \n\n\n\n\n\n\nThe more specific and exhaustive your criteria, the higher the likelihood that we can identify and prioritize the most relevant companies for outreach.",
+  "<div class='question-main'>Please provide a comprehensive and detailed outline of the relevance criteria for companies you aim to target.</div><div class='question-subtitle'>The more specific and exhaustive your criteria, the higher the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>",
+"<div class='question-main'>Please provide mandatory criterias that a company must have to qualify as a relevant company for outreach.</div><div class='question-subtitle'>The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>",
+"<div class='question-main'>Please share qualifying business models that are relevant to this outreach campaign.</div><div class='question-subtitle'>The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>",
+"<div class='question-main'>What are the key positive indicators that signal a company is a strong fit for your target profile?</div><div class='question-subtitle'>Please specify any attributes, characteristics, or patterns that, if present, confirm the company aligns with what you're looking for. The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>",
+"<div class='question-main'>What are some exclusion criteria that the AI should apply to immediately disqualify a company as not relevant?</div><div class='question-subtitle'>Please specify any attributes or red flags that should lead to automatic exclusion. The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>",
+"<div class='question-main'>Please share a few reference companies along with the specific characteristics that make them relevant. This will help the AI better understand and identify similar companies during the targeting process.</div><div class='question-subtitle'>The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>",
+"<div class='question-main'>Do you have any additional validations that need to be ensured to ensure the company is relevant?</div>",
   // Company Shortlisting (6)
-  "Which industries or verticals are in scope?", // step 7
-  "Target company size by head‑count?", // step 8
-  "Target company size by annual revenue?", // step 9 (currency + min + max)
-  "Location", // step 10
-  "Keywords", // step 11
-  "Categories", // step 12
+  "<div class='question-main'>Which industries or verticals are in scope?</div>", // step 7
+  "<div class='question-main'>Target company size by head-count?</div>", // step 8
+  "<div class='question-main'>Target company size by annual revenue?</div>", // step 9 (currency + min + max)
+  "<div class='question-main'>Location</div>", // step 10
+  "<div class='question-main'>Keywords</div>", // step 11
+  "<div class='question-main'>Categories</div>", // step 12
 
   // Persona Prompt (3)
-  "Job titles or role keywords", // step 13
-  "Seniority level", // step 14
-  "Department", // step 15
+  "<div class='question-main'>Job titles or role keywords</div>", // step 13
+  "<div class='question-main'>Seniority level</div>", // step 14
+  "<div class='question-main'>Department</div>", // step 15
 
   // SDR Setup (3)
-  "Please share the email ID of the person against whom the contact should be saved in Hubspot", // step 16
-  "Please share the name product for which you are targeting this outreach", // step 17
-  "Please share the business team for whom you are initiating the outreach" // step 18
+  "<div class='question-main'>Please share the email ID of the person against whom the contact should be saved in Hubspot</div>", // step 16
+  "<div class='question-main'>Please share the name product for which you are targeting this outreach</div>", // step 17
+  "<div class='question-main'>Please share the business team for whom you are initiating the outreach</div>" // step 18
 ];
 
 export const Form = () => {
@@ -116,7 +117,11 @@ export const Form = () => {
 
   const handleNext = () => {
     if (step < stepQuestions.length - 1) {
-      setStep(step + 1);
+      let nextStep = step + 1;
+      if (step === 10) {
+        nextStep = 13;
+      }
+      setStep(nextStep);
     }
   };
 
@@ -141,19 +146,19 @@ export const Form = () => {
   ].filter(Boolean).join('\n\n'),
 
   industry: form[7],
-  employee_count: form[8],
-  currency: form[20], 
-  revenue_min: form[9],
-  revenue_max: form[19],
-  location: form[10],
-  keywords: form[11],
-  categories: form[12],    
+  employee_count: form[8] || 'null',
+  currency: form[20] || 'null', 
+  revenue_min: form[9] || 'null',
+  revenue_max: form[19] || 'null',
+  location: form[10] ,
+  keywords: 'null', //form[11]
+  categories: 'null', //form[12]
   hubspot_email: form[16],
   product_name: form[17],
   business_team: form[18]
 };
 
-
+  
     console.log('Payload:', payload);
 
     try {
@@ -178,6 +183,10 @@ export const Form = () => {
   };
 
   const isStepValid = () => {
+    if (optionalQuestions.has(step)) {
+    return true;
+  }
+
     if (step === 9) {
       // For revenue step, check if both min and max are filled
       return form[9] && form[19] && form[20]; // min, max, currency
@@ -190,8 +199,8 @@ export const Form = () => {
   };
 
   return (
-    <div className="fullscreen-container">
-      <form onSubmit={handleSubmit} className="step-form">
+    <div className="fullscreen-container" >
+      <form onSubmit={handleSubmit} className="step-form full-width-height" >
         <h1 className="form-title">Company Info Form</h1>
         <div className="progress-bar">
           <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
@@ -199,8 +208,10 @@ export const Form = () => {
 
         {!submitted && (
           <div className="step">
-            <p className="question-text">{stepQuestions[step]}</p>
-            
+            <div className="question-text" dangerouslySetInnerHTML={{ __html: stepQuestions[step] }}/>
+            {optionalQuestions.has(step) && (
+                      <p className="optional-indicator">(Optional)</p>
+                    )}
             {/* Steps 0-6: Text areas */}
             {step >= 0 && step <= 6 && (
               <AutoResizeTextarea 
@@ -208,6 +219,7 @@ export const Form = () => {
                 onChange={handleChange} 
                 name={`step_${step}`} 
                 placeholder="Type your answer here..." 
+                
               />
             )}
 
