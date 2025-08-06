@@ -7,32 +7,9 @@ from typing import List, Dict, Any
 LUSHA_API_KEY = os.getenv("LUSHA_API_KEY")
 def lusha_search_api(payload_values: Dict[str, Any]) -> List[int]:
     payload_query =  build_payload(payload_values=payload_values)
+    print(f"Payload Values_new: {payload_query}")
     print(f"Payload Query: {json.dumps(payload_query, indent=2)}")
-    static_payload_query = {
-        "pages": { "page": 0, "size": 20 },
-        "filters": {
-            "companies": {
-                "include": {
-                    "mainIndustriesIds": ["16"],
-                    "locations": [
-                        { "country": "United States" }
-                    ],
-                    "sizes": [
-                        {
-                            "min": 1,
-                            "max": 10
-                        }
-                    ],
-                    "revenues": [
-                        {
-                            "min": 1,
-                            "max": 1000000
-                        }
-                    ]
-                }
-            }
-        }
-    }
+
     url = f"https://api.lusha.com/prospecting/company/search"
     headers = {
         'accept': 'application/json',
@@ -47,7 +24,7 @@ def lusha_search_api(payload_values: Dict[str, Any]) -> List[int]:
 def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     """Build the API payload from input values."""
     # payload_values = {industry: [12,23,23], location: india, revenue: {min:100000, max: 1000000}, size: {min: 10, max: 100}}
-
+    print(f"Building payload: {payload_values}")
     payload_query = {
         "pages": {
             "page": 0,
@@ -62,17 +39,13 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     }
     if "page_size" in payload_values and payload_values["page_size"]:
         payload_query["pages"]["size"] = payload_values["page_size"]
-    
     if "mainIndustriesIds" in payload_values and payload_values["mainIndustriesIds"]:
         payload_query["filters"]["companies"]["include"]["mainIndustriesIds"] = payload_values["mainIndustriesIds"]
     
     if "subIndustriesIds" in payload_values and payload_values["subIndustriesIds"]:
         payload_query["filters"]["companies"]["include"]["subIndustriesIds"] = payload_values["subIndustriesIds"]
-
-
     if "locations" in payload_values and isinstance(payload_values["locations"], list):
         payload_query["filters"]["companies"]["include"]["locations"] = [{"country": country} for country in payload_values["locations"]]
-
     if "revenue" in payload_values and payload_values["revenue"]:
         revenue = payload_values["revenue"]
         if "min" in revenue and "max" in revenue:
@@ -82,7 +55,6 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
                     "max": revenue["max"]
                 }
             ]
-    
     # if "size" in payload_values and payload_values["size"]:
     #     size = payload_values["size"]
     #     if "min" in size and "max" in size:
@@ -92,38 +64,30 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     #                 "max": size["max"]
     #             }
     #         ]
-
-    if "sizes" in payload_values and isinstance(payload_values["sizes"], list):
-        payload_query["filters"]["companies"]["include"]["sizes"] = [
-            {"min": s["min"], "max": s["max"]} for s in payload_values["sizes"]
-        ]
+    if "sizes" in payload_values and payload_values["sizes"]:
+        sizes = payload_values["sizes"]
+        if isinstance(sizes, list) and len(sizes) > 0:
+            payload_query["filters"]["companies"]["include"]["sizes"] = [sizes[0]]  # First size only
     if "pages" in payload_values:
         pages = payload_values["pages"]
         if "page" in pages:
             payload_query["pages"]["page"] = pages["page"]
         if "size" in pages:
             payload_query["pages"]["size"] = pages["size"]
-
     if "empmin" in payload_values:
         payload_query["filters"]["companies"]["include"]["employeeCount"] = {
             "min": payload_values["empmin"],
             "max": payload_values["empmax"]
         }
-    
     if "location-country" in payload_values:
         payload_query["filters"]["companies"]["include"]["locationCountry"] = {
             "match": payload_values["location-country"]
         }
-    
-    if "revenues" in payload_values:
+    if "revenue" in payload_values:
         payload_query["filters"]["companies"]["include"]["revenue"] = {
-            "min": payload_values["revenues"]["min"],
-            "max": payload_values["revenues"]["max"]
+            "min": payload_values["revenue"]["min"],
+            "max": payload_values["revenue"]["max"]
         }
-    
-    if "pages" in payload_values:
-        payload_query["pages"]["page"] =0
-        payload_query["pages"]["size"] = 20
     
     
     return payload_query
@@ -147,7 +111,7 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[
         total_pages = (total_results + page_size - 1) // page_size  # Ceiling division
         
         print(f"Total results: {total_results}, Total pages: {total_pages}")
-        total_pages  = 3
+        total_pages  = 3 if total_pages > 3 else total_pages
         for page_num in range(1, total_pages):
             print(f"Fetching page {page_num + 1} of {total_pages}")
             
