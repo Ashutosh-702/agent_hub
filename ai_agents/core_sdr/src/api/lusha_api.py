@@ -73,7 +73,6 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
         if "size" in pages:
             payload_query["pages"]["size"] = pages["size"]
     
-    
     return payload_query
 
 def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[int]:

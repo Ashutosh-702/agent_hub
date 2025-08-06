@@ -28,7 +28,10 @@ def get_industry_mapping() -> Dict[str, int]:
 
         records = mapping_sheet.get_all_records(expected_headers=expected_headers)
         # print("records: ",records)
-        mapping = {}
+        mapping = {
+            "Sub":{},
+            "Main": {}
+        }
         
         for record in records:
             sub_industry = record.get("subIndustry", "")
@@ -37,17 +40,22 @@ def get_industry_mapping() -> Dict[str, int]:
             main_industry_id = record.get("mainIndustryId", "")
             if sub_industry and sub_industry_id:
                 try:
-                    mapping[sub_industry] = int(sub_industry_id)
+                    mapping["Sub"][sub_industry] = int(sub_industry_id)
+                    
+
                 except ValueError:
-                    print(f"⚠️ Invalid subIndustry ID for '{sub_industry}': {sub_industry_id}")
-            
-            if main_industry and main_industry_id and main_industry not in mapping:
-                try:
-                    mapping[main_industry] = int(main_industry_id)
-                except ValueError:
-                    print(f"⚠️ Invalid mainIndustry ID for '{main_industry}': {main_industry_id}")
+                    print(f"⚠️ Invalid Industry ID for '{sub_industry}': {sub_industry_id}")
         
-        print(f"✅ Loaded {len(mapping)} industry mappings")
+            if main_industry and main_industry_id:
+                try:
+                    mapping["Main"][main_industry] = int(main_industry_id)
+                    
+
+                except ValueError:
+                    print(f"⚠️ Invalid Industry ID for '{main_industry}': {main_industry_id}")
+        
+        
+        print(f"✅ Loaded {len(mapping['Sub'])} Subindustry mappings and {len(mapping['Main'])} Mainindustry mappings ")
         return mapping
         
     except Exception as e:
@@ -104,19 +112,28 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
         print("WORKING TILL HERE - 1")
         # print("industry mapping:",industry_mapping)
 
-        industry_names = [name for name in sheets_data["industry"][0].split(',') if name]
+        industry_names = [name.strip() for name in sheets_data["industry"][0].split(',') if name]
         print("industry_names",industry_names)
         print("WORKING TILL HERE - 2")
-        industry_ids = []
+        main_industry_ids = []
+        sub_industry_ids = []
         
         for name in industry_names:
-            if name in industry_mapping:
-                industry_ids.append(industry_mapping[name])
+            if name in industry_mapping["Main"]:
+                main_industry_ids.append(industry_mapping["Main"][name])
+            else:
+                print(f"⚠️ Industry '{name}' not found in mapping")
+        for name in industry_names:
+            if name in industry_mapping["Sub"]:
+                sub_industry_ids.append(industry_mapping["Sub"][name])
             else:
                 print(f"⚠️ Industry '{name}' not found in mapping")
         
-        if industry_ids:
-            lusha_config["mainIndustriesIds"] = industry_ids
+        print("Main: ",main_industry_ids)
+        if main_industry_ids:
+            lusha_config["mainIndustriesIds"] = main_industry_ids
+        if sub_industry_ids:
+            lusha_config["subIndustriesIds"] = sub_industry_ids
     
     if sheets_data.get("location"):
         locations = [loc for loc in sheets_data["location"][0].split(',') if loc]
