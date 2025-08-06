@@ -78,7 +78,11 @@ def convert_revenue_to_actual(revenue_millions: str, currency: str = "USD") -> i
     """
     Convert revenue from millions to actual numbers
     """
+    ## if curency is INR then conert to usd
+    
     try:
+        if currency == "INR":
+            revenue_millions = float(revenue_millions) / 87.67
         revenue_float = float(revenue_millions)
         actual = int(revenue_float * 1000000)
         #TODO: Currency conversion logic 
@@ -138,7 +142,8 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
     
     if sheets_data.get("employee_count"):
         employee_ranges = [range_str for range_str in sheets_data["employee_count"][0].split(',') if range_str]
-        if employee_ranges:
+        if employee_ranges and employee_ranges[0] != "null":
+            print(f"employee_ranges: {employee_ranges}")
             sizes =[]
             for range in employee_ranges:
                 min_emp, max_emp = parse_employee_range(range)
