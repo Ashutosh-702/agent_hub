@@ -4,13 +4,10 @@ import os
 import re
 from typing import List, Dict, Any
 
-def search_api(dsl_query: Dict[str, Any], user_query: str) -> List[int]:
-    items_per_page = 1
-    match = re.search(r'\b(\d+)\b', user_query)
-    if match:
-        items_per_page = int(match.group(1))
+def search_api(dsl_query: Dict[str, Any]) -> List[int]:
+    items_per_page = 4
     
-    url = f"https://api.coresignal.com/cdapi/v2/company_multi_source/search/es_dsl?items_per_page={items_per_page}"
+    url = f"https://api.coresignal.com/cdapi/v2/company_clean/search/es_dsl?items_per_page={items_per_page}"
     if isinstance(dsl_query, str):
         payload = dsl_query
     else:
@@ -31,7 +28,7 @@ def search_api(dsl_query: Dict[str, Any], user_query: str) -> List[int]:
         raise Exception(f"Search API failed: {response.status_code} - {response.text}")
 
 def collect_api(company_id: int) -> Dict[str, Any]:
-    url = f"https://api.coresignal.com/cdapi/v2/company_multi_source/collect/{company_id}"
+    url = f"https://api.coresignal.com/cdapi/v2/company_clean/collect/{company_id}"
     
     headers = {
         'accept': 'application/json',
@@ -46,17 +43,96 @@ def collect_api(company_id: int) -> Dict[str, Any]:
     else:
         raise Exception(f"Collect API failed: {response.status_code} - {response.text}")
 
-def collect_companies_from_search(dsl_query: Dict[str, Any], user_query: str) -> List[str]:
+def collect_companies_from_search(config: Dict[str, Any]) -> List[str]:
     try:
-        company_ids = search_api(dsl_query, user_query)
+        dsl_query = build_payload(config)
+        company_ids = search_api(dsl_query)
     except Exception as e:
         raise Exception(f"Error searching companies: {str(e)}")
     companies = []
     try:
         for company_id in company_ids:
             company_data = collect_api(company_id)
-            companies.append(company_data["company_name"])
+            companies.append(company_data["name"])
             print(type(company_data))
     except Exception as e:
         raise Exception(f"Error collecting company data: {str(e)}")
     return companies
+
+
+def build_payload(config: Dict[str,Any]):
+    industries = [name for name in config["industry"][0].split(',') if name]
+    locations = config["location"]
+
+    query = {
+        "query": {
+            "bool": {
+                "must": []
+            }
+        }
+    }
+
+    must_clauses = query["query"]["bool"]["must"]
+
+    if industries:
+        industry_should = [
+            {"match": {"industry": {"query": industry}}}
+            for industry in industries
+        ]
+        must_clauses.append({
+            "bool": {
+                "should": industry_should,
+                "minimum_should_match": 1
+            }
+        })
+
+    sizes = []
+    if config.get("employee_count"):
+        employee_ranges = [range_str for range_str in config["employee_count"][0].split(',') if range_str and range_str != "null"]
+        for range_str in employee_ranges:
+            if '+' in range_str:
+                min_val = int(range_str.replace('+', ''))
+                max_val = 1500
+            elif '-' in range_str:
+                parts = range_str.split('-')
+                if len(parts) == 2:
+                    min_val = int(parts[0])
+                    max_val = int(parts[1])
+            else:
+                continue
+            sizes.append({"min": min_val, "max": max_val})
+
+    if sizes:
+        employee_should = []
+        for size in sizes:
+            clause = {
+                "range": {
+                    "size_employees_count": {
+                        "gte": size["min"],
+                        "lte": size["max"]
+                    }
+                }
+            }
+            employee_should.append(clause)
+
+        must_clauses.append({
+            "bool": {
+                "should": employee_should,
+                "minimum_should_match": 1
+            }
+        })
+
+    if locations:
+        location_should = [
+            {"match": {"location_hq_country": loc.strip()}}
+            for loc in locations[0].split(',')
+            if loc.strip()
+        ]
+        must_clauses.append({
+            "bool": {
+                "should": location_should,
+                "minimum_should_match": 1
+            }
+        })
+    print("QUERY: ", query)
+    return query

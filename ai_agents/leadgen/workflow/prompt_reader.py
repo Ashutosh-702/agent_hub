@@ -29,7 +29,7 @@ def prompt_fetcher() -> List[Dict[str, Any]]:
     prompts = []
 
     for i, row in enumerate(records):
-        status = str(row.get("Status", "")).strip().lower()
+        status = str(row.get("status", "")).strip().lower()
         if status in ["false", "no", "0",""]:
             web_prompt = row.get("web_prompt", ""),
             persona_prompt = row.get("persona_prompt", ""),

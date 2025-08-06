@@ -1,10 +1,10 @@
 import asyncio
 import requests
-
+from dotenv import load_dotenv
 BASE_URL = "http://localhost:8000/api/v1/orchestrated/run"
-
+load_dotenv()
 from ai_agents.leadgen.workflow.prompt_reader import prompt_fetcher, set_status_true
-from ai_agents.leadgen.api.main import enhance_query, EnhanceRequest
+from ai_agents.core_sdr.src.api.coresignal_api import collect_companies_from_search
 from ai_agents.core_sdr.src.parsers.lusha_helper import get_companies_from_lusha, sheets_to_lusha_config
 
 async def run_batch():
@@ -50,16 +50,16 @@ async def run_batch():
                 "product_name": product_name,
                 "business_team": business_team
             }
-
-            companies = get_companies_from_lusha(sheets_data)
+            companies = collect_companies_from_search(sheets_data)
             
-            if not companies:
-                print("⚠️ No companies found from Lusha, skipping this entry")
-                continue
+            # companies = get_companies_from_lusha(sheets_data)
+            
+            # if not companies:
+            #     print("⚠️ No companies found from Lusha, skipping this entry")
+            #     continue
 
             print(f"✅ Retrieved {len(companies)} companies from Lusha")
             print(f"📋 Companies: {companies[:5]}{'...' if len(companies) > 5 else ''}")
-
 
             config = {
                 "search_query": web_prompt,
@@ -67,22 +67,6 @@ async def run_batch():
                 "companies": companies,  # Pass the companies list
                 "original_sheets_data": sheets_data  # Include original data for reference
             }
-
-            print(f"🚀 Running orchestrated workflow...")
-
-            # Step 4: Call orchestrated workflow
-            response = requests.post(BASE_URL, json={
-                "config": config
-            })
-
-            if response.status_code == 200 and response.json().get("status") == "success":
-                print("✅ Workflow completed successfully")
-                # Mark as processed in sheets
-                set_status_true(entry["row_index"])
-            else:
-                print(f"❌ Workflow failed: {response.status_code}")
-                if response.text:
-                    print(f"Error details: {response.text}")
 
         except Exception as e:
             print(f"❌ Error processing entry: {str(e)}")

@@ -92,17 +92,13 @@ def health(ctx):
         sys.exit(1)
 
 
-async def process_company_search(query: str) -> Dict[str, Any]:
+async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
     """Core function to process company search"""
-    processor = SimpleDSLProcessor()
-    dsl_result = await processor.process_query(query)
-    if isinstance(dsl_result, str):
-        dsl_data = json.loads(dsl_result)
-    else:
-        dsl_data = dsl_result
     
-    # company_data = collect_companies_from_search(dsl_data, query)
-    company_data = lusha_collect_companies_from_search(dsl_data)
+    
+    
+    company_data = collect_companies_from_search(dsl_data, query)
+    company_data = lusha_collect_companies_from_search(config)
     upload_company_name_to_csv(company_data)
     update_history(company_data, query)
     
