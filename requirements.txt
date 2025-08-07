@@ -16,8 +16,8 @@ orjson~=3.10.18
 PyAutoGUI~=0.9.54
 pillow~=11.2.1
 rubicon-objc
-PyQt6>=6.4.0
-PyQt6-tools>=6.4.0
+# PyQt6>=6.4.0
+# PyQt6-tools>=6.4.0
 hubspot-api-client>=6.0.0
 
 # Core SDR Dependencies

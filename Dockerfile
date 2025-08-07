@@ -18,20 +18,13 @@ RUN apk add --no-cache \
     libmagic
 
 # Copy backend requirements and install Python dependencies
-COPY ai_agents/leadgen/ .
-COPY ai_agents/ai_sdr/ .
-COPY ai_agents/core_sdr/ .
-COPY ai_agents/linkedin_sdr/ .
-COPY ci-test.sh .
-COPY dump_coverage.py .
-COPY server.py .
+COPY . .
 
 RUN pip install --upgrade --no-cache-dir pip setuptools
 
 RUN pip install --no-cache-dir -r requirements.txt
-
 # Copy built frontend from the frontend-builder stage
-COPY --from=frontend-builder /frontend/build /app/static
+COPY --from=frontend-builder /ui/dist /app/static
 
 
 # Create necessary directories
