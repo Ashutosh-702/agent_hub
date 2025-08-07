@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -10,9 +11,40 @@ import os
 from openai import OpenAI
 from ai_agents.leadgen.prompt_enhancer import analyze_prompt, enhance_prompt
 from ai_agents.leadgen.workflow.prompt_reader import submit_company_data
+from database.connection_manager import ConnectionManager
+from config.loaded_config import loaded_config
+
+async def initialize_database():
+    loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_db")
+
+async def close_database():
+    if loaded_config.connection_manager:
+        await loaded_config.connection_manager.close_connections()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("🚀 Starting Lead Generation API server...")
+    try:
+        await initialize_database()
+        print("✅ Database connected successfully")
+    except Exception as e:
+        print(f"❌ Database connection failed: {e}")
+        raise
+    
+    yield  # Server is running
+    
+    # Shutdown
+    print("🔒 Shutting down Lead Generation API server...")
+    try:
+        await close_database()
+        print("✅ Database disconnected successfully")
+    except Exception as e:
+        print(f"❌ Database disconnection failed: {e}")
+
 
 load_dotenv()
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

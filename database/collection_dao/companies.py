@@ -1,0 +1,18 @@
+from database.base_dao import BaseMongoDao
+from motor.motor_asyncio import AsyncIOMotorClient
+
+
+class CompaniesDao(BaseMongoDao):
+    def __init__(self, mongo_client: AsyncIOMotorClient):
+        super().__init__(mongo_client, "companies")
+
+    async def create_company(self, company: dict):
+        return await self.insert_one(company)
+    
+    async def get_companies(self):
+        return await self.find_many({})
+    
+    async def get_company(self, company_id: str):
+        return await self.find_one({"_id": company_id})
+    
+
