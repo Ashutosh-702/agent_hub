@@ -1,7 +1,11 @@
+import os
+from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from ai_agents.core_sdr.src.cli.main import process_company_search
 from ai_agents.leadgen.workflow.prompt_reader import submit_company_data
@@ -115,5 +119,62 @@ async def upload_data_from_form(data: FormSubmission):
 async def call_data_apis(config: Dict[str,Any]):
     company_data = await process_company_search(config)
     return company_data
+
+
+
+
+def configure_static_serving_production(app: FastAPI):
+    """
+    Production-ready static file serving with proper error handling
+    Uses separate mounting for static assets and catch-all for SPA routing
+    """
+
+    serve_static = os.getenv("SERVE_STATIC", "true").lower() == "true"
+    static_path = os.getenv("STATIC_PATH","/Users/vasubhatia/Documents/Company/revamp/agent_hub/ai_agents/ui/dist")
+
+    if not serve_static:
+        print("Static file serving disabled (SERVE_STATIC=false)")
+        return
+    
+    if not os.path.exists(static_path):
+        print(f"WARNING: Static path does not exist: {static_path}")
+        return
+    
+    index_path = Path(static_path) / "index.html"
+    if not index_path.exists():
+        print(f"WARNING: index.html not found in {static_path}")
+        return
+    
+    print(f"✓ Serving static files from: {static_path}")
+    
+    static_assets_path = Path(static_path) / "static"
+    if static_assets_path.exists():
+        app.mount("/static", StaticFiles(directory=static_assets_path), name="static")
+        print(f"✓ Mounted static assets from: {static_assets_path}")
+    @app.get("/{full_path:path}")
+    async def serve_react_app(full_path: str):
+        
+        if (full_path.startswith("api/") or
+            full_path in ["_healthz", "_readyz", "env-config"]):
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        file_path = Path(static_path) / full_path
+
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        
+        return FileResponse(index_path, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        })
+    
+    print("✓ Static file serving configured successfully")
+
+
+configure_static_serving_production(app)
+
+
+
 
 

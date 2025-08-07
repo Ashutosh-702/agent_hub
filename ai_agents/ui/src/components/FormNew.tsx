@@ -312,7 +312,7 @@ export const Form = () => {
                         name="locationType"
                         value="region"
                         checked={locationType === 'region'}
-                        onChange={(e) => {
+                        onChange={() => {
                           setLocationType('region');
                           const updated = [...form];
                           updated[10] = ''; // Clear previous selection
@@ -328,7 +328,7 @@ export const Form = () => {
                         name="locationType"
                         value="country"
                         checked={locationType === 'country'}
-                        onChange={(e) => {
+                        onChange={() => {
                           setLocationType('country');
                           const updated = [...form];
                           updated[10] = ''; // Clear previous selection
