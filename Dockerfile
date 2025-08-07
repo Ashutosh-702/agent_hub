@@ -8,7 +8,7 @@ RUN npm ci
 RUN npm run build
 
 # Stage 2: Setup Backend with Frontend
-FROM python:3.11.13-alpine3.22
+FROM python:3.11-alpine3.20
 WORKDIR /app
 
 # Install system dependencies for Alpine.
