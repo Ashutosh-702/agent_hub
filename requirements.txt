@@ -11,10 +11,10 @@ httpx~=0.28.1
 urllib3~=2.4.0
 langgraph~=0.4.8
 pydantic~=2.11.5
-mcp~=1.9.1
+mcp~=1.10.0
 orjson~=3.10.18
 PyAutoGUI~=0.9.54
-pillow~=11.2.1
+pillow~=11.3.0
 rubicon-objc
 # PyQt6>=6.4.0
 # PyQt6-tools>=6.4.0
