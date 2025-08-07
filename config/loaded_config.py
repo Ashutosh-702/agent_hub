@@ -3,7 +3,7 @@ from database.connection_manager import ConnectionManager
 
 
 class Settings:
-    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+    mongo_uri = os.getenv("MONGO_LINKEDIN_SDR_READ_WRITE")
     connection_manager: ConnectionManager = None
 
 

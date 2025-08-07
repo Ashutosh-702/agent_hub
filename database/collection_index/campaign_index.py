@@ -21,18 +21,10 @@ async def campaign_mongodb_indexes(mongo_client):
             name="idx_status_enum"
         )
     ]
-    company_mapping_indexes = [
-        # Existing unique index
-        IndexModel(
-            [("campaign_id", ASCENDING)],
-            name="idx_campaign_id_unique"
-        )
-    ]
+
     for index in campaign_indexes:
         try:
             await campaigns_collection.create_indexes([index])
-            await company_mappings_collection.create_indexes([index])
-            await companies_collection.create_indexes([index])
             print("Created/verified MongoDB indexes for campaigns collection")
     
         except OperationFailure as e:
