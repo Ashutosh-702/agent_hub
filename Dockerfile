@@ -109,3 +109,62 @@ RUN chmod +x ci-test.sh && \
 
 # Define the entrypoint (Following Vector's Pattern)
 ENTRYPOINT ["python", "main.py"] 
+
+
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /ai_agents/ui
+
+# Copy package files and install dependencies
+COPY ai_agents/ui/package*.json ./
+RUN npm ci
+
+# Copy frontend source code
+COPY ai_agents/ui/ ./
+
+# Build the React application
+RUN npm run build
+
+# Stage 2: Setup Backend with Frontend
+FROM python:3.11.13-alpine3.22
+
+WORKDIR /ai_agents/leadgen/api/
+
+# Install system dependencies for Alpine.
+# We use apk instead of apt-get. build-base includes gcc and other common build tools.
+RUN apk add --no-cache \
+    build-base \
+    libmagic
+
+# Copy backend requirements and install Python dependencies
+COPY ai_agents/leadgen/api .
+COPY ci-test.sh .
+COPY dump_coverage.py .
+COPY main.py .
+
+RUN pip install --upgrade --no-cache-dir pip setuptools
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy built frontend from the frontend-builder stage
+COPY --from=frontend-builder /ai_agents/ui/build /app/static
+
+
+# Create necessary directories
+RUN mkdir -p /ai_agents/leadgen/api/documents /ai_agents/leadgen/api/logs /ai_agents/leadgen/api/static
+
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV SERVE_STATIC=true
+ENV STATIC_PATH=/app/static
+
+# Expose port
+EXPOSE 80
+
+RUN chmod +x ci-test.sh && \
+    mkdir -p /var/log/fynd && chmod 777 /var/log/fynd
+
+
+# Run the application
+ENTRYPOINT ["python", "main.py"]

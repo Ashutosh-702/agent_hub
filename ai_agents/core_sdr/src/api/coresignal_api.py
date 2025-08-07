@@ -43,9 +43,9 @@ def collect_api(company_id: int) -> Dict[str, Any]:
     else:
         raise Exception(f"Collect API failed: {response.status_code} - {response.text}")
 
-def collect_companies_from_search(config: Dict[str, Any]) -> List[str]:
+def collect_companies_from_search(config: Dict[str, Any], lusha_company_list: List[str]) -> List[str]:
     try:
-        dsl_query = build_payload(config)
+        dsl_query = build_payload(config,lusha_company_list)
         company_ids = search_api(dsl_query)
     except Exception as e:
         raise Exception(f"Error searching companies: {str(e)}")
@@ -54,26 +54,33 @@ def collect_companies_from_search(config: Dict[str, Any]) -> List[str]:
         for company_id in company_ids:
             company_data = collect_api(company_id)
             companies.append(company_data["name"])
-            print(type(company_data))
     except Exception as e:
         raise Exception(f"Error collecting company data: {str(e)}")
     return companies
 
 
-def build_payload(config: Dict[str,Any]):
+def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
     industries = [name for name in config["industry"][0].split(',') if name]
     locations = config["location"]
-
+    location_type = config["location_type"]
     query = {
         "query": {
             "bool": {
-                "must": []
+                "must": [],
+                "must_not": []
             }
         }
     }
 
     must_clauses = query["query"]["bool"]["must"]
-
+    must_not_clauses = query["query"]["bool"]["must_not"]
+    if lusha_company_list is not None:
+        for company_found in lusha_company_list:
+            must_not_clauses.append({
+                "match":{
+                    "name": company_found
+                }
+            })
     if industries:
         industry_should = [
             {"match": {"industry": {"query": industry}}}
@@ -122,9 +129,21 @@ def build_payload(config: Dict[str,Any]):
             }
         })
 
-    if locations:
+    if locations and location_type=="country":
         location_should = [
             {"match": {"location_hq_country": loc.strip()}}
+            for loc in locations[0].split(',')
+            if loc.strip()
+        ]
+        must_clauses.append({
+            "bool": {
+                "should": location_should,
+                "minimum_should_match": 1
+            }
+        })
+    elif locations and location_type=="region":
+        location_should = [
+            {"match": {"location_hq_regions": loc.strip()}}
             for loc in locations[0].split(',')
             if loc.strip()
         ]

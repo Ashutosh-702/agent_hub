@@ -104,12 +104,13 @@ const stepQuestions = [
   // SDR Setup (3)
   "<div class='question-main'>Please share the email ID of the person against whom the contact should be saved in Hubspot</div>", // step 16
   "<div class='question-main'>Please share the name product for which you are targeting this outreach</div>", // step 17
-  "<div class='question-main'>Please share the business team for whom you are initiating the outreach</div>" // step 18
+  "<div class='question-main'>Please share the business team for whom you are initiating the outreach</div>", // step 18
+  "<div class='question-main'>Please share your own email id</div>" //step 19
 ];
 
 export const Form = () => {
   // Create form array with extra slots for currency, min revenue, max revenue, location type
-  const [form, setForm] = useState<string[]>(Array(23).fill(''));
+  const [form, setForm] = useState<string[]>(Array(24).fill(''));
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [locationType, setLocationType] = useState<'region' | 'country' | ''>('');
@@ -147,15 +148,17 @@ export const Form = () => {
 
   industry: form[7],
   employee_count: form[8] || 'null',
-  currency: form[20] || 'null', 
+  currency: form[21] || 'null', 
   revenue_min: form[9] || 'null',
-  revenue_max: form[19] || 'null',
+  revenue_max: form[20] || 'null',
   location: form[10] ,
+  location_type: locationType,
   keywords: 'null', //form[11]
   categories: 'null', //form[12]
   hubspot_email: form[16],
   product_name: form[17],
-  business_team: form[18]
+  business_team: form[18],
+  user_email: form[19]
 };
 
   
@@ -170,7 +173,7 @@ export const Form = () => {
 
       if (response.ok) {
         setSubmitted(true);
-        setForm(Array(23).fill(''));
+        setForm(Array(24).fill(''));
         setLocationType('');
         setStep(0);
       } else {
@@ -189,7 +192,7 @@ export const Form = () => {
 
     if (step === 9) {
       // For revenue step, check if both min and max are filled
-      return form[9] && form[19] && form[20]; // min, max, currency
+      return form[9] && form[20] && form[21]; // min, max, currency
     }
     if (step === 10) {
       // For location step, check if location type is selected and locations are chosen
@@ -261,10 +264,10 @@ export const Form = () => {
                 <Select 
                   name="currency" 
                   options={["USD", "EUR", "INR", "GBP"].map(c => ({ label: c, value: c }))} 
-                  value={form[20] ? { label: form[20], value: form[20] } : null} 
+                  value={form[21] ? { label: form[21], value: form[21] } : null} 
                   onChange={(selected) => { 
                     const updated = [...form]; 
-                    updated[20] = selected?.value || ''; 
+                    updated[21] = selected?.value || ''; 
                     setForm(updated); 
                   }} 
                   placeholder="Currency" 
@@ -285,10 +288,10 @@ export const Form = () => {
                   type="number" 
                   placeholder="Max (M)" 
                   className="number-input" 
-                  value={form[19] || ''} 
+                  value={form[20] || ''} 
                   onChange={(e) => { 
                     const updated = [...form]; 
-                    updated[19] = e.target.value; 
+                    updated[20] = e.target.value; 
                     setForm(updated); 
                   }} 
                 />
@@ -444,7 +447,7 @@ export const Form = () => {
                 value={form[step]} 
                 onChange={handleChange} 
                 name={`step_${step}`} 
-                placeholder="Email ID" 
+                placeholder="Enter your Hubspot's Account Email ID" 
               />
             )}
 
@@ -454,7 +457,7 @@ export const Form = () => {
                 name={`step_${step}`} 
                 options={[
                   { label: 'Fynd_Global', value: 'Fynd_Global' }, 
-                  { label: 'Fynd Commerce', value: 'Fynd Commerce' }
+                  { label: 'Fynd_Commerce', value: 'Fynd_Commerce' }
                 ]} 
                 value={form[step] ? { label: form[step], value: form[step] } : null} 
                 onChange={(selected) => { 
@@ -482,6 +485,14 @@ export const Form = () => {
                   setForm(updated); 
                 }} 
                 placeholder="Select business teams" 
+              />
+            )}
+            {step === 19 && (
+              <AutoResizeTextarea 
+                value={form[step]} 
+                onChange={handleChange}
+                name={`step_${step}`} 
+                placeholder="Enter your email id and submit" 
               />
             )}
             

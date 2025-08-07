@@ -19,6 +19,7 @@ from ai_agents.core_sdr.src.parsers.company_name_uploader import upload_company_
 from ai_agents.core_sdr.src.parsers.dsl_query_processor import SimpleDSLProcessor
 from ai_agents.core_sdr.src.api.coresignal_api import collect_companies_from_search
 from ai_agents.core_sdr.src.api.lusha_api import lusha_collect_companies_from_search
+from ai_agents.core_sdr.src.parsers.lusha_helper import sheets_to_lusha_config,get_companies_from_lusha
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -94,19 +95,14 @@ def health(ctx):
 
 async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
     """Core function to process company search"""
-    
-    
-    
-    company_data = collect_companies_from_search(dsl_data, query)
-    company_data = lusha_collect_companies_from_search(config)
-    upload_company_name_to_csv(company_data)
-    update_history(company_data, query)
-    
+    print("Fetching companies from lusha...")
+    lusha_company_data = get_companies_from_lusha(config)
+    print("LUSHA DATA:",lusha_company_data)
+    print("Fetching companies from core_signal...")
+    core_signal_company_data = collect_companies_from_search(config, lusha_company_data)
+    total_company_data = lusha_company_data+core_signal_company_data
     return {
-        "companies": company_data,
-        "csv_path": 'ai_agents/data/company_names.csv',
-        "query": query
+        "companies": total_company_data
     }
-
 if __name__ == '__main__':
     cli()

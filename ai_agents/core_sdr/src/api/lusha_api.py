@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 
 LUSHA_API_KEY = os.getenv("LUSHA_API_KEY")
 def lusha_search_api(payload_values: Dict[str, Any]) -> List[int]:
+    print("Payload_values:", json.dumps(payload_values,indent=2))
     payload_query =  build_payload(payload_values=payload_values)
     print(f"Payload Query: {json.dumps(payload_query, indent=2)}")
     url = f"https://api.lusha.com/prospecting/company/search"
@@ -35,6 +36,7 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
             }
         }
     }
+    print(f"payload_values: {payload_values}")
     if "page_size" in payload_values and payload_values["page_size"]:
         payload_query["pages"]["size"] = payload_values["page_size"]
     if "mainIndustriesIds" in payload_values and payload_values["mainIndustriesIds"]:
@@ -53,15 +55,6 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
                     "max": revenue["max"]
                 }
             ]
-    # if "size" in payload_values and payload_values["size"]:
-    #     size = payload_values["size"]
-    #     if "min" in size and "max" in size:
-    #         payload_query["filters"]["companies"]["include"]["sizes"] = [
-    #             {
-    #                 "min": size["min"],
-    #                 "max": size["max"]
-    #             }
-    #         ]
     if "sizes" in payload_values and payload_values["sizes"]:
         sizes = payload_values["sizes"]
         if isinstance(sizes, list) and len(sizes) > 0:
@@ -75,7 +68,7 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     
     return payload_query
 
-def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[int]:
+def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[str]:
     try:
         print("working propoer")
         all_companies = []
