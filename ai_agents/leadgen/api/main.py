@@ -15,6 +15,7 @@ from database.collection_index.campaign_index import campaign_mongodb_indexes
 from database.collection_index.company_mapping_index import company_mapping_mongodb_indexes
 from database.collection_index.companies_index import companies_mongodb_indexes
 from typing import Dict, Any
+from ai_agents.leadgen.workflow.health_service import HealthService
 async def initialize_database():
     loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_db")
 async def close_database():
@@ -119,6 +120,22 @@ async def upload_data_from_form(data: FormSubmission):
 async def call_data_apis(config: Dict[str,Any]):
     company_data = await process_company_search(config)
     return company_data
+
+@app.get("/api/v1/health_check")
+async def health_check() -> Dict[str, Any]:
+    """Basic health check endpoint."""
+    health_service = HealthService()
+    health_status = await health_service.get_health_status()
+    
+    return health_status.model_dump()
+
+@app.get("/api/v1/readiness_check")
+async def readiness_check() -> Dict[str, Any]:
+    """Readiness check endpoint."""
+    health_service = HealthService()
+    readiness_status = await health_service.get_readiness_status()
+    return readiness_status.model_dump()
+
 
 
 
