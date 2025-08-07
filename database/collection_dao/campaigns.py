@@ -9,8 +9,8 @@ class CampaignsDao(BaseMongoDao):
     async def create_campaign(self, campaign: dict):
         return await self.insert_one(campaign)
     
-    async def get_campaigns(self):
-        return await self.find_many({})
+    async def get_campaigns(self, filters: dict = {}):
+        return await self.find_many(filters)
     
     async def get_campaign(self, campaign_id: str):
         return await self.find_one({"_id": campaign_id})
