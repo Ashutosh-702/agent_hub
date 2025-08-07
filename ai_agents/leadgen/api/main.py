@@ -77,7 +77,6 @@ class FormSubmission(BaseModel):
     business_team: str
     user_email: str
 
-
 @app.post("/api/v1/orchestrated/run")
 async def run_orchestrated(config: OrchestratedConfig):
     pass
@@ -104,10 +103,10 @@ async def upload_data_from_form(data: FormSubmission):
         
         response = await submit_company_data(db_data)
         if response.get("status") == "error":
-            print(f"Error while submitting data to Google Sheets: {response.get('message', 'Failed to submit data to Google Sheets.')}")
-            return {"status": "error", "message": response.get("message", "Failed to submit data to Google Sheets.")}
+            print(f"Error while submitting data to database: {response.get('message', 'Failed to submit data.')}")
+            return {"status": "error", "message": response.get("message", "Failed to submit data.")}
 
-        print(f"📤 Data submitted to Google Sheets: {response}")
+        print(f"📤 Data submitted: {response}")
         return response
 
     except Exception as e:
