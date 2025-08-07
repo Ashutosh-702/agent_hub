@@ -29,9 +29,9 @@ async def lifespan(app: FastAPI):
     try:
         await initialize_database()
         print("✅ Database connected successfully")
-        await campaign_mongodb_indexes(loaded_config.connection_manager.mongo_client)
-        await company_mapping_mongodb_indexes(loaded_config.connection_manager.mongo_client)
-        await companies_mongodb_indexes(loaded_config.connection_manager.mongo_client)
+        # await campaign_mongodb_indexes(loaded_config.connection_manager.mongo_client)
+        # await company_mapping_mongodb_indexes(loaded_config.connection_manager.mongo_client)
+        # await companies_mongodb_indexes(loaded_config.connection_manager.mongo_client)
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
         raise
