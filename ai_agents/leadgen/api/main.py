@@ -37,9 +37,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
         raise
-    
+
     yield  # Server is running
-    
+
     # Shutdown
     print("🔒 Shutting down Lead Generation API server...")
     try:
@@ -54,7 +54,6 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
     allow_methods=["*"],
     allow_headers=["*"]
 )
@@ -63,13 +62,13 @@ class SearchRequest(BaseModel):
     query: str
     mode: str
 class EnhanceRequest(BaseModel):
-    query: str  
+    query: str
 
 class OrchestratedConfig(BaseModel):
     config: dict
 class FormSubmission(BaseModel):
-    web_prompt: str              
-    persona_prompt: str         
+    web_prompt: str
+    persona_prompt: str
     industry: str
     employee_count: str
     revenue_min: str
@@ -107,7 +106,7 @@ async def upload_data_from_form(data: FormSubmission):
             "business_team": data.business_team,
             "user_email": data.user_email
         }
-        
+
         response = await submit_company_data(db_data)
         if response.get("status") == "error":
             print(f"Error while submitting data to database: {response.get('message', 'Failed to submit data.')}")
@@ -128,7 +127,7 @@ async def health_check() -> Dict[str, Any]:
     """Basic health check endpoint."""
     health_service = HealthService()
     health_status = await health_service.get_health_status()
-    
+
     return health_status.model_dump()
 
 @app.get("/api/v1/readiness_check")
@@ -161,45 +160,45 @@ def configure_static_serving_production(app: FastAPI):
     """
 
     serve_static = os.getenv("SERVE_STATIC", "true").lower() == "true"
-    static_path = os.getenv("STATIC_PATH","/Users/vasubhatia/Documents/Company/revamp/agent_hub/ai_agents/ui/dist")
+    static_path = os.getenv("STATIC_PATH","/Users/ahmedropewala/PycharmProjects/etc1/agent_hub/ai_agents/ui/dist")
 
     if not serve_static:
         print("Static file serving disabled (SERVE_STATIC=false)")
         return
-    
+
     if not os.path.exists(static_path):
         print(f"WARNING: Static path does not exist: {static_path}")
         return
-    
+
     index_path = Path(static_path) / "index.html"
     if not index_path.exists():
         print(f"WARNING: index.html not found in {static_path}")
         return
-    
+
     print(f"✓ Serving static files from: {static_path}")
-    
+
     static_assets_path = Path(static_path) / "app/static"
     if static_assets_path.exists():
         app.mount("/static", StaticFiles(directory=static_assets_path), name="static")
         print(f"✓ Mounted static assets from: {static_assets_path}")
     @app.get("/{full_path:path}")
     async def serve_react_app(full_path: str):
-        
+
         if (full_path.startswith("api/") or
             full_path in ["_healthz", "_readyz", "env-config"]):
             raise HTTPException(status_code=404, detail="Not found")
-        
+
         file_path = Path(static_path) / full_path
 
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
-        
+
         return FileResponse(index_path, headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0"
         })
-    
+
     print("✓ Static file serving configured successfully")
 
 
