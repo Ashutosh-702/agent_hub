@@ -16,6 +16,8 @@ from database.collection_index.company_mapping_index import company_mapping_mong
 from database.collection_index.companies_index import companies_mongodb_indexes
 from typing import Dict, Any
 from ai_agents.leadgen.workflow.health_service import HealthService
+from fastapi.responses import ORJSONResponse
+
 async def initialize_database():
     loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_db")
 async def close_database():
@@ -135,6 +137,18 @@ async def readiness_check() -> Dict[str, Any]:
     health_service = HealthService()
     readiness_status = await health_service.get_readiness_status()
     return readiness_status.model_dump()
+
+# Kubernetes health check endpoints
+@app.get("/_healthz")
+async def healthz():
+    return ORJSONResponse(status_code=200, content={"success": True})
+
+
+
+@app.get("/_readyz")
+async def k8s_readiness_check():
+    return ORJSONResponse(status_code=200, content={"success": True})
+
 
 
 
