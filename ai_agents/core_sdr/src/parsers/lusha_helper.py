@@ -38,6 +38,7 @@ def get_industry_mapping() -> Dict[str, int]:
             main_industry = record.get("mainIndustry", "")
             sub_industry_id = record.get("Lusha subIndustry id", "")
             main_industry_id = record.get("mainIndustryId", "")
+            print(f" industry_data : sub_industry: {sub_industry}, sub_industry_id: {sub_industry_id}, main_industry: {main_industry}, main_industry_id: {main_industry_id}")
             if sub_industry and sub_industry_id:
                 try:
                     mapping["Sub"][sub_industry] = int(sub_industry_id)
@@ -112,7 +113,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
         print("WORKING TILL HERE - 1")
         # print("industry mapping:",industry_mapping)
 
-        industry_names = [name.strip() for name in sheets_data["industry"][0].split(',') if name]
+        industry_names = [name.strip() for name in sheets_data["industry"].split(',') if name]
         print("industry_names",industry_names)
         print("WORKING TILL HERE - 2")
         main_industry_ids = []
@@ -136,7 +137,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
             lusha_config["subIndustriesIds"] = sub_industry_ids
     
     if sheets_data.get("location"):
-        locations = [loc for loc in sheets_data["location"][0].split(',') if loc]
+        locations = [loc for loc in sheets_data["location"].split(',') if loc]
         if locations:
             lusha_config["locations"] = locations
     
@@ -166,16 +167,18 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
             print(f"⚠️ Error processing revenue: {e}")
     
     if sheets_data.get("employee_count"):
-        employee_ranges = [range_str for range_str in sheets_data["employee_count"][0].split(',') if range_str]
+        employee_ranges = [range_str for range_str in sheets_data["employee_count"].split(',') if range_str]
         if employee_ranges and employee_ranges[0] != "null":
             print(f"employee_ranges: {employee_ranges}")
             sizes =[]
             for range in employee_ranges:
+                print(f"range_value: {range}")
                 min_emp, max_emp = parse_employee_range(range)
                 sizes.append({
                 "min": min_emp,
                 "max": max_emp
             })
+            print(f"sizes: {sizes}")
             lusha_config["sizes"] = sizes
     
     print(f"✅ Converted sheets config to Lusha config: {lusha_config}")
