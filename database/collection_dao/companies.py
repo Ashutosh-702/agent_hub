@@ -1,5 +1,6 @@
 from database.base_dao import BaseMongoDao
 from motor.motor_asyncio import AsyncIOMotorClient
+from typing import List, Dict, Any
 
 
 class CompaniesDao(BaseMongoDao):
@@ -8,6 +9,9 @@ class CompaniesDao(BaseMongoDao):
 
     async def create_company(self, company: dict):
         return await self.insert_one(company)
+    
+    async def create_companies(self, companies: List[Dict[str, Any]]):
+        return await self.insert_many(companies)
     
     async def get_companies(self):
         return await self.find_many({})
