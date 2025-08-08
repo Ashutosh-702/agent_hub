@@ -177,7 +177,7 @@ def configure_static_serving_production(app: FastAPI):
 
     print(f"✓ Serving static files from: {static_path}")
 
-    static_assets_path = Path(static_path) / "app/static"
+    static_assets_path = Path(static_path) / "static"
     if static_assets_path.exists():
         app.mount("/static", StaticFiles(directory=static_assets_path), name="static")
         print(f"✓ Mounted static assets from: {static_assets_path}")
