@@ -1,7 +1,8 @@
 import os
+import json
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -54,6 +55,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=["http://localhost:5173","https://ai-sdr.tmsz0.de"],
     allow_methods=["*"],
     allow_headers=["*"]
 )
@@ -86,6 +88,30 @@ class FormSubmission(BaseModel):
 @app.post("/api/v1/orchestrated/run")
 async def run_orchestrated(config: OrchestratedConfig):
     pass
+
+@app.get("/env-config", tags=["Configuration"])
+def get_env_config():
+    """Return environment configuration as JavaScript"""
+    config = {
+        "AGENTHUB_MAIN_DOMAIN": os.getenv("AGENTHUB_MAIN_DOMAIN", "http://0.0.0.0:80"),
+        "ENVIRONMENT": os.getenv("ENVIRONMENT", "development"),
+        "VERSION": "2.0.0",
+        "FEATURES": {
+            "document_management": True,
+            "advanced_analytics": True,
+            "export_functionality": True
+        }
+    }
+    config_json = json.dumps(config)
+
+    js_config = f"""
+window.ENV_CONFIG = {config_json};
+window.AGENTHUB_MAIN_DOMAIN = "{config['AGENTHUB_MAIN_DOMAIN']}";
+window.ENVIRONMENT = "{config['ENVIRONMENT']}";
+console.log('Environment configuration loaded:', window.ENV_CONFIG);
+"""
+
+    return Response(content=js_config, media_type="application/javascript")
 @app.post("/api/v1/sheets/upload_data_from_form")
 async def upload_data_from_form(data: FormSubmission):
     try:

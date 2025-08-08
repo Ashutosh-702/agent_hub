@@ -4,7 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
+    <title>Company Info Form</title>
+    <script>
+      const currentURL = window.location.href;
+      const baseDomain = window.location.origin;
+      const isDevelopment = window.location.hostname === 'localhost';
+      const baseURL = isDevelopment ? 'http://0.0.0.0:80' : baseDomain;
+      document.write(`<script src="${baseURL}/env-config" type="text/javascript"><\/script>`);
+    </script>
   </head>
   <body>
     <div id="root"></div>
