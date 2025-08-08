@@ -20,7 +20,7 @@ from ai_agents.leadgen.workflow.health_service import HealthService
 from fastapi.responses import ORJSONResponse
 
 async def initialize_database():
-    loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_db")
+    loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_sdr")
 async def close_database():
     if loaded_config.connection_manager:
         await loaded_config.connection_manager.close_connections()

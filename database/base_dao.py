@@ -4,7 +4,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 class BaseMongoDao:
 
-    def __init__(self, mongo_client: AsyncIOMotorClient, collection_name: str, database_name: str = "linkedin_db"):
+    def __init__(self, mongo_client: AsyncIOMotorClient, collection_name: str, database_name: str = "linkedin_sdr"):
         self.mongo_client = mongo_client
         self.collection = mongo_client[database_name][collection_name]
 
