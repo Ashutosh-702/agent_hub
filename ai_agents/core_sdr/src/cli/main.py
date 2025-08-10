@@ -22,6 +22,7 @@ from ai_agents.core_sdr.src.api.lusha_api import lusha_collect_companies_from_se
 from ai_agents.core_sdr.src.parsers.lusha_helper import sheets_to_lusha_config,get_companies_from_lusha
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.company_mappings import CompanyMappingsDao
+from database.collection_dao.campaigns import CampaignsDao
 from config.loaded_config import loaded_config
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -98,50 +99,66 @@ def health(ctx):
 
 async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
     """Core function to process company search"""
-    print("Fetching companies from lusha...")
-    lusha_company_data = get_companies_from_lusha(config)
-    print("LUSHA DATA:",lusha_company_data)
-    print("Fetching companies from core_signal...")
-    companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-    # lusha_company_data is a list of company names (strings)
-    # we need to convert it to a list of dictionaries for MongoDB
-    companies_list = []
-    if lusha_company_data:
-        for company_name in lusha_company_data:
-            company_doc = {
-                "name": company_name,
-                "industry": config.get("industry"),  # from the original data
-                "revenue_min": config.get("revenue_min", ""),
-                "revenue_max": config.get("revenue_max", ""),
-                "employee_count": config.get("employee_count", ""),
-                "location": config.get("location", ""),
-                "location_type": config.get("location_type", ""),
-                "source": "lusha"
+    try:
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        print("Fetching companies from lusha...")
+        lusha_company_data = get_companies_from_lusha(config) # List of {'id': int, 'name': str}
+        print(f"Found {len(lusha_company_data)} companies from lusha.")
+        print("Fetching companies from core_signal...")
+        core_signal_company_data = collect_companies_from_search(config, lusha_company_data) # List of {'id': int, 'name': str}
+        total_company_data = lusha_company_data+core_signal_company_data
+        companies_list = []
+        if total_company_data:
+            for company_data in lusha_company_data:
+                company_doc = {
+                    "company_id":company_data["id"],
+                    "name": company_data["name"],
+                    "industry": config.get("industry"),  
+                    "revenue_min": config.get("revenue_min", ""),
+                    "revenue_max": config.get("revenue_max", ""),
+                    "employee_count": config.get("employee_count", ""),
+                    "location": config.get("location", ""),
+                    "location_type": config.get("location_type", ""),
+                    "source": "lusha"
+                }
+                companies_list.append(company_doc)
+            for company_data in core_signal_company_data:
+                company_doc = {
+                    "company_id":company_data["id"],
+                    "name": company_data["name"],
+                    "industry": config.get("industry"), 
+                    "revenue_min": config.get("revenue_min", ""),
+                    "revenue_max": config.get("revenue_max", ""),
+                    "employee_count": config.get("employee_count", ""),
+                    "location": config.get("location", ""),
+                    "location_type": config.get("location_type", ""),
+                    "source": "coresignal"
+                }
+                companies_list.append(company_doc)
+            inserted_ids = await companies_dao.create_companies(companies_list)
+            print(f"Total companies added into companies collection: {len(inserted_ids)}")
+
+            company_mappings_dao = CompanyMappingsDao(loaded_config.connection_manager.mongo_client)
+            mapping_doc = {
+                "campaign_id":config.get("campaign_id",""),
+                "campaign_data": {
+                    "industry": config.get("industry"),
+                    "location": config.get("location", ""),
+                    "employee_count": config.get("employee_count", ""),
+                    "revenue_min": config.get("revenue_min", ""),
+                    "revenue_max": config.get("revenue_max", ""),
+                    "keywords": config.get("keywords", ""),
+                    "categories": config.get("categories", "")
+                },
+                "company_ids": inserted_ids,
+                "company_count": len(inserted_ids)
             }
-            companies_list.append(company_doc)
-        print(f"Companies list length: {len(companies_list)}")
-        inserted_ids = await companies_dao.create_companies(companies_list)
-        company_mappings_dao = CompanyMappingsDao(loaded_config.connection_manager.mongo_client)
-        # Create a mapping document that links the campaign entry to the company IDs
-        mapping_doc = {
-            "campaign_data": {
-                "industry": config.get("industry"),
-                "location": config.get("location", ""),
-                "employee_count": config.get("employee_count", ""),
-                "revenue_min": config.get("revenue_min", ""),
-                "revenue_max": config.get("revenue_max", ""),
-                "keywords": config.get("keywords", ""),
-                "categories": config.get("categories", "")
-            },
-            "company_ids": inserted_ids,
-            "company_count": len(inserted_ids),
-            "status": "active"
-        }
-        await company_mappings_dao.create_company_mapping(mapping_doc)
-    print("LUSHA DATA:",lusha_company_data)
-    print("Fetching companies from core_signal...")
-    core_signal_company_data = collect_companies_from_search(config, lusha_company_data)
-    total_company_data = lusha_company_data+core_signal_company_data
+            await company_mappings_dao.create_company_mapping(mapping_doc)
+            campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+            await campaigns_dao.update_campaign_status(mapping_doc['campaign_id'],"processing")
+            print(f"Updated status of {mapping_doc['campaign_id']} to 'processing'")
+    except Exception as e:
+        print(f"Error while processing company search: {str(e)}")
     return {
         "companies": total_company_data
     }

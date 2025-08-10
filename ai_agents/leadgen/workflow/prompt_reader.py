@@ -13,13 +13,11 @@ async def prompt_fetcher() -> List[Dict[str, Any]]:
     except Exception as e:
         raise Exception(f"Error fetching data from db: {str(e)}")
     return prompts
-async def change_status():
-    pass
 async def submit_company_data(config: Dict[str, Any]) -> Dict[str, Any]:
     try:
         config["status"] = "active"
         campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         await campaign_dao.create_campaign(config)
-        return {"status": "success", "message": "Data uploaded successfully."}
+        return {"status": "success", "message": "Data uploaded successfully to Campaigns Collection."}
     except Exception as e:
         return {"status": "error", "message": str(e)}

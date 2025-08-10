@@ -137,8 +137,9 @@ async def upload_data_from_form(data: FormSubmission):
         if response.get("status") == "error":
             print(f"Error while submitting data to database: {response.get('message', 'Failed to submit data.')}")
             return {"status": "error", "message": response.get("message", "Failed to submit data.")}
-
         print(f"📤 Data submitted: {response}")
+        print(f"Proceeding to company search...")
+        company_data = await process_company_search(db_data)
         return response
 
     except Exception as e:

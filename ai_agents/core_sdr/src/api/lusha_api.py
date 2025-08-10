@@ -68,7 +68,7 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     
     return payload_query
 
-def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[str]:
+def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[Dict[str,Any]]:
     try:
         print("working propoer")
         all_companies = []
@@ -80,7 +80,7 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[
         if not first_response or "data" not in first_response:
             return []
         for company in first_response["data"]:
-            all_companies.append(company["name"])
+            all_companies.append({"id": company["id"], "name": company["name"]})
 
         # Step 2: Calculate total pages needed
         total_results = first_response.get("totalResults", 0)
@@ -100,7 +100,7 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[
             if page_response and "data" in page_response:
                 # Extract companies from this page
                 for company in page_response["data"]:
-                    all_companies.append(company["name"])
+                    all_companies.append({"id": company["id"], "name": company["name"]})
             else:
                 print(f"Failed to fetch page {page_num}")
                 break

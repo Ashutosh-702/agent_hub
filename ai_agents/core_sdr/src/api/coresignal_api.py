@@ -43,24 +43,24 @@ def collect_api(company_id: int) -> Dict[str, Any]:
     else:
         raise Exception(f"Collect API failed: {response.status_code} - {response.text}")
 
-def collect_companies_from_search(config: Dict[str, Any], lusha_company_list: List[str]) -> List[str]:
+def collect_companies_from_search(config: Dict[str, Any], lusha_company_list: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
     try:
         dsl_query = build_payload(config,lusha_company_list)
         company_ids = search_api(dsl_query)
     except Exception as e:
-        raise Exception(f"Error searching companies: {str(e)}")
+        raise Exception(f"Error searching companies in coresignal api: {str(e)}")
     companies = []
     try:
         for company_id in company_ids:
             company_data = collect_api(company_id)
-            companies.append(company_data["name"])
+            companies.append({"id":company_data["id"],"name":company_data["name"]})
     except Exception as e:
         raise Exception(f"Error collecting company data: {str(e)}")
     return companies
 
 
 def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
-    industries = [name for name in config["industry"][0].split(',') if name]
+    industries = [name for name in config["industry"].split(',') if name]
     locations = config["location"]
     location_type = config["location_type"]
     query = {
@@ -78,7 +78,7 @@ def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
         for company_found in lusha_company_list:
             must_not_clauses.append({
                 "match":{
-                    "name": company_found
+                    "name": company_found["name"]
                 }
             })
     if industries:
@@ -95,7 +95,7 @@ def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
 
     sizes = []
     if config.get("employee_count"):
-        employee_ranges = [range_str for range_str in config["employee_count"][0].split(',') if range_str and range_str != "null"]
+        employee_ranges = [range_str for range_str in config["employee_count"].split(',') if range_str and range_str != "null"]
         for range_str in employee_ranges:
             if '+' in range_str:
                 min_val = int(range_str.replace('+', ''))
@@ -132,7 +132,7 @@ def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
     if locations and location_type=="country":
         location_should = [
             {"match": {"location_hq_country": loc.strip()}}
-            for loc in locations[0].split(',')
+            for loc in locations.split(',')
             if loc.strip()
         ]
         must_clauses.append({
@@ -144,7 +144,7 @@ def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
     elif locations and location_type=="region":
         location_should = [
             {"match": {"location_hq_regions": loc.strip()}}
-            for loc in locations[0].split(',')
+            for loc in locations.split(',')
             if loc.strip()
         ]
         must_clauses.append({

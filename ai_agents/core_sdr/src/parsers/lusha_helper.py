@@ -38,7 +38,7 @@ def get_industry_mapping() -> Dict[str, int]:
             main_industry = record.get("mainIndustry", "")
             sub_industry_id = record.get("Lusha subIndustry id", "")
             main_industry_id = record.get("mainIndustryId", "")
-            print(f" industry_data : sub_industry: {sub_industry}, sub_industry_id: {sub_industry_id}, main_industry: {main_industry}, main_industry_id: {main_industry_id}")
+            # print(f" industry_data : sub_industry: {sub_industry}, sub_industry_id: {sub_industry_id}, main_industry: {main_industry}, main_industry_id: {main_industry_id}")
             if sub_industry and sub_industry_id:
                 try:
                     mapping["Sub"][sub_industry] = int(sub_industry_id)
@@ -184,7 +184,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
     print(f"✅ Converted sheets config to Lusha config: {lusha_config}")
     return lusha_config
 
-def get_companies_from_lusha(sheets_data: Dict[str, Any]) -> List[str]:
+def get_companies_from_lusha(sheets_data: Dict[str, Any]) -> List[Dict[str,Any]]:
     """
     Main function to get companies from Lusha using sheets data
     """
