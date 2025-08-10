@@ -53,16 +53,17 @@ def collect_companies_from_search(config: Dict[str, Any], lusha_company_list: Li
     try:
         for company_id in company_ids:
             company_data = collect_api(company_id)
-            companies.append({"id":company_data["id"],"name":company_data["name"]})
+            if company_data:
+                companies.append({"id":company_data["id"],"name":company_data["name"]})
     except Exception as e:
         raise Exception(f"Error collecting company data: {str(e)}")
     return companies
 
 
 def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
-    industries = [name for name in config["industry"].split(',') if name]
-    locations = config["location"]
-    location_type = config["location_type"]
+    industries = [name for name in config['segmentation']["industry"].split(',') if name]
+    locations = config['target']["location"]['names']
+    location_type = config['target']["location"]['type']
     query = {
         "query": {
             "bool": {
@@ -94,8 +95,8 @@ def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
         })
 
     sizes = []
-    if config.get("employee_count"):
-        employee_ranges = [range_str for range_str in config["employee_count"].split(',') if range_str and range_str != "null"]
+    if config.get("target", {}).get("employee_count", ""):
+        employee_ranges = [range_str for range_str in config['target']["employee_count"].split(',') if range_str and range_str != "null"]
         for range_str in employee_ranges:
             if '+' in range_str:
                 min_val = int(range_str.replace('+', ''))

@@ -16,6 +16,6 @@ class CampaignsDao(BaseMongoDao):
         return await self.find_one({"_id": campaign_id})
     
     async def update_campaign_status(self, campaign_id: str, status: str):
-        return await self.update_one({"_id": campaign_id}, {"$set": {"status": status}})
+        return await self.update_one({"_id": campaign_id}, {"$set": {"lifecycle":{"status": status}}})
 
 

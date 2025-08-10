@@ -24,6 +24,7 @@ from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.company_mappings import CompanyMappingsDao
 from database.collection_dao.campaigns import CampaignsDao
 from config.loaded_config import loaded_config
+from datetime import datetime
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -103,36 +104,59 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
         companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         print("Fetching companies from lusha...")
         lusha_company_data = get_companies_from_lusha(config) # List of {'id': int, 'name': str}
+        # lusha_company_data = [{'id':1,'name': "Company 1"},{'id':2,'name': "Company 2"},{'id':3,'name': "Company 3"}]
         print(f"Found {len(lusha_company_data)} companies from lusha.")
         print("Fetching companies from core_signal...")
         core_signal_company_data = collect_companies_from_search(config, lusha_company_data) # List of {'id': int, 'name': str}
+        # core_signal_company_data = [{'id':4,'name': "Company 4"},{'id':5,'name': "Company 5"},{'id':6,'name': "Company 6"}]
         total_company_data = lusha_company_data+core_signal_company_data
         companies_list = []
         if total_company_data:
             for company_data in lusha_company_data:
                 company_doc = {
-                    "company_id":company_data["id"],
-                    "name": company_data["name"],
-                    "industry": config.get("industry"),  
-                    "revenue_min": config.get("revenue_min", ""),
-                    "revenue_max": config.get("revenue_max", ""),
-                    "employee_count": config.get("employee_count", ""),
-                    "location": config.get("location", ""),
-                    "location_type": config.get("location_type", ""),
-                    "source": "lusha"
+                    "identifiers":{
+                        "company_api_id": company_data["id"],
+                        "name": company_data["name"],
+                    }, 
+                    "profile":{
+                        "industry": config.get("segmentation")['industry'],  
+                        "revenue_min": config.get("target", "")['revenue_min'],
+                        "revenue_max": config.get("target", "")['revenue_max'],
+                        "employee_count": config.get("target", "")['employee_count'],
+                    },
+                    "location":{
+                        "type": config.get("target", "")['location']['type'],
+                        "name": config.get("target", "")['location']['names'],
+                    },
+                    "source": "lusha",
+                    "metadata":{
+                        "created_at":datetime.utcnow(),
+                        "updated_at":datetime.utcnow(),
+
+                    }
                 }
                 companies_list.append(company_doc)
             for company_data in core_signal_company_data:
                 company_doc = {
-                    "company_id":company_data["id"],
-                    "name": company_data["name"],
-                    "industry": config.get("industry"), 
-                    "revenue_min": config.get("revenue_min", ""),
-                    "revenue_max": config.get("revenue_max", ""),
-                    "employee_count": config.get("employee_count", ""),
-                    "location": config.get("location", ""),
-                    "location_type": config.get("location_type", ""),
-                    "source": "coresignal"
+                    "identifiers":{
+                        "company_api_id":company_data["id"],
+                        "name": company_data["name"],
+                    },
+                    "profile":{
+                        "industry": config.get("segmentation")['industry'],  
+                        "revenue_min": config.get("target", "")['revenue_min'],
+                        "revenue_max": config.get("target", "")['revenue_max'],
+                        "employee_count": config.get("target", "")['employee_count'],
+                    },
+                    "location":{
+                        "type": config.get("target", "")['location']['type'],
+                        "name": config.get("target", "")['location']['names'],
+                    },
+                    "source": "coresignal",
+                    "metadata":{
+                        "created_at":datetime.utcnow(),
+                        "updated_at":datetime.utcnow(),
+                    }
                 }
                 companies_list.append(company_doc)
             inserted_ids = await companies_dao.create_companies(companies_list)
@@ -140,23 +164,25 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
 
             company_mappings_dao = CompanyMappingsDao(loaded_config.connection_manager.mongo_client)
             mapping_doc = {
-                "campaign_id":config.get("campaign_id",""),
-                "campaign_data": {
-                    "industry": config.get("industry"),
-                    "location": config.get("location", ""),
-                    "employee_count": config.get("employee_count", ""),
-                    "revenue_min": config.get("revenue_min", ""),
-                    "revenue_max": config.get("revenue_max", ""),
-                    "keywords": config.get("keywords", ""),
-                    "categories": config.get("categories", "")
+                "references":{
+                    "campaign_id": config.get("campaign_id",""),
+                    "company_ids": inserted_ids,
+                    "company_count": len(inserted_ids),
                 },
-                "company_ids": inserted_ids,
-                "company_count": len(inserted_ids)
+                "snapshot": {
+                    "industry": config.get("segmentation")['industry'], 
+                    "location": config.get("target", "")['location']['names'],
+                    "revenue_min": config.get("target", "")['revenue_min'],
+                    "revenue_max": config.get("target", "")['revenue_max'],
+                    "employee_count": config.get("target", "")['employee_count'],
+                    "keywords": config.get("segmentation", "")['keywords'],
+                    "categories": config.get("segmentation", "")['categories'],
+                },
             }
             await company_mappings_dao.create_company_mapping(mapping_doc)
             campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-            await campaigns_dao.update_campaign_status(mapping_doc['campaign_id'],"processing")
-            print(f"Updated status of {mapping_doc['campaign_id']} to 'processing'")
+            await campaigns_dao.update_campaign_status(mapping_doc['references']['campaign_id'],"processing")
+            print(f"Updated status of {mapping_doc['references']['campaign_id']} to 'processing'")
     except Exception as e:
         print(f"Error while processing company search: {str(e)}")
     return {

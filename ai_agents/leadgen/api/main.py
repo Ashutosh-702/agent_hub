@@ -116,24 +116,35 @@ console.log('Environment configuration loaded:', window.ENV_CONFIG);
 async def upload_data_from_form(data: FormSubmission):
     try:
         db_data = {
-            "web_prompt": data.web_prompt,
-            "persona_prompt": data.persona_prompt,
-            "industry": data.industry,
-            "employee_count": data.employee_count,
-            "revenue_min": data.revenue_min,
-            "revenue_max": data.revenue_max,
-            "location_type": data.location_type,
-            "location": data.location,
-            "keywords": data.keywords,
-            "categories": data.categories,
-            "currency": data.currency,
-            "hubspot_email": data.hubspot_email,
-            "product_name": data.product_name,
-            "business_team": data.business_team,
-            "user_email": data.user_email
-        }
+            "prompts":{"web":data.web_prompt, 
+                        "persona":data.persona_prompt},
+            "segmentation":{"industry":data.industry,
+                            "keywords":data.keywords,
+                            "categories":data.categories},
+            "target":{"employee_count": data.employee_count,
+                      "revenue_min": data.revenue_min, 
+                      "revenue_max": data.revenue_max, 
+                      "currency":data.currency,
+                      "location": {
+                          "type":data.location_type,
+                          "names":data.location
+                      }
 
+                      
+                      },
+            "ownership":{
+                "hubspot_email":data.hubspot_email,
+                "product_name":data.product_name,
+                "business_team":data.business_team,
+                "user_email":data.user_email
+            },
+            "lifecycle":{"status":"active"},
+            "metadata":{}
+        }
+        
         response = await submit_company_data(db_data)
+        campaign_id = response.get("campaign_id","")
+        db_data["campaign_id"] = campaign_id
         if response.get("status") == "error":
             print(f"Error while submitting data to database: {response.get('message', 'Failed to submit data.')}")
             return {"status": "error", "message": response.get("message", "Failed to submit data.")}
