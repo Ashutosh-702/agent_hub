@@ -118,7 +118,7 @@ async def upload_data_from_form(data: FormSubmission):
         db_data = {
             "prompts":{"web":data.web_prompt, 
                         "persona":data.persona_prompt},
-            "segmentation":{"industry":data.industry,
+            "segmentation":{"industry": sorted([industry.strip() for industry in data.industry.split(',') if industry]),
                             "keywords":data.keywords,
                             "categories":data.categories},
             "target":{"employee_count": data.employee_count,
@@ -127,7 +127,7 @@ async def upload_data_from_form(data: FormSubmission):
                       "currency":data.currency,
                       "location": {
                           "type":data.location_type,
-                          "names":data.location
+                          "names":sorted([name.strip() for name in data.location.split(',') if name])
                       }
 
                       

@@ -61,7 +61,7 @@ def collect_companies_from_search(config: Dict[str, Any], exclude_company_list: 
 
 
 def build_payload(config: Dict[str,Any], exclude_company_list: List[str]):
-    industries = [name for name in config['segmentation']["industry"].split(',') if name]
+    industries = config['segmentation']["industry"]
     locations = config['target']["location"]['names']
     location_type = config['target']["location"]['type']
     query = {
@@ -133,7 +133,7 @@ def build_payload(config: Dict[str,Any], exclude_company_list: List[str]):
     if locations and location_type=="country":
         location_should = [
             {"match": {"location_hq_country": loc.strip()}}
-            for loc in locations.split(',')
+            for loc in locations
             if loc.strip()
         ]
         must_clauses.append({
@@ -145,7 +145,7 @@ def build_payload(config: Dict[str,Any], exclude_company_list: List[str]):
     elif locations and location_type=="region":
         location_should = [
             {"match": {"location_hq_regions": loc.strip()}}
-            for loc in locations.split(',')
+            for loc in locations
             if loc.strip()
         ]
         must_clauses.append({

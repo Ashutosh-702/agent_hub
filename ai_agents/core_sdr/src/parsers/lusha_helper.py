@@ -113,7 +113,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
         print("WORKING TILL HERE - 1")
         # print("industry mapping:",industry_mapping)
 
-        industry_names = [name.strip() for name in sheets_data["segmentation"]["industry"].split(',') if name]
+        industry_names = sheets_data["segmentation"]["industry"]
         print("industry_names",industry_names)
         print("WORKING TILL HERE - 2")
         main_industry_ids = []
@@ -137,7 +137,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
             lusha_config["subIndustriesIds"] = sub_industry_ids
     
     if sheets_data.get("target", "")['location']['names']:
-        locations = [loc for loc in sheets_data['target']["location"]['names'].split(',') if loc]
+        locations = sheets_data['target']["location"]['names']
         if locations:
             lusha_config["locations"] = locations
     
