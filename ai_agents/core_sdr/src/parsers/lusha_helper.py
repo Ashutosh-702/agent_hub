@@ -184,7 +184,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
     print(f"✅ Converted sheets config to Lusha config: {lusha_config}")
     return lusha_config
 
-def get_companies_from_lusha(config: Dict[str, Any]) -> List[Dict[str,Any]]:
+def get_companies_from_lusha(config: Dict[str, Any], cached_data: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
     """
     Main function to get companies from Lusha using sheets data
     """
@@ -196,7 +196,7 @@ def get_companies_from_lusha(config: Dict[str, Any]) -> List[Dict[str,Any]]:
         return []
     
     try:
-        companies = lusha_collect_companies_from_search(lusha_config)
+        companies = lusha_collect_companies_from_search(lusha_config, cached_data)
         print(f"✅ Retrieved {len(companies)} companies from Lusha")
         return companies
         

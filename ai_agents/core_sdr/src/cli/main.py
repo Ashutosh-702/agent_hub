@@ -13,6 +13,7 @@ import os
 import sys
 from typing import Dict, Any
 import asyncclick as click
+from bson import ObjectId
 from click import Context
 from dotenv import load_dotenv
 from ai_agents.core_sdr.src.parsers.company_name_uploader import upload_company_name_to_csv,update_history
@@ -103,11 +104,16 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
     try:
         companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         print("Fetching companies from lusha...")
-        lusha_company_data = get_companies_from_lusha(config) # List of {'id': int, 'name': str}
+        cached_data =[]
+        cached_data_db = await companies_dao.get_companies({"location.name":config.get("target", "")['location']['names'], "location.type": config.get("target", "")['location']['type'], "profile.industry":config.get("segmentation")['industry']})
+        for company_data in cached_data_db:
+            cached_data.append({'mongo_id': company_data['_id'],'id': company_data['identifiers']['source_id'],'name': company_data['identifiers']['name']})
+        cached_ids = [company['mongo_id'] for company in cached_data]
+        lusha_company_data = get_companies_from_lusha(config,cached_data) # List of {'id': int, 'name': str}
         # lusha_company_data = [{'id':1,'name': "Company 1"},{'id':2,'name': "Company 2"},{'id':3,'name': "Company 3"}]
         print(f"Found {len(lusha_company_data)} companies from lusha.")
         print("Fetching companies from core_signal...")
-        core_signal_company_data = collect_companies_from_search(config, lusha_company_data) # List of {'id': int, 'name': str}
+        core_signal_company_data = collect_companies_from_search(config, lusha_company_data+cached_data) # List of {'id': int, 'name': str}
         # core_signal_company_data = [{'id':4,'name': "Company 4"},{'id':5,'name': "Company 5"},{'id':6,'name': "Company 6"}]
         total_company_data = lusha_company_data+core_signal_company_data
         companies_list = []
@@ -115,7 +121,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
             for company_data in lusha_company_data:
                 company_doc = {
                     "identifiers":{
-                        "company_api_id": company_data["id"],
+                        "source_id": company_data["id"],
                         "name": company_data["name"],
                     }, 
                     "profile":{
@@ -139,7 +145,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
             for company_data in core_signal_company_data:
                 company_doc = {
                     "identifiers":{
-                        "company_api_id":company_data["id"],
+                        "source_id":company_data["id"],
                         "name": company_data["name"],
                     },
                     "profile":{
@@ -160,14 +166,14 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
                 }
                 companies_list.append(company_doc)
             inserted_ids = await companies_dao.create_companies(companies_list)
-            print(f"Total companies added into companies collection: {len(inserted_ids)}")
-
+            print(f"Total new companies added into companies collection: {len(inserted_ids)}")
+            id_list = inserted_ids + cached_ids
             company_mappings_dao = CompanyMappingsDao(loaded_config.connection_manager.mongo_client)
             mapping_doc = {
                 "references":{
-                    "campaign_id": config.get("campaign_id",""),
-                    "company_ids": inserted_ids,
-                    "company_count": len(inserted_ids),
+                    "campaign_id": ObjectId(config.get("campaign_id","")),
+                    "company_ids": id_list,
+                    "company_count": len(id_list),
                 },
                 "snapshot": {
                     "industry": config.get("segmentation")['industry'], 

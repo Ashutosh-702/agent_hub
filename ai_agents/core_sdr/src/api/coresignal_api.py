@@ -5,7 +5,7 @@ import re
 from typing import List, Dict, Any
 
 def search_api(dsl_query: Dict[str, Any]) -> List[int]:
-    items_per_page = 4
+    items_per_page = 1
     
     url = f"https://api.coresignal.com/cdapi/v2/company_clean/search/es_dsl?items_per_page={items_per_page}"
     if isinstance(dsl_query, str):
@@ -43,9 +43,9 @@ def collect_api(company_id: int) -> Dict[str, Any]:
     else:
         raise Exception(f"Collect API failed: {response.status_code} - {response.text}")
 
-def collect_companies_from_search(config: Dict[str, Any], lusha_company_list: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
+def collect_companies_from_search(config: Dict[str, Any], exclude_company_list: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
     try:
-        dsl_query = build_payload(config,lusha_company_list)
+        dsl_query = build_payload(config,exclude_company_list)
         company_ids = search_api(dsl_query)
     except Exception as e:
         raise Exception(f"Error searching companies in coresignal api: {str(e)}")
@@ -60,7 +60,7 @@ def collect_companies_from_search(config: Dict[str, Any], lusha_company_list: Li
     return companies
 
 
-def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
+def build_payload(config: Dict[str,Any], exclude_company_list: List[str]):
     industries = [name for name in config['segmentation']["industry"].split(',') if name]
     locations = config['target']["location"]['names']
     location_type = config['target']["location"]['type']
@@ -75,8 +75,8 @@ def build_payload(config: Dict[str,Any], lusha_company_list: List[str]):
 
     must_clauses = query["query"]["bool"]["must"]
     must_not_clauses = query["query"]["bool"]["must_not"]
-    if lusha_company_list is not None:
-        for company_found in lusha_company_list:
+    if exclude_company_list is not None:
+        for company_found in exclude_company_list:
             must_not_clauses.append({
                 "match":{
                     "name": company_found["name"]

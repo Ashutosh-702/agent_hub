@@ -13,8 +13,8 @@ class CompaniesDao(BaseMongoDao):
     async def create_companies(self, companies: List[Dict[str, Any]]):
         return await self.insert_many(companies)
     
-    async def get_companies(self):
-        return await self.find_many({})
+    async def get_companies(self, filters: dict = {}):
+        return await self.find_many(filters)
     
     async def get_company(self, company_id: str):
         return await self.find_one({"_id": company_id})

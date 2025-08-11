@@ -5,9 +5,9 @@ import re
 from typing import List, Dict, Any
 
 LUSHA_API_KEY = os.getenv("LUSHA_API_KEY")
-def lusha_search_api(payload_values: Dict[str, Any]) -> List[int]:
+def lusha_search_api(payload_values: Dict[str, Any], cached_data: List[Dict[str,Any]]) -> List[int]:
     print("Payload_values:", json.dumps(payload_values,indent=2))
-    payload_query =  build_payload(payload_values=payload_values)
+    payload_query =  build_payload(payload_values=payload_values, cached_data=cached_data)
     print(f"Payload Query: {json.dumps(payload_query, indent=2)}")
     url = f"https://api.lusha.com/prospecting/company/search"
     headers = {
@@ -20,7 +20,7 @@ def lusha_search_api(payload_values: Dict[str, Any]) -> List[int]:
        return response.json()
     else:
         raise Exception(f"Search API failed: {response.status_code} - {response.text}")
-def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
+def build_payload(payload_values: Dict[str, Any],cached_data: List[Dict[str,Any]]) -> Dict[str, Any]:
     """Build the API payload from input values."""
     # payload_values = {industry: [12,23,23], location: india, revenue: {min:100000, max: 1000000}, size: {min: 10, max: 100}}
 
@@ -37,6 +37,8 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
     print(f"payload_values: {payload_values}")
+    if cached_data:
+        payload_query["filters"]["companies"]["exclude"]["names"] = [company['name'] for company in cached_data]
     if "page_size" in payload_values and payload_values["page_size"]:
         payload_query["pages"]["size"] = payload_values["page_size"]
     if "mainIndustriesIds" in payload_values and payload_values["mainIndustriesIds"]:
@@ -68,7 +70,7 @@ def build_payload(payload_values: Dict[str, Any]) -> Dict[str, Any]:
     
     return payload_query
 
-def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[Dict[str,Any]]:
+def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_data: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
     try:
         print("working propoer")
         all_companies = []
@@ -76,7 +78,7 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any]) -> List[
 
         initial_payload = payload_values.copy()
         initial_payload["pages"] = {"page": 0, "size": page_size}
-        first_response = lusha_search_api(payload_values=initial_payload)
+        first_response = lusha_search_api(payload_values=initial_payload, cached_data=cached_data)
         if not first_response or "data" not in first_response:
             return []
         for company in first_response["data"]:
