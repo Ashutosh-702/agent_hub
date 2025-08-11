@@ -107,8 +107,8 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
         cached_data =[]
         cached_data_db = await companies_dao.get_companies({"location.name":config.get("target", "")['location']['names'], "location.type": config.get("target", "")['location']['type'], "profile.industry":config.get("segmentation")['industry']})
         for company_data in cached_data_db:
-            cached_data.append({'mongo_id': company_data['_id'],'id': company_data['identifiers']['source_id'],'name': company_data['identifiers']['name']})
-        cached_ids = [company['mongo_id'] for company in cached_data]
+            cached_data.append({'id': company_data['identifiers']['source_id'],'name': company_data['identifiers']['name']})
+        cached_ids = [company['_id'] for company in cached_data_db]
         lusha_company_data = get_companies_from_lusha(config,cached_data) # List of {'id': int, 'name': str}
         # lusha_company_data = [{'id':1,'name': "Company 1"},{'id':2,'name': "Company 2"},{'id':3,'name': "Company 3"}]
         print(f"Found {len(lusha_company_data)} companies from lusha.")
@@ -192,7 +192,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error while processing company search: {str(e)}")
     return {
-        "companies": total_company_data
+        "companies": total_company_data+cached_data
     }
 if __name__ == '__main__':
     cli()

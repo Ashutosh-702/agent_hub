@@ -151,6 +151,7 @@ async def upload_data_from_form(data: FormSubmission):
         print(f"📤 Data submitted: {response}")
         print(f"Proceeding to company search...")
         company_data = await process_company_search(db_data)
+        print(f"Found {len(company_data['companies'])} companies")
         return response
 
     except Exception as e:
