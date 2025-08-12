@@ -37,8 +37,8 @@ def build_payload(payload_values: Dict[str, Any],cached_data: List[Dict[str,Any]
         }
     }
     print(f"payload_values: {payload_values}")
-    if cached_data:
-        payload_query["filters"]["companies"]["exclude"]["names"] = [company['name'] for company in cached_data]
+    # if cached_data:
+    #     payload_query["filters"]["companies"]["exclude"]["names"] = [company['name'] for company in cached_data]
     if "page_size" in payload_values and payload_values["page_size"]:
         payload_query["pages"]["size"] = payload_values["page_size"]
     if "mainIndustriesIds" in payload_values and payload_values["mainIndustriesIds"]:
@@ -82,7 +82,7 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_d
         if not first_response or "data" not in first_response:
             return []
         for company in first_response["data"]:
-            all_companies.append({"id": company["id"], "name": company["name"]})
+            all_companies.append({"id": company["id"], "name": company["name"],"api_response_metadata":company})
 
         # Step 2: Calculate total pages needed
         total_results = first_response.get("totalResults", 0)
@@ -102,7 +102,7 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_d
             if page_response and "data" in page_response:
                 # Extract companies from this page
                 for company in page_response["data"]:
-                    all_companies.append({"id": company["id"], "name": company["name"]})
+                    all_companies.append({"id": company["id"], "name": company["name"],"api_response_metadata":company})
             else:
                 print(f"Failed to fetch page {page_num}")
                 break

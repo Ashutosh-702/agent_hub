@@ -87,7 +87,7 @@ async def process_leadgen_message(request_id: str, campaign_id: str):
         result = await process_company_search(campaign_data)
         
         print(f"✅ Completed processing: {request_id}")
-        print(f"📝 Result: {result}")
+        # print(f"📝 Result: {result}")
         
     except Exception as e:
         print(f"❌ Error processing request {request_id}: {e}")

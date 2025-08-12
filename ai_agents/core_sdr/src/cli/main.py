@@ -149,7 +149,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
                     "metadata":{
                         "created_at":datetime.utcnow(),
                         "updated_at":datetime.utcnow(),
-
+                        "api_response": company_data["api_response_metadata"],
                     }
                 }
                 companies_list.append(company_doc)
@@ -173,6 +173,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
                     "metadata":{
                         "created_at":datetime.utcnow(),
                         "updated_at":datetime.utcnow(),
+                        "api_response": company_data["api_response_metadata"],
                     }
                 }
                 companies_list.append(company_doc)
@@ -182,7 +183,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
             company_mappings_dao = CompanyMappingsDao(loaded_config.connection_manager.mongo_client)
             mapping_doc = {
                 "references":{
-                    "campaign_id": ObjectId(config.get("campaign_id","")),
+                    "campaign_id": config.get("_id"),
                     "company_ids": id_list,
                     "company_count": len(id_list),
                 },

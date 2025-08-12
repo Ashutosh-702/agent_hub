@@ -1,3 +1,4 @@
+import asyncio
 import os
 import json
 import uuid
@@ -13,6 +14,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from ai_agents.core_sdr.src.cli.main import process_company_search
 from ai_agents.leadgen.workflow.prompt_reader import submit_company_data
+from database.collection_dao.companies import CompaniesDao
+from database.collection_dao.company_mappings import CompanyMappingsDao
+from database.collection_dao.campaigns import CampaignsDao
 from database.connection_manager import ConnectionManager
 from config.loaded_config import loaded_config
 from database.collection_index.campaign_index import campaign_mongodb_indexes
@@ -21,6 +25,7 @@ from database.collection_index.companies_index import companies_mongodb_indexes
 from typing import Dict, Any
 from ai_agents.leadgen.workflow.health_service import HealthService
 from fastapi.responses import ORJSONResponse
+from ai_agents.ai_sdr.cli_app_orchestrated import run_orchestrated_workflow
 from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
 
@@ -135,7 +140,7 @@ async def upload_data_from_form(data: FormSubmission):
             "segmentation":{"industry": sorted([industry.strip() for industry in data.industry.split(',') if industry]),
                             "keywords":data.keywords,
                             "categories":data.categories},
-            "target":{"employee_count": data.employee_count,
+            "target":{"employee_count": sorted([employee_count.strip() for employee_count in data.employee_count.split(',') if employee_count]),
                       "revenue_min": data.revenue_min, 
                       "revenue_max": data.revenue_max, 
                       "currency":data.currency,
@@ -203,6 +208,32 @@ async def upload_data_from_form(data: FormSubmission):
 async def call_data_apis(config: Dict[str,Any]):
     company_data = await process_company_search(config)
     return company_data
+@app.post("/api/v1/ai-sdr")
+async def run_ai_sdr():
+    campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+    unprocessed_campaigns = await campaigns_dao.get_campaigns({'lifecycle.status': 'processing'})
+    for campaign in unprocessed_campaigns:
+        campaign_id = campaign.get("_id","")
+        web_enricher_prompt = campaign.get("prompts",{}).get("web","")
+        persona_prompt = campaign.get("prompts",{}).get("persona","")
+        hubspot_email = campaign.get("ownership",{}).get("hubspot_email","")
+        user_email = campaign.get("ownership",{}).get("user_email","")
+        product_name = campaign.get("ownership",{}).get("user_email","")
+        business_team = campaign.get("ownership",{}).get("business_team")
+        ai_sdr_custom_config = {
+            "custom_prompts": {}
+        }
+        web_enrichment_prompt = f"""Relevance Criteria: {web_enricher_prompt}
+
+    Begin your research now using the web search tool to determine if companies match these criteria."""
+        
+        ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
+        ai_sdr_custom_config["custom_prompts"]["prospect_enricher_user_prompt"] = persona_prompt
+        print(f"Running orchestrated workflow for Campaign Id: {campaign_id}")
+        print(f"Loaded custom prompts: {json.dumps(ai_sdr_custom_config,indent=2)}")
+        await run_orchestrated_workflow(ai_sdr_custom_config)
+
+    return
 
 @app.get("/api/v1/health_check")
 async def health_check() -> Dict[str, Any]:

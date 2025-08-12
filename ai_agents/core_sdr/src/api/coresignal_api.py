@@ -54,7 +54,7 @@ def collect_companies_from_search(config: Dict[str, Any], exclude_company_list: 
         for company_id in company_ids:
             company_data = collect_api(company_id)
             if company_data:
-                companies.append({"id":company_data["id"],"name":company_data["name"]})
+                companies.append({"id":company_data["id"],"name":company_data["name"],"api_response_metadata": company_data})
     except Exception as e:
         raise Exception(f"Error collecting company data: {str(e)}")
     return companies
@@ -96,11 +96,11 @@ def build_payload(config: Dict[str,Any], exclude_company_list: List[str]):
 
     sizes = []
     if config.get("target", {}).get("employee_count", ""):
-        employee_ranges = [range_str for range_str in config['target']["employee_count"].split(',') if range_str and range_str != "null"]
+        employee_ranges = [range_str for range_str in config['target']["employee_count"] if range_str and range_str != "null"]
         for range_str in employee_ranges:
             if '+' in range_str:
                 min_val = int(range_str.replace('+', ''))
-                max_val = 1500
+                max_val = 150000000000
             elif '-' in range_str:
                 parts = range_str.split('-')
                 if len(parts) == 2:

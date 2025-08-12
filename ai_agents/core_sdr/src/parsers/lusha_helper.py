@@ -71,7 +71,7 @@ def parse_employee_range(range_str: str) -> tuple:
     
     if '+' in range_str:
         min_val = int(range_str.replace('+', ''))
-        return min_val, 10000
+        return min_val, 150000000000
     elif '-' in range_str:
         parts = range_str.split('-')
         if len(parts) == 2:
@@ -167,7 +167,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
             print(f"⚠️ Error processing revenue: {e}")
     
     if sheets_data.get("target", "")['employee_count']:
-        employee_ranges = [range_str for range_str in sheets_data['target']["employee_count"].split(',') if range_str]
+        employee_ranges = [range_str for range_str in sheets_data['target']["employee_count"] if range_str]
         if employee_ranges and employee_ranges[0] != "null":
             print(f"employee_ranges: {employee_ranges}")
             sizes =[]

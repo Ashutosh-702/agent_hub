@@ -151,3 +151,69 @@ html, body {
 .text-input{
   min-height: 100px;
 }
+.prev-button {
+  padding: 0.9rem 1rem;
+  font-size: 1rem;
+  background-color: #e5e7eb;
+  color: #1f2937;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.2s ease-in-out, transform 0.2s ease;
+}
+
+.prev-button:hover {
+  background-color: #d1d5db;
+  transform: translateY(-1px);
+}
+.button-group {
+  display: flex;
+  gap: 1rem;
+  flex-direction: row;
+}
+.number-input {
+  padding: 0.9rem 1rem;
+  font-size: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  width: 300px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: white;
+  color: #111827;
+}
+
+/* Focus effect */
+.number-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+}
+
+/* Style for Chrome/Safari (WebKit) */
+.number-input::-webkit-inner-spin-button,
+.number-input::-webkit-outer-spin-button {
+  opacity: 1; /* Show arrows */
+  height: 1.2em;
+  width: 1.2em;
+  cursor: pointer;
+  filter: grayscale(100%);
+  transition: filter 0.2s ease;
+}
+
+.number-input::-webkit-inner-spin-button:hover,
+.number-input::-webkit-outer-spin-button:hover {
+  filter: none;
+}
+
+/* Firefox support */
+.number-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Optional: Make the arrows look cleaner on focus */
+.number-input:focus::-webkit-inner-spin-button,
+.number-input:focus::-webkit-outer-spin-button {
+  filter: none;
+}
