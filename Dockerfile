@@ -15,6 +15,7 @@ WORKDIR /app
 # We use apk instead of apt-get. build-base includes gcc and other common build tools.
 RUN apk add --no-cache \
     build-base \
+    git \
     libmagic
 
 # Copy backend requirements and install Python dependencies
