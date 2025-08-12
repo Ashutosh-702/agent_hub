@@ -1,5 +1,8 @@
 import os
 import json
+import uuid
+import asyncio
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Response
@@ -18,9 +21,20 @@ from database.collection_index.companies_index import companies_mongodb_indexes
 from typing import Dict, Any
 from ai_agents.leadgen.workflow.health_service import HealthService
 from fastapi.responses import ORJSONResponse
+from kafkautils.producer.event_helpers import emit_event_helper
+from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
+
+# Consumer imports
+from kafkautils.consumer.consumer import start_eventbridge_consumer
+from kafkautils.consumer.kafka_config import get_available_consumer_types
+from eventbridge.health import _healthz, _readyz
+import uvicorn
 
 async def initialize_database():
     loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_sdr")
+    # Initialize EventBridge producer in connection manager (pigeon pattern)
+    await loaded_config.connection_manager.setup_eventbridge_producer()
+
 async def close_database():
     if loaded_config.connection_manager:
         await loaded_config.connection_manager.close_connections()
@@ -31,12 +45,12 @@ async def lifespan(app: FastAPI):
     print("🚀 Starting Lead Generation API server...")
     try:
         await initialize_database()
-        print("✅ Database connected successfully")
+        print("✅ Database and EventBridge connected successfully")
         # await campaign_mongodb_indexes(loaded_config.connection_manager.mongo_client)
         # await company_mapping_mongodb_indexes(loaded_config.connection_manager.mongo_client)
         # await companies_mongodb_indexes(loaded_config.connection_manager.mongo_client)
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
+        print(f"❌ Startup failed: {e}")
         raise
 
     yield  # Server is running
@@ -45,9 +59,9 @@ async def lifespan(app: FastAPI):
     print("🔒 Shutting down Lead Generation API server...")
     try:
         await close_database()
-        print("✅ Database disconnected successfully")
+        print("✅ Database and EventBridge disconnected successfully")
     except Exception as e:
-        print(f"❌ Database disconnection failed: {e}")
+        print(f"❌ Shutdown failed: {e}")
 
 
 load_dotenv()
@@ -143,16 +157,45 @@ async def upload_data_from_form(data: FormSubmission):
         }
         
         response = await submit_company_data(db_data)
-        campaign_id = response.get("campaign_id","")
-        db_data["campaign_id"] = campaign_id
         if response.get("status") == "error":
             print(f"Error while submitting data to database: {response.get('message', 'Failed to submit data.')}")
             return {"status": "error", "message": response.get("message", "Failed to submit data.")}
-        print(f"📤 Data submitted: {response}")
-        print(f"Proceeding to company search...")
-        company_data = await process_company_search(db_data)
-        print(f"Found {len(company_data['companies'])} companies")
-        return response
+
+        # Get campaign_id from database insert
+        campaign_id = response.get("campaign_id")
+        if not campaign_id:
+            print("❌ Error: No campaign_id returned from database")
+            return {"status": "error", "message": "Failed to get campaign_id from database"}
+
+        # Send to EventBridge using pigeon pattern with emit_event_helper
+        request_id = str(uuid.uuid4())
+        
+        # Send only campaign_id via Kafka (much cleaner!)
+        if loaded_config.connection_manager.event_emitter:
+            event = {
+                "request_id": request_id,
+                "action": "process_company_search",
+                "campaign_id": campaign_id,  # Only send the ID, not all data
+                "timestamp": asyncio.get_event_loop().time()
+            }
+            
+            await emit_event_helper(
+                event_emitter=loaded_config.connection_manager.event_emitter,
+                topics=KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]["topics"],  # Use actual topic from mapping
+                partition_value=request_id,
+                event=event,
+                event_meta={"service": "leadgen", "campaign_id": campaign_id}
+            )
+            print(f"📤 Campaign ID {campaign_id} queued for processing: {request_id}")
+        else:
+            print("⚠️ EventBridge Producer not initialized, skipping background processing")
+        
+        return {
+            "status": "success", 
+            "message": "Data uploaded and queued for processing via EventBridge",
+            "request_id": request_id,
+            "campaign_id": campaign_id
+        }
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -243,6 +286,82 @@ def configure_static_serving_production(app: FastAPI):
 
 configure_static_serving_production(app)
 
+
+# ==========================================
+# CONSUMER SERVER FUNCTIONS
+# ==========================================
+
+async def consumer_main():
+    """Async consumer startup (following LinkedIn SDR pattern)"""
+    consumer_type = os.getenv("CONSUMER_TYPE", "")
+    print("🤖 Starting Leadgen Kafka Consumer Server...")
+    print(f"   📡 Consumer type: {consumer_type}")
+    print("   📨 Listening for company search requests...")
+    print("   🔄 Will process company searches asynchronously")
+    print("   🌉 Using EventBridge abstraction")
+    
+    try:
+        # Validate consumer type
+        available_types = get_available_consumer_types()
+        if consumer_type not in available_types:
+            print(f"❌ Unknown consumer type: {consumer_type}")
+            print(f"   Available consumer types: {available_types}")
+            print("   Set CONSUMER_TYPE environment variable")
+            print("   Examples:")
+            for consumer in available_types:
+                print(f"     CONSUMER_TYPE={consumer}")
+            sys.exit(1)
+        
+        print(f"   ⚙️  Service: leadgen")
+        print(f"   📂 Topic: leadgen-batch-processing")
+        
+        # Start health check endpoints
+        print("   ❤️ Starting health check endpoints...")
+        asyncio.create_task(_healthz())
+        asyncio.create_task(_readyz())
+        
+        # Start EventBridge consumer
+        print("   🚀 Starting EventBridge consumer...")
+        await start_eventbridge_consumer(consumer_type)
+        
+    except KeyError as e:
+        available_types = get_available_consumer_types()
+        print(f"❌ Configuration error: {e}")
+        print(f"   Available consumer types: {available_types}")
+        print("   Set CONSUMER_TYPE environment variable")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Consumer startup failed: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+# ==========================================
+# MAIN ENTRY POINT
+# ==========================================
+
+def server_main():
+    """Main entry point for API server only"""
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("API_PORT", "80"))
+    workers = int(os.getenv("API_WORKERS", "1"))
+    reload = os.getenv("API_RELOAD", "false").lower() == "true"
+    
+    print("=" * 60)
+    print("🚀 LEADGEN API SERVER")
+    print("=" * 60)
+    print(f"🌐 Starting API server on {host}:{port}")
+    print(f"👥 Workers: {workers}")
+    print(f"🔄 Reload: {reload}")
+    
+    uvicorn.run(
+        "ai_agents.leadgen.api.main:app",
+        host=host,
+        port=port,
+        workers=workers,
+        reload=reload
+    )
 
 
 

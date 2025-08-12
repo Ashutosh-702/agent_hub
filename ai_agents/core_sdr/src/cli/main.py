@@ -101,11 +101,22 @@ def health(ctx):
 
 async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
     """Core function to process company search"""
+    # Initialize variables before try block to avoid UnboundLocalError
+    total_company_data = []
+    cached_data = []
+    
     try:
+        # Check if connection manager is properly initialized
+        if not loaded_config.connection_manager or not loaded_config.connection_manager.mongo_client:
+            print("❌ Error: Database connection not initialized")
+            return {
+                "companies": [],
+                "error": "Database connection not available"
+            }
+            
         companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         print("Fetching companies from lusha...")
-        cached_data =[]
-        cached_data_db = await companies_dao.get_companies({"location.name":config.get("target", "")['location']['names'], "location.type": config.get("target", "")['location']['type'], "profile.industry":config.get("segmentation")['industry']})
+        cached_data_db = await companies_dao.get_companies({"location.name":config.get("target", {}).get("location", {}).get("names", []), "location.type": config.get("target", {}).get("location", {}).get("type", ""), "profile.industry":config.get("segmentation", {}).get("industry", [])})
         for company_data in cached_data_db:
             cached_data.append({'id': company_data['identifiers']['source_id'],'name': company_data['identifiers']['name']})
         cached_ids = [company['_id'] for company in cached_data_db]

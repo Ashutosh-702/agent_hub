@@ -12,7 +12,7 @@ urllib3~=2.4.0
 langgraph~=0.4.8
 pydantic~=2.11.5
 mcp~=1.10.0
-orjson~=3.10.18
+orjson==3.10.10
 PyAutoGUI~=0.9.54
 pillow~=11.3.0
 rubicon-objc
@@ -41,3 +41,8 @@ sse-starlette
 
 #Development Dependencies
 motor
+# Kafka dependencies for Chronos consumer
+aiokafka==0.8.1
+confluent-kafka==2.3.0
+eventbridge @git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/fynd-event-bridge@v2.1.0-alpha.4#egg=eventbridge
+# Additional dependencies for production
