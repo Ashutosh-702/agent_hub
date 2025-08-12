@@ -1,7 +1,6 @@
 import requests
 import json
 import os
-import re
 from typing import List, Dict, Any
 
 def search_api(dsl_query: Dict[str, Any]) -> List[int]:

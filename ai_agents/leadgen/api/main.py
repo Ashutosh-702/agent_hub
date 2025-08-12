@@ -14,14 +14,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from ai_agents.core_sdr.src.cli.main import process_company_search
 from ai_agents.leadgen.workflow.prompt_reader import submit_company_data
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.company_mappings import CompanyMappingsDao
 from database.collection_dao.campaigns import CampaignsDao
 from database.connection_manager import ConnectionManager
 from config.loaded_config import loaded_config
-from database.collection_index.campaign_index import campaign_mongodb_indexes
-from database.collection_index.company_mapping_index import company_mapping_mongodb_indexes
-from database.collection_index.companies_index import companies_mongodb_indexes
 from typing import Dict, Any
 from ai_agents.leadgen.workflow.health_service import HealthService
 from fastapi.responses import ORJSONResponse

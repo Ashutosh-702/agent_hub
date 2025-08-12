@@ -7,20 +7,15 @@ Usage:
     python -m core_sdr cli health
 """
 
-import json
 import logging
 import os
 import sys
 from typing import Dict, Any
 import asyncclick as click
-from bson import ObjectId
 from click import Context
 from dotenv import load_dotenv
-from ai_agents.core_sdr.src.parsers.company_name_uploader import upload_company_name_to_csv,update_history
-from ai_agents.core_sdr.src.parsers.dsl_query_processor import SimpleDSLProcessor
 from ai_agents.core_sdr.src.api.coresignal_api import collect_companies_from_search
-from ai_agents.core_sdr.src.api.lusha_api import lusha_collect_companies_from_search
-from ai_agents.core_sdr.src.parsers.lusha_helper import sheets_to_lusha_config,get_companies_from_lusha
+from ai_agents.core_sdr.src.parsers.lusha_helper import get_companies_from_lusha
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.company_mappings import CompanyMappingsDao
 from database.collection_dao.campaigns import CampaignsDao

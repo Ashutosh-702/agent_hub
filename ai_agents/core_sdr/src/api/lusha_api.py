@@ -1,7 +1,6 @@
 import requests
 import json
 import os
-import re
 from typing import List, Dict, Any
 
 LUSHA_API_KEY = os.getenv("LUSHA_API_KEY")
