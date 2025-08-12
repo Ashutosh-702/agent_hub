@@ -15,12 +15,31 @@ WORKDIR /app
 # We use apk instead of apt-get. build-base includes gcc and other common build tools.
 RUN apk update && apk upgrade && \
     apk add --no-cache \
-    build-base \
-    git \
-    libmagic
+        build-base \
+        curl \
+        g++ \
+        gcc \
+        git \
+        libffi-dev \
+        librdkafka-dev \
+        openssh \
+        openssl-dev \
+        protobuf-dev \
+        libmagic \
+        && rm -rf /var/cache/apk/*
 
 # Copy backend requirements and install Python dependencies
 COPY . .
+
+ARG AZURE_PRIVATE_TOKEN_BASE64
+
+# Configure SSH for Git operations
+RUN mkdir -p /root/.ssh && \
+    touch /root/.ssh/id_rsa && \
+    curl -H "Authorization: Basic $AZURE_PRIVATE_TOKEN_BASE64" "https://dev.azure.com/Gofynd/Infrastructure/_apis/git/repositories/kube-infrastructure/items?scopePath=gitlab%2Fid_rsa&versionDescriptor.version=master" -o /root/.ssh/id_rsa && \
+    chmod 600 /root/.ssh/id_rsa && \
+    echo "Host dev.azure.com\n\tHostName dev.azure.com\n\tUser git\n\tStrictHostKeyChecking no\n" >> /root/.ssh/config && \
+    ssh-keyscan -t rsa ssh.dev.azure.com >> /root/.ssh/known_hosts
 
 RUN pip install --upgrade --no-cache-dir pip setuptools
 
