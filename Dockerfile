@@ -13,7 +13,8 @@ WORKDIR /app
 
 # Install system dependencies for Alpine.
 # We use apk instead of apt-get. build-base includes gcc and other common build tools.
-RUN apk add --no-cache \
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
     build-base \
     git \
     libmagic
