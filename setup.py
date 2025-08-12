@@ -9,7 +9,7 @@ import os
 
 def read_requirements():
     """Read requirements from root requirements.txt"""
-    requirements_path = "requirements.txt"
+    requirements_path = "requirements.in"
     if os.path.exists(requirements_path):
         with open(requirements_path, 'r') as f:
             return [line.strip() for line in f
