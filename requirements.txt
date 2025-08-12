@@ -14,7 +14,9 @@ anyio==4.10.0
     # via
     #   asyncclick
     #   httpx
+    #   mcp
     #   openai
+    #   sse-starlette
     #   starlette
 async-timeout==5.0.1
     # via
@@ -22,6 +24,10 @@ async-timeout==5.0.1
     #   eventbridge
 asyncclick==8.1.8.0
     # via -r requirements.in
+attrs==25.3.0
+    # via
+    #   jsonschema
+    #   referencing
 cachetools==5.5.2
     # via google-auth
 certifi==2025.8.3
@@ -35,6 +41,8 @@ click==8.2.2
     # via
     #   -r requirements.in
     #   uvicorn
+colorama==0.4.6
+    # via griffe
 confluent-kafka==2.3.0
     # via eventbridge
 distro==1.9.0
@@ -51,6 +59,8 @@ google-auth==2.40.3
     #   gspread
 google-auth-oauthlib==1.2.2
     # via gspread
+griffe==1.11.1
+    # via openai-agents
 gspread==6.2.1
     # via -r requirements.in
 h11==0.16.0
@@ -66,7 +76,10 @@ httpx==0.28.1
     #   -r requirements.in
     #   langgraph-sdk
     #   langsmith
+    #   mcp
     #   openai
+httpx-sse==0.4.1
+    # via mcp
 idna==3.10
     # via
     #   anyio
@@ -78,6 +91,10 @@ jsonpatch==1.33
     # via langchain-core
 jsonpointer==3.0.0
     # via jsonpatch
+jsonschema==4.25.0
+    # via mcp
+jsonschema-specifications==2025.4.1
+    # via jsonschema
 langchain-core==0.3.74
     # via
     #   langgraph
@@ -101,6 +118,8 @@ lz4==4.3.2
     # via eventbridge
 marshmallow==3.20.1
     # via eventbridge
+mcp==1.12.4
+    # via openai-agents
 motor==3.7.1
     # via -r requirements.in
 numpy==2.3.2
@@ -110,6 +129,10 @@ oauth2client==4.1.3
 oauthlib==3.3.1
     # via requests-oauthlib
 openai==1.99.9
+    # via
+    #   -r requirements.in
+    #   openai-agents
+openai-agents==0.2.6
     # via -r requirements.in
 orjson==3.10.10
     # via
@@ -145,9 +168,14 @@ pydantic==2.11.7
     #   langchain-core
     #   langgraph
     #   langsmith
+    #   mcp
     #   openai
+    #   openai-agents
+    #   pydantic-settings
 pydantic-core==2.33.2
     # via pydantic
+pydantic-settings==2.10.1
+    # via mcp
 pymongo==4.14.0
     # via motor
 pyparsing==3.2.3
@@ -157,21 +185,34 @@ python-dateutil==2.9.0
     #   -r requirements.in
     #   pandas
 python-dotenv==1.1.1
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   pydantic-settings
+python-multipart==0.0.20
+    # via mcp
 pytz==2025.2
     # via pandas
 pyyaml==6.0.2
     # via langchain-core
+referencing==0.36.2
+    # via
+    #   jsonschema
+    #   jsonschema-specifications
 requests==2.32.4
     # via
     #   -r requirements.in
     #   langsmith
+    #   openai-agents
     #   requests-oauthlib
     #   requests-toolbelt
 requests-oauthlib==2.0.0
     # via google-auth-oauthlib
 requests-toolbelt==1.0.0
     # via langsmith
+rpds-py==0.27.0
+    # via
+    #   jsonschema
+    #   referencing
 rsa==4.9.1
     # via
     #   google-auth
@@ -184,34 +225,47 @@ sniffio==1.3.1
     # via
     #   anyio
     #   openai
+sse-starlette==3.0.2
+    # via mcp
 starlette==0.47.2
-    # via fastapi
+    # via
+    #   fastapi
+    #   mcp
 tenacity==9.1.2
     # via
     #   -r requirements.in
     #   langchain-core
 tqdm==4.67.1
     # via openai
+types-requests==2.32.4.20250809
+    # via openai-agents
 typing-extensions==4.14.1
     # via
     #   anyio
     #   fastapi
     #   langchain-core
     #   openai
+    #   openai-agents
     #   pydantic
     #   pydantic-core
+    #   referencing
     #   starlette
     #   typing-inspection
 typing-inspection==0.4.1
-    # via pydantic
+    # via
+    #   pydantic
+    #   pydantic-settings
 tzdata==2025.2
     # via pandas
 urllib3==2.5.0
     # via
     #   -r requirements.in
     #   requests
+    #   types-requests
 uvicorn==0.35.0
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   mcp
 xxhash==3.5.0
     # via langgraph
 zstandard==0.23.0

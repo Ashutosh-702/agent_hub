@@ -9,6 +9,7 @@ httpx==0.28.1
 urllib3==2.5.0
 langgraph==0.6.4
 pydantic==2.11.7
+openai-agents~=0.2.0
 
 # Core SDR Dependencies
 fastapi==0.116.1
