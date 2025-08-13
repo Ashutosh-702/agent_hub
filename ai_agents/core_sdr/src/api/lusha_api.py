@@ -26,7 +26,7 @@ def build_payload(payload_values: Dict[str, Any],cached_data: List[Dict[str,Any]
     payload_query = {
         "pages": {
             "page": 0,
-            "size": 1  # Default size
+            "size": 40
         },
         "filters": {
             "companies": {

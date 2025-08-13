@@ -8,7 +8,7 @@ const industries = ["Real Estate","Design Services","Retail","Chemical Manufactu
 
 
 const employeeCounts = ['1-10', '11-50', '51-200', '201-500','501-1000','1001-5000','5001-10000','10000+'];
-const optionalQuestions = new Set([8,9]);
+const optionalQuestions = new Set([1,2]);
 const regions = [
   'North America',
   'South America', 
@@ -40,7 +40,12 @@ const AutoResizeTextarea = ({
     const el = textareaRef.current;
     if (el) {
       el.style.height = 'auto';
-      el.style.height = `${Math.max(el.scrollHeight,450)}px`;
+
+      const viewportHeight = window.innerHeight;
+      const rect = el.getBoundingClientRect();
+      const spaceBelow = viewportHeight - rect.top - 80;
+      const idealHeight = Math.min(spaceBelow, Math.max(el.scrollHeight, 425));
+      el.style.height = `${idealHeight}px`;
     }
   }, [value]);
 
@@ -52,8 +57,7 @@ const AutoResizeTextarea = ({
       value={value}
       onChange={onChange}
       name={name}
-      rows={1}
-      style={{minHeight:'450px'}}
+      style={{ minHeight: '150px', resize: 'none' }}
     />
   );
 };
@@ -61,19 +65,20 @@ const AutoResizeTextarea = ({
 const stepQuestions = [
   // SDR Company Relevance Prompt (7)
   // "Please provide a comprehensive and detailed outline of the relevance criteria for companies you aim to target. \n\n\n\n\n\n\nThe more specific and exhaustive your criteria, the higher the likelihood that we can identify and prioritize the most relevant companies for outreach.",
+  "<div class='question-main'>Which industries or verticals are in scope?</div>", // step 7 // new 0
+  "<div class='question-main'>Target company size by head-count?</div>", // step 8 //new 1
+  "<div class='question-main'>Target company size by annual revenue?</div>", // step 9 (currency + min + max) //new 2
+  "<div class='question-main'>Location</div>", // step 10 //new 3
+  // new 4 5 6 7 8 9 
 "<div class='question-main'>Please provide a comprehensive and detailed outline of the relevance criteria for companies you aim to target.</div><div class='question-subtitle'><span style='color:black;'>Example:  A relevant company must be a retailer that specializes in or has significant operations in selling or renting furniture, mattresses, or other heavy/bulky home goods items.</span><br/><br/>The more specific and exhaustive your criteria, the higher the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>",
 "<div class='question-main'>Please provide mandatory criterias that a company must have to qualify as a relevant company for outreach.</div><div class='question-subtitle'><span style='color:black;'>Example: Primary business must involve furniture, mattresses, or heavy/bulky home goods (sofas, beds, tables, chairs, wardrobes, appliances, outdoor furniture). Must have either e-commerce presence (online store with delivery capabilities) OR physical retail stores. Must serve end consumers (B2C model)</span><br/><br/>The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>",
 "<div class='question-main'>Please share qualifying business models that are relevant to this outreach campaign.</div><div class='question-subtitle'><span style='color:black;'>Example: Direct furniture/mattress sales (online or in-store). Furniture rental services. Made-to-order/custom furniture providers. Hybrid models combining sales and rental.</span><br/><br/>The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>", 
-"<div class='question-main'>What are the key positive indicators that signal a company is a strong fit for your target profile?</div><div class='question-subtitle'><span style='color:black;'>Example: Multiple physical store locations. Established e-commerce platform with delivery logistics. Offers both ready-made and customizable options. Provides white-glove delivery or assembly services. Has dedicated sections for living room, bedroom, dining room furniture. Offers financing or rental plans. Serves metropolitan areas.</span><br/><br/>Please specify any attributes, characteristics, or patterns that, if present, confirm the company aligns with what you're looking for. The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>", 
-"<div class='question-main'>What are some exclusion criteria that the AI should apply to immediately disqualify a company as not relevant?</div><div class='question-subtitle'><span style='color:black;'>Example: Pure B2B furniture suppliers without consumer presence. Interior design services without furniture sales. Pure marketplace platforms without own inventory. Companies focusing only on small home decor items without furniture. Office furniture specialists without home furniture offerings.</span><br/><br/>Please specify any attributes or red flags that should lead to automatic exclusion. The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>", 
+"<div class='question-main'>What are the key positive indicators that signal a company is a strong fit for your target profile? Please specify any attributes, characteristics, or patterns that, if present, confirm the company aligns with what you're looking for.</div><div class='question-subtitle'><span style='color:black;'>Example: Multiple physical store locations. Established e-commerce platform with delivery logistics. Offers both ready-made and customizable options. Provides white-glove delivery or assembly services. Has dedicated sections for living room, bedroom, dining room furniture. Offers financing or rental plans. Serves metropolitan areas.</span><br/><br/>The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>", 
+"<div class='question-main'>What are some exclusion criteria that the AI should apply to immediately disqualify a company as not relevant? Please specify any attributes or red flags that should lead to automatic exclusion.</div><div class='question-subtitle'><span style='color:black;'>Example: Pure B2B furniture suppliers without consumer presence. Interior design services without furniture sales. Pure marketplace platforms without own inventory. Companies focusing only on small home decor items without furniture. Office furniture specialists without home furniture offerings.</span><br/><br/>The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>", 
 "<div class='question-main'>Please share a few reference companies along with the specific characteristics that make them relevant. This will help the AI better understand and identify similar companies during the targeting process.</div><div class='question-subtitle'><span style='color:black;'>Example: The Sleep Company: Mattress specialist with e-commerce focus. West Elm/Pottery Barn: Multi-location furniture retailers with strong e-commerce and physical presence. CityFurnish/Rentickle: Furniture rental services targeting urban consumers.</span><br/><br/>The more specific and exhaustive details you share, the higher will be the likelihood that we can identify and prioritize the most relevant companies for outreach.</div>",
-
-"<div class='question-main'>Do you have any additional validations that need to be ensured to ensure the company is relevant?</div>",
+// new 10
+"<div class='question-main'>Do you have any additional validations that need to be ensured to ensure the company is relevant?</div><div class='question-subtitle'>Company is relevant if it meets ALL mandatory criteria AND demonstrates at least 2 positive indicators while avoiding ALL exclusion criteria.</div>",
   // Company Shortlisting (6)
-  "<div class='question-main'>Which industries or verticals are in scope?</div>", // step 7
-  "<div class='question-main'>Target company size by head-count?</div>", // step 8
-  "<div class='question-main'>Target company size by annual revenue?</div>", // step 9 (currency + min + max)
-  "<div class='question-main'>Location</div>", // step 10
   "<div class='question-main'>Keywords</div>", // step 11
   "<div class='question-main'>Categories</div>", // step 12
 
@@ -90,6 +95,7 @@ const stepQuestions = [
 ];
 
 export const Form = () => {
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
   // Create form array with extra slots for currency, min revenue, max revenue, location type
   const [form, setForm] = useState<string[]>(Array(24).fill(''));
   const [step, setStep] = useState(0);
@@ -128,13 +134,13 @@ export const Form = () => {
 
     const payload = {
   web_prompt: [
-    form[0] && `Comprehensive Outline: ${form[0]}`,
-  form[1] && `Mandatory Criteria: ${form[1]}`,
-  form[2] && `Relevant Business Models: ${form[2]}`,
-  form[3] && `Positive Indicators: ${form[3]}`,
-  form[4] && `Exclusion Criteria: ${form[4]}`,
-  form[5] && `Reference Companies: ${form[5]}`,
-  form[6] && `Other Validations: ${form[6]}`
+    form[4] && `Comprehensive Outline: ${form[4]}`,
+  form[5] && `Mandatory Criteria: ${form[5]}`,
+  form[6] && `Relevant Business Models: ${form[6]}`,
+  form[7] && `Positive Indicators: ${form[7]}`,
+  form[8] && `Exclusion Criteria: ${form[8]}`,
+  form[9] && `Reference Companies: ${form[9]}`,
+  form[10] && `Other Validations by user: ${form[10]}`
   ].filter(Boolean).join('\n\n'),
 
   persona_prompt: [
@@ -143,12 +149,12 @@ export const Form = () => {
     form[15]  
   ].filter(Boolean).join('\n\n'),
 
-  industry: form[7],
-  employee_count: form[8] || 'null',
+  industry: form[0],
+  employee_count: form[1] || 'null',
   currency: "USD", 
-  revenue_min: form[9] || 'null',
-  revenue_max: form[20] || 'null',
-  location: form[10] ,
+  revenue_min: form[21] || 'null',
+  revenue_max: form[22] || 'null',
+  location: form[3] ,
   location_type: locationType,
   keywords: 'null', //form[11]
   categories: 'null', //form[12]
@@ -167,8 +173,9 @@ export const Form = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
-      if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data?.campaign_id) {
+        setSubmittedId(data.campaign_id)
         setSubmitted(true);
         setForm(Array(24).fill(''));
         setLocationType('');
@@ -187,13 +194,13 @@ export const Form = () => {
     return true;
   }
 
-    if (step === 9) {
+    if (step === 2) {
       // For revenue step, check if both min and max are filled
-      return form[9] && form[20] && form[21]; // min, max, currency
+      return form[9] && form[20]; // min, max, currency
     }
-    if (step === 10) {
+    if (step === 3) {
       // For location step, check if location type is selected and locations are chosen
-      return locationType && form[10] && form[10].trim();
+      return locationType && form[step] && form[step].trim();
     }
     return form[step] && form[step].toString().trim();
   };
@@ -212,8 +219,8 @@ export const Form = () => {
             {optionalQuestions.has(step) && (
                       <p className="optional-indicator">(Optional)</p>
                     )}
-            {/* Steps 0-6: Text areas */}
-            {step >= 0 && step <= 6 && (
+            {/* Steps 4-10: Text areas */}
+            {step >= 4 && step <= 10 && (
               <AutoResizeTextarea 
                 value={form[step]} 
                 onChange={handleChange} 
@@ -223,8 +230,8 @@ export const Form = () => {
               />
             )}
 
-            {/* Step 7: Industries */}
-            {step === 7 && (
+            {/* Step 0: Industries */}
+            {step === 0 && (
               <Select 
                 isMulti 
                 name={`step_${step}`} 
@@ -239,8 +246,8 @@ export const Form = () => {
               />
             )}
 
-            {/* Step 8: Employee Count */}
-            {step === 8 && (
+            {/* Step 1: Employee Count */}
+            {step === 1 && (
               <Select 
                 isMulti 
                 name={`step_${step}`} 
@@ -255,8 +262,8 @@ export const Form = () => {
               />
             )}
 
-            {/* Step 9: Revenue (Currency + Min + Max) */}
-            {step === 9 && (
+            {/* Step 2: Revenue (Currency + Min + Max) */}
+            {step === 2 && (
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 {/* <Select 
                   name="currency" 
@@ -274,32 +281,32 @@ export const Form = () => {
                   type="number" 
                   placeholder="Min (USD in Millions)" 
                   className="number-input" 
-                  value={form[9] || ''} 
+                  value={form[21] || ''} 
                   onChange={(e) => { 
                     const updated = [...form]; 
-                    updated[9] = e.target.value; 
+                    updated[21] = e.target.value; 
                     setForm(updated); 
                   }} 
                   min={0}
-                  max={form[20] || ''}
+                  max={form[22] || ''}
                 />
                 <input 
                   type="number" 
                   placeholder="Max (USD in Millions)" 
                   className="number-input" 
-                  value={form[20] || ''} 
+                  value={form[22] || ''} 
                   onChange={(e) => { 
                     const updated = [...form]; 
-                    updated[20] = e.target.value; 
+                    updated[22] = e.target.value; 
                     setForm(updated); 
                   }} 
-                  min={form[9] || ''}
+                  min={form[21] || ''}
                 />
               </div>
             )}
 
-            {/* Step 10: Location */}
-            {step === 10 && (
+            {/* Step 3: Location */}
+            {step === 3 && (
               <div>
                 <div style={{ marginBottom: '15px' }}>
                   <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>
@@ -315,7 +322,7 @@ export const Form = () => {
                         onChange={() => {
                           setLocationType('region');
                           const updated = [...form];
-                          updated[10] = ''; // Clear previous selection
+                          updated[step] = ''; // Clear previous selection
                           setForm(updated);
                         }}
                         style={{ marginRight: '5px' }}
@@ -331,7 +338,7 @@ export const Form = () => {
                         onChange={() => {
                           setLocationType('country');
                           const updated = [...form];
-                          updated[10] = ''; // Clear previous selection
+                          updated[step] = ''; // Clear previous selection
                           setForm(updated);
                         }}
                         style={{ marginRight: '5px' }}
@@ -346,10 +353,10 @@ export const Form = () => {
                     isMulti 
                     name="regions" 
                     options={regions.map(region => ({ label: region, value: region }))} 
-                    value={form[10] ? form[10].split(',').map(val => ({ label: val, value: val })) : []} 
+                    value={form[step] ? form[step].split(',').map(val => ({ label: val, value: val })) : []} 
                     onChange={(selected) => { 
                       const updated = [...form]; 
-                      updated[10] = selected.map(opt => opt.value).join(','); 
+                      updated[step] = selected.map(opt => opt.value).join(','); 
                       setForm(updated); 
                     }} 
                     placeholder="Select regions..." 
@@ -361,10 +368,10 @@ export const Form = () => {
                     isMulti 
                     name="countries" 
                     options={countries.map(country => ({ label: country, value: country }))} 
-                    value={form[10] ? form[10].split(',').map(val => ({ label: val, value: val })) : []} 
+                    value={form[step] ? form[step].split(',').map(val => ({ label: val, value: val })) : []} 
                     onChange={(selected) => { 
                       const updated = [...form]; 
-                      updated[10] = selected.map(opt => opt.value).join(','); 
+                      updated[step] = selected.map(opt => opt.value).join(','); 
                       setForm(updated); 
                     }} 
                     placeholder="Select countries..." 
@@ -526,8 +533,15 @@ export const Form = () => {
         )}
 
         {submitted && (
-          <p className="success-message">✅ Submitted successfully!</p>
-        )}
+              <div className="success-message">
+                ✅ Submitted successfully!
+                {submittedId && (
+                  <div style={{ marginTop: 8 }}>
+                    <strong>Please store this Campaign ID and share with the technical team for updates:</strong> <code>{submittedId}</code>
+                  </div>
+                )}
+              </div>
+            )}
       </form>
     </div>
   );
