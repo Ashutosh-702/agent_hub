@@ -67,7 +67,6 @@ async def main(cli_config=None):
         log_workflow_start("SDR Orchestrated", config=config)
         # Use the workflow adapter with orchestrated mode
         workflow_runner = WorkflowAdapter.create_orchestrated_workflow(config)
-
         initial_state = WorkflowState(
             run_id=config["run_directories"]["run_id"],
             started_at=datetime.now(),
@@ -76,6 +75,7 @@ async def main(cli_config=None):
 
         # Run the workflow
         clean_log("")  # Add blank line before workflow output
+        
         result = await workflow_runner.run(initial_state)
         clean_log("")  # Add blank line after workflow output
 

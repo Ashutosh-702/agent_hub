@@ -205,7 +205,8 @@ def load_configuration(run_directories: Dict[str, str], cli_config: Dict[str, An
             "type": data_source_type,
             "file_path": get_config_value("CSV_FILE_PATH", "CSV_FILE_PATH", "ai_agents/data/company_names.csv"),
             "sheet_url": get_config_value("GOOGLE_SHEET_URL", "GOOGLE_SHEET_URL"),
-            "worksheet_name": get_config_value("GOOGLE_WORKSHEET_NAME", "GOOGLE_WORKSHEET_NAME")
+            "worksheet_name": get_config_value("GOOGLE_WORKSHEET_NAME", "GOOGLE_WORKSHEET_NAME"),
+            "campaign_id": get_config_value("CAMPAIGN_ID","CAMPAIGN_ID")
         },
         "clearbit_api_key": get_config_value("CLEARBIT_API_KEY", "CLEARBIT_API_KEY"),
         "browser_timeout": int(get_config_value("BROWSER_TIMEOUT", "BROWSER_TIMEOUT", "30")),

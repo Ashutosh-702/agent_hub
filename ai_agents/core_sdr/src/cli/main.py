@@ -177,25 +177,21 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
             id_list = inserted_ids + cached_ids
             company_mappings_dao = CompanyMappingsDao(loaded_config.connection_manager.mongo_client)
             mapping_doc = {
-                "references":{
-                    "campaign_id": config.get("_id"),
-                    "company_ids": id_list,
-                    "company_count": len(id_list),
-                },
-                "snapshot": {
-                    "industry": config.get("segmentation")['industry'], 
-                    "location": config.get("target", "")['location']['names'],
-                    "revenue_min": config.get("target", "")['revenue_min'],
-                    "revenue_max": config.get("target", "")['revenue_max'],
-                    "employee_count": config.get("target", "")['employee_count'],
-                    "keywords": config.get("segmentation", "")['keywords'],
-                    "categories": config.get("segmentation", "")['categories'],
+                "campaign_id": config.get("_id"),
+                "company_output":[{
+                    "company_id": _id,
+                    "is_relevant": False,
+                    "contact_ids": []
+                } for _id in id_list] ,
+                "metadata":{
+                        "created_at":datetime.utcnow(),
+                        "updated_at":datetime.utcnow(),
                 },
             }
             await company_mappings_dao.create_company_mapping(mapping_doc)
             campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-            await campaigns_dao.update_campaign_status(mapping_doc['references']['campaign_id'],"processing")
-            print(f"Updated status of {mapping_doc['references']['campaign_id']} to 'processing'")
+            await campaigns_dao.update_campaign_status(mapping_doc['campaign_id'],"processing")
+            print(f"Updated status of {mapping_doc['campaign_id']} to 'processing'")
     except Exception as e:
         print(f"Error while processing company search: {str(e)}")
     return {

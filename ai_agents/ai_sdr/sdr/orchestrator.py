@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 from loguru import logger
-
+import pandas as pd
 from ai_agents.ai_sdr.sdr.logging_config import sdr_logger
 from ai_agents.ai_sdr.sdr.models import Company, WorkflowState
 from ai_agents.ai_sdr.sdr.nodes.company_list_retriever import _read_google_sheet, _read_csv_file, \
@@ -18,7 +18,9 @@ from ai_agents.ai_sdr.sdr.nodes.error_reporter import save_error_summary
 from ai_agents.ai_sdr.sdr.nodes.final_progress_saver import save_final_workflow_results
 from ai_agents.ai_sdr.sdr.nodes.progress_saver import save_linkedin_progress
 from ai_agents.ai_sdr.sdr.single_company_workflow import compile_single_company_workflow
-
+from database.collection_dao.companies import CompaniesDao
+from database.collection_dao.company_mappings import CompanyMappingsDao
+from config.loaded_config import loaded_config
 
 @dataclass
 class OrchestratorResult:
@@ -86,7 +88,25 @@ class WorkflowOrchestrator:
             elif source_type == 'csv':
                 file_path = data_source.get('file_path', 'ai_agents/data/company_names.csv')
                 df = await _read_csv_file(file_path)
-
+            elif source_type == 'mongo':
+                campaign_id = data_source.get("campaign_id")
+                if not campaign_id:
+                    raise ValueError("Campaign Id is required")
+                mappings_dao = CompanyMappingsDao(loaded_config.connection_manager.mongo_client)
+                mapping_doc = await mappings_dao.get_company_mappings({"campaign_id": campaign_id})
+                company_output_list = mapping_doc[0]["company_output"]
+                data= []
+                if company_output_list:
+                    for company_output in company_output_list:
+                        company_id = company_output.get("company_id","")
+                        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+                        company_data = await companies_dao.get_company(company_id)
+                        name = company_data.get("identifiers",{}).get("name","")
+                        if name:
+                            data.append(name)
+                df = pd.DataFrame(data,columns=["company_name"])
+                logger.info(f"DataFrame columns: {df.columns}")
+                logger.info(f"DataFrame data: {df.head()}")
             else:
                 raise ValueError(f"Unsupported data source type: {source_type}")
 
@@ -145,6 +165,7 @@ class WorkflowOrchestrator:
             initial_state.enriched_data["user_prompts"] = self.config['custom_prompts']
 
         try:
+            print("WORKING TILL HERERERERERERERERERERERE")
             # Run the single company workflow
             final_state = await self.single_company_workflow.ainvoke(
                 initial_state,

@@ -207,25 +207,35 @@ async def call_data_apis(config: Dict[str,Any]):
 async def run_ai_sdr():
     campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
     unprocessed_campaigns = await campaigns_dao.get_campaigns({'lifecycle.status': 'processing'})
-    for campaign in unprocessed_campaigns:
+    print(f"Unprocessed Campaigns: {len(unprocessed_campaigns)}")
+    for campaign in unprocessed_campaigns[-1:]:
         campaign_id = campaign.get("_id","")
+        if not campaign_id:
+            raise ValueError("No campaign Id")
         web_enricher_prompt = campaign.get("prompts",{}).get("web","")
         persona_prompt = campaign.get("prompts",{}).get("persona","")
-        hubspot_email = campaign.get("ownership",{}).get("hubspot_email","")
+        hubspot_owner_email = campaign.get("ownership",{}).get("hubspot_email","")
         user_email = campaign.get("ownership",{}).get("user_email","")
         product_name = campaign.get("ownership",{}).get("user_email","")
         business_team = campaign.get("ownership",{}).get("business_team")
         ai_sdr_custom_config = {
-            "custom_prompts": {}
+            "HUBSPOT_OWNER_EMAIL": hubspot_owner_email,
+            "USER_EMAIL": user_email,
+            "PRODUCT_NAME": product_name,
+            "BUSINESS_TEAM": business_team,
+            "custom_prompts": {},
+            "CAMPAIGN_ID":campaign_id,
+            "DATA_SOURCE_TYPE":"mongo"
         }
-        web_enrichment_prompt = f"""Relevance Criteria: {web_enricher_prompt}
+        web_enrichment_prompt = f"""Relevance Criteria: Determine if the company fits either of the following:
+        
+            {web_enricher_prompt}
 
     Begin your research now using the web search tool to determine if companies match these criteria."""
         
         ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
         ai_sdr_custom_config["custom_prompts"]["prospect_enricher_user_prompt"] = persona_prompt
         print(f"Running orchestrated workflow for Campaign Id: {campaign_id}")
-        print(f"Loaded custom prompts: {json.dumps(ai_sdr_custom_config,indent=2)}")
         await run_orchestrated_workflow(ai_sdr_custom_config)
 
     return

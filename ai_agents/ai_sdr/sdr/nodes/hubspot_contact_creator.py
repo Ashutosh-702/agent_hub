@@ -127,7 +127,7 @@ class HubspotContactCreator:
                 "linkedin_url": linkedin_url,
                 "hubspot_owner_id": owner_id,
                 "source":"AI-SDR",
-                "product":"OMS_Global",
+                "product": "",#product_name,
                 "ci_lifecycle_stage":"Not Contacted",
             }
 

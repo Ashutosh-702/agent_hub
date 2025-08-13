@@ -105,7 +105,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
     Convert sheets configuration to Lusha API configuration
     """
     lusha_config = {
-        "pages": {"page": 0, "size": 20} 
+        "pages": {"page": 0, "size": 40} 
     }
     
     if sheets_data.get("segmentation")['industry']:
