@@ -1,6 +1,6 @@
 from database.base_dao import BaseMongoDao
 from motor.motor_asyncio import AsyncIOMotorClient
-
+from typing import Dict, Any
 
 class CompanyMappingsDao(BaseMongoDao):
     def __init__(self, mongo_client: AsyncIOMotorClient):
@@ -15,4 +15,5 @@ class CompanyMappingsDao(BaseMongoDao):
     async def get_company_mapping(self, company_mapping_id: str):
         return await self.find_one({"_id": company_mapping_id})
     
-
+    async def update_company_mapping(self, query: Dict[str, Any], update_clause: Dict[str, Any]):
+        return await self.update_one(query, update_clause)

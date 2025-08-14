@@ -17,6 +17,10 @@ from urllib3.exceptions import InsecureRequestWarning
 from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log
 from ai_agents.ai_sdr.sdr.models import Company, WorkflowState
 
+from database.collection_dao.company_mappings import CompanyMappingsDao
+from database.collection_dao.companies import CompaniesDao
+from config.loaded_config import loaded_config
+from bson import ObjectId
 urllib3.disable_warnings(InsecureRequestWarning)
 
 
@@ -113,6 +117,75 @@ async def _read_google_sheet(sheet_url: str, worksheet_name: str = None) -> pd.D
         detailed_log("Make sure the Google Sheet is publicly accessible (Anyone with the link can view)", "error")
         raise
 
+async def _read_mongo_companies(campaign_id: str) -> pd.DataFrame:
+    """
+    Read companies for a campaign from MongoDB and return a DataFrame
+    shaped like our CSV/Sheets input (e.g., includes 'company_name').
+
+    Returns columns that _normalize_company_data() understands:
+      - company_name (→ maps to 'name')
+      - industry (optional)
+      - company_size (optional)
+      - location (optional)
+    """
+    try:
+        try:
+            campaign_oid = ObjectId(campaign_id)
+        except Exception:
+            raise ValueError(f"Invalid campaign_id: {campaign_id}")
+
+        clean_log(f"Reading companies from Mongo for campaign {campaign_id}")
+        detailed_log(f"Fetching company mappings for campaign_id={campaign_id}")
+
+        mappings_dao = CompanyMappingsDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+
+        mapping_docs = await mappings_dao.get_company_mappings({"campaign_id": campaign_oid})
+        if not mapping_docs:
+            raise ValueError(f"No company mappings found for campaign_id {campaign_id}")
+
+        data_rows = []
+        for mapping in mapping_docs:
+            for entry in mapping.get("company_output", []):
+                company_id = entry.get("company_id")
+                if not company_id:
+                    continue
+                # company_id may already be ObjectId or string
+                try:
+                    company_oid = company_id if isinstance(company_id, ObjectId) else ObjectId(company_id)
+                except Exception:
+                    continue
+
+                company_doc = await companies_dao.get_company(company_oid)
+                if not company_doc:
+                    continue
+
+                name = (company_doc.get("identifiers",{})).get("name")
+                if not name:
+                    continue
+
+                profile = company_doc.get("profile") or {}
+                location = company_doc.get("location") or {}
+
+                data_rows.append({
+                    "company_name": name,
+                    "company_id": company_oid,
+                    "industry": profile.get("industry"),
+                    "company_size": profile.get("employeeCount"),
+                    "location": location.get("name"),
+                })
+        if not data_rows:
+            raise ValueError(f"No valid companies found in Mongo for campaign {campaign_id}")
+
+        df = pd.DataFrame(data_rows)
+        clean_log(f"Read {len(df)} rows from Mongo for campaign {campaign_id}")
+        detailed_log(f"Mongo DataFrame columns: {df.columns.tolist()}")
+        return df
+
+    except Exception as e:
+        clean_log(f"Mongo read error: {e}", "error")
+        detailed_log(f"Error reading from Mongo: {e}", "error")
+        raise
 
 async def _read_csv_file(file_path: str) -> pd.DataFrame:
     """Read data from CSV file"""
@@ -134,6 +207,7 @@ def _normalize_company_data(df: pd.DataFrame) -> list[Company]:
         'company_name': 'name',
         'company': 'name',  # This will match "Company" column
         'organization': 'name',
+        'company_id':'company_id',
         'website_url': 'website',
         'website': 'website',
         'url': 'website',
@@ -173,6 +247,7 @@ def _normalize_company_data(df: pd.DataFrame) -> list[Company]:
         company_data = {
             # Initialize all fields with None by default
             'name': None,
+            'company_id':None,
             'website': None,
             'domain': None,
             'industry': None,
@@ -181,7 +256,6 @@ def _normalize_company_data(df: pd.DataFrame) -> list[Company]:
             'description': None,
             'linkedin_url': None
         }
-
         # Map columns to Company fields
         for col in df_normalized.columns:
             if col in column_mapping:
@@ -189,9 +263,8 @@ def _normalize_company_data(df: pd.DataFrame) -> list[Company]:
                 value = row[col]
                 if pd.notna(value) and str(value).strip():
                     company_data[field_name] = str(value).strip()
-
         # Ensure we have at least a company name
-        if company_data['name'] is not None and company_data['name'].strip():
+        if company_data['name'] is not None and company_data['name'].strip() and company_data['company_id'] is not None and company_data['company_id'].strip():
             try:
                 # Create the Company object with all fields properly initialized
                 company = Company(**company_data)
@@ -251,13 +324,21 @@ async def company_list_retriever(state: WorkflowState, config: Dict[str, Any]) -
             clean_log(f"Reading from CSV file: {file_path}")
             detailed_log(f"Reading from CSV file: {file_path}")
             df = await _read_csv_file(file_path)
+        elif source_type == 'mongo':
+            campaign_id = data_source.get('campaign_id')
+            if not campaign_id:
+                raise ValueError("Mongo data source requires 'campaign_id'")
+
+            clean_log(f"Reading from Mongo for campaign_id: {campaign_id}")
+            detailed_log(f"Reading from Mongo for campaign_id: {campaign_id}")
+            df = await _read_mongo_companies(campaign_id)
 
         else:
             raise ValueError(f"Unsupported data source type: {source_type}")
 
         # Normalize and convert to Company objects
         companies = _normalize_company_data(df)
-
+        clean_log(f"FOUND_COMAPNIES{companies}")
         # Enhanced validation for company list
         if not companies or len(companies) == 0:
             error_msg = "No valid companies found in data source - company list is empty"

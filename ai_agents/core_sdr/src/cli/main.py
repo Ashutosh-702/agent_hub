@@ -190,8 +190,8 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
             }
             await company_mappings_dao.create_company_mapping(mapping_doc)
             campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-            await campaigns_dao.update_campaign_status(mapping_doc['campaign_id'],"processing")
-            print(f"Updated status of {mapping_doc['campaign_id']} to 'processing'")
+            await campaigns_dao.update_campaign_status(mapping_doc['campaign_id'],"pending")
+            print(f"Updated status of {mapping_doc['campaign_id']} to 'pending'")
     except Exception as e:
         print(f"Error while processing company search: {str(e)}")
     return {

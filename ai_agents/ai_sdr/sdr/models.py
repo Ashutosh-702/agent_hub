@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 class Company(BaseModel):
     """Company model"""
     name: str
+    company_id: str
     website: Optional[str] = None
     domain: Optional[str] = None
     description: Optional[str] = None

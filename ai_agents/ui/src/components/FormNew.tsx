@@ -144,9 +144,9 @@ export const Form = () => {
   ].filter(Boolean).join('\n\n'),
 
   persona_prompt: [
-    form[13], 
-    form[14],
-    form[15]  
+    form[13] && `Job Title(s) of People to be searched: ${form[13]}`, 
+    form[14] && `Seniority Level(s): ${form[14]}`,
+    form[15]  && `Department(s) of people to be searched: ${form[15]}`
   ].filter(Boolean).join('\n\n'),
 
   industry: form[0],

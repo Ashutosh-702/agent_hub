@@ -36,7 +36,7 @@ class ProspectEnricher:
         company_name = company.name
         company_website = web_analysis.get('research_summary', {}).get('website_found', 'Not found')
         industry = web_analysis.get('research_summary', {}).get('industry_identified', 'Unknown')
-
+        
         # Clean log for main status
         clean_log(f"LinkedIn Research: {company_name}")
         detailed_log("")
@@ -315,7 +315,7 @@ async def prospect_enricher(state: WorkflowState, config: Dict[str, Any]) -> Wor
     """
     detailed_log("")
     detailed_log("▶️ Starting LinkedIn prospect enrichment")
-
+    
     config = config.get("configurable", {})
     company = state.current_company
     # Initialize enricher
