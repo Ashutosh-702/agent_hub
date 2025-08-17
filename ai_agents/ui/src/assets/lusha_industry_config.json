@@ -1,0 +1,1353 @@
+[
+  {
+    "main_industry": "Hospitality",
+    "main_industry_id": 1,
+    "sub_industries": [
+      {
+        "value": "Restaurants",
+        "id": 2
+      },
+      {
+        "value": "Food & Beverage Services",
+        "id": 1
+      },
+      {
+        "value": "Hotels & Motels",
+        "id": 3
+      },
+      {
+        "value": "Other (Hospitality)",
+        "id": 778
+      }
+    ]
+  },
+  {
+    "main_industry": "Administrative & Support Services",
+    "main_industry_id": 2,
+    "sub_industries": [
+      {
+        "value": "Facilities Services",
+        "id": 6,
+        "coresignal": [
+          "Recreational Facilities",
+          "Skiing Facilities"
+        ]
+      },
+      {
+        "value": "Translation & Localization",
+        "id": 10,
+        "coresignal": [
+          "Translation and Localization",
+          "Translation & Localization"
+        ]
+      },
+      {
+        "value": "Events Services",
+        "id": 5,
+        "coresignal": [
+          "Events Services"
+        ]
+      },
+      {
+        "value": "Administrative & Support Services",
+        "id": 4,
+        "coresignal": [
+          "Design Services",
+          "Information Technology & Services",
+          "Advertising Services",
+          "Food and Beverage Services",
+          "Financial Services",
+          "Business Consulting and Services",
+          "IT Services and IT Consulting",
+          "Environmental Services",
+          "Information Services",
+          "Consumer Services",
+          "Human Resources Services",
+          "Wellness and Fitness Services",
+          "Legal Services",
+          "Public Relations and Communications Services",
+          "Events Services",
+          "Printing Services",
+          "Philanthropic Fundraising Services",
+          "Individual and Family Services",
+          "Government Relations Services",
+          "Facilities Services",
+          "Strategic Management Services",
+          "Research Services",
+          "Veterinary Services",
+          "Wireless Services",
+          "Services for Renewable Energy",
+          "Professional Services",
+          "Marketing Services",
+          "Security Systems Services",
+          "Engineering Services",
+          "Individual & Family Services",
+          "Digital Accessibility Services",
+          "Recreational Facilities & Services",
+          "IT System Design Services",
+          "Health and Human Services",
+          "Executive Search Services",
+          "Personal Care Services",
+          "Community Services",
+          "Water, Waste, Steam, and Air Conditioning Services",
+          "Urban Transit Services",
+          "Taxi and Limousine Services",
+          "Services for the Elderly and Disabled",
+          "Real Estate and Equipment Rental Services",
+          "IT System Data Services",
+          "Pet Services",
+          "Landscaping Services",
+          "Blockchain Services",
+          "Emergency and Relief Services",
+          "Vocational Rehabilitation Services",
+          "Accommodation and Food Services",
+          "Administrative and Support Services",
+          "Surveying and Mapping Services",
+          "Equipment Rental Services",
+          "Shuttles and Special Needs Transportation Services",
+          "Security Guards and Patrol Services",
+          "IT System Training and Support",
+          "Home Health Care Services",
+          "Child Day Care Services",
+          "Janitorial Services",
+          "Household Services",
+          "Mobile Food Services",
+          "Laundry and Drycleaning Services",
+          "Interurban and Rural Bus Services",
+          "Postal Services",
+          "Temporary Help Services",
+          "Ambulance Services",
+          "Claims Adjusting, Actuarial Services",
+          "Personal and Laundry Services",
+          "School and Employee Bus Services"
+        ]
+      },
+      {
+        "value": "Other (Administrative & Support Services)",
+        "id": 789
+      },
+      {
+        "value": "Travel Arrangements",
+        "id": 11,
+        "coresignal": [
+          "Travel Arrangements",
+          "Leisure, Travel & Tourism"
+        ]
+      },
+      {
+        "value": "Security & Investigations",
+        "id": 8,
+        "coresignal": [
+          "Security and Investigations",
+          "Computer and Network Security",
+          "Security & Investigations",
+          "Computer & Network Security"
+        ]
+      },
+      {
+        "value": "Staffing & Recruiting",
+        "id": 9,
+        "coresignal": [
+          "Staffing and Recruiting",
+          "Staffing & Recruiting"
+        ]
+      },
+      {
+        "value": "Fundraising",
+        "id": 7,
+        "coresignal": [
+          "Fundraising"
+        ]
+      },
+      {
+        "value": "Writing & Editing",
+        "id": 12,
+        "coresignal": [
+          "Writing and Editing",
+          "Writing & Editing"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Construction",
+    "main_industry_id": 3,
+    "sub_industries": [
+      {
+        "value": "Civil Engineering",
+        "id": 16,
+        "coresignal": [
+          "Civil Engineering"
+        ]
+      },
+      {
+        "value": "Other (Construction)",
+        "id": 791
+      },
+      {
+        "value": "Construction",
+        "id": 13,
+        "coresignal": [
+          "Construction"
+        ]
+      },
+      {
+        "value": "Building Construction",
+        "id": 15,
+        "coresignal": [
+          "Building Construction"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Consumer Services",
+    "main_industry_id": 4,
+    "sub_industries": [
+      {
+        "value": "Other (Consumer Services)",
+        "id": 792
+      },
+      {
+        "value": "Philanthropic Fundraising Services",
+        "id": 18,
+        "coresignal": [
+          "Philanthropic Fundraising Services",
+          "Philanthropy"
+        ]
+      },
+      {
+        "value": "Repair & Maintenance",
+        "id": 19,
+        "coresignal": [
+          "Repair and Maintenance"
+        ]
+      },
+      {
+        "value": "Personal care services",
+        "id": 17,
+        "coresignal": [
+          "Personal Care Services"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Organizations",
+    "main_industry_id": 5,
+    "sub_industries": [
+      {
+        "value": "Political Organizations",
+        "id": 20,
+        "coresignal": [
+          "Political Organizations",
+          "Political Organization"
+        ]
+      },
+      {
+        "value": "Religious Institutions",
+        "id": 22,
+        "coresignal": [
+          "Religious Institutions"
+        ]
+      },
+      {
+        "value": "Civic & Social Organizations",
+        "id": 21,
+        "coresignal": [
+          "Civic and Social Organizations",
+          "Civic & Social Organization"
+        ]
+      },
+      {
+        "value": "Other (Organizations)",
+        "id": 793
+      }
+    ]
+  },
+  {
+    "main_industry": "Education",
+    "main_industry_id": 6,
+    "sub_industries": [
+      {
+        "value": "Other (Education)",
+        "id": 794
+      },
+      {
+        "value": "Primary & Secondary Education",
+        "id": 25,
+        "coresignal": [
+          "Primary and Secondary Education",
+          "Primary/Secondary Education"
+        ]
+      },
+      {
+        "value": "E-Learning Providers",
+        "id": 23,
+        "coresignal": [
+          "E-Learning Providers",
+          "E-learning"
+        ]
+      },
+      {
+        "value": "Higher Education",
+        "id": 24,
+        "coresignal": [
+          "Higher Education"
+        ]
+      },
+      {
+        "value": "Training",
+        "id": 26,
+        "coresignal": [
+          "Professional Training & Coaching",
+          "Technical and Vocational Training"
+        ]
+      },
+      {
+        "value": "Schools",
+        "id": 27,
+        "coresignal": [
+          "Education"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Entertainment",
+    "main_industry_id": 7,
+    "sub_industries": [
+      {
+        "value": "Performing Arts",
+        "id": 31,
+        "coresignal": [
+          "Performing Arts",
+          "Theater Companies",
+          "Dance Companies"
+        ]
+      },
+      {
+        "value": "Recreational Facilities",
+        "id": 33,
+        "coresignal": [
+          "Recreational Facilities",
+          "Recreational Facilities & Services"
+        ]
+      },
+      {
+        "value": "Museums, Historical Sites, & Zoos",
+        "id": 29,
+        "coresignal": [
+          "Museums, Historical Sites, and Zoos",
+          "Museums",
+          "Historical Sites",
+          "Zoos and Botanical Gardens"
+        ]
+      },
+      {
+        "value": "Wellness & Fitness Services",
+        "id": 35,
+        "coresignal": [
+          "Wellness and Fitness Services",
+          "Health, Wellness & Fitness"
+        ]
+      },
+      {
+        "value": "Gambling Facilities & Casinos",
+        "id": 34,
+        "coresignal": [
+          "Gambling Facilities and Casinos",
+          "Gambling & Casinos"
+        ]
+      },
+      {
+        "value": "Entertainment Providers",
+        "id": 28,
+        "coresignal": [
+          "Entertainment Providers",
+          "Entertainment"
+        ]
+      },
+      {
+        "value": "Sports",
+        "id": 32,
+        "coresignal": [
+          "Sports",
+          "Sports Teams and Clubs",
+          "Sports and Recreation Instruction",
+          "Spectator Sports"
+        ]
+      },
+      {
+        "value": "Musicians, Artists & Writers",
+        "id": 30,
+        "coresignal": [
+          "Musicians",
+          "Artists and Writers"
+        ]
+      },
+      {
+        "value": "Other (Entertainment)",
+        "id": 795
+      }
+    ]
+  },
+  {
+    "main_industry": "Farming, Ranching, Forestry",
+    "main_industry_id": 8,
+    "sub_industries": [
+      {
+        "value": "Farming, Ranching, Forestry",
+        "id": 36,
+        "coresignal": [
+          "Farming, Ranching, Forestry",
+          "Farming",
+          "Forestry and Logging",
+          "Ranching and Fisheries"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Finance",
+    "main_industry_id": 9,
+    "sub_industries": [
+      {
+        "value": "International Trade & Development",
+        "id": 43,
+        "coresignal": [
+          "International Trade & Development",
+          "International Trade and Development"
+        ]
+      },
+      {
+        "value": "Capital Markets",
+        "id": 38,
+        "coresignal": [
+          "Capital Markets"
+        ]
+      },
+      {
+        "value": "Venture Capital & Private Equity Principals",
+        "id": 41,
+        "coresignal": [
+          "Venture Capital and Private Equity Principals",
+          "Venture Capital & Private Equity"
+        ]
+      },
+      {
+        "value": "Insurance",
+        "id": 44,
+        "coresignal": [
+          "Insurance",
+          "Insurance Agencies and Brokerages",
+          "Insurance and Employee Benefit Funds"
+        ]
+      },
+      {
+        "value": "Investment Banking",
+        "id": 39,
+        "coresignal": [
+          "Investment Banking"
+        ]
+      },
+      {
+        "value": "Banking",
+        "id": 42,
+        "coresignal": [
+          "Banking"
+        ]
+      },
+      {
+        "value": "Investment Management",
+        "id": 40,
+        "coresignal": [
+          "Investment Management",
+          "Funds and Trusts"
+        ]
+      },
+      {
+        "value": "Other (Finance)",
+        "id": 797
+      },
+      {
+        "value": "Financial Services",
+        "id": 37,
+        "coresignal": [
+          "Financial Services",
+          "Investment Advice",
+          "Credit Intermediation"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Government",
+    "main_industry_id": 10,
+    "sub_industries": [
+      {
+        "value": "Government Relations Services",
+        "id": 58,
+        "coresignal": [
+          "Government Relations Services",
+          "Government Relations"
+        ]
+      },
+      {
+        "value": "International Affairs",
+        "id": 54,
+        "coresignal": [
+          "International Affairs",
+          "Military and International Affairs"
+        ]
+      },
+      {
+        "value": "Public Safety",
+        "id": 49,
+        "coresignal": [
+          "Public Safety"
+        ]
+      },
+      {
+        "value": "Legislative Offices",
+        "id": 57,
+        "coresignal": [
+          "Legislative Offices",
+          "Legislative Office"
+        ]
+      },
+      {
+        "value": "Government Administration",
+        "id": 45,
+        "coresignal": [
+          "Government Administration"
+        ]
+      },
+      {
+        "value": "Education Administration Programs",
+        "id": 50,
+        "coresignal": [
+          "Education Administration Programs"
+        ]
+      },
+      {
+        "value": "Military",
+        "id": 53,
+        "coresignal": [
+          "Military",
+          "Armed Forces"
+        ]
+      },
+      {
+        "value": "Administration of Justice",
+        "id": 46,
+        "coresignal": [
+          "Administration of Justice",
+          "Courts of Law"
+        ]
+      },
+      {
+        "value": "Other (Government)",
+        "id": 779
+      },
+      {
+        "value": "Public Policy Offices",
+        "id": 55,
+        "coresignal": [
+          "Public Policy Offices",
+          "Public Policy"
+        ]
+      },
+      {
+        "value": "Health & Human Services",
+        "id": 51,
+        "coresignal": [
+          "Health and Human Services",
+          "Public Health"
+        ]
+      },
+      {
+        "value": "Housing & Community Development",
+        "id": 52,
+        "coresignal": [
+          "Housing and Community Development",
+          "Community Development and Urban Planning"
+        ]
+      },
+      {
+        "value": "Executive Offices",
+        "id": 56,
+        "coresignal": [
+          "Executive Offices",
+          "Executive Office"
+        ]
+      },
+      {
+        "value": "Law Enforcement",
+        "id": 48,
+        "coresignal": [
+          "Law Enforcement"
+        ]
+      },
+      {
+        "value": "Fire Protection",
+        "id": 47,
+        "coresignal": [
+          "Fire Protection"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Hospitals, Healthcare & Clinics",
+    "main_industry_id": 11,
+    "sub_industries": [
+      {
+        "value": "Mental Health Care",
+        "id": 64,
+        "coresignal": [
+          "Mental Health Care"
+        ]
+      },
+      {
+        "value": "Individual & Family Services",
+        "id": 61,
+        "coresignal": [
+          "Individual & Family Services",
+          "Individual and Family Services"
+        ]
+      },
+      {
+        "value": "Alternative Medicine",
+        "id": 62,
+        "coresignal": [
+          "Alternative Medicine"
+        ]
+      },
+      {
+        "value": "Other (Hospitals, Healthcare & Clinics)",
+        "id": 780
+      },
+      {
+        "value": "Medical Practices",
+        "id": 65,
+        "coresignal": [
+          "Medical Practices",
+          "Medical Practice"
+        ]
+      },
+      {
+        "value": "Hospitals & Healthcare",
+        "id": 59,
+        "coresignal": [
+          "Hospitals and Health Care",
+          "Hospital & Health Care",
+          "Hospitals"
+        ]
+      },
+      {
+        "value": "Community Services",
+        "id": 60,
+        "coresignal": [
+          "Community Services"
+        ]
+      },
+      {
+        "value": "Nursing Homes & Residential Care Facilities",
+        "id": 66,
+        "coresignal": [
+          "Nursing Homes and Residential Care Facilities"
+        ]
+      },
+      {
+        "value": "Home Health Care Services",
+        "id": 63,
+        "coresignal": [
+          "Home Health Care Services"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Manufacturing",
+    "main_industry_id": 12,
+    "sub_industries": [
+      {
+        "value": "Food & Beverage",
+        "id": 76,
+        "coresignal": [
+          "Food and Beverage Manufacturing",
+          "Food Production",
+          "Beverage Manufacturing"
+        ]
+      },
+      {
+        "value": "Pharmaceuticals",
+        "id": 71,
+        "coresignal": [
+          "Pharmaceuticals",
+          "Pharmaceutical Manufacturing"
+        ]
+      },
+      {
+        "value": "Medical Equipment",
+        "id": 80,
+        "coresignal": [
+          "Medical Equipment Manufacturing",
+          "Medical Device"
+        ]
+      },
+      {
+        "value": "Apparel",
+        "id": 67,
+        "coresignal": [
+          "Apparel Manufacturing",
+          "Apparel & Fashion",
+          "Fashion Accessories Manufacturing"
+        ]
+      },
+      {
+        "value": "Chemicals & Related Products",
+        "id": 69,
+        "coresignal": [
+          "Chemicals",
+          "Chemical Manufacturing",
+          "Chemical Raw Materials Manufacturing"
+        ]
+      },
+      {
+        "value": "Plastics & Rubber Products",
+        "id": 82,
+        "coresignal": [
+          "Plastics and Rubber Product Manufacturing",
+          "Plastics",
+          "Rubber Products Manufacturing"
+        ]
+      },
+      {
+        "value": "Paper & Forest Product",
+        "id": 81,
+        "coresignal": [
+          "Paper and Forest Product Manufacturing",
+          "Paper & Forest Products"
+        ]
+      },
+      {
+        "value": "Furniture",
+        "id": 77,
+        "coresignal": [
+          "Furniture",
+          "Furniture and Home Furnishings Manufacturing",
+          "Household and Institutional Furniture Manufacturing"
+        ]
+      },
+      {
+        "value": "Computer Hardware",
+        "id": 73,
+        "coresignal": [
+          "Computer Hardware",
+          "Computer Hardware Manufacturing"
+        ]
+      },
+      {
+        "value": "Tobacco",
+        "id": 85,
+        "coresignal": [
+          "Tobacco Manufacturing",
+          "Tobacco"
+        ]
+      },
+      {
+        "value": "Shipbuilding",
+        "id": 89,
+        "coresignal": [
+          "Shipbuilding"
+        ]
+      },
+      {
+        "value": "Appliances, Electrical, & Electronics",
+        "id": 68,
+        "coresignal": [
+          "Appliances, Electrical, and Electronics Manufacturing",
+          "Electrical & Electronic Manufacturing"
+        ]
+      },
+      {
+        "value": "Railroad Equipment",
+        "id": 88,
+        "coresignal": [
+          "Railroad Equipment Manufacturing"
+        ]
+      },
+      {
+        "value": "Computer Equipment & Electronics",
+        "id": 72,
+        "coresignal": [
+          "Computers and Electronics Manufacturing"
+        ]
+      },
+      {
+        "value": "Personal Care Products",
+        "id": 70,
+        "coresignal": [
+          "Personal Care Product Manufacturing",
+          "Cosmetics"
+        ]
+      },
+      {
+        "value": "Fabricated Metal Products",
+        "id": 75,
+        "coresignal": [
+          "Fabricated Metal Products"
+        ]
+      },
+      {
+        "value": "Sporting Goods",
+        "id": 83,
+        "coresignal": [
+          "Sporting Goods",
+          "Sporting Goods Manufacturing"
+        ]
+      },
+      {
+        "value": "Textile",
+        "id": 84,
+        "coresignal": [
+          "Textile Manufacturing",
+          "Textiles"
+        ]
+      },
+      {
+        "value": "Glass, Ceramics, Clay & Concrete",
+        "id": 78,
+        "coresignal": [
+          "Glass, Ceramics and Concrete Manufacturing",
+          "Glass, Ceramics & Concrete"
+        ]
+      },
+      {
+        "value": "Motor Vehicles",
+        "id": 87,
+        "coresignal": [
+          "Motor Vehicle Manufacturing",
+          "Motor Vehicle Parts Manufacturing"
+        ]
+      },
+      {
+        "value": "Industrial Machinery & Equipment",
+        "id": 79,
+        "coresignal": [
+          "Industrial Machinery Manufacturing",
+          "Machinery",
+          "Automation Machinery Manufacturing"
+        ]
+      },
+      {
+        "value": "Semiconductor & Renewable Energy Semiconductor",
+        "id": 74,
+        "coresignal": [
+          "Semiconductor Manufacturing",
+          "Renewable Energy Semiconductor Manufacturing",
+          "Semiconductors"
+        ]
+      },
+      {
+        "value": "Other (Manufacturing)",
+        "id": 781
+      },
+      {
+        "value": "Aerospace & Defense",
+        "id": 86,
+        "coresignal": [
+          "Aviation & Aerospace",
+          "Defense & Space",
+          "Defense and Space Manufacturing",
+          "Aviation and Aerospace Component Manufacturing"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Oil, Gas & Mining",
+    "main_industry_id": 13,
+    "sub_industries": [
+      {
+        "value": "Oil & Gas",
+        "id": 91,
+        "coresignal": [
+          "Oil & Energy",
+          "Oil and Gas"
+        ]
+      },
+      {
+        "value": "Mining",
+        "id": 90,
+        "coresignal": [
+          "Mining",
+          "Mining & Metals",
+          "Metal Ore Mining"
+        ]
+      },
+      {
+        "value": "Other (Oil, Gas & Mining)",
+        "id": 782
+      }
+    ]
+  },
+  {
+    "main_industry": "Business Services",
+    "main_industry_id": 14,
+    "sub_industries": [
+      {
+        "value": "Biotechnology Research Services",
+        "id": 106,
+        "coresignal": [
+          "Biotechnology Research",
+          "Biotechnology",
+          "Nanotechnology Research"
+        ]
+      },
+      {
+        "value": "Photography Services",
+        "id": 105,
+        "coresignal": [
+          "Photography"
+        ]
+      },
+      {
+        "value": "Environmental Services",
+        "id": 98,
+        "coresignal": [
+          "Environmental Services",
+          "Environmental Quality Programs"
+        ]
+      },
+      {
+        "value": "Business Consulting & Services",
+        "id": 97,
+        "coresignal": [
+          "Business Consulting and Services",
+          "Professional Services",
+          "Operations Consulting",
+          "Strategic Management Services"
+        ]
+      },
+      {
+        "value": "Human Resources Services",
+        "id": 99,
+        "coresignal": [
+          "Human Resources Services",
+          "Human Resources",
+          "Executive Search Services"
+        ]
+      },
+      {
+        "value": "Public Relations & Communications Services",
+        "id": 94,
+        "coresignal": [
+          "Public Relations and Communications Services",
+          "Public Relations & Communications"
+        ]
+      },
+      {
+        "value": "IT Consulting & IT Services",
+        "id": 103,
+        "coresignal": [
+          "IT Services and IT Consulting"
+        ]
+      },
+      {
+        "value": "Advertising & Marketing Services",
+        "id": 93,
+        "coresignal": [
+          "Marketing & Advertising",
+          "Advertising Services",
+          "Marketing Services"
+        ]
+      },
+      {
+        "value": "Market Research Services",
+        "id": 95,
+        "coresignal": [
+          "Market Research"
+        ]
+      },
+      {
+        "value": "Law Firms & Legal Services",
+        "id": 104,
+        "coresignal": [
+          "Legal Services",
+          "Law Practice"
+        ]
+      },
+      {
+        "value": "Outsourcing & Offshoring Consulting",
+        "id": 100,
+        "coresignal": [
+          "Outsourcing and Offshoring Consulting",
+          "Outsourcing/Offshoring"
+        ]
+      },
+      {
+        "value": "Other (Business Services)",
+        "id": 783
+      },
+      {
+        "value": "Veterinary Services",
+        "id": 108,
+        "coresignal": [
+          "Veterinary Services",
+          "Veterinary"
+        ]
+      },
+      {
+        "value": "Research Services",
+        "id": 107,
+        "coresignal": [
+          "Research Services",
+          "Research"
+        ]
+      },
+      {
+        "value": "Architecture & Planning",
+        "id": 96,
+        "coresignal": [
+          "Architecture & Planning",
+          "Architecture and Planning"
+        ]
+      },
+      {
+        "value": "Design Services",
+        "id": 101,
+        "coresignal": [
+          "Design Services",
+          "Design",
+          "Graphic Design"
+        ]
+      },
+      {
+        "value": "Accounting & Services",
+        "id": 92,
+        "coresignal": [
+          "Accounting"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Real Estate",
+    "main_industry_id": 15,
+    "sub_industries": [
+      {
+        "value": "Real Estate",
+        "id": 109,
+        "coresignal": [
+          "Real Estate",
+          "Commercial Real Estate",
+          "Real Estate Agents and Brokers",
+          "Leasing Non-residential Real Estate",
+          "Leasing Residential Real Estate",
+          "Real Estate and Equipment Rental Services"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Retail",
+    "main_industry_id": 16,
+    "sub_industries": [
+      {
+        "value": "Retail Apparel & Fashion",
+        "id": 113,
+        "coresignal": [
+          "Retail Apparel and Fashion",
+          "Apparel & Fashion"
+        ]
+      },
+      {
+        "value": "Retail Luxury Goods & Jewelry",
+        "id": 110,
+        "coresignal": [
+          "Luxury Goods & Jewelry"
+        ]
+      },
+      {
+        "value": "Other (Retail)",
+        "id": 785
+      },
+      {
+        "value": "Grocery Retail",
+        "id": 112,
+        "coresignal": [
+          "Retail Groceries",
+          "Supermarkets"
+        ]
+      },
+      {
+        "value": "Retail Office Equipment",
+        "id": 114,
+        "coresignal": [
+          "Retail Office Equipment"
+        ]
+      },
+      {
+        "value": "Food & Beverage Retail",
+        "id": 111,
+        "coresignal": [
+          "Food and Beverage Retail"
+        ]
+      },
+      {
+        "value": "Retail",
+        "id": 115,
+        "coresignal": [
+          "Retail",
+          "Online and Mail Order Retail"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Technology, Information & Media",
+    "main_industry_id": 17,
+    "sub_industries": [
+      {
+        "value": "Book & Newspaper Publishing",
+        "id": 116,
+        "coresignal": [
+          "Book and Periodical Publishing",
+          "Newspaper Publishing",
+          "Book Publishing",
+          "Periodical Publishing"
+        ]
+      },
+      {
+        "value": "Internet Publishing",
+        "id": 123,
+        "coresignal": [
+          "Internet Publishing",
+          "Online Media",
+          "Internet News",
+          "Blogs"
+        ]
+      },
+      {
+        "value": "Computer & Mobile Games",
+        "id": 126,
+        "coresignal": [
+          "Computer Games",
+          "Mobile Games",
+          "Mobile Gaming Apps"
+        ]
+      },
+      {
+        "value": "Blockchain Services",
+        "id": 121,
+        "coresignal": [
+          "Blockchain Services"
+        ]
+      },
+      {
+        "value": "Software Development",
+        "id": 129,
+        "coresignal": [
+          "Software Development",
+          "Computer Software",
+          "IT System Custom Software Development",
+          "Embedded Software Products",
+          "Desktop Computing Software Products",
+          "Mobile Computing Software Products"
+        ]
+      },
+      {
+        "value": "Other (Technology, Information & Media)",
+        "id": 786
+      },
+      {
+        "value": "Movies, Videos & Sound",
+        "id": 118,
+        "coresignal": [
+          "Movies, Videos, and Sound",
+          "Movies and Sound Recording",
+          "Sound Recording",
+          "Motion Pictures & Film"
+        ]
+      },
+      {
+        "value": "Information Services",
+        "id": 122,
+        "coresignal": [
+          "Information Services"
+        ]
+      },
+      {
+        "value": "Internet Shop & Marketplace",
+        "id": 124,
+        "coresignal": [
+          "Internet Marketplace Platforms",
+          "Online and Mail Order Retail"
+        ]
+      },
+      {
+        "value": "Broadcast Media Production & Distribution",
+        "id": 117,
+        "coresignal": [
+          "Broadcast Media Production and Distribution",
+          "Broadcast Media",
+          "Radio and Television Broadcasting",
+          "Cable and Satellite Programming"
+        ]
+      },
+      {
+        "value": "Social Networking Platforms",
+        "id": 125,
+        "coresignal": [
+          "Social Networking Platforms"
+        ]
+      },
+      {
+        "value": "Computer & Network Security Services",
+        "id": 128,
+        "coresignal": [
+          "Computer and Network Security",
+          "Computer & Network Security",
+          "Data Security Software Products"
+        ]
+      },
+      {
+        "value": "Computer Networking Products",
+        "id": 127,
+        "coresignal": [
+          "Computer Networking Products",
+          "Computer Networking"
+        ]
+      },
+      {
+        "value": "Data Infrastructure & Analytics",
+        "id": 120,
+        "coresignal": [
+          "Data Infrastructure and Analytics",
+          "Business Intelligence Platforms",
+          "Climate Data and Analytics"
+        ]
+      },
+      {
+        "value": "Telecommunications",
+        "id": 119,
+        "coresignal": [
+          "Telecommunications",
+          "Telecommunications Carriers",
+          "Wireless",
+          "Wireless Services",
+          "Media and Telecommunications"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Transportation, Logistics, Supply Chain & Storage",
+    "main_industry_id": 18,
+    "sub_industries": [
+      {
+        "value": "Other (Transportation, Logistics, Supply Chain & Storage)",
+        "id": 787
+      },
+      {
+        "value": "Airlines, Airports & Air Services",
+        "id": 130,
+        "coresignal": [
+          "Airlines and Aviation",
+          "Airlines/Aviation"
+        ]
+      },
+      {
+        "value": "Maritime Transportation",
+        "id": 133,
+        "coresignal": [
+          "Maritime Transportation",
+          "Maritime"
+        ]
+      },
+      {
+        "value": "Truck Transportation",
+        "id": 134,
+        "coresignal": [
+          "Truck Transportation"
+        ]
+      },
+      {
+        "value": "Freight & Package Transportation",
+        "id": 131,
+        "coresignal": [
+          "Freight and Package Transportation",
+          "Package/Freight Delivery"
+        ]
+      },
+      {
+        "value": "Ground Passenger Transportation",
+        "id": 132,
+        "coresignal": [
+          "Ground Passenger Transportation",
+          "Taxi and Limousine Services",
+          "Urban Transit Services",
+          "Rail Transportation"
+        ]
+      },
+      {
+        "value": "Warehousing & Storage",
+        "id": 135,
+        "coresignal": [
+          "Warehousing and Storage",
+          "Warehousing",
+          "Logistics & Supply Chain",
+          "Transportation, Logistics, Supply Chain and Storage"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Utilities",
+    "main_industry_id": 19,
+    "sub_industries": [
+      {
+        "value": "Utilities",
+        "id": 136,
+        "coresignal": [
+          "Utilities"
+        ]
+      }
+    ]
+  },
+  {
+    "main_industry": "Wholesale",
+    "main_industry_id": 20,
+    "sub_industries": [
+      {
+        "value": "Other (Wholesale)",
+        "id": 790
+      },
+      {
+        "value": "Wholesale",
+        "id": 137,
+        "coresignal": [
+          "Wholesale"
+        ]
+      },
+      {
+        "value": "Wholesale Building Materials",
+        "id": 138,
+        "coresignal": [
+          "Wholesale Building Materials"
+        ]
+      },
+      {
+        "value": "Wholesale Import & Export",
+        "id": 139,
+        "coresignal": [
+          "Wholesale Import and Export",
+          "Import & Export"
+        ]
+      }
+    ]
+  }
+]
