@@ -250,6 +250,7 @@ class OrchestratedCLIApp:
                 existing_config.get("MONGO_DB_NAME", "linkedin_sdr"),
                 required=True
             )
+
     async def claim_and_run_mongo_campaigns(self):
         """Claim pending campaigns and process them sequentially in distributed-safe mode."""
         loaded_config.connection_manager = ConnectionManager(mongo_uri=self.mongo_uri, db_name=self.db_name)
@@ -297,15 +298,16 @@ class OrchestratedCLIApp:
             try:
                 await self.run_orchestrated_workflow(with_monitoring=False)
                 await campaigns_dao.update_campaign_status(
-                campaign_id=campaign_id,
-                status="processed"
-            )
+                    campaign_id=campaign_id,
+                    status="processed"
+                )
             except Exception as e:
                 self.print_error(f"Error processing campaign {campaign_id}: {e}")
                 await campaigns_dao.update_campaign_status(
-                campaign_id=campaign_id,
-                status="pending"
-            )
+                    campaign_id=campaign_id,
+                    status="failed"
+                )
+
     def configure_processing_options(self, existing_config: Dict[str, str]):
         """Configure processing options with orchestrated-specific settings"""
         self.print_section("Processing Options")

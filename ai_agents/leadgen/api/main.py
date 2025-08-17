@@ -146,7 +146,7 @@ async def upload_data_from_form(data: FormSubmission):
             "prompts": {"web": data.web_prompt,
                         "persona": data.persona_prompt},
             "segmentation": {
-                "industry": sorted([industry.strip() for industry in data.industry.split(',') if industry]),
+                "industry": sorted([industry.strip() for industry in data.industry.split(';') if industry]),
                 "keywords": data.keywords,
                 "categories": data.categories},
             "target": {"employee_count": sorted(

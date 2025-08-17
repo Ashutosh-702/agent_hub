@@ -190,6 +190,119 @@ html, body {
   border-color: #6366f1;
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
 }
+.industry-tree {
+  max-height: 450px;
+  overflow-y: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 12px;
+  background-color: #fafafa;
+  font-family: system-ui, sans-serif;
+}
+
+/* Each main industry group */
+.industry-group {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Last group without border */
+.industry-group:last-child {
+  border-bottom: none;
+}
+
+/* Main industry label */
+.industry-main {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  cursor: pointer;
+  background-color: #f3f4f6;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.industry-main:hover {
+  background-color: #e5e7eb;
+}
+
+/* Sub-industry list */
+.industry-sub-list {
+  padding-left: 20px;
+  margin-top: 6px;
+}
+
+/* Sub-industry label */
+.industry-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background-color 0.15s ease;
+}
+
+.industry-sub:hover {
+  background-color: #f9fafb;
+}
+
+/* Checkbox tweaks */
+.industry-main input[type="checkbox"],
+.industry-sub input[type="checkbox"] {
+  cursor: pointer;
+  transform: scale(1.1);
+}
+
+/* Scrollbar styling */
+.industry-tree::-webkit-scrollbar {
+  width: 8px;
+}
+
+.industry-tree::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+}
+
+.industry-tree::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+/* Search box */
+.industry-search {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* Collapse icon styling */
+.collapse-icon {
+  display: inline-block;
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+  font-size: 10px;
+  margin-right: 4px;
+  color: #6b7280;
+}
+
+.collapse-icon.collapsed {
+  transform: rotate(0deg);
+}
+
+/* Cursor pointer for main row */
+.industry-main {
+  cursor: pointer;
+}
+.industry-main input[type="checkbox"] {
+  cursor: pointer;
+}
 
 /* Style for Chrome/Safari (WebKit) */
 .number-input::-webkit-inner-spin-button,

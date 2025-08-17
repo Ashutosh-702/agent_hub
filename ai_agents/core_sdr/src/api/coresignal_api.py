@@ -1,8 +1,14 @@
+from pathlib import Path
 import requests
 import json
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, OrderedDict
 
+LUSHA_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "lusha_industry_config.json"
+with open(LUSHA_CONFIG_PATH, "r", encoding="utf-8") as f:
+    LUSHA_CONFIG = json.load(f)
+    
+    
 def search_api(dsl_query: Dict[str, Any]) -> List[int]:
     items_per_page = 1
     
@@ -81,6 +87,18 @@ def build_payload(config: Dict[str,Any], exclude_company_list: List[str]):
                     "name": company_found["name"]
                 }
             })
+    coresignal_lookup = {}
+    for main in LUSHA_CONFIG:
+        for sub in main["sub_industries"]:
+            coresignal_lookup[sub["value"]] = sub.get("coresignal", [])
+
+    mapped_industries = []
+    for name in industries:
+        if name in coresignal_lookup:
+            mapped_industries.extend(coresignal_lookup[name])
+        else:
+            print(f"⚠️ No CoreSignal mapping found for '{name}'")
+    industries = list(OrderedDict.fromkeys(mapped_industries))
     if industries:
         industry_should = [
             {"match": {"industry": {"query": industry}}}

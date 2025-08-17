@@ -261,7 +261,7 @@ def _normalize_company_data(df: pd.DataFrame) -> list[Company]:
             if col in column_mapping:
                 field_name = column_mapping[col]
                 value = row[col]
-                if pd.notna(value) and str(value).strip():
+                if value is not None and str(value).strip():
                     company_data[field_name] = str(value).strip()
         # Ensure we have at least a company name
         if company_data['name'] is not None and company_data['name'].strip() and company_data['company_id'] is not None and company_data['company_id'].strip():

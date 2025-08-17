@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Select from 'react-select';
 import { API_BASE_URL } from '../config/api.js'
+import lushaJson from '../../../core_sdr/config/lusha_industry_config.json';
 const bqCategories = [  "mining", "energy", "utilities", "hospitality", "media", "entertainment", "gaming", "sports",  "insurance", "banking", "finance", "fintech", "real estate", "education", "legal", "construction",  "retail", "ecommerce", "wholesale", "manufacturing", "logistics", "supply chain", "automotive", "biotech","fashion", "apparel", "beauty", "pharmaceutical", "chemicals", "defense", "aerospace", "cloud computing","artificial intelligence", "machine learning", "blockchain", "iot", "cybersecurity", "saas", "big data","data analytics", "erp", "crm", "cms", "robotics", "augmented reality", "virtual reality", "3d printing","5g", "digital twins", "biometrics", "edge computing", "computer vision", "speech recognition", "b2b","b2c", "d2c", "marketplace", "subscription", "on-demand", "freemium", "licensing", "outsourcing","franchise", "reseller", "aggregator", "consulting", "marketing", "advertising", "seo", "ppc","content marketing", "email marketing", "affiliate marketing", "influencer marketing", "customer service","tech support", "field service", "delivery", "installation", "training", "research", "ui design","ux design", "graphic design", "product management", "project management", "account management","data science", "machine intelligence", "computer science", "web development", "frontend", "backend","full stack", "qa", "devops", "infrastructure", "sre", "hr", "talent acquisition", "payroll","employee engagement", "compliance", "legal ops", "procurement", "finance ops", "fp&a","customer success", "sales enablement", "lead generation", "crm automation", "call center","crm systems", "product analytics", "session replay", "conversion rate", "churn prevention","loyalty programs", "payment gateway", "checkout optimization", "personalization engine","recommendation engine", "A/B testing", "multivariate testing", "data lake", "data warehouse","data mart", "etl", "elt", "pipeline orchestration", "notebooks", "BI tools", "dashboards","reporting", "OKRs", "KPIs", "north star metric", "unit economics", "CAC", "LTV", "retention","activation", "user onboarding", "feature flags", "experimentation", "feedback loops","interview scheduling", "ATS", "HRIS", "learning management", "security compliance", "ISO27001","SOC 2", "GDPR", "HIPAA", "PCI", "pen testing", "bug bounty", "vulnerability scanning","threat detection", "endpoint protection", "SIEM", "cloud security", "identity management","SSO", "MFA", "IAM", "zero trust", "network segmentation", "firewalls", "api gateway","rate limiting", "auth", "oauth", "jwt", "webhooks", "scheduling", "notifications","email infrastructure", "SMS", "push notifications", "in-app messaging", "chatbot","voice assistant", "natural language", "translation", "localization", "internationalization","geolocation", "maps", "places api", "routing", "ETA", "tracking", "fleet management","sensors", "hardware", "firmware", "bluetooth", "nfc", "qr code", "barcodes","inventory", "stock keeping", "pricing engine", "discount rules", "campaigns","voucher system", "gift cards", "wallet", "cashback", "referrals", "growth hacks","network effects", "virality", "influencer campaigns", "ugc", "reviews", "ratings","moderation", "spam detection", "toxicity", "image classification", "object detection","OCR", "document parsing", "pdf processing", "excel import", "csv export", "json apis","graphql", "rest apis", "rate limiting", "api keys", "token management", "permissions","roles", "audit logs", "billing", "invoicing", "tax", "gst", "vat", "accounting","bookkeeping", "audit", "legal", "notarization", "identity verification", "kyc","aml", "fraud detection", "risk scoring", "credit scoring", "insurance underwriting","claims", "policy management", "loan origination", "mortgages", "real estate listing","property management", "tenant screening", "lease signing", "rent collection","facility management", "maintenance requests", "smart locks", "access control","surveillance", "home automation", "climate control", "lighting", "voice control","scene management", "automation rules", "trigger events", "logging", "alerts","uptime monitoring", "status page", "incident response", "pager", "on-call","runbooks", "playbooks", "postmortems", "rca", "escalations", "sla tracking","user permissions", "session management", "cookie consent", "privacy policy","terms of use", "legal disclaimers", "dmca", "copyright", "trademark","patent", "ip strategy", "legal entity", "business registration","cap table", "equity management", "vesting", "esop", "fundraising","pitch deck", "data room", "term sheet", "safe", "convertible note","valuation", "dilution", "burn rate", "runway", "revenue model","pricing strategy", "customer segmentation", "target audience", "personas","user research", "usability testing", "click tracking", "heatmaps", "session recordings","interviews", "surveys", "net promoter score", "customer satisfaction","churn analysis", "cohort analysis", "funnel analysis", "retention curve","virality curve", "growth loops", "network analysis", "graph db","relational db", "nosql", "mongodb", "postgres", "mysql", "dynamodb","redis", "elastic search", "solr", "kafka", "rabbitmq", "sqs", "sns","pubsub", "event bus", "event sourcing", "cqrs", "command pattern","observer pattern", "factory pattern", "singleton", "builder","adapter", "proxy", "decorator", "chain of responsibility","mediator", "mvc", "mvvm", "clean architecture", "hexagonal architecture","domain driven design", "test driven development", "behavior driven development","unit testing", "integration testing", "e2e testing", "load testing", "performance testing","security testing", "accessibility", "wcag", "screen readers", "keyboard navigation","focus trap", "tab order", "semantic html", "aria labels", "contrast ratio","color blindness", "font scaling", "dark mode", "rtl support", "l10n", "i18n"];
 
 // Demo industries for now
@@ -22,6 +23,169 @@ const regions = [
 
 const countries = [ "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo (Congo-Brazzaville)", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Democratic Republic of the Congo", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Ivory Coast", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine State", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe" ];
 
+type IndustryStepProps = {
+  form: string[];
+  setForm: (v: string[]) => void;
+  step: number;
+};
+
+function IndustryStep({ form, setForm, step }: IndustryStepProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(
+    () =>
+      lushaJson.reduce((acc, main) => {
+        acc[main.main_industry] = true;
+        return acc;
+      }, {} as Record<string, boolean>)
+  );
+
+  const q = searchQuery.trim().toLowerCase();
+  const hasQuery = q.length > 0;
+
+  const toggleCollapse = (mainName: string) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [mainName]: !prev[mainName],
+    }));
+  };
+
+  // Helpers for selection string
+  const getSelected = () =>
+    form[step] ? form[step].split(';').map(v => v.trim()).filter(Boolean) : [];
+
+  const setSelected = (vals: string[]) => {
+    const updated = [...form];
+    updated[step] = vals.join(';');
+    setForm(updated);
+  };
+
+  const toggleMain = (allSubs: string[]) => {
+    const selected = getSelected();
+    const allSelected = allSubs.length > 0 && allSubs.every(v => selected.includes(v));
+    let updated = [...selected];
+    if (allSelected) {
+      updated = updated.filter(v => !allSubs.includes(v));
+    } else {
+      allSubs.forEach(v => {
+        if (!updated.includes(v)) updated.push(v);
+      });
+    }
+    setSelected(updated);
+  };
+
+  const toggleSub = (subValue: string) => {
+    const selected = getSelected();
+    let updated = [...selected];
+    if (updated.includes(subValue)) {
+      updated = updated.filter(v => v !== subValue);
+    } else {
+      updated.push(subValue);
+    }
+    setSelected(updated);
+  };
+
+  // Filtering mains by main name OR any sub name
+  const mainsToShow = lushaJson.filter(main => {
+    if (!hasQuery) return true;
+    const mainMatch = main.main_industry.toLowerCase().includes(q);
+    const subMatch = main.sub_industries.some((s: any) => s.value.toLowerCase().includes(q));
+    return mainMatch || subMatch;
+  });
+
+  // Helper to highlight matches (optional; add CSS below)
+  const highlight = (text: string) => {
+    if (!hasQuery) return text;
+    const idx = text.toLowerCase().indexOf(q);
+    if (idx === -1) return text;
+    const before = text.slice(0, idx);
+    const match = text.slice(idx, idx + q.length);
+    const after = text.slice(idx + q.length);
+    return (
+      <>
+        {before}
+        <span className="match">{match}</span>
+        {after}
+      </>
+    );
+  };
+
+  return (
+    <div className="industry-tree">
+      <input
+        type="text"
+        className="industry-search"
+        placeholder="Search industries..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+      />
+
+      {mainsToShow.map(main => {
+        // If searching, only show subs that match the query (unless main itself matches; then show all)
+        const mainMatches = hasQuery && main.main_industry.toLowerCase().includes(q);
+        const subs = hasQuery && !mainMatches
+          ? main.sub_industries.filter((s: any) => s.value.toLowerCase().includes(q))
+          : main.sub_industries;
+
+        const selected = getSelected();
+        const allSubs = subs.map((s: any) => s.value); // operate on visible subs when searching
+        const allSubsSelected = allSubs.length > 0 && allSubs.every(v => selected.includes(v));
+        const someSubsSelected = allSubs.some(v => selected.includes(v)) && !allSubsSelected;
+
+        // While searching, auto-expand groups with matches
+        const isCollapsed = hasQuery ? false : !!collapsedGroups[main.main_industry];
+
+        return (
+          <div key={main.main_industry} className="industry-group">
+            <div
+              className="industry-main"
+              onClick={() => !hasQuery && toggleCollapse(main.main_industry)}
+              title={hasQuery ? 'Expanded due to search' : 'Click to collapse/expand'}
+            >
+              <span className={`collapse-icon ${isCollapsed ? 'collapsed' : ''}`}>
+                ▶
+              </span>
+              <input
+                type="checkbox"
+                ref={(el) => {
+                  if (el) el.indeterminate = someSubsSelected;
+                }}
+                checked={allSubsSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  // When not searching, toggle all actual subs in the group
+                  // When searching, toggle only the visible subs (so UX matches what user sees)
+                  const targetSubs = hasQuery
+                    ? subs.map((s: any) => s.value)
+                    : main.sub_industries.map((s: any) => s.value);
+                  toggleMain(targetSubs);
+                }}
+              />
+              <span>{highlight(main.main_industry)}</span>
+            </div>
+
+            {!isCollapsed && (
+              <div className="industry-sub-list">
+                {subs.map((sub: any) => (
+                  <label key={sub.value} className="industry-sub">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(sub.value)}
+                      onChange={() => toggleSub(sub.value)}
+                    />
+                    <span>{highlight(sub.value)}</span>
+                  </label>
+                ))}
+                {subs.length === 0 && hasQuery && (
+                  <div className="industry-sub empty">No matching sub-industries</div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 const AutoResizeTextarea = ({
   value,
@@ -231,7 +395,7 @@ export const Form = () => {
             )}
 
             {/* Step 0: Industries */}
-            {step === 0 && (
+            {/* {step === 0 && (
               <Select 
                 isMulti 
                 name={`step_${step}`} 
@@ -244,7 +408,10 @@ export const Form = () => {
                 }} 
                 placeholder="Select industries..." 
               />
-            )}
+            )} */}
+              {step === 0 && (
+  <IndustryStep form={form} setForm={setForm} step={0} />
+)}
 
             {/* Step 1: Employee Count */}
             {step === 1 && (

@@ -1,8 +1,17 @@
 import gspread
 from ai_agents.core_sdr.src.api.lusha_api import lusha_collect_companies_from_search
 from oauth2client.service_account import ServiceAccountCredentials
-from typing import Dict, Any, List
+from typing import Dict, Any, List, OrderedDict
 from pathlib import Path
+import json
+
+LUSHA_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "lusha_industry_config.json"
+with open(LUSHA_CONFIG_PATH, "r", encoding="utf-8") as f:
+    LUSHA_CONFIG = json.load(f)
+LUSHA_LOOKUP = {}
+for main in LUSHA_CONFIG:
+    for sub in main["sub_industries"]:
+        LUSHA_LOOKUP[sub["value"]] = sub["id"]
 
 def get_industry_mapping() -> Dict[str, int]:
     """
@@ -10,53 +19,9 @@ def get_industry_mapping() -> Dict[str, int]:
     Returns: Dictionary mapping industry names to Lusha industry IDs
     """
     try:
-        scope = [
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        base_dir = Path(__file__).resolve().parent.parent.parent
-        creds = ServiceAccountCredentials.from_json_keyfile_name(
-            f"{base_dir}/config/service_account.json", scope
-        )
-        client = gspread.authorize(creds)
-        mapping_sheet = client.open_by_url(
-            "https://docs.google.com/spreadsheets/d/1YlSkziIIWoQd8S6DCC4fiX4uU0R96y_d7qEtfEADZWk/edit?gid=1348584716#gid=1348584716"
-        ).worksheet("Combined Mapping")
-        expected_headers = [ 'subIndustry', 'mainIndustry', 'Lusha subIndustry id', 'mainIndustryId', 'coresignalIndustries']
-        # headers = mapping_sheet.row_values(1)
-        # print("Detected headers:", headers)
-
-        records = mapping_sheet.get_all_records(expected_headers=expected_headers)
-        # print("records: ",records)
-        mapping = {
-            "Sub":{},
-            "Main": {}
-        }
-        
-        for record in records:
-            sub_industry = record.get("subIndustry", "")
-            main_industry = record.get("mainIndustry", "")
-            sub_industry_id = record.get("Lusha subIndustry id", "")
-            main_industry_id = record.get("mainIndustryId", "")
-            # print(f" industry_data : sub_industry: {sub_industry}, sub_industry_id: {sub_industry_id}, main_industry: {main_industry}, main_industry_id: {main_industry_id}")
-            if sub_industry and sub_industry_id:
-                try:
-                    mapping["Sub"][sub_industry] = int(sub_industry_id)
-                    
-
-                except ValueError:
-                    print(f"⚠️ Invalid Industry ID for '{sub_industry}': {sub_industry_id}")
-        
-            if main_industry and main_industry_id:
-                try:
-                    mapping["Main"][main_industry] = int(main_industry_id)
-                    
-
-                except ValueError:
-                    print(f"⚠️ Invalid Industry ID for '{main_industry}': {main_industry_id}")
-        
-        
-        print(f"✅ Loaded {len(mapping['Sub'])} Subindustry mappings and {len(mapping['Main'])} Mainindustry mappings ")
+        mapping = {"Sub": {}, "Main": {}}
+        for name, id_val in LUSHA_LOOKUP.items():
+            mapping["Sub"][name] = id_val
         return mapping
         
     except Exception as e:
@@ -107,34 +72,21 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
     lusha_config = {
         "pages": {"page": 0, "size": 40} 
     }
-    
-    if sheets_data.get("segmentation")['industry']:
-        industry_mapping = get_industry_mapping()
-        print("WORKING TILL HERE - 1")
-        # print("industry mapping:",industry_mapping)
+    industry_names = sheets_data.get("segmentation", {}).get("industry", [])
+    if not isinstance(industry_names, list):
+        print("⚠️ Expected list for industry names, got:", type(industry_names))
+        industry_names = []
 
-        industry_names = sheets_data["segmentation"]["industry"]
-        print("industry_names",industry_names)
-        print("WORKING TILL HERE - 2")
-        main_industry_ids = []
-        sub_industry_ids = []
-        
+    if industry_names:
+        sub_ids = []
         for name in industry_names:
-            if name in industry_mapping["Main"]:
-                main_industry_ids.append(industry_mapping["Main"][name])
+            if name in LUSHA_LOOKUP:
+                sub_ids.append(LUSHA_LOOKUP[name])
             else:
                 print(f"⚠️ Industry '{name}' not found in mapping")
-        for name in industry_names:
-            if name in industry_mapping["Sub"]:
-                sub_industry_ids.append(industry_mapping["Sub"][name])
-            else:
-                print(f"⚠️ Industry '{name}' not found in mapping")
-        
-        print("Main: ",main_industry_ids)
-        if main_industry_ids:
-            lusha_config["mainIndustriesIds"] = main_industry_ids
-        if sub_industry_ids:
-            lusha_config["subIndustriesIds"] = sub_industry_ids
+        sub_ids = list(OrderedDict.fromkeys(sub_ids))
+        if sub_ids:
+            lusha_config["subIndustriesIds"] = sub_ids
     
     if sheets_data.get("target", "")['location']['names']:
         locations = sheets_data['target']["location"]['names']
