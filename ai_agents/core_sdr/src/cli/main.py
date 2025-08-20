@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from ai_agents.core_sdr.src.api.coresignal_api import collect_companies_from_search
 from ai_agents.core_sdr.src.parsers.lusha_helper import get_companies_from_lusha
 from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.company_mappings import CompanyMappingsDao
+from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.campaigns import CampaignsDao
 from config.loaded_config import loaded_config
 from datetime import datetime
@@ -175,20 +175,18 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
             inserted_ids = await companies_dao.create_companies(companies_list)
             print(f"Total new companies added into companies collection: {len(inserted_ids)}")
             id_list = inserted_ids + cached_ids
-            company_mappings_dao = CompanyMappingsDao(loaded_config.connection_manager.mongo_client)
-            mapping_doc = {
+            campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+            for _id in id_list:
+                mapping_doc = {
                 "campaign_id": config.get("_id"),
-                "company_output":[{
-                    "company_id": _id,
-                    "is_relevant": False,
-                    "contact_ids": []
-                } for _id in id_list] ,
+                "company_id": _id,
+                "company_status": False,
                 "metadata":{
                         "created_at":datetime.utcnow(),
                         "updated_at":datetime.utcnow(),
                 },
             }
-            await company_mappings_dao.create_company_mapping(mapping_doc)
+                await campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
             campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
             await campaigns_dao.update_campaign_status(mapping_doc['campaign_id'],"pending")
             print(f"Updated status of {mapping_doc['campaign_id']} to 'pending'")

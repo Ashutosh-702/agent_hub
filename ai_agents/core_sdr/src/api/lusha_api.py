@@ -111,3 +111,59 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_d
         return all_companies
     except Exception as e:
         raise Exception(f"Error searching companies: {str(e)}")
+def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
+    print("Payload_values_for_contact:", json.dumps(payload_values_for_contact,indent=2))
+    payload_query =  build_payload_for_contact(payload_values_for_contact=payload_values_for_contact)
+    print(f"Payload Query: {json.dumps(payload_query, indent=2)}")
+    url = f"https://api.lusha.com/prospecting/contact/search"
+    headers = {
+        'accept': 'application/json',
+        "api_key": f"{os.getenv('LUSHA_API_KEY')}",
+        'Content-Type': 'application/json'
+    }
+    response = requests.post(url, headers=headers, json=payload_query)
+    if response.status_code == 201:
+       return response.json()
+    else:
+        raise Exception(f"Search API failed: {response.status_code} - {response.text}")
+    
+def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
+    payload_query_for_contact = {
+        "pages": {
+            "page": 0,
+            "size": 40
+        },
+        "filters": {
+            "contacts": {
+                "include": {},
+                "exclude": {}
+            },
+            "companies":{
+                "include": {}
+            }
+        }
+    }
+    print(f"payload_values: {payload_values_for_contact}")
+    if "page_size" in payload_values_for_contact and payload_values_for_contact["page_size"]:
+        payload_query_for_contact["pages"]["size"] = payload_values_for_contact["page_size"]
+    if "company_names" in payload_values_for_contact and payload_values_for_contact["company_names"]:
+        payload_query_for_contact["filters"]["companies"]["include"]['names'] = [name for name in payload_values_for_contact["company_names"]]
+    return payload_query_for_contact
+
+def lusha_contact_enrich_api(request_id: str, contact_id_list: List[str]) -> Dict[str, Any]:
+    
+    url = f"https://api.lusha.com/prospecting/contact/enrich"
+    headers = {
+        'accept': 'application/json',
+        "api_key": f"{os.getenv('LUSHA_API_KEY')}",
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        "requestId": request_id,
+        "contactIds": [id for id in contact_id_list]
+    }
+    response = requests.post(url, headers=headers,json=payload)
+    if response.status_code == 201:
+       return response.json()
+    else:
+        raise Exception(f"Search API failed: {response.status_code} - {response.text}")

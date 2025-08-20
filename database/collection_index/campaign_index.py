@@ -5,7 +5,7 @@ async def campaign_mongodb_indexes(mongo_client):
     """Create necessary indexes for MongoDB collections."""
     # Get stores collection
     campaigns_collection = mongo_client.linkedin_db.campaigns
-    company_mappings_collection = mongo_client.linkedin_db.company_mappings
+    campaign_company_runs_collection = mongo_client.linkedin_db.campaign_company_runs
     companies_collection = mongo_client.linkedin_db.companies
     
 

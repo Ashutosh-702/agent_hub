@@ -10,10 +10,10 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, Any, List
-
+import requests
 from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log, sdr_logger
 from ai_agents.ai_sdr.sdr.models import WorkflowState
-
+from config.loaded_config import loaded_config
 
 def save_company_linkedin_progress(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:
     """
@@ -101,9 +101,13 @@ def save_company_linkedin_progress(state: WorkflowState, config: Dict[str, Any])
         if executives_found:
             csv_filename = f"company_{safe_company_name}_prospects_{timestamp}.csv"
             csv_filepath = os.path.join(progress_dir, csv_filename)
-            
+            data_source_type = config_dict.get("data_source",{}).get("type","")
+            campaign_id = config_dict.get("data_source",{}).get("campaign_id","")
+            company_id = getattr(state.current_company, "company_id", None)
+            if data_source_type == "mongo":
+                _save_company_prospects_mongo(executives_found,company.name,campaign_id=campaign_id,company_id=company_id)
+                clean_log("Stored in Database")
             _save_company_prospects_csv(executives_found, company.name, csv_filepath)
-            
             sdr_logger.log_file_saved(csv_filepath, f"LinkedIn prospects CSV for {company.name}")
             detailed_log(f"LinkedIn prospects CSV saved to: {csv_filename}")
             
@@ -262,7 +266,20 @@ def _save_company_prospects_csv(prospects: List[Dict[str, Any]], company_name: s
                 'Company LinkedIn URL': prospect.get('company_linkedin_url', '')
             })
 
-
+def _save_company_prospects_mongo(prospects: List[Dict[str, Any]], company_name: str, campaign_id: str, company_id: str):
+    """Save company's LinkedIn prospects to Database"""
+    payload = {
+        "prospects":prospects,
+        "company_name":company_name,
+        "campaign_id": campaign_id,
+        "company_id": company_id
+    }
+    try:
+        BASE_URL = loaded_config.base_url
+        requests.post(f"{BASE_URL}/api/v1/save_prospects_data_to_mongo",json=payload)
+    except Exception as e:
+        clean_log(f"error {e}")
+        raise Exception("Error",str(e))
 # Async wrappers for LangGraph compatibility
 async def linkedin_progress_saver(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:
     """

@@ -1,35 +1,41 @@
 import asyncio
+from datetime import datetime
 import os
 import json
 import uuid
 import asyncio
 import sys
 from pathlib import Path
+from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Request
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+import pandas as pd
 from pydantic import BaseModel
 from ai_agents.core_sdr.src.cli.main import process_company_search
 from ai_agents.leadgen.workflow.prompt_reader import submit_company_data
 from database.collection_dao.campaigns import CampaignsDao
+from database.collection_dao.companies import CompaniesDao
+from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
+from database.collection_dao.contacts import ContactsDao
 from database.connection_manager import ConnectionManager
 from config.loaded_config import loaded_config
 from typing import Dict, Any
 from ai_agents.leadgen.workflow.health_service import HealthService
 from fastapi.responses import ORJSONResponse
-from ai_agents.ai_sdr.cli_app_orchestrated import run_orchestrated_workflow
+from ai_agents.ai_sdr.cli_app_orchestrated import OrchestratedCLIApp, run_orchestrated_workflow
 from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
-
 # Consumer imports
 from kafkautils.consumer.consumer import start_eventbridge_consumer
 from kafkautils.consumer.kafka_config import get_available_consumer_types
 from eventbridge.health import _healthz, _readyz
 import uvicorn
-
+from ai_agents.core_sdr.src.api.lusha_api import lusha_contact_enrich_api,lusha_contact_search_api
 
 async def initialize_database():
     loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_sdr")
@@ -50,7 +56,7 @@ async def lifespan(app: FastAPI):
         await initialize_database()
         print("✅ Database and EventBridge connected successfully")
         # await campaign_mongodb_indexes(loaded_config.connection_manager.mongo_client)
-        # await company_mapping_mongodb_indexes(loaded_config.connection_manager.mongo_client)
+        # await campaign_company_run_mongodb_indexes(loaded_config.connection_manager.mongo_client)
         # await companies_mongodb_indexes(loaded_config.connection_manager.mongo_client)
     except Exception as e:
         print(f"❌ Startup failed: {e}")
@@ -259,6 +265,237 @@ async def run_ai_sdr():
 
     return
 
+@app.post("/api/v1/lusha_contact_enrichment")
+async def lusha_contact_enrich(campaign_id):
+    try:    
+        if not campaign_id:
+            raise ValueError("Campaign Id is required")
+        campaign_company_run_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        company_map_list = await campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
+        company_ids = []
+        if company_map_list:
+            for companies in company_map_list:
+                company_output = companies.get("company_id","")
+                company_ids.append(company_output)
+        payload = {
+            "company_names":company_ids
+        }
+        if company_ids:
+            response = await lusha_contact_search_api(payload)
+            req_id = response.get("request_id","")
+            contacts = response.get("contacts",{})
+            contact_ids = []
+            for contact in contacts:
+                id = contact.get("contactId")
+                contact_ids.append(id)
+        if req_id and contact_ids:
+            enriched_contact_data = await lusha_contact_enrich_api(req_id,contact_ids)
+            if "contacts" in enriched_contact_data:
+                for contact in enriched_contact_data["contacts"]:
+                    data = contact.get("data", {})
+                    linkedin_url = data.get("socialLinks",{}).get("linkedin","")
+                    email_addresses = [e["email"] for e in data.get("emailAddresses", []) if "email" in e]
+                    phone_numbers = [p["number"] for p in data.get("phoneNumbers", []) if "number" in p]
+                    contact_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+                    db_contacts = await contact_dao.get_contacts({"linkedin_data.linkedin_url": linkedin_url})
+                    if db_contacts:
+                        db_contact = db_contacts[0]
+                        await contact_dao.update_one({"_id": db_contact["_id"]},{
+                                                                            "$set": {
+                                                                            "contact_data.email": email_addresses,
+                                                                            "contact_data.phone": phone_numbers,
+                                                                            "metadata.updated_at": datetime.utcnow()
+                                                                            }})
+                    else:
+                        firstname = data["firstName"]
+                        lastname = data["lastName"]
+                        job_title = data["jobTitle"]
+                        company = data["companyName"]
+                        contact_doc = {
+                            "contact_data": {
+                                "firstname": firstname,
+                                "lastname": lastname,
+                                "email": email_addresses,
+                                "phone": phone_numbers,
+                                "jobtitle": job_title,
+                                "company": company
+                            },
+                            "linkedin_data": {
+                                "linkedin_url": linkedin_url,
+                                "source": "LUSHA-ENRICHER"
+                            },
+                            "hubspot_data": {
+                                "ci_lifecycle_stage": "Not Contacted"
+                            },
+                            "metadata": {
+                                "created_at": datetime.utcnow(),
+                                "updated_at": datetime.utcnow()
+                            }
+                        }
+
+                        contact_id = await contact_dao.create_contact(contact_doc)
+                        await campaign_company_run_dao.update_campaign_company_run(
+                                        {"campaign_id": campaign_id, "company_output.company_id": company},
+                                        {
+                                            "$push": {
+                                                "company_output.$.contact_ids": contact_id
+                                            },
+                                            "$set": {
+                                                "metadata.updated_at": datetime.utcnow()
+                                            }
+                                        }
+                                    )
+        return {"status":"success","message":"Data upload is successful"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+                
+@app.get("/api/v1/fetch_and_claim_first_campaign")
+async def fetch_and_claim_first_campaign():
+    campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+    claimed_campaign = await campaigns_dao.find_one_and_update({"lifecycle.status": "pending"},{"$set": {"lifecycle.status": "processing"}})
+    if not claimed_campaign:
+        return {"status":"success", "message": "No campaign found"}
+    campaign_id = claimed_campaign.get("_id","")
+    ownership = claimed_campaign.get("ownership", {})
+    prompts = claimed_campaign.get("prompts", {})
+    ai_sdr_custom_config = {
+        "HUBSPOT_OWNER_EMAIL": ownership.get("hubspot_email", ""),
+        "USER_EMAIL": ownership.get("user_email", ""),
+        "PRODUCT_NAME": ownership.get("product_name", ""),
+        "BUSINESS_TEAM": ownership.get("business_team", ""),
+        "custom_prompts": {}, 
+        "CAMPAIGN_ID": str(campaign_id),
+        "DATA_SOURCE_TYPE": "mongo",
+        "target_executives": prompts.get("persona", "")
+    }
+
+    web_enrichment_prompt = f"""Relevance Criteria: Determine if the company fits either of the following:
+    
+    {prompts.get("web", "")}
+
+    Begin your research now using the web search tool to determine if companies match these criteria."""
+    ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
+    ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get("persona", "")
+    return {"status":"success","config": ai_sdr_custom_config}
+
+@app.post("/api/v1/update_campaign_status")
+async def update_campaign_status(campaign_id: str,status: str):
+    campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+    claimed_campaign = await campaigns_dao.update_campaign_status(ObjectId(campaign_id),status)
+    if claimed_campaign:
+        return {"status":"success","message": f"Successfully updated campaign status for id {campaign_id} to {status}"}
+    else:
+        return {"status":"error","message": f"No campaign found with campaign id: {campaign_id}"}
+
+@app.get("/api/v1/fetch_companies")
+async def fetch_companies_from_mappings(campaign_id: str):
+    campaign_oid = ObjectId(campaign_id)
+
+    mappings_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+    companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+
+    mapping_docs = await mappings_dao.get_campaign_company_runs({"campaign_id": campaign_oid})
+    if not mapping_docs:
+        raise ValueError(f"No company mappings found for campaign_id {campaign_id}")
+
+    data_rows = []
+    for mapping in mapping_docs:
+        company_id = mapping.get("company_id")
+        if not company_id:
+            continue
+        company_oid = company_id if isinstance(company_id, ObjectId) else ObjectId(company_id)
+        
+        company_doc = await companies_dao.get_company(company_oid)
+        if not company_doc:
+            continue
+        name = (company_doc.get("identifiers",{})).get("name")
+        if not name:
+            continue
+
+        profile = company_doc.get("profile") or {}
+        location = company_doc.get("location") or {}
+
+        data_rows.append({
+            "company_name": name,
+            "company_id": str(company_oid),
+            "industry": profile.get("industry"),
+            "company_size": profile.get("employeeCount"),
+            "location": location.get("name"),
+        })
+    if not data_rows:
+        raise ValueError(f"No valid companies found in Mongo for campaign {campaign_id}")
+    print(data_rows)
+    return {"status": "success", "company_df": data_rows}
+
+@app.post("/api/v1/save_prospects_data_to_mongo")
+async def save_prospects_data_to_mongo(request: Request):
+    body = await request.json()
+    prospects = body.get("prospects",[])
+    campaign_id = body.get("campaign_id","")
+    company_name = body.get("company_name","")
+    company_id = body.get("company_id","")
+    contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+    campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
+    campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+    
+    await campaign_company_runs_dao.update_campaign_company_run({"campaign_id":ObjectId(campaign_id),"company_id":ObjectId(company_id)},{
+        "$set":{"company_status":True, "metadata.updated_at":datetime.utcnow()}
+    })
+    inserted_ids = []
+    for prospect in prospects:
+        linkedin_url = prospect.get("linkedin_profile", "")
+        stored_contacts = await contacts_dao.get_contacts({"linkedin_data.linkedin_url":linkedin_url,"contact_data.company_id": ObjectId(company_id)})
+        if len(stored_contacts)==0:
+            full_name = prospect.get("name", "")
+            name_parts = full_name.split(" ", 1) if full_name else ["", ""]
+            firstname = name_parts[0]
+            lastname = name_parts[1] if len(name_parts) > 1 else ""
+            contact_doc = {
+                "contact_data": {
+                    "firstname": firstname,
+                    "lastname": lastname,
+                    "email": prospect.get("email", ""),
+                    "phone": prospect.get("phone_number", ""),
+                    "jobtitle": prospect.get("title", ""),
+                    "company": prospect.get("company", company_name),
+                    "company_id":ObjectId(company_id)
+                    },
+                    "linkedin_data": {
+                        "linkedin_url": prospect.get("linkedin_profile", ""),
+                        "source": "AI-SDR",
+                        "product_name": prospect.get("product","")
+                    },
+                    "hubspot_data": {
+                        "hubspot_owner_id": prospect.get("hubspot_owner_email",""), #TODO: Check if passed in prospect
+                        "ci_lifecycle_stage": "Not Contacted"
+                    },
+                    "metadata": {
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            contact_id = await contacts_dao.create_contact(contact_doc)
+            inserted_ids.append(ObjectId(contact_id))
+        else:
+            contact = stored_contacts[0]
+            contact_id = contact.get("_id","")
+            inserted_ids.append(contact_id)
+        
+    if campaign_id and company_id:
+        for id in inserted_ids:
+            campaign_contact_run_doc = {
+            "campaign_id": ObjectId(campaign_id),
+            "company_id": ObjectId(company_id),
+            "contact_id":id,
+            "contact_status": False ,
+            "metadata":{
+                "created_at":datetime.utcnow(),
+                "updated_at":datetime.utcnow(),
+            }
+        }
+            await campaign_contact_runs_dao.create_campaign_contact_run(campaign_contact_run_doc)
+    return {"status": "success"}
 
 @app.get("/api/v1/health_check")
 async def health_check() -> Dict[str, Any]:

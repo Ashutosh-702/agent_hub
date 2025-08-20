@@ -9,11 +9,8 @@ This is the CLI entry point for the orchestrated (per-company) architecture.
 import os
 import sys
 
-from bson import ObjectId
-from database.connection_manager import ConnectionManager
-from database.collection_dao.campaigns import CampaignsDao
+import requests
 from config.loaded_config import loaded_config
-
 # Add project root to Python path
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
@@ -253,60 +250,26 @@ class OrchestratedCLIApp:
 
     async def claim_and_run_mongo_campaigns(self):
         """Claim pending campaigns and process them sequentially in distributed-safe mode."""
-        loaded_config.connection_manager = ConnectionManager(mongo_uri=self.mongo_uri, db_name=self.db_name)
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
 
         while True:
-            pending_campaigns = await campaigns_dao.get_campaigns({"lifecycle.status": "pending"})
-            if not pending_campaigns:
-                self.print_success("No pending campaigns left.")
+            BASE_URL = loaded_config.base_url
+            response = requests.get(f"{BASE_URL}/api/v1/fetch_and_claim_first_campaign")
+            claimed = response.json()
+
+            if claimed.get("status") == "success" and "config" not in claimed:
+                self.print_success("No pending campaigns left")
                 break
-
-            claimed = pending_campaigns[0]
-            campaign_id = claimed["_id"]
-
-            await campaigns_dao.update_campaign_status(
-                campaign_id=campaign_id,
-                status="processing"
-            )
-
-            ownership = claimed.get("ownership", {})
-            prompts = claimed.get("prompts", {})
-
-            ai_sdr_custom_config = {
-                "HUBSPOT_OWNER_EMAIL": ownership.get("hubspot_email", ""),
-                "USER_EMAIL": ownership.get("user_email", ""),
-                "PRODUCT_NAME": ownership.get("product_name", ""),
-                "BUSINESS_TEAM": ownership.get("business_team", ""),
-                "custom_prompts": {},
-                "CAMPAIGN_ID": str(campaign_id),
-                "DATA_SOURCE_TYPE": "mongo",
-                "target_executives": prompts.get("persona", "")
-            }
-
-            web_enrichment_prompt = f"""Relevance Criteria: Determine if the company fits either of the following:
-            
-                {prompts.get("web", "")}
-
-                Begin your research now using the web search tool to determine if companies match these criteria."""
-            ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
-            ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get("persona", "")
-
+            ai_sdr_custom_config = claimed.get("config",{})
+            campaign_id =ai_sdr_custom_config.get("CAMPAIGN_ID","")
             self.config = ai_sdr_custom_config
             self.print_section(f"Processing Campaign: {campaign_id}")
 
             try:
                 await self.run_orchestrated_workflow(with_monitoring=False)
-                await campaigns_dao.update_campaign_status(
-                    campaign_id=campaign_id,
-                    status="processed"
-                )
-            except Exception as e:
+                requests.post(f"{BASE_URL}/api/v1/update_campaign_status",params={"campaign_id": campaign_id, "status": "processed"})
+            except BaseException as e:
                 self.print_error(f"Error processing campaign {campaign_id}: {e}")
-                await campaigns_dao.update_campaign_status(
-                    campaign_id=campaign_id,
-                    status="failed"
-                )
+                requests.post(F"{BASE_URL}/api/v1/update_campaign_status",params={"campaign_id": campaign_id, "status": "failed"})
 
     def configure_processing_options(self, existing_config: Dict[str, str]):
         """Configure processing options with orchestrated-specific settings"""
@@ -660,24 +623,10 @@ class OrchestratedCLIApp:
             self.configure_api_keys(existing_config)
             await self.configure_data_source(existing_config)
             if self.config.get("DATA_SOURCE_TYPE") == "mongo":
-                if self.config.get("DATA_SOURCE_TYPE") == "mongo":
-                    await self.claim_and_run_mongo_campaigns()
-                    return
-                self.show_configuration_summary()
-
-                while True:
-                    action = self.run_workflow_menu()
-                    if action == "run_orchestrated":
-                        await self.run_orchestrated_workflow(with_monitoring=False)
-                    elif action == "run_with_monitoring":
-                        await self.run_orchestrated_workflow(with_monitoring=True)
-                    elif action == "validate_models":
-                        self.run_model_validation()
-                    elif action == "compare_workflows":
-                        self.compare_workflows()
-                    elif action == "exit":
-                        break
+                await self.claim_and_run_mongo_campaigns()
                 return
+            self.show_configuration_summary()
+
             self.configure_processing_options(existing_config)
             self.configure_prompts()
 
@@ -685,6 +634,19 @@ class OrchestratedCLIApp:
             if not self.save_env_file():
                 prompt_log(f"{Colors.RED}Failed to save configuration. Exiting.{Colors.END}")
                 return
+            while True:
+                action = self.run_workflow_menu()
+                if action == "run_orchestrated":
+                    await self.run_orchestrated_workflow(with_monitoring=False)
+                elif action == "run_with_monitoring":
+                    await self.run_orchestrated_workflow(with_monitoring=True)
+                elif action == "validate_models":
+                    self.run_model_validation()
+                elif action == "compare_workflows":
+                    self.compare_workflows()
+                elif action == "exit":
+                    break
+            return
 
             self.show_configuration_summary()
 

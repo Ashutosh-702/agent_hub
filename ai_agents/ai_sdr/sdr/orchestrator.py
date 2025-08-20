@@ -18,9 +18,6 @@ from ai_agents.ai_sdr.sdr.nodes.error_reporter import save_error_summary
 from ai_agents.ai_sdr.sdr.nodes.final_progress_saver import save_final_workflow_results
 from ai_agents.ai_sdr.sdr.nodes.progress_saver import save_linkedin_progress
 from ai_agents.ai_sdr.sdr.single_company_workflow import compile_single_company_workflow
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.company_mappings import CompanyMappingsDao
-from config.loaded_config import loaded_config
 
 @dataclass
 class OrchestratorResult:

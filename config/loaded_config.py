@@ -7,5 +7,6 @@ class Settings:
     connection_manager: ConnectionManager = None
     debug = os.getenv("DEBUG",False)
     MODE = os.getenv("MODE", "server")
+    base_url = os.getenv("BASE_URL","http://0.0.0.0:80")
 
 loaded_config = Settings()
