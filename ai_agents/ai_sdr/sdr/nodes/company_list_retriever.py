@@ -127,7 +127,7 @@ async def _read_mongo_companies(campaign_id: str) -> pd.DataFrame:
     """
     try:
         BASE_URL = loaded_config.base_url
-        response = requests.get(f"{BASE_URL}/api/v1/fetch_companies",params={"campaign_id":campaign_id})
+        response = requests.get(f"{BASE_URL}/api/v1/fetch_companies",params={"campaign_id":campaign_id}, verify=False, timeout=30)
         response = response.json()
         df=[]
         if response.get("status","") == "success":

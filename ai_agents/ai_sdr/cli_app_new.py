@@ -20,6 +20,10 @@ import asyncio
 from typing import Dict
 from pathlib import Path
 from datetime import datetime
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+
+urllib3.disable_warnings(InsecureRequestWarning)
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent.parent
@@ -253,7 +257,7 @@ class OrchestratedCLIApp:
 
         while True:
             BASE_URL = loaded_config.base_url
-            response = requests.get(f"{BASE_URL}/api/v1/fetch_and_claim_first_campaign")
+            response = requests.get(f"{BASE_URL}/api/v1/fetch_and_claim_first_campaign", verify=False, timeout=30)
             claimed = response.json()
 
             if claimed.get("status") == "success" and "config" not in claimed:
@@ -266,10 +270,10 @@ class OrchestratedCLIApp:
 
             try:
                 await self.run_orchestrated_workflow(with_monitoring=False)
-                requests.post(f"{BASE_URL}/api/v1/update_campaign_status",params={"campaign_id": campaign_id, "status": "processed"})
+                requests.post(f"{BASE_URL}/api/v1/update_campaign_status",params={"campaign_id": campaign_id, "status": "processed"}, verify=False, timeout=30)
             except BaseException as e:
                 self.print_error(f"Error processing campaign {campaign_id}: {e}")
-                requests.post(F"{BASE_URL}/api/v1/update_campaign_status",params={"campaign_id": campaign_id, "status": "failed"})
+                requests.post(F"{BASE_URL}/api/v1/update_campaign_status",params={"campaign_id": campaign_id, "status": "failed"}, verify=False, timeout=30)
 
     def configure_processing_options(self, existing_config: Dict[str, str]):
         """Configure processing options with orchestrated-specific settings"""

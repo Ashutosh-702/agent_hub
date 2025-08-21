@@ -36,6 +36,10 @@ from kafkautils.consumer.kafka_config import get_available_consumer_types
 from eventbridge.health import _healthz, _readyz
 import uvicorn
 from ai_agents.core_sdr.src.api.lusha_api import lusha_contact_enrich_api,lusha_contact_search_api
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+
+urllib3.disable_warnings(InsecureRequestWarning)
 
 async def initialize_database():
     loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_sdr")
@@ -445,6 +449,7 @@ async def save_prospects_data_to_mongo(request: Request):
     inserted_ids = []
     for prospect in prospects:
         linkedin_url = prospect.get("linkedin_profile", "")
+        linkedin_url = linkedin_url.lower().rstrip('/')
         stored_contacts = await contacts_dao.get_contacts({"linkedin_data.linkedin_url":linkedin_url,"contact_data.company_id": ObjectId(company_id)})
         if len(stored_contacts)==0:
             full_name = prospect.get("name", "")
@@ -462,14 +467,9 @@ async def save_prospects_data_to_mongo(request: Request):
                     "company_id":ObjectId(company_id)
                     },
                     "linkedin_data": {
-                        "linkedin_url": prospect.get("linkedin_profile", ""),
-                        "source": "AI-SDR",
-                        "product_name": prospect.get("product","")
-                    },
-                    "hubspot_data": {
-                        "hubspot_owner_id": prospect.get("hubspot_owner_email",""), #TODO: Check if passed in prospect
-                        "ci_lifecycle_stage": "Not Contacted"
-                    },
+                        "linkedin_url": linkedin_url,
+                        "source": "AI-SDR"
+                    }, #Removed hubspot and product data from here
                     "metadata": {
                         "created_at": datetime.utcnow(),
                         "updated_at": datetime.utcnow()

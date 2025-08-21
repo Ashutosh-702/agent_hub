@@ -3,6 +3,10 @@ import requests
 import json
 import os
 from typing import List, Dict, Any, OrderedDict
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+
+urllib3.disable_warnings(InsecureRequestWarning)
 
 LUSHA_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "lusha_industry_config.json"
 with open(LUSHA_CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -23,7 +27,7 @@ def search_api(dsl_query: Dict[str, Any]) -> List[int]:
         'accept': 'application/json'
     }
     
-    response = requests.post(url, headers=headers, data=payload)
+    response = requests.post(url, headers=headers, data=payload, verify=False, timeout=30)
     
     if response.status_code == 200:
         data = response.json()
@@ -41,7 +45,7 @@ def collect_api(company_id: int) -> Dict[str, Any]:
         'Content-Type': 'application/json'
     }
     
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, verify=False, timeout=30)
     
     if response.status_code == 200:
         return response.json()

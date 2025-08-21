@@ -2,6 +2,10 @@ import requests
 import json
 import os
 from typing import List, Dict, Any
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+
+urllib3.disable_warnings(InsecureRequestWarning)
 
 LUSHA_API_KEY = os.getenv("LUSHA_API_KEY")
 def lusha_search_api(payload_values: Dict[str, Any], cached_data: List[Dict[str,Any]]) -> List[int]:
@@ -14,7 +18,7 @@ def lusha_search_api(payload_values: Dict[str, Any], cached_data: List[Dict[str,
         "api_key": f"{os.getenv('LUSHA_API_KEY')}",
         'Content-Type': 'application/json'
     }
-    response = requests.post(url, headers=headers, json=payload_query)
+    response = requests.post(url, headers=headers, json=payload_query, verify=False, timeout=30)
     if response.status_code == 201:
        return response.json()
     else:
@@ -121,7 +125,7 @@ def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict
         "api_key": f"{os.getenv('LUSHA_API_KEY')}",
         'Content-Type': 'application/json'
     }
-    response = requests.post(url, headers=headers, json=payload_query)
+    response = requests.post(url, headers=headers, json=payload_query, verify=False, timeout=30)
     if response.status_code == 201:
        return response.json()
     else:
@@ -162,7 +166,7 @@ def lusha_contact_enrich_api(request_id: str, contact_id_list: List[str]) -> Dic
         "requestId": request_id,
         "contactIds": [id for id in contact_id_list]
     }
-    response = requests.post(url, headers=headers,json=payload)
+    response = requests.post(url, headers=headers,json=payload, verify=False, timeout=30)
     if response.status_code == 201:
        return response.json()
     else:

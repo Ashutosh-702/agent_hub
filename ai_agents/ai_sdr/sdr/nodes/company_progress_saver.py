@@ -14,6 +14,10 @@ import requests
 from ai_agents.ai_sdr.sdr.logging_config import clean_log, detailed_log, sdr_logger
 from ai_agents.ai_sdr.sdr.models import WorkflowState
 from config.loaded_config import loaded_config
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+
+urllib3.disable_warnings(InsecureRequestWarning)
 
 def save_company_linkedin_progress(state: WorkflowState, config: Dict[str, Any]) -> WorkflowState:
     """
@@ -276,7 +280,7 @@ def _save_company_prospects_mongo(prospects: List[Dict[str, Any]], company_name:
     }
     try:
         BASE_URL = loaded_config.base_url
-        requests.post(f"{BASE_URL}/api/v1/save_prospects_data_to_mongo",json=payload)
+        requests.post(f"{BASE_URL}/api/v1/save_prospects_data_to_mongo",json=payload, verify=False, timeout=30)
     except Exception as e:
         clean_log(f"error {e}")
         raise Exception("Error",str(e))
