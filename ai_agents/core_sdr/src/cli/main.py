@@ -116,38 +116,39 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
             cached_data.append({'id': company_data['identifiers']['source_id'],'name': company_data['identifiers']['name']})
         cached_ids = [company['_id'] for company in cached_data_db]
         lusha_company_data = get_companies_from_lusha(config,cached_data) # List of {'id': int, 'name': str}
-        # lusha_company_data = [{'id':1,'name': "Company 1"},{'id':2,'name': "Company 2"},{'id':3,'name': "Company 3"}]
         print(f"Found {len(lusha_company_data)} companies from lusha.")
         print("Fetching companies from core_signal...")
         core_signal_company_data = collect_companies_from_search(config, lusha_company_data+cached_data) # List of {'id': int, 'name': str}
-        # core_signal_company_data = [{'id':4,'name': "Company 4"},{'id':5,'name': "Company 5"},{'id':6,'name': "Company 6"}]
         total_company_data = lusha_company_data+core_signal_company_data
         companies_list = []
         if total_company_data:
+            source_id_list = [cached_company["id"] for cached_company in cached_data]
             for company_data in lusha_company_data:
-                company_doc = {
-                    "identifiers":{
-                        "source_id": company_data["id"],
-                        "name": company_data["name"],
-                    }, 
-                    "profile":{
-                        "industry": config.get("segmentation")['industry'],  
-                        "revenue_min": config.get("target", "")['revenue_min'],
-                        "revenue_max": config.get("target", "")['revenue_max'],
-                        "employee_count": config.get("target", "")['employee_count'],
-                    },
-                    "location":{
-                        "type": config.get("target", "")['location']['type'],
-                        "name": config.get("target", "")['location']['names'],
-                    },
-                    "source": "lusha",
-                    "metadata":{
-                        "created_at":datetime.utcnow(),
-                        "updated_at":datetime.utcnow(),
-                        "api_response": company_data["api_response_metadata"],
+                source_id = company_data["id"]
+                if source_id not in source_id_list:  
+                    company_doc = {
+                        "identifiers":{
+                            "source_id": company_data["id"],
+                            "name": company_data["name"],
+                        }, 
+                        "profile":{
+                            "industry": config.get("segmentation")['industry'],  
+                            "revenue_min": config.get("target", "")['revenue_min'],
+                            "revenue_max": config.get("target", "")['revenue_max'],
+                            "employee_count": config.get("target", "")['employee_count'],
+                        },
+                        "location":{
+                            "type": config.get("target", "")['location']['type'],
+                            "name": config.get("target", "")['location']['names'],
+                        },
+                        "source": "lusha",
+                        "metadata":{
+                            "created_at":datetime.utcnow(),
+                            "updated_at":datetime.utcnow(),
+                            "api_response": company_data["api_response_metadata"],
+                        }
                     }
-                }
-                companies_list.append(company_doc)
+                    companies_list.append(company_doc)
             for company_data in core_signal_company_data:
                 company_doc = {
                     "identifiers":{

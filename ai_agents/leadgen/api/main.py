@@ -270,51 +270,69 @@ async def run_ai_sdr():
     return
 
 @app.post("/api/v1/lusha_contact_enrichment")
-async def lusha_contact_enrich(campaign_id):
+async def lusha_contact_enrich(campaign_id: str):
     try:    
         if not campaign_id:
             raise ValueError("Campaign Id is required")
+        campaign_id = ObjectId(campaign_id)
         campaign_company_run_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        campaign_contact_run_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        
         company_map_list = await campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
-        company_ids = []
+        company_names = []
+        
         if company_map_list:
-            for companies in company_map_list:
-                company_output = companies.get("company_id","")
-                company_ids.append(company_output)
+            for companies in company_map_list[:1]:
+                company_id = companies.get("company_id", "")
+                company_doc = await companies_dao.get_company(company_id)
+                company_name = company_doc.get("identifiers",{}).get("name","")
+                company_names.append(company_name)
+        
         payload = {
-            "company_names":company_ids
+            "company_names": company_names
         }
-        if company_ids:
-            response = await lusha_contact_search_api(payload)
-            req_id = response.get("request_id","")
-            contacts = response.get("contacts",{})
+        
+        if company_names:
+            response = lusha_contact_search_api(payload)
+            req_id = response.get("requestId", "")
+            contacts = response.get("data", [])
             contact_ids = []
             for contact in contacts:
                 id = contact.get("contactId")
                 contact_ids.append(id)
         if req_id and contact_ids:
-            enriched_contact_data = await lusha_contact_enrich_api(req_id,contact_ids)
+            enriched_contact_data = lusha_contact_enrich_api(req_id, contact_ids)
             if "contacts" in enriched_contact_data:
                 for contact in enriched_contact_data["contacts"]:
                     data = contact.get("data", {})
-                    linkedin_url = data.get("socialLinks",{}).get("linkedin","")
+                    linkedin_url = data.get("socialLinks", {}).get("linkedin", "")
                     email_addresses = [e["email"] for e in data.get("emailAddresses", []) if "email" in e]
                     phone_numbers = [p["number"] for p in data.get("phoneNumbers", []) if "number" in p]
+                    
                     contact_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
                     db_contacts = await contact_dao.get_contacts({"linkedin_data.linkedin_url": linkedin_url})
+                    
                     if db_contacts:
                         db_contact = db_contacts[0]
-                        await contact_dao.update_one({"_id": db_contact["_id"]},{
-                                                                            "$set": {
-                                                                            "contact_data.email": email_addresses,
-                                                                            "contact_data.phone": phone_numbers,
-                                                                            "metadata.updated_at": datetime.utcnow()
-                                                                            }})
+                        await contact_dao.update_one(
+                            {"_id": db_contact["_id"]},
+                            {
+                                "$set": {
+                                    "contact_data.email": email_addresses,
+                                    "contact_data.phone": phone_numbers,
+                                    "metadata.updated_at": datetime.utcnow()
+                                }
+                            }
+                        )
                     else:
                         firstname = data["firstName"]
                         lastname = data["lastName"]
                         job_title = data["jobTitle"]
-                        company = data["companyName"]
+                    
+                        company_doc = await companies_dao.get_company(ObjectId(company_id))
+                        company_name = company_doc.get("identifiers", {}).get("name", "Unknown Company")
+                        
                         contact_doc = {
                             "contact_data": {
                                 "firstname": firstname,
@@ -322,14 +340,12 @@ async def lusha_contact_enrich(campaign_id):
                                 "email": email_addresses,
                                 "phone": phone_numbers,
                                 "jobtitle": job_title,
-                                "company": company
+                                "company": company_name,
+                                "company_id": ObjectId(company_id)
                             },
                             "linkedin_data": {
                                 "linkedin_url": linkedin_url,
                                 "source": "LUSHA-ENRICHER"
-                            },
-                            "hubspot_data": {
-                                "ci_lifecycle_stage": "Not Contacted"
                             },
                             "metadata": {
                                 "created_at": datetime.utcnow(),
@@ -338,18 +354,21 @@ async def lusha_contact_enrich(campaign_id):
                         }
 
                         contact_id = await contact_dao.create_contact(contact_doc)
-                        await campaign_company_run_dao.update_campaign_company_run(
-                                        {"campaign_id": campaign_id, "company_output.company_id": company},
-                                        {
-                                            "$push": {
-                                                "company_output.$.contact_ids": contact_id
-                                            },
-                                            "$set": {
-                                                "metadata.updated_at": datetime.utcnow()
-                                            }
-                                        }
-                                    )
-        return {"status":"success","message":"Data upload is successful"}
+                        await campaign_contact_run_dao.create_campaign_contact_run(
+                            {
+                                "campaign_id": campaign_id,
+                                "company_id": company_id,
+                                "contact_id": contact_id,
+                                "metadata": {
+                                "created_at": datetime.utcnow(),
+                                "updated_at": datetime.utcnow()
+                            }
+                        },
+                            
+                        )
+        
+        return {"status": "success", "message": "Data upload is successful"}
+        
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

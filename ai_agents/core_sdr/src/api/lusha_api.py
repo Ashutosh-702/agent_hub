@@ -138,10 +138,6 @@ def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dic
             "size": 40
         },
         "filters": {
-            "contacts": {
-                "include": {},
-                "exclude": {}
-            },
             "companies":{
                 "include": {}
             }
