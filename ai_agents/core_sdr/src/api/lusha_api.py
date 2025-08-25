@@ -18,9 +18,15 @@ def lusha_search_api(payload_values: Dict[str, Any], cached_data: List[Dict[str,
         "api_key": f"{os.getenv('LUSHA_API_KEY')}",
         'Content-Type': 'application/json'
     }
+    
     response = requests.post(url, headers=headers, json=payload_query, verify=False, timeout=30)
+        
     if response.status_code == 201:
-       return response.json()
+        return response.json()
+    elif response.status_code == 429:
+        # Return None to indicate rate limit exhaustion rather than raising exception
+        print(f"Rate limit exhausted")
+        return None
     else:
         raise Exception(f"Search API failed: {response.status_code} - {response.text}")
 def build_payload(payload_values: Dict[str, Any],cached_data: List[Dict[str,Any]]) -> Dict[str, Any]:
@@ -78,21 +84,36 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_d
         print("working propoer")
         all_companies = []
         page_size = payload_values.get("pages", {}).get("size", 20)
+        rate_limit_hit = False
 
+        # Step 1: Get first page to determine total results
         initial_payload = payload_values.copy()
         initial_payload["pages"] = {"page": 0, "size": page_size}
         first_response = lusha_search_api(payload_values=initial_payload, cached_data=cached_data)
-        if not first_response or "data" not in first_response:
+
+        if not first_response:
+            print("First API call failed or hit rate limit. Returning empty results.")
             return []
+            
+        if "data" not in first_response:
+            print("No data in first response. Returning empty results.")
+            return []
+            
+        # Process first page data
         for company in first_response["data"]:
-            all_companies.append({"id": company["id"], "name": company["name"],"api_response_metadata":company})
+            all_companies.append({
+                "id": company["id"], 
+                "name": company["name"],
+                "api_response_metadata": company
+            })
 
         # Step 2: Calculate total pages needed
         total_results = first_response.get("totalResults", 0)
+        print(f"Total results for this search: {total_results}")
         total_pages = (total_results + page_size - 1) // page_size  # Ceiling division
         
         print(f"Total results: {total_results}, Total pages: {total_pages}")
-        total_pages  = 1 if total_pages > 1 else total_pages
+        # total_pages  = 1 if total_pages > 1 else total_pages
         for page_num in range(1, total_pages):
             print(f"Fetching page {page_num + 1} of {total_pages}")
             
@@ -100,21 +121,44 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_d
             page_payload = payload_values.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
             
-            page_response = lusha_search_api(payload_values=page_payload)
+            # some time it throws error 429, so we need to handle it like the number of   data it already has it should  return. how to handle this?
+            page_response = lusha_search_api(payload_values=page_payload, cached_data=cached_data)
             
-            if page_response and "data" in page_response:
-                # Extract companies from this page
+            if page_response is None:
+                # Rate limit hit and retries exhausted
+                print(f"Rate limit hit on page {page_num + 1}. Returning {len(all_companies)} companies collected so far.")
+                rate_limit_hit = True
+                break
+            elif page_response and "data" in page_response:
+                # Successfully got data from this page
+                page_companies = 0
                 for company in page_response["data"]:
-                    all_companies.append({"id": company["id"], "name": company["name"],"api_response_metadata":company})
+                    all_companies.append({
+                        "id": company["id"], 
+                        "name": company["name"],
+                        "api_response_metadata": company
+                    })
+                    page_companies += 1
+                print(f"Collected {page_companies} companies from page {page_num + 1}")
             else:
                 print(f"Failed to fetch page {page_num}")
                 break
         
-        print(f"Collected {len(all_companies)} companies from {total_pages} pages")
-        print(f"all_companies: {all_companies}")
+        # Final summary
+        if rate_limit_hit:
+            print(f"Collection completed with rate limiting. Collected {len(all_companies)} companies out of {total_results} total available.")
+        else:
+            print(f"Collection completed successfully. Collected {len(all_companies)} companies from {total_pages} pages.")
+        
         return all_companies
+        
     except Exception as e:
-        raise Exception(f"Error searching companies: {str(e)}")
+        # If we have some companies collected, return them instead of failing completely
+        if 'all_companies' in locals() and len(all_companies) > 0:
+            print(f"Error occurred during collection, but returning {len(all_companies)} companies already collected: {str(e)}")
+            return all_companies
+        else:
+            raise Exception(f"Error searching companies: {str(e)}")
 def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
     print("Payload_values_for_contact:", json.dumps(payload_values_for_contact,indent=2))
     payload_query =  build_payload_for_contact(payload_values_for_contact=payload_values_for_contact)
