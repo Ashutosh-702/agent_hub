@@ -38,7 +38,10 @@ async def lusha_search_api(payload_values: Dict[str, Any], cached_data: Optional
         print(f"Rate limit exhausted")
         return None
     else:
-        raise Exception(f"Search API failed: {response.status_code} - {response.text}")
+        #Temp code
+        print(f"Search API failed: {response.status_code} - {response.text}")
+        return None
+        # raise Exception(f"Search API failed: {response.status_code} - {response.text}")
 def build_payload(payload_values: Dict[str, Any],cached_data: Optional[List[Dict[str,Any]]]) -> Dict[str, Any]:
     """Build the API payload from input values."""
     # payload_values = {industry: [12,23,23], location: india, revenue: {min:100000, max: 1000000}, size: {min: 10, max: 100}}
@@ -130,7 +133,8 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
         total_pages = (total_results + page_size - 1) // page_size  # Ceiling division
         
         print(f"Total results: {total_results}, Total pages: {total_pages}")
-        # total_pages  = 1 if total_pages > 1 else total_pages
+        #temp code
+        total_pages  = 2 if total_pages > 2 else total_pages
         for page_num in range(1, total_pages):
             print(f"Fetching page {page_num + 1} of {total_pages}")
             
