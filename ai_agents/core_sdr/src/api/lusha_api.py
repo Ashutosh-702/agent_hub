@@ -107,7 +107,8 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
             schedule_func, eta_func = get_chronos_utils()
             if schedule_func and eta_func:
                 eta = eta_func()
-                await schedule_func(payload_values, eta)
+                scheduler_response = await schedule_func(payload_values, eta)
+                print(f"Scheduler response: {scheduler_response}")
             return []
             
         if "data" not in first_response:
@@ -149,7 +150,8 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
                 schedule_func, eta_func = get_chronos_utils()
                 if schedule_func and eta_func:
                     eta = eta_func()
-                    await schedule_func(payload_values, eta)
+                    scheduler_response = await schedule_func(payload_values, eta)
+                    print(f"Scheduler response: {scheduler_response}")
                 break
             elif page_response and "data" in page_response:
                 # Successfully got data from this page
