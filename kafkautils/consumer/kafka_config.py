@@ -1,8 +1,9 @@
 """Kafka consumer configuration for leadgen service."""
 import os
 from typing import Dict, Any
-from kafkautils.constants import LeadgenServices, LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING
+from kafkautils.constants import LeadgenServices, LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LUSHA_COMPANY_COLLECTION
 from kafkautils.handlers import leadgen_batch_processing_handler
+from kafkautils.handlers import lusha_company_collection_handler
 
 # Common Consumer Configuration
 COMMON_CONSUMER_CONFIG = {
@@ -32,8 +33,12 @@ KAFKA_CONSUMER_SETTINGS = {
             "custom_commit_offset": "post",
             "async_kafka": True,
             "topics_configurations": {
-                KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]["topics"][0]: {  # Dynamic topic lookup
+                # Multiple topics with their respective handlers
+                KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]["topics"][0]: {
                     "tasks": [leadgen_batch_processing_handler]
+                },
+                KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LUSHA_COMPANY_COLLECTION]["topics"][0]: {
+                    "tasks": [lusha_company_collection_handler]
                 }
             },
         }

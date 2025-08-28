@@ -1,15 +1,25 @@
 import requests
 import json
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any,Optional
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
-
+# from kafkautils.handlers import process_lusha_company_collection  # Removed to fix circular import
+# from global_utils.chronos_utils import schedule_lusha_company_collection,generate_default_eta_expression  # Removed to fix circular import
 urllib3.disable_warnings(InsecureRequestWarning)
-
+import time
 LUSHA_API_KEY = os.getenv("LUSHA_API_KEY")
-def lusha_search_api(payload_values: Dict[str, Any], cached_data: List[Dict[str,Any]]) -> List[int]:
-    print("Payload_values:", json.dumps(payload_values,indent=2))
+
+def get_chronos_utils():
+    """Local import helper to avoid circular dependencies."""
+    try:
+        from global_utils.chronos_utils import schedule_lusha_company_collection, generate_default_eta_expression
+        return schedule_lusha_company_collection, generate_default_eta_expression
+    except ImportError as e:
+        print(f"Could not import chronos utils: {e}")
+        return None, None
+async def lusha_search_api(payload_values: Dict[str, Any], cached_data: Optional[List[Dict[str,Any]]]= None) -> List[int]:
+    print(f"Payload_values: {payload_values}")
     payload_query =  build_payload(payload_values=payload_values, cached_data=cached_data)
     print(f"Payload Query: {json.dumps(payload_query, indent=2)}")
     url = f"https://api.lusha.com/prospecting/company/search"
@@ -29,7 +39,7 @@ def lusha_search_api(payload_values: Dict[str, Any], cached_data: List[Dict[str,
         return None
     else:
         raise Exception(f"Search API failed: {response.status_code} - {response.text}")
-def build_payload(payload_values: Dict[str, Any],cached_data: List[Dict[str,Any]]) -> Dict[str, Any]:
+def build_payload(payload_values: Dict[str, Any],cached_data: Optional[List[Dict[str,Any]]]) -> Dict[str, Any]:
     """Build the API payload from input values."""
     # payload_values = {industry: [12,23,23], location: india, revenue: {min:100000, max: 1000000}, size: {min: 10, max: 100}}
 
@@ -79,7 +89,7 @@ def build_payload(payload_values: Dict[str, Any],cached_data: List[Dict[str,Any]
     
     return payload_query
 
-def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_data: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
+async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_data: List[Dict[str,Any]],config: Dict[str, Any]) -> List[Dict[str,Any]]:
     try:
         print("working propoer")
         all_companies = []
@@ -89,10 +99,15 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_d
         # Step 1: Get first page to determine total results
         initial_payload = payload_values.copy()
         initial_payload["pages"] = {"page": 0, "size": page_size}
-        first_response = lusha_search_api(payload_values=initial_payload, cached_data=cached_data)
+        first_response = await lusha_search_api(payload_values=initial_payload, cached_data=cached_data)
 
         if not first_response:
             print("First API call failed or hit rate limit. Returning empty results.")
+            payload_values['raw_config'] = config
+            schedule_func, eta_func = get_chronos_utils()
+            if schedule_func and eta_func:
+                eta = eta_func()
+                await schedule_func(payload_values, eta)
             return []
             
         if "data" not in first_response:
@@ -109,6 +124,7 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_d
 
         # Step 2: Calculate total pages needed
         total_results = first_response.get("totalResults", 0)
+
         print(f"Total results for this search: {total_results}")
         total_pages = (total_results + page_size - 1) // page_size  # Ceiling division
         
@@ -120,14 +136,20 @@ def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_d
             # Update payload for current page
             page_payload = payload_values.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
-            
+            page_payload["total_results"] = total_results
+            time.sleep(2)
             # some time it throws error 429, so we need to handle it like the number of   data it already has it should  return. how to handle this?
-            page_response = lusha_search_api(payload_values=page_payload, cached_data=cached_data)
+            page_response = await lusha_search_api(payload_values=page_payload, cached_data=cached_data)
             
             if page_response is None:
                 # Rate limit hit and retries exhausted
                 print(f"Rate limit hit on page {page_num + 1}. Returning {len(all_companies)} companies collected so far.")
                 rate_limit_hit = True
+                payload_values['raw_config'] = config
+                schedule_func, eta_func = get_chronos_utils()
+                if schedule_func and eta_func:
+                    eta = eta_func()
+                    await schedule_func(payload_values, eta)
                 break
             elif page_response and "data" in page_response:
                 # Successfully got data from this page

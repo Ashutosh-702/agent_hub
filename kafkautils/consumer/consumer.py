@@ -72,8 +72,13 @@ class LeadgenEventBridgeConsumer:
             # Set the message handler in the topics configuration
             topics_config = self.consumer_config["topics_configurations"]
             for topic_name, topic_config in topics_config.items():
-                topic_config["tasks"] = [self.leadgen_message_handler]
-                print(f"   📂 Set handler for topic: {topic_name}")
+                # Only set default handler if no handler is already configured
+                if "tasks" not in topic_config or not topic_config["tasks"]:
+                    topic_config["tasks"] = [self.leadgen_message_handler]
+                    print(f"   📂 Set default handler for topic: {topic_name}")
+                else:
+                    print(f"   📂 Using configured handler for topic: {topic_name}")
+                    print(f"      Handler: {topic_config['tasks'][0].__name__ if topic_config['tasks'] else 'None'}")
             
             print("   📡 Connecting to Kafka via EventBridge...")
             print(f"   👂 Listening for leadgen company search messages...")
