@@ -2,7 +2,7 @@ import os
 import random
 import json
 from dotenv import load_dotenv
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from chronos_client.client import SchedulerAPIClient
 from bson import ObjectId
 
@@ -10,14 +10,18 @@ from bson import ObjectId
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=env_path)
 
-def serialize_objectids(obj):
-    """Convert ObjectIds to strings for JSON serialization"""
+def serialize_for_json(obj):
+    """Convert ObjectIds and datetime objects to strings for JSON serialization"""
     if isinstance(obj, ObjectId):
         return str(obj)
+    elif isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    elif isinstance(obj, timezone):
+        return str(obj)
     elif isinstance(obj, dict):
-        return {key: serialize_objectids(value) for key, value in obj.items()}
+        return {key: serialize_for_json(value) for key, value in obj.items()}
     elif isinstance(obj, list):
-        return [serialize_objectids(item) for item in obj]
+        return [serialize_for_json(item) for item in obj]
     else:
         return obj
 
@@ -47,8 +51,8 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta: str):
     chronos_url = os.getenv("CHRONOS_INTRNL_SVC")
     scheduler_client = SchedulerAPIClient(base_url=chronos_url)
     
-    # Serialize ObjectIds to avoid JSON serialization errors
-    serialized_campaign_details = serialize_objectids(campaign_details)
+    # Serialize ObjectIds and datetime objects to avoid JSON serialization errors
+    serialized_campaign_details = serialize_for_json(campaign_details)
     
     scheduler_payload = {
         "service_name": "linkedin_sdr",
