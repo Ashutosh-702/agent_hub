@@ -26,22 +26,19 @@ def serialize_for_json(obj):
         return obj
 
 def get_eta_datetime(eta: int) -> str:
-    """Calculate ETA in ISO format - copied from vector add 10 seconds"""
-    return (datetime.now(timezone.utc) + timedelta(minutes=eta) + timedelta(seconds=10)).isoformat(timespec="seconds")
+    """Calculate ETA in chronos-compatible format - without timezone info"""
+    eta_datetime = datetime.now(timezone.utc) + timedelta(minutes=eta) + timedelta(seconds=10)
+    # Return in format expected by chronos marshmallow schema: '%Y-%m-%dT%H:%M:%S' (no timezone)
+    return eta_datetime.strftime('%Y-%m-%dT%H:%M:%S')
 
 def generate_default_eta_expression() -> str:
     """
-    Generate a default cron expression for 2 hours from now
-    Returns format: "minute hour * * *" (specific time today)
+    Generate a default ETA for 10 seconds from now in chronos-compatible format (for SIT testing)
+    Returns format: '%Y-%m-%dT%H:%M:%S' (no timezone)
     """
-    # eta is in minutes
-    
-    future_time = datetime.now() + timedelta(hours=1)
-    minute = future_time.minute
-    hour = future_time.hour
-    DEFAULT_TIMESPEC = 'seconds'
-    future_time = future_time.isoformat(timespec=DEFAULT_TIMESPEC)
-    return future_time
+    future_time = datetime.now() + timedelta(seconds=10)
+    # Return in format expected by chronos marshmallow schema: '%Y-%m-%dT%H:%M:%S' (no timezone)
+    return future_time.strftime('%Y-%m-%dT%H:%M:%S')
 
 async def schedule_lusha_company_collection(campaign_details: dict, eta):
     """
@@ -50,14 +47,6 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
     """
     chronos_url = os.getenv("CHRONOS_INTRNL_SVC")
     scheduler_client = SchedulerAPIClient(base_url=chronos_url)
-    
-    # Ensure eta is a string (convert datetime if needed)
-    if isinstance(eta, (datetime, date)):
-        eta = eta.isoformat()
-    elif not isinstance(eta, str):
-        eta = str(eta)
-    
-    print(f"🔍 Debug - eta type: {type(eta)}, value: {eta}")
     
     # Serialize ObjectIds and datetime objects to avoid JSON serialization errors
     serialized_campaign_details = serialize_for_json(campaign_details)
@@ -69,23 +58,12 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
             "campaign_details": json.dumps(serialized_campaign_details),
             "action": "process_lusha_company_collection"  
         },
-        "eta": eta,  
+        "eta": eta,  # eta is now properly formatted from get_eta_datetime()
         "partition_value": str(campaign_details.get("campaign_id", ""))
     }
     
-    # CRITICAL: Serialize the ENTIRE payload since chronos_client's serializer is incomplete
-    scheduler_payload = serialize_for_json(scheduler_payload)
-    
     try:
         print(f"Scheduling lusha company collection {campaign_details.get('campaign_id')} with eta: {eta}")
-        
-        # Debug: Check if we can serialize the payload
-        try:
-            json.dumps(scheduler_payload)
-            print("✅ scheduler_payload is already JSON serializable")
-        except Exception as debug_error:
-            print(f"❌ scheduler_payload has non-serializable objects: {debug_error}")
-        
         scheduler_response = await scheduler_client.create_scheduler(scheduler_data=scheduler_payload)
         if scheduler_response.get("status") != 200:
             raise Exception("Error while scheduling batch processing")
