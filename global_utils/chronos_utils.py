@@ -36,7 +36,7 @@ def generate_default_eta_expression() -> str:
     Generate a default ETA for 10 seconds from now in chronos-compatible format (for SIT testing)
     Returns format: '%Y-%m-%dT%H:%M:%S' (no timezone)
     """
-    future_time = datetime.now() + timedelta(seconds=10)
+    future_time = datetime.now(timezone.utc) + timedelta(seconds=10)
     # Return in format expected by chronos marshmallow schema: '%Y-%m-%dT%H:%M:%S' (no timezone)
     return future_time.strftime('%Y-%m-%dT%H:%M:%S')
 
@@ -61,6 +61,9 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
         "eta": eta,  # eta is now properly formatted from get_eta_datetime()
         "partition_value": str(campaign_details.get("campaign_id", ""))
     }
+    
+    # CRITICAL: Serialize the ENTIRE payload since chronos_client's serializer is incomplete
+    scheduler_payload = serialize_for_json(scheduler_payload)
     
     try:
         print(f"Scheduling lusha company collection {campaign_details.get('campaign_id')} with eta: {eta}")
