@@ -43,13 +43,21 @@ def generate_default_eta_expression() -> str:
     future_time = future_time.isoformat(timespec=DEFAULT_TIMESPEC)
     return future_time
 
-async def schedule_lusha_company_collection(campaign_details: dict, eta: str):
+async def schedule_lusha_company_collection(campaign_details: dict, eta):
     """
     Schedule batch processing using cron expression with Chronos
     This will call /process-batch/{batch_id} at the scheduled time
     """
     chronos_url = os.getenv("CHRONOS_INTRNL_SVC")
     scheduler_client = SchedulerAPIClient(base_url=chronos_url)
+    
+    # Ensure eta is a string (convert datetime if needed)
+    if isinstance(eta, (datetime, date)):
+        eta = eta.isoformat()
+    elif not isinstance(eta, str):
+        eta = str(eta)
+    
+    print(f"🔍 Debug - eta type: {type(eta)}, value: {eta}")
     
     # Serialize ObjectIds and datetime objects to avoid JSON serialization errors
     serialized_campaign_details = serialize_for_json(campaign_details)
@@ -65,8 +73,19 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta: str):
         "partition_value": str(campaign_details.get("campaign_id", ""))
     }
     
+    # CRITICAL: Serialize the ENTIRE payload since chronos_client's serializer is incomplete
+    scheduler_payload = serialize_for_json(scheduler_payload)
+    
     try:
         print(f"Scheduling lusha company collection {campaign_details.get('campaign_id')} with eta: {eta}")
+        
+        # Debug: Check if we can serialize the payload
+        try:
+            json.dumps(scheduler_payload)
+            print("✅ scheduler_payload is already JSON serializable")
+        except Exception as debug_error:
+            print(f"❌ scheduler_payload has non-serializable objects: {debug_error}")
+        
         scheduler_response = await scheduler_client.create_scheduler(scheduler_data=scheduler_payload)
         if scheduler_response.get("status") != 200:
             raise Exception("Error while scheduling batch processing")
