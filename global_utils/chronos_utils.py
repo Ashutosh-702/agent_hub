@@ -1,12 +1,25 @@
 import os
 import random
+import json
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 from chronos_client.client import SchedulerAPIClient
+from bson import ObjectId
 
 
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=env_path)
+
+def serialize_objectids(obj):
+    """Convert ObjectIds to strings for JSON serialization"""
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    elif isinstance(obj, dict):
+        return {key: serialize_objectids(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_objectids(item) for item in obj]
+    else:
+        return obj
 
 def get_eta_datetime(eta: int) -> str:
     """Calculate ETA in ISO format - copied from vector add 10 seconds"""
@@ -26,7 +39,7 @@ def generate_default_eta_expression() -> str:
     future_time = future_time.isoformat(timespec=DEFAULT_TIMESPEC)
     return future_time
 
-async def schedule_lusha_company_collection(campaign_details: str, eta: str):
+async def schedule_lusha_company_collection(campaign_details: dict, eta: str):
     """
     Schedule batch processing using cron expression with Chronos
     This will call /process-batch/{batch_id} at the scheduled time
@@ -34,15 +47,18 @@ async def schedule_lusha_company_collection(campaign_details: str, eta: str):
     chronos_url = os.getenv("CHRONOS_INTRNL_SVC")
     scheduler_client = SchedulerAPIClient(base_url=chronos_url)
     
+    # Serialize ObjectIds to avoid JSON serialization errors
+    serialized_campaign_details = serialize_objectids(campaign_details)
+    
     scheduler_payload = {
         "service_name": "linkedin_sdr",
         "topic": "lusha-company-collection",  
         "payload": {
-            "campaign_details": campaign_details,
+            "campaign_details": json.dumps(serialized_campaign_details),
             "action": "process_lusha_company_collection"  
         },
         "eta": eta,  
-        "partition_value": str(campaign_details.get("campaign_id"))
+        "partition_value": str(campaign_details.get("campaign_id", ""))
     }
     
     try:
