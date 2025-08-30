@@ -26,19 +26,19 @@ def serialize_for_json(obj):
         return obj
 
 def get_eta_datetime(eta: int) -> str:
-    """Calculate ETA in chronos-compatible format - without timezone info"""
+    """Calculate ETA in ISO format that works with MongoDB"""
     eta_datetime = datetime.now(timezone.utc) + timedelta(minutes=eta) + timedelta(seconds=10)
-    # Return in format expected by chronos marshmallow schema: '%Y-%m-%dT%H:%M:%S' (no timezone)
-    return eta_datetime.strftime('%Y-%m-%dT%H:%M:%S')
+    # Return in ISO format with timezone - MongoDB can handle this
+    return eta_datetime.isoformat()
 
 def generate_default_eta_expression() -> str:
     """
-    Generate a default ETA for 10 seconds from now in chronos-compatible format (for SIT testing)
-    Returns format: '%Y-%m-%dT%H:%M:%S' (no timezone)
+    Generate a default ETA for 10 seconds from now in ISO format (for SIT testing)
+    Returns ISO format that MongoDB can handle directly
     """
     future_time = datetime.now(timezone.utc) + timedelta(seconds=10)
-    # Return in format expected by chronos marshmallow schema: '%Y-%m-%dT%H:%M:%S' (no timezone)
-    return future_time.strftime('%Y-%m-%dT%H:%M:%S')
+    # Return in ISO format with timezone - MongoDB can handle this
+    return future_time.isoformat()
 
 async def schedule_lusha_company_collection(campaign_details: dict, eta):
     """
@@ -61,9 +61,6 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
         "eta": eta,  # eta is now properly formatted from get_eta_datetime()
         "partition_value": str(campaign_details.get("campaign_id", ""))
     }
-    
-    # CRITICAL: Serialize the ENTIRE payload since chronos_client's serializer is incomplete
-    scheduler_payload = serialize_for_json(scheduler_payload)
     
     try:
         print(f"Scheduling lusha company collection {campaign_details.get('campaign_id')} with eta: {eta}")
