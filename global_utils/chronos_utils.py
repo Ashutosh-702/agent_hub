@@ -4,6 +4,7 @@ import json
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone, date
 from chronos_client.client import SchedulerAPIClient
+from chronos_client.https import AsyncHTTPClient
 from bson import ObjectId
 
 
@@ -26,19 +27,52 @@ def serialize_for_json(obj):
         return obj
 
 def get_eta_datetime(eta: int) -> str:
-    """Calculate ETA in ISO format that works with MongoDB"""
+    """Calculate ETA in chronos_client expected format: '%Y-%m-%dT%H:%M:%S'"""
     eta_datetime = datetime.now(timezone.utc) + timedelta(minutes=eta) + timedelta(seconds=10)
-    # Return in ISO format with timezone - MongoDB can handle this
-    return eta_datetime.isoformat()
+    # Return in format expected by chronos_client: '%Y-%m-%dT%H:%M:%S' (no timezone)
+    return eta_datetime.strftime('%Y-%m-%dT%H:%M:%S')
 
 def generate_default_eta_expression() -> str:
     """
-    Generate a default ETA for 10 seconds from now in ISO format (for SIT testing)
-    Returns ISO format that MongoDB can handle directly
+    Generate a default ETA for 10 seconds from now in chronos_client format (for SIT testing)
+    Returns format: '%Y-%m-%dT%H:%M:%S' (no timezone)
     """
     future_time = datetime.now(timezone.utc) + timedelta(seconds=10)
-    # Return in ISO format with timezone - MongoDB can handle this
-    return future_time.isoformat()
+    # Return in format expected by chronos_client: '%Y-%m-%dT%H:%M:%S' (no timezone)
+    return future_time.strftime('%Y-%m-%dT%H:%M:%S')
+
+# Store original fetch method at module level
+_original_fetch = AsyncHTTPClient.fetch
+
+async def _patched_fetch(self, method, url, **kwargs):
+    """Patched fetch method that properly serializes datetime objects"""
+    print(f"🔧 PATCH CALLED: method={method}, url={url}")
+    print(f"🔧 kwargs keys: {list(kwargs.keys())}")
+    
+    if 'json' in kwargs:
+        # Serialize the JSON data ourselves with our enhanced converter
+        json_data = kwargs.pop('json')
+        print(f"🔧 Original JSON data type: {type(json_data)}")
+        print(f"🔧 ETA in original data: {json_data.get('eta')} (type: {type(json_data.get('eta'))})")
+        
+        serialized_data = serialize_for_json(json_data)
+        print(f"🔧 ETA after serialization: {serialized_data.get('eta')} (type: {type(serialized_data.get('eta'))})")
+        
+        kwargs['data'] = json.dumps(serialized_data)
+        kwargs['headers'] = {'Content-Type': 'application/json'}
+        print(f"🔧 Patched HTTP call - serialized datetime objects in payload")
+    
+    return await _original_fetch(self, method, url, **kwargs)
+
+def _enable_datetime_serialization_patch():
+    """Enable the datetime serialization patch"""
+    print(f"🔧 ENABLING PATCH: Original fetch = {_original_fetch}")
+    AsyncHTTPClient.fetch = _patched_fetch
+    print(f"🔧 PATCH ENABLED: New fetch = {AsyncHTTPClient.fetch}")
+
+def _disable_datetime_serialization_patch():
+    """Disable the datetime serialization patch"""
+    AsyncHTTPClient.fetch = _original_fetch
 
 async def schedule_lusha_company_collection(campaign_details: dict, eta):
     """
@@ -62,6 +96,9 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
         "partition_value": str(campaign_details.get("campaign_id", ""))
     }
     
+    # Enable datetime serialization patch
+    _enable_datetime_serialization_patch()
+    
     try:
         print(f"Scheduling lusha company collection {campaign_details.get('campaign_id')} with eta: {eta}")
         scheduler_response = await scheduler_client.create_scheduler(scheduler_data=scheduler_payload)
@@ -71,6 +108,9 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
     except Exception as e:
         print(f"Error scheduling batch: {e}")
         raise Exception("Error while scheduling batch processing")
+    finally:
+        # Disable the patch
+        _disable_datetime_serialization_patch()
 
 async def schedule_connection_processing(batch_id: str, linkedin_url: str):
     """
