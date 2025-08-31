@@ -37,16 +37,18 @@ def generate_default_eta_expression() -> str:
     Generate a default ETA for 10 seconds from now in chronos_client format (for SIT testing)
     Returns format: '%Y-%m-%dT%H:%M:%S' (no timezone)
     """
-    future_time = datetime.now(timezone.utc) + timedelta(seconds=10)
+    future_time = (datetime.utcnow() + timedelta(seconds=10)).isoformat(timespec="seconds")
     # Return in format expected by chronos_client: '%Y-%m-%dT%H:%M:%S' (no timezone)
-    return future_time.strftime('%Y-%m-%dT%H:%M:%S')
+    return future_time
+    # return future_time.strftime('%Y-%m-%dT%H:%M:%S')
 
-# Store original fetch method at module level
+# Store original methods at module level
 _original_fetch = AsyncHTTPClient.fetch
+_original_post = AsyncHTTPClient.post
 
 async def _patched_fetch(self, method, url, **kwargs):
     """Patched fetch method that properly serializes datetime objects"""
-    print(f"🔧 PATCH CALLED: method={method}, url={url}")
+    print(f"🔧 FETCH PATCH CALLED: method={method}, url={url}")
     print(f"🔧 kwargs keys: {list(kwargs.keys())}")
     
     if 'json' in kwargs:
@@ -64,15 +66,38 @@ async def _patched_fetch(self, method, url, **kwargs):
     
     return await _original_fetch(self, method, url, **kwargs)
 
+async def _patched_post(self, url, **kwargs):
+    """Patched post method that properly serializes datetime objects"""
+    print(f"🔧 POST PATCH CALLED: url={url}")
+    print(f"🔧 kwargs keys: {list(kwargs.keys())}")
+    
+    if 'json' in kwargs:
+        # Serialize the JSON data ourselves with our enhanced converter
+        json_data = kwargs['json']
+        print(f"🔧 Original JSON data type: {type(json_data)}")
+        print(f"🔧 ETA in original data: {json_data.get('eta')} (type: {type(json_data.get('eta'))})")
+        
+        serialized_data = serialize_for_json(json_data)
+        print(f"🔧 ETA after serialization: {serialized_data.get('eta')} (type: {type(serialized_data.get('eta'))})")
+        
+        kwargs['json'] = serialized_data
+        print(f"🔧 Patched POST call - serialized datetime objects in payload")
+    
+    return await _original_post(self, url, **kwargs)
+
 def _enable_datetime_serialization_patch():
     """Enable the datetime serialization patch"""
     print(f"🔧 ENABLING PATCH: Original fetch = {_original_fetch}")
+    print(f"🔧 ENABLING PATCH: Original post = {_original_post}")
     AsyncHTTPClient.fetch = _patched_fetch
+    AsyncHTTPClient.post = _patched_post
     print(f"🔧 PATCH ENABLED: New fetch = {AsyncHTTPClient.fetch}")
+    print(f"🔧 PATCH ENABLED: New post = {AsyncHTTPClient.post}")
 
 def _disable_datetime_serialization_patch():
     """Disable the datetime serialization patch"""
     AsyncHTTPClient.fetch = _original_fetch
+    AsyncHTTPClient.post = _original_post
 
 async def schedule_lusha_company_collection(campaign_details: dict, eta):
     """
