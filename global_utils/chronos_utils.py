@@ -49,7 +49,7 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
     
     scheduler_payload = {
         "service_name": LeadgenServices.leadgen,
-        "topic": "lusha-company-collection",  
+        "topic": "lusha_company_collection",  
         "payload": {
             "campaign_details": json.dumps(serialized_campaign_details),
             "action": "process_lusha_company_collection"  
