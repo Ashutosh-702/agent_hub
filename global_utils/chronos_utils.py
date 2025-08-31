@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone, date
 from chronos_client.client import SchedulerAPIClient
 from chronos_client.https import AsyncHTTPClient
 from bson import ObjectId
-
+from kafkautils.constants import LeadgenServices
 
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=env_path)
@@ -48,7 +48,7 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
     serialized_campaign_details = serialize_for_json(campaign_details)
     
     scheduler_payload = {
-        "service_name": "linkedin_sdr",
+        "service_name": LeadgenServices.leadgen,
         "topic": "lusha-company-collection",  
         "payload": {
             "campaign_details": json.dumps(serialized_campaign_details),
