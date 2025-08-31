@@ -111,6 +111,7 @@ async def process_leadgen_message(request_id: str, campaign_id: str):
 async def lusha_company_collection_handler(message: Any):
     """Handler for lusha company collection messages."""
     try:
+        print(f"📨 Received lusha company collection message: {message}")
         payload = None
         if hasattr(message, 'value'):
             payload = message.value
