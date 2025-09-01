@@ -149,7 +149,7 @@ async def process_lusha_company_collection(campaign_details: Any):
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
-        loaded_config.lusha_api_key = "43db38be-049f-4dcf-b24b-331e539cb5be"
+        loaded_config.lusha_api_key = "cf7f4465-da50-4e3c-88b2-2b9f5521a9f3"
         # Parse campaign_details if it's a JSON string
         if isinstance(campaign_details, str):
             print(f"🔍 Debug - campaign_details is string, parsing JSON...")
@@ -183,14 +183,15 @@ async def process_lusha_company_collection(campaign_details: Any):
                             "name": company_data["name"],
                         }, 
                         "profile":{
-                            "industry": config.get("segmentation")['industry'],  
-                            "revenue_min": config.get("target", "")['revenue_min'],
-                            "revenue_max": config.get("target", "")['revenue_max'],
-                            "employee_count": config.get("target", "")['employee_count'],
+                            "industry": config.get("segmentation", {}).get("industry", None),  
+                            #here revenue_min, revenue_max, employee_count may not present in the config. need to handle this.
+                            "revenue_min": config.get("target", {}).get("revenue_min", None),
+                            "revenue_max": config.get("target", {}).get("revenue_max", None),
+                            "employee_count": config.get("target", {}).get("employee_count", None),
                         },
                         "location":{
-                            "type": config.get("target", "")['location']['type'],
-                            "name": config.get("target", "")['location']['names'],
+                            "type": config.get("target", {}).get("location", {}).get("type", None),
+                            "name": config.get("target", {}).get("location", {}).get("names", None),
                         },
                         "source": "lusha",
                         "metadata":{
@@ -246,7 +247,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                 if first_response is None:
                     print(f"❌ rate limit exhausted")
                     return []
-                total_results = first_response["totalResults"]
+            total_results = first_response["totalResults"]
             campaign_details["total_results"] = total_results
             print("got response")
             print(first_response)
@@ -259,7 +260,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                 })
         #temp current page
         per_page = 1
-        total_pages = 1
+        total_pages = 2
         for page_num in range(per_page, total_pages):
             page_payload = campaign_details.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
