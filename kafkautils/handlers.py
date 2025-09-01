@@ -149,70 +149,16 @@ async def process_lusha_company_collection(campaign_details: Any):
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
-        loaded_config.lusha_api_key = "43db38be-049f-4dcf-b24b-331e539cb5be"
+        # loaded_config.lusha_api_key = "43db38be-049f-4dcf-b24b-331e539cb5be"
         # Parse campaign_details if it's a JSON string
         if isinstance(campaign_details, str):
             print(f"🔍 Debug - campaign_details is string, parsing JSON...")
             campaign_details = json.loads(campaign_details)
         
-        per_page = campaign_details["pages"]["page"]
-        page_size = campaign_details["pages"]["size"]
-        
-        #here total_results is the total number of companies to collect. this key may comes may not comes. need to handle this.
-        total_results = campaign_details.get("total_results", 0)
-        
-        all_companies = []
-        if total_results == 0:
-            print("fetching response")
-            # Convert ObjectId to string to make it JSON serializable
-            api_payload = convert_objectid_to_string(campaign_details)
-            first_response = await lusha_search_api(api_payload)
-            if first_response is None:
-                #need  to loop for try 3 times with sleep
-                for i in range(3):
-                    first_response = await lusha_search_api(api_payload)
-                    if first_response is None:
-                        time.sleep(2)
-                    if first_response is not None:
-                        break
-                if first_response is None:
-                    print(f"❌ rate limit exhausted")
-                    return 
-                total_results = first_response["totalResults"]
-            campaign_details["total_results"] = total_results
-            print("got response")
-            print(first_response)
-            total_pages = (total_results + page_size - 1) // page_size
-            for company in first_response["data"]:
-                all_companies.append({
-                    "id": company["id"], 
-                    "name": company["name"],
-                    "api_response_metadata": company
-                })
-        #temp current page
-        per_page = total_pages -1
-        for page_num in range(per_page, total_pages):
-            page_payload = campaign_details.copy()
-            page_payload["pages"] = {"page": page_num, "size": page_size}
-            page_response = await lusha_search_api(page_payload, all_companies)
-            if page_response is None:
-                #need  to loop for try 3 times with sleep
-                for i in range(3):
-                    page_response = await lusha_search_api(page_payload, all_companies)
-                    if page_response is None:
-                        time.sleep(2)
-                    if page_response is not None:
-                        break
-                if page_response is None:
-                    print(f"❌ rate limit exhausted")
-                    break
-            for company in page_response["data"]:
-                all_companies.append({
-                    "id": company["id"], 
-                    "name": company["name"],
-                    "api_response_metadata": company
-                })
-        lusha_company_data = all_companies
+        lusha_company_data = await lusha_company_data_collection(campaign_details)
+        if not lusha_company_data:
+            print("❌ No company data found")
+            return
         companies_list = []
         cached_data = []
         companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
@@ -275,5 +221,69 @@ async def process_lusha_company_collection(campaign_details: Any):
                 print(f"Error occurred during collection, but returning {len(lusha_company_data)} companies already collected: {str(e)}")
                 return lusha_company_data
             return []
+
+async def lusha_company_data_collection(campaign_details: Any):
+    try:
+        per_page = campaign_details["pages"]["page"]
+        page_size = campaign_details["pages"]["size"]
         
-    
+        #here total_results is the total number of companies to collect. this key may comes may not comes. need to handle this.
+        total_results = campaign_details.get("total_results", 0)
+        all_companies = []
+        if total_results == 0:
+            print("fetching response")
+            # Convert ObjectId to string to make it JSON serializable
+            api_payload = convert_objectid_to_string(campaign_details)
+            first_response = await lusha_search_api(api_payload)
+            if first_response is None:
+                #need  to loop for try 3 times with sleep
+                for i in range(3):
+                    first_response = await lusha_search_api(api_payload)
+                    if first_response is None:
+                        time.sleep(2)
+                    if first_response is not None:
+                        break
+                if first_response is None:
+                    print(f"❌ rate limit exhausted")
+                    return []
+                total_results = first_response["totalResults"]
+            campaign_details["total_results"] = total_results
+            print("got response")
+            print(first_response)
+            total_pages = (total_results + page_size - 1) // page_size
+            for company in first_response["data"]:
+                all_companies.append({
+                    "id": company["id"], 
+                    "name": company["name"],
+                    "api_response_metadata": company
+                })
+        #temp current page
+        per_page = 1
+        total_pages = 1
+        for page_num in range(per_page, total_pages):
+            page_payload = campaign_details.copy()
+            page_payload["pages"] = {"page": page_num, "size": page_size}
+            page_response = await lusha_search_api(page_payload, all_companies)
+            if page_response is None:
+                #need  to loop for try 3 times with sleep
+                for i in range(1):
+                    page_response = await lusha_search_api(page_payload, all_companies)
+                    if page_response is None:
+                        time.sleep(2)
+                    if page_response is not None:
+                        break
+                if page_response is None:
+                    print(f"❌ rate limit exhausted")
+                    break
+            for company in page_response["data"]:
+                all_companies.append({
+                    "id": company["id"], 
+                    "name": company["name"],
+                    "api_response_metadata": company
+                })
+        return all_companies
+    except Exception as e:
+        if 'lusha_company_data' in locals() and len(all_companies) > 0:
+                print(f"Error occurred during collection, but returning {len(all_companies)} companies already collected: {str(e)}")
+                return all_companies
+        return []
