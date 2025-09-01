@@ -149,7 +149,7 @@ async def process_lusha_company_collection(campaign_details: Any):
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
-        loaded_config.lusha_api_key = "cf7f4465-da50-4e3c-88b2-2b9f5521a9f3"
+        loaded_config.lusha_api_key = "43db38be-049f-4dcf-b24b-331e539cb5be"
         # Parse campaign_details if it's a JSON string
         if isinstance(campaign_details, str):
             print(f"🔍 Debug - campaign_details is string, parsing JSON...")
@@ -218,6 +218,7 @@ async def process_lusha_company_collection(campaign_details: Any):
             await campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
         return lusha_company_data
     except Exception as e:
+            print(f"❌ Error occurred during collection: {str(e)}")
             if 'lusha_company_data' in locals() and len(lusha_company_data) > 0:
                 print(f"Error occurred during collection, but returning {len(lusha_company_data)} companies already collected: {str(e)}")
                 return lusha_company_data
@@ -284,6 +285,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                 })
         return all_companies
     except Exception as e:
+        print(f"❌ Error occurred during data collection: {str(e)}")
         if 'lusha_company_data' in locals() and len(all_companies) > 0:
                 print(f"Error occurred during collection, but returning {len(all_companies)} companies already collected: {str(e)}")
                 return all_companies
