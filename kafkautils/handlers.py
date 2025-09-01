@@ -252,15 +252,15 @@ async def process_lusha_company_collection(campaign_details: Any):
             campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
             for _id in id_list:
                 mapping_doc = {
-                "campaign_id": config.get("_id"),
-                "company_id": _id,
+                "campaign_id": ObjectId(config.get("_id")),
+                "company_id": ObjectId(_id),
                 "company_status": False,
                 "metadata":{
                         "created_at":datetime.now(timezone.utc),
                         "updated_at":datetime.now(timezone.utc),
-                },
-            }
-            await campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
+                    },
+                }
+                await campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
         return lusha_company_data
     except Exception as e:
             print(f"❌ Error occurred during collection: {str(e)}")
