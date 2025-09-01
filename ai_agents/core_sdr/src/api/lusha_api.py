@@ -8,7 +8,7 @@ from urllib3.exceptions import InsecureRequestWarning
 # from global_utils.chronos_utils import schedule_lusha_company_collection,generate_default_eta_expression  # Removed to fix circular import
 urllib3.disable_warnings(InsecureRequestWarning)
 import time
-LUSHA_API_KEY = os.getenv("LUSHA_API_KEY")
+from config.loaded_config import loaded_config
 
 def get_chronos_utils():
     """Local import helper to avoid circular dependencies."""
@@ -25,7 +25,7 @@ async def lusha_search_api(payload_values: Dict[str, Any], cached_data: Optional
     url = f"https://api.lusha.com/prospecting/company/search"
     headers = {
         'accept': 'application/json',
-        "api_key": f"{os.getenv('LUSHA_API_KEY')}",
+        "api_key": f"{loaded_config.lusha_api_key}",
         'Content-Type': 'application/json'
     }
     

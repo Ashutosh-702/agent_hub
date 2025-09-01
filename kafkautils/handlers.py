@@ -149,7 +149,7 @@ async def process_lusha_company_collection(campaign_details: Any):
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
-        
+        loaded_config.lusha_api_key = "43db38be-049f-4dcf-b24b-331e539cb5be"
         # Parse campaign_details if it's a JSON string
         if isinstance(campaign_details, str):
             print(f"🔍 Debug - campaign_details is string, parsing JSON...")
@@ -189,6 +189,8 @@ async def process_lusha_company_collection(campaign_details: Any):
                     "name": company["name"],
                     "api_response_metadata": company
                 })
+        #temp current page
+        per_page = total_pages -1
         for page_num in range(per_page, total_pages):
             page_payload = campaign_details.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
