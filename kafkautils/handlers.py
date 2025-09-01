@@ -1,6 +1,7 @@
 """Message handlers for leadgen Kafka consumers."""
 from time import sleep
 from typing import Any
+import json
 from ai_agents.core_sdr.src.cli.main import process_company_search
 from database.connection_manager import ConnectionManager
 from database.collection_dao.campaigns import CampaignsDao
@@ -128,11 +129,16 @@ async def lusha_company_collection_handler(message: Any):
             print("❌ Invalid message payload")
             return
 
-        action = payload.get("action")   
+        # Handle nested payload structure from Chronos
+        print(f"🔍 Debug - Full payload structure: {list(payload.keys()) if isinstance(payload, dict) else type(payload)}")
+        inner_payload = payload.get("payload", payload)  # Try to get nested payload, fallback to original
+        print(f"🔍 Debug - Inner payload structure: {list(inner_payload.keys()) if isinstance(inner_payload, dict) else type(inner_payload)}")
+        inner_payload = inner_payload.get("payload", inner_payload)
+        action = inner_payload.get("action")   
         if action != "process_lusha_company_collection":
             print(f"❌ Unknown action: {action}")
             return
-        campaign_details = payload.get("campaign_details") 
+        campaign_details = inner_payload.get("campaign_details") 
         await process_lusha_company_collection(campaign_details)
     except Exception as e:
         print(f"❌ Error handling lusha company collection message: {e}")
@@ -144,7 +150,11 @@ async def process_lusha_company_collection(campaign_details: Any):
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
         
-        # campaign_details = message
+        # Parse campaign_details if it's a JSON string
+        if isinstance(campaign_details, str):
+            print(f"🔍 Debug - campaign_details is string, parsing JSON...")
+            campaign_details = json.loads(campaign_details)
+        
         per_page = campaign_details["pages"]["page"]
         page_size = campaign_details["pages"]["size"]
         
