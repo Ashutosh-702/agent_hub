@@ -4,20 +4,19 @@ import os
 from typing import List, Dict, Any,Optional
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
-# from kafkautils.handlers import process_lusha_company_collection  # Removed to fix circular import
-# from global_utils.chronos_utils import schedule_lusha_company_collection,generate_default_eta_expression  # Removed to fix circular import
+from global_utils.chronos_utils import schedule_lusha_company_collection,generate_default_eta_expression  # Removed to fix circular import
 urllib3.disable_warnings(InsecureRequestWarning)
 import time
 from config.loaded_config import loaded_config
 
-def get_chronos_utils():
-    """Local import helper to avoid circular dependencies."""
-    try:
-        from global_utils.chronos_utils import schedule_lusha_company_collection, generate_default_eta_expression
-        return schedule_lusha_company_collection, generate_default_eta_expression
-    except ImportError as e:
-        print(f"Could not import chronos utils: {e}")
-        return None, None
+# def get_chronos_utils():
+#     """Local import helper to avoid circular dependencies."""
+#     try:
+#         from global_utils.chronos_utils import schedule_lusha_company_collection, generate_default_eta_expression
+#         return schedule_lusha_company_collection, generate_default_eta_expression
+#     except ImportError as e:
+#         print(f"Could not import chronos utils: {e}")
+#         return None, None
 async def lusha_search_api(payload_values: Dict[str, Any], cached_data: Optional[List[Dict[str,Any]]]= None) -> List[int]:
     print(f"Payload_values: {payload_values}")
     payload_query =  build_payload(payload_values=payload_values, cached_data=cached_data)
@@ -107,11 +106,11 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
         if not first_response:
             print("First API call failed or hit rate limit. Returning empty results.")
             payload_values['raw_config'] = config
-            schedule_func, eta_func = get_chronos_utils()
-            if schedule_func and eta_func:
-                eta = eta_func()
-                scheduler_response = await schedule_func(payload_values, eta)
-                print(f"Scheduler response: {scheduler_response}")
+            # schedule_func, eta_func = get_chronos_utils()
+            # if schedule_func and eta_func:
+            eta = generate_default_eta_expression()
+            scheduler_response = await schedule_lusha_company_collection(payload_values, eta)
+            print(f"Scheduler response: {scheduler_response}")
             return []
             
         if "data" not in first_response:
@@ -151,11 +150,10 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
                 print(f"Rate limit hit on page {page_num + 1}. Returning {len(all_companies)} companies collected so far.")
                 rate_limit_hit = True
                 page_payload['raw_config'] = config
-                schedule_func, eta_func = get_chronos_utils()
-                if schedule_func and eta_func:
-                    eta = eta_func()
-                    scheduler_response = await schedule_func(page_payload, eta)
-                    print(f"Scheduler response: {scheduler_response}")
+                # schedule_func, eta_func = get_chronos_utils()
+                eta = generate_default_eta_expression()
+                scheduler_response = await schedule_lusha_company_collection(page_payload, eta)
+                print(f"Scheduler response: {scheduler_response}")
                 break
             elif page_response and "data" in page_response:
                 # Successfully got data from this page
