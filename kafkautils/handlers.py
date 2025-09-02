@@ -244,22 +244,25 @@ async def lusha_company_data_collection(campaign_details: Any):
             # Convert ObjectId to string to make it JSON serializable
             api_payload = convert_objectid_to_string(campaign_details)
             first_response = await lusha_search_api(api_payload)
-            if first_response is None:
+            if first_response['status_code'] == 429:
                 #need  to loop for try 3 times with sleep
                 for i in range(3):
-                    time.sleep(2)
+                    time.sleep(10)
                     first_response = await lusha_search_api(api_payload)
-                    if first_response is not None:
+                    if first_response['status_code'] == 201:
                         break
-                if first_response is None:
+                if first_response['status_code'] == 429:
                     print(f"❌ rate limit exhausted")
-                    eta = generate_default_eta_expression()
+                    eta = generate_default_eta_expression(daily_left=first_response['daily_left'], hourly_left=first_response['hourly_left'], minute_left=first_response['minute_left'])
                     api_payload["total_results"] = total_results
                     api_payload["raw_config"] = campaign_details["raw_config"]
                     scheduler = await schedule_lusha_company_collection(campaign_details=api_payload, eta=eta)
                     print(f"Scheduler response from handler: {scheduler}")
                     return []
-            total_results = first_response["totalResults"]
+            elif first_response['status_code'] == 201 and "data" not in first_response['results'] or first_response['status_code'] != 201:
+                print("No data in first response. Returning empty results.")
+                return []
+            total_results = first_response["results"]["totalResults"]
             campaign_details["total_results"] = total_results
             print("got response")
             print(first_response)
@@ -277,27 +280,33 @@ async def lusha_company_data_collection(campaign_details: Any):
             page_payload = campaign_details.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
             page_response = await lusha_search_api(page_payload, all_companies)
-            if page_response is None:
+            if page_response['status_code'] == 429:
                 #need  to loop for try 3 times with sleep
                 for i in range(1):
                     page_response = await lusha_search_api(page_payload, all_companies)
-                    if page_response is None:
-                        time.sleep(2)
-                    if page_response is not None:
+                    if page_response['status_code'] == 429:
+                        time.sleep(10)
+                    else:
                         break
-                if page_response is None:
+                if page_response['status_code'] == 429:
                     print(f"❌ rate limit exhausted")
-                    eta = generate_default_eta_expression()
+                    eta = generate_default_eta_expression(daily_left=page_response['daily_left'], hourly_left=page_response['hourly_left'], minute_left=page_response['minute_left'])
                     page_payload["total_results"] = total_results
                     page_payload["raw_config"] = campaign_details["raw_config"]
                     scheduler = schedule_lusha_company_collection(campaign_details=page_payload, eta=eta)
                     break
-            for company in page_response["data"]:
-                all_companies.append({
-                    "id": company["id"], 
-                    "name": company["name"],
-                    "api_response_metadata": company
-                })
+                else:
+                    break
+            elif page_response['status_code'] == 201 and "data" in page_response['results']:
+                for company in page_response["results"]["data"]:
+                    all_companies.append({
+                        "id": company["id"], 
+                        "name": company["name"],
+                        "api_response_metadata": company
+                    })
+            else:
+                print(f"Failed to fetch page {page_num}")
+                break
         return all_companies
     except Exception as e:
         print(f"❌ Error occurred during data collection: {str(e)}")

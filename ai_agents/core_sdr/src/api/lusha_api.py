@@ -1,3 +1,4 @@
+from eventbridge.logic.async_kafka_consumer import orjson
 import requests
 import json
 import os
@@ -29,13 +30,22 @@ async def lusha_search_api(payload_values: Dict[str, Any], cached_data: Optional
     }
     
     response = requests.post(url, headers=headers, json=payload_query, verify=False, timeout=30)
-        
+    response_data ={}
+    response_data['status_code'] = response.status_code
+
     if response.status_code == 201:
-        return response.json()
+        response_data['results'] = response.json()
+        return response_data
     elif response.status_code == 429:
         # Return None to indicate rate limit exhaustion rather than raising exception
+        response_headers = dict(response.headers)
+        response_data['daily_left'] = response_headers.get('x-daily-requests-left', None)
+        response_data['hourly_left'] = response_headers.get('x-hourly-requests-left', None) 
+        response_data['minute_left'] = response_headers.get('x-minute-requests-left', None)
+        print(f"Daily left: {response_data['daily_left']}, Hourly left: {response_data['hourly_left']}, Minute left: {response_data['minute_left']}")
+
         print(f"Rate limit exhausted")
-        return None
+        return response_data
     else:
         #Temp code
         print(f"Search API failed: {response.status_code} - {response.text}")
@@ -103,22 +113,20 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
         initial_payload["pages"] = {"page": 0, "size": page_size}
         first_response = await lusha_search_api(payload_values=initial_payload, cached_data=cached_data)
 
-        if not first_response:
+        if first_response['status_code'] == 429:
             print("First API call failed or hit rate limit. Returning empty results.")
             payload_values['raw_config'] = config
-            # schedule_func, eta_func = get_chronos_utils()
-            # if schedule_func and eta_func:
-            eta = generate_default_eta_expression()
+            eta = generate_default_eta_expression(daily_left=first_response['daily_left'], hourly_left=first_response['hourly_left'], minute_left=first_response['minute_left'])
+            # eta = generate_default_eta_expression()
             scheduler_response = await schedule_lusha_company_collection(payload_values, eta)
             print(f"Scheduler response: {scheduler_response}")
             return []
-            
-        if "data" not in first_response:
+        elif first_response['status_code'] == 201 and "data" not in first_response['results'] or first_response['status_code'] != 201:
             print("No data in first response. Returning empty results.")
             return []
             
         # Process first page data
-        for company in first_response["data"]:
+        for company in first_response["results"]["data"]:
             all_companies.append({
                 "id": company["id"], 
                 "name": company["name"],
@@ -126,7 +134,7 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
             })
 
         # Step 2: Calculate total pages needed
-        total_results = first_response.get("totalResults", 0)
+        total_results = first_response.get("results", {}).get("totalResults", 0)
 
         print(f"Total results for this search: {total_results}")
         total_pages = (total_results + page_size - 1) // page_size  # Ceiling division
@@ -145,20 +153,20 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
             # some time it throws error 429, so we need to handle it like the number of   data it already has it should  return. how to handle this?
             page_response = await lusha_search_api(payload_values=page_payload, cached_data=cached_data)
             
-            if page_response is None:
+            if page_response['status_code'] == 429:
                 # Rate limit hit and retries exhausted
                 print(f"Rate limit hit on page {page_num + 1}. Returning {len(all_companies)} companies collected so far.")
                 rate_limit_hit = True
                 page_payload['raw_config'] = config
                 # schedule_func, eta_func = get_chronos_utils()
-                eta = generate_default_eta_expression()
+                eta = generate_default_eta_expression(daily_left=page_response['daily_left'], hourly_left=page_response['hourly_left'], minute_left=page_response['minute_left'])
                 scheduler_response = await schedule_lusha_company_collection(page_payload, eta)
                 print(f"Scheduler response: {scheduler_response}")
                 break
-            elif page_response and "data" in page_response:
+            elif page_response['status_code'] == 201 and "data" in page_response['results']:
                 # Successfully got data from this page
                 page_companies = 0
-                for company in page_response["data"]:
+                for company in page_response["results"]["data"]:
                     all_companies.append({
                         "id": company["id"], 
                         "name": company["name"],

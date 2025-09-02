@@ -7,6 +7,7 @@ from chronos_client.client import SchedulerAPIClient
 from chronos_client.https import AsyncHTTPClient
 from bson import ObjectId
 from kafkautils.constants import LeadgenServices
+from typing import Optional
 
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=env_path)
@@ -32,9 +33,18 @@ def get_eta_datetime(eta: int) -> str:
     # Return in format expected by chronos_client: '%Y-%m-%dT%H:%M:%S' (no timezone)
     return eta_datetime.strftime('%Y-%m-%dT%H:%M:%S')
 
-def generate_default_eta_expression() -> str:
-    future_time = (datetime.utcnow() + timedelta(seconds=10)).isoformat(timespec="seconds")
-    # Return in format expected by chronos_client: '%Y-%m-%dT%H:%M:%S' (no timezone)
+def generate_default_eta_expression(daily_left: Optional[int]=None, hourly_left: Optional[int]=None, minute_left: Optional[int]=None) -> str:
+    if daily_left != None and daily_left == '0':
+        #it should be at least 1 day
+        return (datetime.utcnow() + timedelta(days=1)).isoformat(timespec="seconds")
+    elif hourly_left != None and hourly_left == '0':
+        #it should be at least 1 hour
+        return (datetime.utcnow() + timedelta(hours=1)).isoformat(timespec="seconds")
+    elif minute_left != None and minute_left == '0':
+        #it should be at least 1 minute
+        return (datetime.utcnow() + timedelta(minutes=1)).isoformat(timespec="seconds")
+    else:
+        return (datetime.utcnow() + timedelta(seconds=10)).isoformat(timespec="seconds")
     return future_time
     # return future_time.strftime('%Y-%m-%dT%H:%M:%S')
 
