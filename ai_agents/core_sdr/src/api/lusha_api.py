@@ -150,11 +150,11 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
                 # Rate limit hit and retries exhausted
                 print(f"Rate limit hit on page {page_num + 1}. Returning {len(all_companies)} companies collected so far.")
                 rate_limit_hit = True
-                payload_values['raw_config'] = config
+                page_payload['raw_config'] = config
                 schedule_func, eta_func = get_chronos_utils()
                 if schedule_func and eta_func:
                     eta = eta_func()
-                    scheduler_response = await schedule_func(payload_values, eta)
+                    scheduler_response = await schedule_func(page_payload, eta)
                     print(f"Scheduler response: {scheduler_response}")
                 break
             elif page_response and "data" in page_response:
