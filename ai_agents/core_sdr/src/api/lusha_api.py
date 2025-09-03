@@ -149,7 +149,6 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
             page_payload = payload_values.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
             page_payload["total_results"] = total_results
-            time.sleep(2)
             # some time it throws error 429, so we need to handle it like the number of   data it already has it should  return. how to handle this?
             page_response = await lusha_search_api(payload_values=page_payload, cached_data=cached_data)
             

@@ -65,8 +65,10 @@ def collect_companies_from_search(config: Dict[str, Any], exclude_company_list: 
             if company_data:
                 companies.append({"id":company_data["id"],"name":company_data["name"],"api_response_metadata": company_data})
     except Exception as e:
+        print(f"Error collecting company data: {str(e)}")
         raise Exception(f"Error collecting company data: {str(e)}")
-    return companies
+    finally:
+        return companies
 
 
 def build_payload(config: Dict[str,Any], exclude_company_list: List[str]):
