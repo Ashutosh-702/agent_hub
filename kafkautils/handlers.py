@@ -148,6 +148,7 @@ async def lusha_company_collection_handler(message: Any):
 
 
 async def process_lusha_company_collection(campaign_details: Any):
+    lusha_company_data = []  # Initialize before try block
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
@@ -223,22 +224,20 @@ async def process_lusha_company_collection(campaign_details: Any):
                     },
                 }
                 await campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
-        return lusha_company_data
     except Exception as e:
-            print(f"❌ Error occurred during collection: {str(e)}")
-            if 'lusha_company_data' in locals() and len(lusha_company_data) > 0:
-                print(f"Error occurred during collection, but returning {len(lusha_company_data)} companies already collected: {str(e)}")
-                return lusha_company_data
-            return []
+        print(f"❌ Error occurred during collection: {str(e)}")
+    finally:
+        print(f"Returning {len(lusha_company_data)} companies")
+        return lusha_company_data
 
 async def lusha_company_data_collection(campaign_details: Any):
+    all_companies = []
     try:
         per_page = campaign_details["pages"]["page"]
         page_size = campaign_details["pages"]["size"]
         
         #here total_results is the total number of companies to collect. this key may comes may not comes. need to handle this.
         total_results = campaign_details.get("total_results", 0)
-        all_companies = []
         if total_results == 0:
             print("fetching response")
             # Convert ObjectId to string to make it JSON serializable
@@ -267,7 +266,7 @@ async def lusha_company_data_collection(campaign_details: Any):
             print("got response")
             print(first_response)
             total_pages = (total_results + page_size - 1) // page_size
-            for company in first_response["data"]:
+            for company in first_response["results"]["data"]:
                 all_companies.append({
                     "id": company["id"], 
                     "name": company["name"],
@@ -310,10 +309,8 @@ async def lusha_company_data_collection(campaign_details: Any):
         return all_companies
     except Exception as e:
         print(f"❌ Error occurred during data collection: {str(e)}")
-        if 'lusha_company_data' in locals() and len(all_companies) > 0:
-                print(f"Error occurred during collection, but returning {len(all_companies)} companies already collected: {str(e)}")
-                return all_companies
-        return []
+    finally:
+        return all_companies
 
 async def lusha_sample_data():
     return  [{'id': '9252341', 'name': 'Swiggy', 'api_response_metadata': {'id': '9252341', 'name': 'Swiggy', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
