@@ -53,20 +53,18 @@ def collect_api(company_id: int) -> Dict[str, Any]:
         raise Exception(f"Collect API failed: {response.status_code} - {response.text}")
 
 def collect_companies_from_search(config: Dict[str, Any], exclude_company_list: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
+    companies = []
     try:
         dsl_query = build_payload(config,exclude_company_list)
         company_ids = search_api(dsl_query)
-    except Exception as e:
-        raise Exception(f"Error searching companies in coresignal api: {str(e)}")
-    companies = []
-    try:
         for company_id in company_ids:
             company_data = collect_api(company_id)
             if company_data:
                 companies.append({"id":company_data["id"],"name":company_data["name"],"api_response_metadata": company_data})
     except Exception as e:
-        raise Exception(f"Error collecting company data: {str(e)}")
-    return companies
+        print(f"Error collecting company data: {str(e)}")
+    finally:
+        return companies
 
 
 def build_payload(config: Dict[str,Any], exclude_company_list: List[str]):
