@@ -152,7 +152,7 @@ async def process_lusha_company_collection(campaign_details: Any):
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
-        loaded_config.lusha_api_key = "20fc4277-7a88-4e05-b17a-9d65d59b757f"
+        # loaded_config.lusha_api_key = "20fc4277-7a88-4e05-b17a-9d65d59b757f"
         # Parse campaign_details if it's a JSON string
         if isinstance(campaign_details, str):
             print(f"🔍 Debug - campaign_details is string, parsing JSON...")
