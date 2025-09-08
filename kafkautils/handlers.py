@@ -276,8 +276,10 @@ async def lusha_company_data_collection(campaign_details: Any):
                     "api_response_metadata": company
                 })
         #temp current page
-        per_page = 1
-        total_pages = 2
+        # per_page = 1
+        # total_pages = 2
+        print(f"pages: {per_page} page_size: {page_size} totalpages: {total_pages}")
+
         for page_num in range(per_page, total_pages):
             page_payload = campaign_details.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
