@@ -50,6 +50,11 @@ async def main(cli_config=None):
         #     config["custom_prompts"] = custom_prompts
         if cli_config and "custom_prompts" in cli_config:
             config["custom_prompts"] = cli_config["custom_prompts"]
+        if cli_config and "PRODUCT_NAME" in cli_config:
+            config["product"] = cli_config['PRODUCT_NAME']
+        else:
+            config["product"] = ""
+
         # Initialize OpenAI client
         api_key = config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
         if not api_key:
