@@ -232,7 +232,9 @@ async def process_lusha_company_collection(campaign_details: Any):
 
 async def lusha_company_data_collection(campaign_details: Any):
     all_companies = []
+    fetch_company_status = False
     try:
+        
         per_page = campaign_details["pages"]["page"]
         page_size = campaign_details["pages"]["size"]
         
@@ -249,6 +251,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                     time.sleep(10)
                     first_response = await lusha_search_api(api_payload)
                     if first_response['status_code'] == 201:
+                        fetch_company_status = True
                         break
                 if first_response['status_code'] == 429:
                     print(f"❌ rate limit exhausted")
@@ -297,6 +300,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                 else:
                     break
             elif page_response['status_code'] == 201 and "data" in page_response['results']:
+                fetch_company_status = True
                 for company in page_response["results"]["data"]:
                     all_companies.append({
                         "id": company["id"], 
@@ -306,10 +310,19 @@ async def lusha_company_data_collection(campaign_details: Any):
             else:
                 print(f"Failed to fetch page {page_num}")
                 break
-        return all_companies
+        # if fetch_company_status:
+        #     campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        #     update_campaign_status = await campaigns_dao.update_campaign_status(ObjectId(campaign_details["campaign_id"]), "pending")
+        #     print(f"Updated status of {campaign_details['_id']} to 'processed'")
+        # return all_companies
+        
     except Exception as e:
         print(f"❌ Error occurred during data collection: {str(e)}")
     finally:
+        if fetch_company_status:
+            campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+            update_campaign_status = await campaigns_dao.update_campaign_status(ObjectId(campaign_details["campaign_id"]), "pending")
+            print(f"Updated status of {campaign_details['campaign_id']} to 'pending'")
         return all_companies
 
 async def lusha_sample_data():
