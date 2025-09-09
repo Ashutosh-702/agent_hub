@@ -6,6 +6,9 @@ from pathlib import Path
 import json
 
 LUSHA_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "lusha_industry_config.json"
+LUSHA_COMPANY_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "country_api_results.json"
+with open(LUSHA_COMPANY_CONFIG_PATH, "r", encoding="utf-8") as f:
+    LUSHA_COMPANY_CONFIG = json.load(f)
 with open(LUSHA_CONFIG_PATH, "r", encoding="utf-8") as f:
     LUSHA_CONFIG = json.load(f)
 LUSHA_LOOKUP = {}
@@ -88,9 +91,20 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
         if sub_ids:
             lusha_config["subIndustriesIds"] = sub_ids
     
+    
+
     if sheets_data.get("target", "")['location']['names']:
+        lusha_locations = []
         locations = sheets_data['target']["location"]['names']
         if locations:
+            for location in locations:
+                if location in LUSHA_COMPANY_CONFIG:
+                    lusha_locations.append(LUSHA_COMPANY_CONFIG[location].get("country",location))
+                else:
+                    lusha_locations.append(location)
+            if lusha_locations:
+                lusha_config["locations"] = lusha_locations
+        else:
             lusha_config["locations"] = locations
     
     revenue_min = sheets_data.get("target", "")['revenue_min']
