@@ -265,11 +265,11 @@ class OrchestratedCLIApp:
                 break
             ai_sdr_custom_config = claimed.get("config",{})
             campaign_id =ai_sdr_custom_config.get("CAMPAIGN_ID","")
-            #it should be like if  config is not empty then append it to the existing config
+
             if ai_sdr_custom_config:
                 self.config.update(ai_sdr_custom_config)
-            self.print_section(f"Processing Campaign: {campaign_id}")
 
+            self.print_section(f"Processing Campaign: {campaign_id}")
             try:
                 await self.run_orchestrated_workflow(with_monitoring=False)
                 requests.post(f"{BASE_URL}/api/v1/update_campaign_status",params={"campaign_id": campaign_id, "status": "processed"}, verify=False, timeout=30)

@@ -51,7 +51,7 @@ async def main(cli_config=None):
         if cli_config and "custom_prompts" in cli_config:
             config["custom_prompts"] = cli_config["custom_prompts"]
         if cli_config and "PRODUCT_NAME" in cli_config:
-            config["product"] = cli_config['PRODUCT_NAME']
+            config["product"] = cli_config["PRODUCT_NAME"]
         else:
             config["product"] = ""
 
