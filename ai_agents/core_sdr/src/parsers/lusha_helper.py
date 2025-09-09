@@ -107,8 +107,6 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
         if sub_ids:
             lusha_config["subIndustriesIds"] = sub_ids
     
-    
-
     if sheets_data.get("target", "")['location']['names']:
         lusha_locations = []
         location_type = sheets_data['target']["location"]['type']

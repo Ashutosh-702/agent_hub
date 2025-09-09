@@ -116,7 +116,7 @@ class HubspotContactCreator:
                 ["linkedin_url", "firstname", "lastname", "source","product","ci_lifecycle_stage"],
                 ["linkedin_url", "source","product","ci_lifecycle_stage"]
             ]
-
+            product = self.config.get("product", "")
             base = {
                 "email": email,
                 "firstname": firstname,
@@ -127,7 +127,7 @@ class HubspotContactCreator:
                 "linkedin_url": linkedin_url,
                 "hubspot_owner_id": owner_id,
                 "source":"AI-SDR",
-                "product":"OMS_Global",
+                "product": product,
                 "ci_lifecycle_stage":"Not Contacted",
             }
 
