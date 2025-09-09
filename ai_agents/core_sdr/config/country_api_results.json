@@ -247,6 +247,11 @@
     "continent": "Asia",
     "country": "Iraq"
   },
+  "Iran": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Iran, Islamic Republic of"
+  },
   "Ireland": {
     "country_grouping": "emea",
     "continent": "Europe",
@@ -543,6 +548,11 @@
     "country_grouping": "datch-emea",
     "continent": "Europe",
     "country": "Switzerland"
+  },
+  "Syria": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Syrian Arab Republic"
   },
   "Taiwan": {
     "country_grouping": "apac",
