@@ -11,6 +11,9 @@ with open(LUSHA_COMPANY_CONFIG_PATH, "r", encoding="utf-8") as f:
     LUSHA_COMPANY_CONFIG = json.load(f)
 with open(LUSHA_CONFIG_PATH, "r", encoding="utf-8") as f:
     LUSHA_CONFIG = json.load(f)
+LUSHA_REGION_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "region_country_mapping.json"
+with open(LUSHA_REGION_CONFIG_PATH, "r", encoding="utf-8") as f:
+    LUSHA_REGION_CONFIG = json.load(f)
 LUSHA_LOOKUP = {}
 for main in LUSHA_CONFIG:
     for sub in main["sub_industries"]:
@@ -95,13 +98,21 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
 
     if sheets_data.get("target", "")['location']['names']:
         lusha_locations = []
+        location_type = sheets_data['target']["location"]['type']
         locations = sheets_data['target']["location"]['names']
         if locations:
-            for location in locations:
-                if location in LUSHA_COMPANY_CONFIG:
-                    lusha_locations.append(LUSHA_COMPANY_CONFIG[location].get("country",location))
-                else:
-                    lusha_locations.append(location)
+            if location_type == "region":
+                for location in locations:
+                    if location in LUSHA_REGION_CONFIG:
+                        lusha_locations.extend(LUSHA_REGION_CONFIG[location])
+                    else:
+                        lusha_locations.append(location)
+            else:
+                for location in locations:
+                    if location in LUSHA_COMPANY_CONFIG:
+                        lusha_locations.append(LUSHA_COMPANY_CONFIG[location].get("country",location))
+                    else:
+                        lusha_locations.append(location)
             if lusha_locations:
                 lusha_config["locations"] = lusha_locations
         else:
