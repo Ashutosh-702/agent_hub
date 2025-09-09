@@ -1,0 +1,662 @@
+{
+  "Afghanistan": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Afghanistan"
+  },
+  "Algeria": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Algeria"
+  },
+  "Angola": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Angola"
+  },
+  "Argentina": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Argentina"
+  },
+  "Australia": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Australia"
+  },
+  "Austria": {
+    "country_grouping": "datch-emea",
+    "continent": "Europe",
+    "country": "Austria"
+  },
+  "Bahamas": {
+    "country_grouping": "na",
+    "continent": "North America",
+    "country": "Bahamas"
+  },
+  "Bahrain": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Bahrain"
+  },
+  "Bangladesh": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Bangladesh"
+  },
+  "Barbados": {
+    "country_grouping": "na",
+    "continent": "North America",
+    "country": "Barbados"
+  },
+  "Belarus": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Belarus"
+  },
+  "Belgium": {
+    "country_grouping": "emea-benelux",
+    "continent": "Europe",
+    "country": "Belgium"
+  },
+  "Belize": {
+    "country_grouping": "na",
+    "continent": "North America",
+    "country": "Belize"
+  },
+  "Bhutan": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Bhutan"
+  },
+  "Bolivia": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Bolivia"
+  },
+  "Botswana": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Botswana"
+  },
+  "Brazil": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Brazil"
+  },
+  "Brunei": {
+    "continent": "Asia",
+    "country": "Brunei Darussalam"
+  },
+  "Bulgaria": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Bulgaria"
+  },
+  "Cambodia": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Cambodia"
+  },
+  "Cameroon": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Cameroon"
+  },
+  "Canada": {
+    "country_grouping": "na",
+    "continent": "North America",
+    "country": "Canada"
+  },
+  "Chile": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Chile"
+  },
+  "China": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "China"
+  },
+  "Colombia": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Colombia"
+  },
+  "Costa Rica": {
+    "country_grouping": "na-latam",
+    "continent": "North America",
+    "country": "Costa Rica"
+  },
+  "Croatia": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Croatia"
+  },
+  "Cuba": {
+    "country_grouping": "na-latam",
+    "continent": "North America",
+    "country": "Cuba"
+  },
+  "Czech Republic": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Czech Republic"
+  },
+  "Denmark": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Denmark"
+  },
+  "Dominican Republic": {
+    "country_grouping": "latam-na",
+    "continent": "North America",
+    "country": "Dominican Republic"
+  },
+  "Ecuador": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Ecuador"
+  },
+  "Egypt": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Egypt"
+  },
+  "El Salvador": {
+    "country_grouping": "na-latam",
+    "continent": "North America",
+    "country": "El Salvador"
+  },
+  "Estonia": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Estonia"
+  },
+  "Ethiopia": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Ethiopia"
+  },
+  "Fiji": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Fiji"
+  },
+  "Finland": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Finland"
+  },
+  "France": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "France"
+  },
+  "Germany": {
+    "country_grouping": "emea-datch",
+    "continent": "Europe",
+    "country": "Germany"
+  },
+  "Ghana": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Ghana"
+  },
+  "Greece": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Greece"
+  },
+  "Guatemala": {
+    "country_grouping": "na-latam",
+    "continent": "North America",
+    "country": "Guatemala"
+  },
+  "Guyana": {
+    "continent": "South America",
+    "country": "Guyana"
+  },
+  "Haiti": {
+    "country_grouping": "na-latam",
+    "continent": "North America",
+    "country": "Haiti"
+  },
+  "Honduras": {
+    "country_grouping": "na-latam",
+    "continent": "North America",
+    "country": "Honduras"
+  },
+  "Hungary": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Hungary"
+  },
+  "India": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "India"
+  },
+  "Indonesia": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Indonesia"
+  },
+  "Iraq": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Iraq"
+  },
+  "Iran": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Iran, Islamic Republic of"
+  },
+  "Ireland": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Ireland"
+  },
+  "Israel": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Israel"
+  },
+  "Italy": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Italy"
+  },
+  "Jamaica": {
+    "country_grouping": "na",
+    "continent": "North America",
+    "country": "Jamaica"
+  },
+  "Japan": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Japan"
+  },
+  "Jordan": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Jordan"
+  },
+  "Kenya": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Kenya"
+  },
+  "Kiribati": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Kiribati"
+  },
+  "Kuwait": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Kuwait"
+  },
+  "Latvia": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Latvia"
+  },
+  "Lebanon": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Lebanon"
+  },
+  "Libya": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Libya"
+  },
+  "Lithuania": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Lithuania"
+  },
+  "Luxembourg": {
+    "country_grouping": "emea-benelux",
+    "continent": "Europe",
+    "country": "Luxembourg"
+  },
+  "Malaysia": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Malaysia"
+  },
+  "Maldives": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Maldives"
+  },
+  "Mexico": {
+    "country_grouping": "na-latam",
+    "continent": "North America",
+    "country": "Mexico"
+  },
+  "Micronesia": {
+    "continent": "Oceania",
+    "country": "Micronesia, Federated States of"
+  },
+  "Mongolia": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Mongolia"
+  },
+  "Morocco": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Morocco"
+  },
+  "Mozambique": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Mozambique"
+  },
+  "Myanmar": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Myanmar"
+  },
+  "Namibia": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Namibia"
+  },
+  "Nauru": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Nauru"
+  },
+  "Nepal": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Nepal"
+  },
+  "Netherlands": {
+    "country_grouping": "emea-benelux",
+    "continent": "Europe",
+    "country": "Netherlands"
+  },
+  "New Zealand": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "New Zealand"
+  },
+  "Nicaragua": {
+    "country_grouping": "latam-na",
+    "continent": "North America",
+    "country": "Nicaragua"
+  },
+  "Nigeria": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Nigeria"
+  },
+  "North Korea": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "North Korea"
+  },
+  "Norway": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Norway"
+  },
+  "Oman": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Oman"
+  },
+  "Pakistan": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Pakistan"
+  },
+  "Palau": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Palau"
+  },
+  "Palestine State": {
+    "continent": "Asia",
+    "country": "Palestine, State of"
+  },
+  "Panama": {
+    "country_grouping": "na-latam",
+    "continent": "North America",
+    "country": "Panama"
+  },
+  "Papua New Guinea": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Papua New Guinea"
+  },
+  "Paraguay": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Paraguay"
+  },
+  "Peru": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Peru"
+  },
+  "Philippines": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Philippines"
+  },
+  "Poland": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Poland"
+  },
+  "Portugal": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Portugal"
+  },
+  "Qatar": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Qatar"
+  },
+  "Romania": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Romania"
+  },
+  "Russia": {
+    "country_grouping": "apac-emea",
+    "continent": "Europe",
+    "country": "Russia"
+  },
+  "Samoa": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Samoa"
+  },
+  "Saudi Arabia": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Saudi Arabia"
+  },
+  "Senegal": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Senegal"
+  },
+  "Serbia": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Serbia"
+  },
+  "Singapore": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Singapore"
+  },
+  "Slovakia": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Slovakia"
+  },
+  "Slovenia": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Slovenia"
+  },
+  "Solomon Islands": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Solomon Islands"
+  },
+  "South Africa": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "South Africa"
+  },
+  "South Korea": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "South Korea"
+  },
+  "Spain": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Spain"
+  },
+  "Sri Lanka": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Sri Lanka"
+  },
+  "Suriname": {
+    "continent": "South America",
+    "country": "Suriname"
+  },
+  "Sweden": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Sweden"
+  },
+  "Switzerland": {
+    "country_grouping": "datch-emea",
+    "continent": "Europe",
+    "country": "Switzerland"
+  },
+  "Syria": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Syrian Arab Republic"
+  },
+  "Taiwan": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Taiwan"
+  },
+  "Tanzania": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Tanzania"
+  },
+  "Thailand": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Thailand"
+  },
+  "Timor-Leste": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Timor-Leste"
+  },
+  "Tonga": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Tonga"
+  },
+  "Trinidad and Tobago": {
+    "country_grouping": "na",
+    "continent": "North America",
+    "country": "Trinidad and Tobago"
+  },
+  "Tunisia": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Tunisia"
+  },
+  "Turkey": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Turkey"
+  },
+  "Tuvalu": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Tuvalu"
+  },
+  "Uganda": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Uganda"
+  },
+  "Ukraine": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "Ukraine"
+  },
+  "United Arab Emirates": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "United Arab Emirates"
+  },
+  "United Kingdom": {
+    "country_grouping": "emea",
+    "continent": "Europe",
+    "country": "United Kingdom"
+  },
+  "United States": {
+    "country_grouping": "na",
+    "continent": "North America",
+    "country": "United States"
+  },
+  "Uruguay": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Uruguay"
+  },
+  "Vanuatu": {
+    "country_grouping": "apac",
+    "continent": "Oceania",
+    "country": "Vanuatu"
+  },
+  "Venezuela": {
+    "country_grouping": "latam",
+    "continent": "South America",
+    "country": "Venezuela"
+  },
+  "Vietnam": {
+    "country_grouping": "apac",
+    "continent": "Asia",
+    "country": "Vietnam"
+  },
+  "Yemen": {
+    "country_grouping": "emea",
+    "continent": "Asia",
+    "country": "Yemen"
+  },
+  "Zambia": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Zambia"
+  },
+  "Zimbabwe": {
+    "country_grouping": "emea",
+    "continent": "Africa",
+    "country": "Zimbabwe"
+  }
+}
