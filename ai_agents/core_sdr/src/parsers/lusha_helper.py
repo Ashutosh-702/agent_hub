@@ -5,15 +5,28 @@ from typing import Dict, Any, List, OrderedDict
 from pathlib import Path
 import json
 
-LUSHA_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "lusha_industry_config.json"
-LUSHA_COMPANY_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "country_api_results.json"
+LUSHA_CONFIG_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "config" / "lusha_industry_config.json"
+)
+LUSHA_COMPANY_CONFIG_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "config" / "country_api_results.json"
+)
+LUSHA_REGION_CONFIG_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "config" / "region_country_mapping.json"
+)
+
 with open(LUSHA_COMPANY_CONFIG_PATH, "r", encoding="utf-8") as f:
     LUSHA_COMPANY_CONFIG = json.load(f)
+
 with open(LUSHA_CONFIG_PATH, "r", encoding="utf-8") as f:
     LUSHA_CONFIG = json.load(f)
-LUSHA_REGION_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "region_country_mapping.json"
+
 with open(LUSHA_REGION_CONFIG_PATH, "r", encoding="utf-8") as f:
     LUSHA_REGION_CONFIG = json.load(f)
+
 LUSHA_LOOKUP = {}
 for main in LUSHA_CONFIG:
     for sub in main["sub_industries"]:
@@ -108,10 +121,12 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
                         lusha_countries.extend(LUSHA_REGION_CONFIG[location])
                     else:
                         lusha_countries.append(location)
-                locations =lusha_countries
+                locations = lusha_countries
             for location in locations:
                 if location in LUSHA_COMPANY_CONFIG:
-                    lusha_locations.append(LUSHA_COMPANY_CONFIG[location].get("country",location))
+                    lusha_locations.append(
+                        LUSHA_COMPANY_CONFIG[location].get("country",location)
+                    )
                 else:
                     lusha_locations.append(location)
             if lusha_locations:
