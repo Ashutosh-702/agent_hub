@@ -321,6 +321,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                     page_payload["total_results"] = total_results
                     page_payload["raw_config"] = campaign_details["raw_config"]
                     scheduler = await schedule_lusha_company_collection(campaign_details=page_payload, eta=eta)
+                    print(f" lusha company data collection scheduler: {scheduler}")
                     break
                 else:
                     break
