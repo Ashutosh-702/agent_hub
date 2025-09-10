@@ -2,13 +2,21 @@ from eventbridge.logic.async_kafka_consumer import orjson
 import requests
 import json
 import os
+import time
 from typing import List, Dict, Any,Optional
+
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
-from global_utils.chronos_utils import schedule_lusha_company_collection,generate_default_eta_expression  # Removed to fix circular import
-urllib3.disable_warnings(InsecureRequestWarning)
-import time
+
 from config.loaded_config import loaded_config
+from global_utils.chronos_utils import (
+    schedule_lusha_company_collection,
+    generate_default_eta_expression
+)  # Removed to fix circular import
+
+urllib3.disable_warnings(InsecureRequestWarning)
+
+
 
 # def get_chronos_utils():
 #     """Local import helper to avoid circular dependencies."""
@@ -18,10 +26,17 @@ from config.loaded_config import loaded_config
 #     except ImportError as e:
 #         print(f"Could not import chronos utils: {e}")
 #         return None, None
-async def lusha_search_api(payload_values: Dict[str, Any], cached_data: Optional[List[Dict[str,Any]]]= None) -> List[int]:
+async def lusha_search_api(
+    payload_values: Dict[str, Any],
+    cached_data: Optional[List[Dict[str,Any]]]= None,
+) -> List[int]:
     print(f"Payload_values: {payload_values}")
-    payload_query =  build_payload(payload_values=payload_values, cached_data=cached_data)
+    payload_query =  build_payload(
+        payload_values=payload_values, 
+        cached_data=cached_data,
+    )
     print(f"Payload Query: {json.dumps(payload_query, indent=2)}")
+
     url = f"https://api.lusha.com/prospecting/company/search"
     headers = {
         'accept': 'application/json',
@@ -29,7 +44,9 @@ async def lusha_search_api(payload_values: Dict[str, Any], cached_data: Optional
         'Content-Type': 'application/json'
     }
     
-    response = requests.post(url, headers=headers, json=payload_query, verify=False, timeout=30)
+    response = requests.post(
+        url, headers=headers, json=payload_query, verify=False, timeout=30,
+    )
     response_data ={}
     response_data['status_code'] = response.status_code
 
@@ -39,19 +56,24 @@ async def lusha_search_api(payload_values: Dict[str, Any], cached_data: Optional
     elif response.status_code == 429:
         # Return None to indicate rate limit exhaustion rather than raising exception
         response_headers = dict(response.headers)
-        response_data['daily_left'] = response_headers.get('x-daily-requests-left', None)
-        response_data['hourly_left'] = response_headers.get('x-hourly-requests-left', None) 
-        response_data['minute_left'] = response_headers.get('x-minute-requests-left', None)
-        print(f"Daily left: {response_data['daily_left']}, Hourly left: {response_data['hourly_left']}, Minute left: {response_data['minute_left']}")
-
+        response_data['daily_left'] = response_headers.get(
+            'x-daily-requests-left', None)
+        response_data['hourly_left'] = response_headers.get(
+            'x-hourly-requests-left', None)
+        response_data['minute_left'] = response_headers.get(
+            'x-minute-requests-left', None)
+        print(f"Daily left: {response_data['daily_left']}, "
+              f"Hourly left: {response_data['hourly_left']}, "
+              f"Minute left: {response_data['minute_left']}")
         print(f"Rate limit exhausted")
         return response_data
     else:
-        #Temp code
         print(f"Search API failed: {response.status_code} - {response.text}")
         return None
-        # raise Exception(f"Search API failed: {response.status_code} - {response.text}")
-def build_payload(payload_values: Dict[str, Any],cached_data: Optional[List[Dict[str,Any]]]) -> Dict[str, Any]:
+def build_payload(
+    payload_values: Dict[str, Any],
+    cached_data: Optional[List[Dict[str,Any]]],
+) -> Dict[str, Any]:
     """Build the API payload from input values."""
     # payload_values = {industry: [12,23,23], location: india, revenue: {min:100000, max: 1000000}, size: {min: 10, max: 100}}
 
@@ -101,7 +123,11 @@ def build_payload(payload_values: Dict[str, Any],cached_data: Optional[List[Dict
     
     return payload_query
 
-async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], cached_data: List[Dict[str,Any]],config: Dict[str, Any]) -> List[Dict[str,Any]]:
+async def lusha_collect_companies_from_search(
+    payload_values: Dict[str, Any],
+    cached_data: List[Dict[str,Any]],
+    config: Dict[str, Any],
+) -> List[Dict[str,Any]]:
     try:
         print("working propoer")
         all_companies = []
@@ -111,17 +137,31 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
         # Step 1: Get first page to determine total results
         initial_payload = payload_values.copy()
         initial_payload["pages"] = {"page": 0, "size": page_size}
-        first_response = await lusha_search_api(payload_values=initial_payload, cached_data=cached_data)
+        
+        first_response = await lusha_search_api(
+            payload_values=initial_payload, 
+            cached_data=cached_data
+        )
 
         if first_response['status_code'] == 429:
             print("First API call failed or hit rate limit. Returning empty results.")
             payload_values['raw_config'] = config
-            eta = generate_default_eta_expression(daily_left=first_response['daily_left'], hourly_left=first_response['hourly_left'], minute_left=first_response['minute_left'])
+            eta = generate_default_eta_expression(
+                daily_left=first_response['daily_left'],
+                hourly_left=first_response['hourly_left'],
+                minute_left=first_response['minute_left']
+            )
+
             # eta = generate_default_eta_expression()
-            scheduler_response = await schedule_lusha_company_collection(payload_values, eta)
+            scheduler_response = await schedule_lusha_company_collection(
+                payload_values, 
+                eta
+            )
             print(f"Scheduler response: {scheduler_response}")
             return []
-        elif first_response['status_code'] == 201 and "data" not in first_response['results'] or first_response['status_code'] != 201:
+        elif (first_response['status_code'] == 201
+              and "data" not in first_response['results']
+              or first_response['status_code'] != 201):
             print("No data in first response. Returning empty results.")
             return []
             
@@ -135,7 +175,6 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
 
         # Step 2: Calculate total pages needed
         total_results = first_response.get("results", {}).get("totalResults", 0)
-
         print(f"Total results for this search: {total_results}")
         total_pages = (total_results + page_size - 1) // page_size  # Ceiling division
         
@@ -149,20 +188,32 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
             page_payload = payload_values.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
             page_payload["total_results"] = total_results
-            # some time it throws error 429, so we need to handle it like the number of   data it already has it should  return. how to handle this?
-            page_response = await lusha_search_api(payload_values=page_payload, cached_data=cached_data)
+
+            page_response = await lusha_search_api(
+                payload_values=page_payload, 
+                cached_data=cached_data
+            )
             
             if page_response['status_code'] == 429:
                 # Rate limit hit and retries exhausted
-                print(f"Rate limit hit on page {page_num + 1}. Returning {len(all_companies)} companies collected so far.")
+                print(f"Rate limit hit on page {page_num + 1}. "
+                      f"Returning {len(all_companies)} companies collected so far.")
                 rate_limit_hit = True
                 page_payload['raw_config'] = config
                 # schedule_func, eta_func = get_chronos_utils()
-                eta = generate_default_eta_expression(daily_left=page_response['daily_left'], hourly_left=page_response['hourly_left'], minute_left=page_response['minute_left'])
-                scheduler_response = await schedule_lusha_company_collection(page_payload, eta)
+                eta = generate_default_eta_expression(
+                    daily_left=page_response['daily_left'], 
+                    hourly_left=page_response['hourly_left'], 
+                    minute_left=page_response['minute_left']
+                )
+                scheduler_response = await schedule_lusha_company_collection(
+                    page_payload, eta
+                )
                 print(f"Scheduler response: {scheduler_response}")
                 break
-            elif page_response['status_code'] == 201 and "data" in page_response['results']:
+
+            elif (page_response['status_code'] == 201
+                  and "data" in page_response['results']):
                 # Successfully got data from this page
                 page_companies = 0
                 for company in page_response["results"]["data"]:
@@ -179,7 +230,8 @@ async def lusha_collect_companies_from_search(payload_values: Dict[str, Any], ca
         
         # Final summary
         if rate_limit_hit:
-            print(f"Collection completed with rate limiting. Collected {len(all_companies)} companies out of {total_results} total available.")
+            print(f"Collection completed with rate limiting. "
+                  f"Collected {len(all_companies)} companies out of {total_results} total available.")
         else:
             print(f"Collection completed successfully. Collected {len(all_companies)} companies from {total_pages} pages.")
         

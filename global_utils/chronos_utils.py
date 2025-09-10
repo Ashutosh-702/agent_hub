@@ -29,32 +29,31 @@ def serialize_for_json(obj):
 
 def get_eta_datetime(eta: int) -> str:
     """Calculate ETA in chronos_client expected format: '%Y-%m-%dT%H:%M:%S'"""
-    eta_datetime = datetime.now(timezone.utc) + timedelta(minutes=eta) + timedelta(seconds=10)
+    eta_datetime = (datetime.now(timezone.utc) + 
+                    timedelta(minutes=eta) + 
+                    timedelta(seconds=10))
     # Return in format expected by chronos_client: '%Y-%m-%dT%H:%M:%S' (no timezone)
     return eta_datetime.strftime('%Y-%m-%dT%H:%M:%S')
 
-def generate_default_eta_expression(daily_left: Optional[int]=None, hourly_left: Optional[int]=None, minute_left: Optional[int]=None) -> str:
+def generate_default_eta_expression(
+    daily_left: Optional[int]=None, 
+    hourly_left: Optional[int]=None, 
+    minute_left: Optional[int]=None,
+) -> str:
     if daily_left != None and daily_left == '0':
-        #it should be at least 1 day
         return (datetime.utcnow() + timedelta(days=1)).isoformat(timespec="seconds")
     elif hourly_left != None and hourly_left == '0':
-        #it should be at least 1 hour
         return (datetime.utcnow() + timedelta(hours=1)).isoformat(timespec="seconds")
     elif minute_left != None and minute_left == '0':
-        #it should be at least 1 minute
         return (datetime.utcnow() + timedelta(minutes=1)).isoformat(timespec="seconds")
     else:
         return (datetime.utcnow() + timedelta(seconds=10)).isoformat(timespec="seconds")
-    return future_time
-    # return future_time.strftime('%Y-%m-%dT%H:%M:%S')
 
 async def schedule_lusha_company_collection(campaign_details: dict, eta):
     chronos_url = os.getenv("CHRONOS_INTRNL_SVC")
     print(f"Chronos URL: {chronos_url}")
     scheduler_client = SchedulerAPIClient(base_url=chronos_url)
 
-    
-    # Serialize ObjectIds and datetime objects to avoid JSON serialization errors
     serialized_campaign_details = serialize_for_json(campaign_details)
     
     scheduler_payload = {
@@ -69,44 +68,14 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
     }
     
     try:
-        print(f"Scheduling lusha company collection {campaign_details.get('campaign_id')} with eta: {eta}")
-        scheduler_response = await scheduler_client.create_scheduler(scheduler_data=scheduler_payload)
+        print(f"Scheduling lusha company collection "
+              f"{campaign_details.get('campaign_id')} with eta: {eta}")
+        scheduler_response = await scheduler_client.create_scheduler(
+            scheduler_data=scheduler_payload,
+        )
         if scheduler_response.get("status") != 200:
             raise Exception("Error while scheduling batch processing")
         return scheduler_response
     except Exception as e:
         print(f"Error scheduling batch: {e}")
         raise Exception("Error while scheduling batch processing")
-
-async def schedule_connection_processing(batch_id: str, linkedin_url: str):
-    """
-    Schedule individual connection processing with random delay
-    Simple approach without kafka complexity
-    """
-    chronos_url = os.getenv("CHRONOS_INTRNL_SVC")
-    scheduler_client = SchedulerAPIClient(base_url=chronos_url)
-    
-    # 5 mins + random (0-30 mins) delay
-    base_delay = 5
-    random_delay = random.randint(0, 30)
-    total_delay = base_delay + random_delay
-    
-    scheduler_payload = {
-        "service_name": "linkedin_sdr",
-        "topic": "linkedin-connection-processing",
-        "payload": {
-            "batch_id": batch_id,
-            "linkedin_url": linkedin_url
-        },
-        "eta": get_eta_datetime(eta=total_delay),
-        "partition_value": batch_id
-    }
-    
-    try:
-        scheduler_response = await scheduler_client.create_scheduler(scheduler_data=scheduler_payload)
-        if scheduler_response.get("status") != 200:
-            raise Exception("Error while scheduling connection processing")
-        return scheduler_response
-    except Exception as e:
-        print(f"Error scheduling connection: {e}")
-        raise Exception("Error while scheduling connection processing") 

@@ -12,8 +12,10 @@ from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from datetime import datetime, timezone
 import time
-from global_utils.chronos_utils import generate_default_eta_expression,schedule_lusha_company_collection
-
+from global_utils.chronos_utils import (
+    generate_default_eta_expression,
+    schedule_lusha_company_collection
+)
 
 def convert_objectid_to_string(payload: dict) -> dict:
     """Convert ObjectId values to strings for JSON serialization."""
@@ -146,27 +148,27 @@ async def lusha_company_collection_handler(message: Any):
         print(f"❌ Error handling lusha company collection message: {e}")
         raise
 
-
 async def process_lusha_company_collection(campaign_details: Any):
     lusha_company_data = []  # Initialize before try block
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
-        # loaded_config.lusha_api_key = "20fc4277-7a88-4e05-b17a-9d65d59b757f"
-        # Parse campaign_details if it's a JSON string
+
         if isinstance(campaign_details, str):
             print(f"🔍 Debug - campaign_details is string, parsing JSON...")
             campaign_details = json.loads(campaign_details)
         
         lusha_company_data = await lusha_company_data_collection(campaign_details)
-        # lusha_company_data = await lusha_sample_data()
         print(f"lusha_company_data: {lusha_company_data}")
+
         if not lusha_company_data:
             print("❌ No company data found")
             return
         companies_list = []
         cached_data = []
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = CompaniesDao(
+            loaded_config.connection_manager.mongo_client
+        )
         config = campaign_details["raw_config"]
         # cached_data_db = await companies_dao.get_companies({"location.name":config.get("locations", {}).get("location", {}).get("names", []), "location.type": config.get("target", {}).get("location", {}).get("type", ""), "profile.industry":config.get("segmentation", {}).get("industry", [])})
         cached_data_db = await companies_dao.get_companies({
@@ -237,14 +239,13 @@ async def lusha_company_data_collection(campaign_details: Any):
         
         per_page = campaign_details["pages"]["page"]
         page_size = campaign_details["pages"]["size"]
-        
-        #here total_results is the total number of companies to collect. this key may comes may not comes. need to handle this.
         total_results = campaign_details.get("total_results", 0)
+
         if total_results == 0:
             print("fetching response")
-            # Convert ObjectId to string to make it JSON serializable
             api_payload = convert_objectid_to_string(campaign_details)
             first_response = await lusha_search_api(api_payload)
+
             if first_response['status_code'] == 429:
                 #need  to loop for try 3 times with sleep
                 for i in range(3):
@@ -255,7 +256,11 @@ async def lusha_company_data_collection(campaign_details: Any):
                         break
                 if first_response['status_code'] == 429:
                     print(f"❌ rate limit exhausted")
-                    eta = generate_default_eta_expression(daily_left=first_response['daily_left'], hourly_left=first_response['hourly_left'], minute_left=first_response['minute_left'])
+                    eta = generate_default_eta_expression(
+                        daily_left=first_response['daily_left'], 
+                        hourly_left=first_response['hourly_left'], 
+                        minute_left=first_response['minute_left']
+                    )
                     api_payload["total_results"] = total_results
                     api_payload["raw_config"] = campaign_details["raw_config"]
                     scheduler = await schedule_lusha_company_collection(campaign_details=api_payload, eta=eta)
@@ -264,11 +269,13 @@ async def lusha_company_data_collection(campaign_details: Any):
             elif first_response['status_code'] == 201 and "data" not in first_response['results'] or first_response['status_code'] != 201:
                 print("No data in first response. Returning empty results.")
                 return []
+
             total_results = first_response["results"]["totalResults"]
             campaign_details["total_results"] = total_results
             print("got response")
             print(first_response)
             total_pages = (total_results + page_size - 1) // page_size
+
             for company in first_response["results"]["data"]:
                 all_companies.append({
                     "id": company["id"], 
@@ -284,6 +291,7 @@ async def lusha_company_data_collection(campaign_details: Any):
             page_payload = campaign_details.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
             page_response = await lusha_search_api(page_payload, all_companies)
+
             if page_response['status_code'] == 429:
                 #need  to loop for try 3 times with sleep
                 for i in range(1):
@@ -292,9 +300,14 @@ async def lusha_company_data_collection(campaign_details: Any):
                         time.sleep(10)
                     else:
                         break
+
                 if page_response['status_code'] == 429:
                     print(f"❌ rate limit exhausted")
-                    eta = generate_default_eta_expression(daily_left=page_response['daily_left'], hourly_left=page_response['hourly_left'], minute_left=page_response['minute_left'])
+                    eta = generate_default_eta_expression(
+                        daily_left=page_response['daily_left'], 
+                        hourly_left=page_response['hourly_left'], 
+                        minute_left=page_response['minute_left']
+                    )
                     page_payload["total_results"] = total_results
                     page_payload["raw_config"] = campaign_details["raw_config"]
                     scheduler = schedule_lusha_company_collection(campaign_details=page_payload, eta=eta)
@@ -322,49 +335,9 @@ async def lusha_company_data_collection(campaign_details: Any):
         print(f"❌ Error occurred during data collection: {str(e)}")
     finally:
         if fetch_company_status:
-            campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+            campaigns_dao = CampaignsDao(
+                loaded_config.connection_manager.mongo_client
+            )
             update_campaign_status = await campaigns_dao.update_campaign_status(ObjectId(campaign_details["campaign_id"]), "pending")
             print(f"Updated status of {campaign_details['campaign_id']} to 'pending'")
         return all_companies
-
-async def lusha_sample_data():
-    return  [{'id': '9252341', 'name': 'Swiggy', 'api_response_metadata': {'id': '9252341', 'name': 'Swiggy', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '10143', 'name': 'Taj Hotels', 'api_response_metadata': {'id': '10143', 'name': 'Taj Hotels', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '3716484', 'name': 'OYO', 'api_response_metadata': {'id': '3716484', 'name': 'OYO', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '16271', 'name': 'Britannia Industries Limited', 'api_response_metadata': {'id': '16271', 'name': 'Britannia Industries Limited', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '361348', 'name': 'Myntra', 'api_response_metadata': {'id': '361348', 'name': 'Myntra', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '17302', 'name': 'DS Group', 'api_response_metadata': {'id': '17302', 'name': 'DS Group', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '14468407', 'name': 'The Indian Hotels Company Limited (IHCL)', 'api_response_metadata': {'id': '14468407', 'name': 'The Indian Hotels Company Limited (IHCL)', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '164809', 'name': 'Aditya Birla Fashion and Retail Ltd.', 'api_response_metadata': {'id': '164809', 'name': 'Aditya Birla Fashion and Retail Ltd.', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '31239958', 'name': 'Tata Consumer Products', 'api_response_metadata': {'id': '31239958', 'name': 'Tata Consumer Products', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '27515', 'name': 'ITC Hotels Limited', 'api_response_metadata': {'id': '27515', 'name': 'ITC Hotels Limited', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '566952', 'name': 'Jubilant FoodWorks Ltd.', 'api_response_metadata': {'id': '566952', 'name': 'Jubilant FoodWorks Ltd.', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '12577', 'name': 'Arvind Limited', 'api_response_metadata': {'id': '12577', 'name': 'Arvind Limited', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '18259907', 'name': 'Hindustan Coca-Cola Beverages', 'api_response_metadata': {'id': '18259907', 'name': 'Hindustan Coca-Cola Beverages', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '129585', 'name': 'Shahi Exports Pvt Ltd', 'api_response_metadata': {'id': '129585', 'name': 'Shahi Exports Pvt Ltd', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '148669', 'name': 'The Leela Palaces, Hotels and Resorts', 'api_response_metadata': {'id': '148669', 'name': 'The Leela Palaces, Hotels and Resorts', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '2618177', 'name': 'Reliance Brands Limited', 'api_response_metadata': {'id': '2618177', 'name': 'Reliance Brands Limited', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '571704', 'name': 'Bata India Limited', 'api_response_metadata': {'id': '571704', 'name': 'Bata India Limited', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '369636', 'name': 'Devyani International Limited', 'api_response_metadata': {'id': '369636', 'name': 'Devyani International Limited', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '1127583', 'name': 'Mahindra Holidays & Resorts India Limited', 'api_response_metadata': {'id': '1127583', 'name': 'Mahindra Holidays & Resorts India Limited', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '912501', 'name': 'United Breweries Ltd.', 'api_response_metadata': {'id': '912501', 'name': 'United Breweries Ltd.', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '518933', 'name': 'Bisleri International Pvt Ltd', 'api_response_metadata': {'id': '518933', 'name': 'Bisleri International Pvt Ltd', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '33353', 'name': 'Arvind Fashions Limited', 'api_response_metadata': {'id': '33353', 'name': 'Arvind Fashions Limited', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '457313', 'name': 'The Lalit Suri Hospitality Group', 'api_response_metadata': {'id': '457313', 'name': 'The Lalit Suri Hospitality Group', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '412199', 'name': 'Page Industries Ltd', 'api_response_metadata': {'id': '412199', 'name': 'Page Industries Ltd', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '95569', 'name': 'Lemon Tree Hotels', 'api_response_metadata': {'id': '95569', 'name': 'Lemon Tree Hotels', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '83004373', 'name': 'Hyperpure by Zomato', 'api_response_metadata': {'id': '83004373', 'name': 'Hyperpure by Zomato', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '1842947', 'name': 'Bira 91', 'api_response_metadata': {'id': '1842947', 'name': 'Bira 91', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '17976', 'name': 'Oberoi Hotels & Resorts', 'api_response_metadata': {'id': '17976', 'name': 'Oberoi Hotels & Resorts', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '13195556', 'name': 'Sapphire Foods India Limited', 'api_response_metadata': {'id': '13195556', 'name': 'Sapphire Foods India Limited', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '9471845', 'name': 'Licious', 'api_response_metadata': {'id': '9471845', 'name': 'Licious', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '307094', 'name': 'Haldiram’s snacks food pvt. ltd.', 'api_response_metadata': {'id': '307094', 'name': 'Haldiram’s snacks food pvt. ltd.', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '978380', 'name': 'Barbeque Nation Hospitality Ltd.', 'api_response_metadata': {'id': '978380', 'name': 'Barbeque Nation Hospitality Ltd.', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '13631041', 'name': 'Fortune Park Hotels Ltd', 'api_response_metadata': {'id': '13631041', 'name': 'Fortune Park Hotels Ltd', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '13318625', 'name': 'Stanza Living', 'api_response_metadata': {'id': '13318624', 'name': 'Stanza Living', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '10594819', 'name': 'Lifestyle International Pvt Ltd', 'api_response_metadata': {'id': '10594819', 'name': 'Lifestyle International Pvt Ltd', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '1610594', 'name': 'Compass Group India', 'api_response_metadata': {'id': '1610594', 'name': 'Compass Group India', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '330905', 'name': 'Blackberrys Menswear', 'api_response_metadata': {'id': '330905', 'name': 'Blackberrys Menswear', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '4037279', 'name': 'Havmor Ice Cream', 'api_response_metadata': {'id': '4037279', 'name': 'Havmor Ice Cream', 'hasCompanyRevenue': False, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '17975', 'name': 'The Oberoi Group', 'api_response_metadata': {'id': '17975', 'name': 'The Oberoi Group', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': False, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}},
-            {'id': '14517494', 'name': 'Metro Brands Limited', 'api_response_metadata': {'id': '14517494', 'name': 'Metro Brands Limited', 'hasCompanyRevenue': True, 'hasCompanyMainIndustry': True, 'hasCompanySubIndustry': True, 'hasCompanyFunding': True, 'hasCompanyIntent': False, 'hasCompanyTechnologies': True}}]
