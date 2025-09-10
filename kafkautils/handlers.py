@@ -244,6 +244,8 @@ async def lusha_company_data_collection(campaign_details: Any):
 
         
         # Calculate total_pages regardless of whether we need to fetch results
+        total_pages = (total_results + page_size - 1) // page_size if total_results > 0 else 1
+        print(f" lusha company data collection calculated total_pages: {total_pages}")
 
         if total_results == 0:
             print("fetching response")
