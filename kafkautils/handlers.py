@@ -236,10 +236,14 @@ async def lusha_company_data_collection(campaign_details: Any):
     all_companies = []
     fetch_company_status = False
     try:
-        
+        print(f" lusha company data collection campaign_details: {campaign_details}")
         per_page = campaign_details["pages"]["page"]
         page_size = campaign_details["pages"]["size"]
         total_results = campaign_details.get("total_results", 0)
+        print(f" lusha company data collection total_results: {total_results}")
+
+        
+        # Calculate total_pages regardless of whether we need to fetch results
 
         if total_results == 0:
             print("fetching response")
@@ -274,7 +278,10 @@ async def lusha_company_data_collection(campaign_details: Any):
             campaign_details["total_results"] = total_results
             print("got response")
             print(first_response)
-            total_pages = (total_results + page_size - 1) // page_size
+            # Recalculate total_pages with the new total_results
+            total_pages = (total_results + page_size - 1) // page_size if total_results > 0 else 1
+
+            # total_pages = (total_results + page_size - 1) // page_size
 
             for company in first_response["results"]["data"]:
                 all_companies.append({
