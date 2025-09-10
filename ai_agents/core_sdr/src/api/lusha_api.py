@@ -180,7 +180,7 @@ async def lusha_collect_companies_from_search(
         
         print(f"Total results: {total_results}, Total pages: {total_pages}")
         #temp code
-        total_pages  = 2 if total_pages > 2 else total_pages
+        # total_pages  = 2 if total_pages > 2 else total_pages
         for page_num in range(1, total_pages):
             print(f"Fetching page {page_num + 1} of {total_pages}")
             
