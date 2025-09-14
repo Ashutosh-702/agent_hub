@@ -215,17 +215,21 @@ async def process_lusha_company_collection(campaign_details: Any):
             print(f"Total new companies added into companies collection: {len(inserted_ids)}")
             id_list = inserted_ids + cached_ids
             campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+
+            campaign_company_runs_data = await campaign_company_runs_dao.get_campaign_company_runs({"campaign_id": ObjectId(config.get("_id")), "company_id": {"$in": id_list}})
+            print(f" lusha company data collection campaign_company_runs_data: {campaign_company_runs_data}")
             for _id in id_list:
-                mapping_doc = {
-                "campaign_id": ObjectId(config.get("_id")),
-                "company_id": ObjectId(_id),
-                "company_status": False,
-                "metadata":{
-                        "created_at":datetime.now(timezone.utc),
-                        "updated_at":datetime.now(timezone.utc),
-                    },
-                }
-                await campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
+                if _id not in [run["company_id"] for run in campaign_company_runs_data]:
+                    mapping_doc = {
+                    "campaign_id": ObjectId(config.get("_id")),
+                    "company_id": ObjectId(_id),
+                    "company_status": False,
+                    "metadata":{
+                            "created_at":datetime.now(timezone.utc),
+                            "updated_at":datetime.now(timezone.utc),
+                        },
+                    }
+                    await campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
     except Exception as e:
         print(f"❌ Error occurred during collection: {str(e)}")
     finally:
