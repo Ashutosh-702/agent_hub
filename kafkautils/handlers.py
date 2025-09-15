@@ -217,7 +217,6 @@ async def process_lusha_company_collection(campaign_details: Any):
             campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
 
             campaign_company_runs_data = await campaign_company_runs_dao.get_campaign_company_runs({"campaign_id": ObjectId(config.get("_id")), "company_id": {"$in": id_list}})
-            print(f" lusha company data collection campaign_company_runs_data: {campaign_company_runs_data}")
             for _id in id_list:
                 if _id not in [run["company_id"] for run in campaign_company_runs_data]:
                     mapping_doc = {
