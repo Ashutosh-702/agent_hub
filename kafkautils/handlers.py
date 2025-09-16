@@ -354,8 +354,6 @@ async def lusha_company_data_collection(campaign_details: Any):
                     scheduler = await schedule_lusha_company_collection(campaign_details=page_payload, eta=eta)
                     print(f" lusha company data collection scheduler: {scheduler}")
                     break
-                else:
-                    break
             elif page_response['status_code'] == 201 and "data" in page_response['results']:
                 fetch_company_status = True
                 for company in page_response["results"]["data"]:
