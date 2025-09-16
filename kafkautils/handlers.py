@@ -282,7 +282,6 @@ async def lusha_company_data_collection(campaign_details: Any):
 
                 #need  to loop for try 3 times with sleep
                 for i in range(3):
-                    time.sleep(10)
                     first_response = await lusha_search_api(api_payload)
 
                     if first_response['status_code'] == 201:
@@ -335,10 +334,11 @@ async def lusha_company_data_collection(campaign_details: Any):
 
             if page_response['status_code'] == 429:
                 #need  to loop for try 3 times with sleep
-                for i in range(1):
+                for i in range(3):
+                    print(f"retrying {i+1} times")
                     page_response = await lusha_search_api(page_payload, all_companies)
                     if page_response['status_code'] == 429:
-                        time.sleep(10)
+                        continue
                     else:
                         break
 
