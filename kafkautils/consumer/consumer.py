@@ -71,7 +71,9 @@ class LeadgenEventBridgeConsumer:
         try:
             # Set the message handler in the topics configuration
             topics_config = self.consumer_config["topics_configurations"]
+            
             for topic_name, topic_config in topics_config.items():
+
                 # Only set default handler if no handler is already configured
                 if "tasks" not in topic_config or not topic_config["tasks"]:
                     topic_config["tasks"] = [self.leadgen_message_handler]

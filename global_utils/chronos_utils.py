@@ -29,9 +29,12 @@ def serialize_for_json(obj):
 
 def get_eta_datetime(eta: int) -> str:
     """Calculate ETA in chronos_client expected format: '%Y-%m-%dT%H:%M:%S'"""
-    eta_datetime = (datetime.now(timezone.utc) + 
-                    timedelta(minutes=eta) + 
-                    timedelta(seconds=10))
+    eta_datetime = (
+        datetime.now(timezone.utc) + 
+        timedelta(minutes=eta) + 
+        timedelta(seconds=10)
+    )
+
     # Return in format expected by chronos_client: '%Y-%m-%dT%H:%M:%S' (no timezone)
     return eta_datetime.strftime('%Y-%m-%dT%H:%M:%S')
 
@@ -40,6 +43,7 @@ def generate_default_eta_expression(
     hourly_left: Optional[int]=None, 
     minute_left: Optional[int]=None,
 ) -> str:
+
     if daily_left != None and daily_left == '0':
         return (datetime.utcnow() + timedelta(days=1)).isoformat(timespec="seconds")
     elif hourly_left != None and hourly_left == '0':
@@ -70,11 +74,14 @@ async def schedule_lusha_company_collection(campaign_details: dict, eta):
     try:
         print(f"Scheduling lusha company collection "
               f"{campaign_details.get('campaign_id')} with eta: {eta}")
+              
         scheduler_response = await scheduler_client.create_scheduler(
             scheduler_data=scheduler_payload,
         )
+
         if scheduler_response.get("status") != 200:
             raise Exception("Error while scheduling batch processing")
+            
         return scheduler_response
     except Exception as e:
         print(f"Error scheduling batch: {e}")
