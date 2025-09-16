@@ -8,5 +8,6 @@ class Settings:
     debug = os.getenv("DEBUG",False)
     MODE = os.getenv("MODE", "server")
     base_url = os.getenv("BASE_URL","http://0.0.0.0:80")
+    lusha_api_key = os.getenv("LUSHA_API_KEY")
 
 loaded_config = Settings()

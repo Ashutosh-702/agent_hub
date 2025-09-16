@@ -115,7 +115,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
         for company_data in cached_data_db:
             cached_data.append({'id': company_data['identifiers']['source_id'],'name': company_data['identifiers']['name']})
         cached_ids = [company['_id'] for company in cached_data_db]
-        lusha_company_data = get_companies_from_lusha(config,cached_data) # List of {'id': int, 'name': str}
+        lusha_company_data = await get_companies_from_lusha(config,cached_data) # List of {'id': int, 'name': str}
         print(f"Found {len(lusha_company_data)} companies from lusha.")
         print("Fetching companies from core_signal...")
         core_signal_company_data = collect_companies_from_search(config, lusha_company_data+cached_data) # List of {'id': int, 'name': str}

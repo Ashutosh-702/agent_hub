@@ -603,11 +603,11 @@ configure_static_serving_production(app)
 
 async def consumer_main():
     """Async consumer startup (following LinkedIn SDR pattern)"""
-    consumer_type = os.getenv("CONSUMER_TYPE", "")
+    consumer_type = os.getenv("CONSUMER_TYPE", "leadgen_batch_consumer")
     print("🤖 Starting Leadgen Kafka Consumer Server...")
     print(f"   📡 Consumer type: {consumer_type}")
-    print("   📨 Listening for company search requests...")
-    print("   🔄 Will process company searches asynchronously")
+    print("   📨 Listening for multiple topics...")
+    print("   🔄 Will process company searches and lusha collections asynchronously")
     print("   🌉 Using EventBridge abstraction")
 
     try:
@@ -623,7 +623,7 @@ async def consumer_main():
             sys.exit(1)
 
         print(f"   ⚙️  Service: leadgen")
-        print(f"   📂 Topic: leadgen-batch-processing")
+        print(f"   📂 Topics: leadgen-batch-processing, lusha-company-collection")
 
         # Start health check endpoints
         print("   ❤️ Starting health check endpoints...")

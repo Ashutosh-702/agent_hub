@@ -5,9 +5,23 @@
 #    pip-compile requirements.in
 #
 aiofiles==23.2.1
-    # via eventbridge
+    # via
+    #   chronos-client
+    #   eventbridge
+aiohappyeyeballs==2.6.1
+    # via
+    #   aiohttp
+    #   chronos-client
+aiohttp==3.12.15
+    # via chronos-client
 aiokafka==0.9.0
-    # via eventbridge
+    # via
+    #   chronos-client
+    #   eventbridge
+aiosignal==1.4.0
+    # via
+    #   aiohttp
+    #   chronos-client
 annotated-types==0.7.0
     # via pydantic
 anyio==4.10.0
@@ -21,11 +35,14 @@ anyio==4.10.0
 async-timeout==5.0.1
     # via
     #   aiokafka
+    #   chronos-client
     #   eventbridge
 asyncclick==8.1.8.0
     # via -r requirements.in
 attrs==25.3.0
     # via
+    #   aiohttp
+    #   chronos-client
     #   jsonschema
     #   referencing
 cachetools==5.5.2
@@ -38,6 +55,8 @@ certifi==2025.8.3
     #   requests
 charset-normalizer==3.4.3
     # via requests
+chronos-client @ git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/chronos-client@v2.1.5-alpha2
+    # via -r requirements.in
 click==8.2.1
     # via
     #   -r requirements.in
@@ -45,22 +64,31 @@ click==8.2.1
 colorama==0.4.6
     # via griffe
 confluent-kafka==2.3.0
-    # via eventbridge
+    # via
+    #   chronos-client
+    #   eventbridge
+crontab==1.0.1
+    # via chronos-client
 distro==1.9.0
     # via openai
 dnspython==2.7.0
     # via pymongo
-eventbridge @ git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/fynd-event-bridge@bump_reqs_v2.1.0-alpha.4
-    # via -r requirements.in
+eventbridge @ git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/fynd-event-bridge@bump_reqs_v2.1.0-alpha.5
+    # via chronos-client
 fastapi==0.116.1
     # via -r requirements.in
+frozenlist==1.7.0
+    # via
+    #   aiohttp
+    #   aiosignal
+    #   chronos-client
 google-auth==2.40.3
     # via
     #   google-auth-oauthlib
     #   gspread
 google-auth-oauthlib==1.2.2
     # via gspread
-griffe==1.11.1
+griffe==1.13.0
     # via openai-agents
 gspread==6.2.1
     # via -r requirements.in
@@ -86,19 +114,21 @@ hubspot-api-client==12.0.0
 idna==3.10
     # via
     #   anyio
+    #   chronos-client
     #   httpx
     #   requests
+    #   yarl
 jiter==0.10.0
     # via openai
 jsonpatch==1.33
     # via langchain-core
 jsonpointer==3.0.0
     # via jsonpatch
-jsonschema==4.25.0
+jsonschema==4.25.1
     # via mcp
 jsonschema-specifications==2025.4.1
     # via jsonschema
-langchain-core==0.3.74
+langchain-core==0.3.75
     # via
     #   langgraph
     #   langgraph-checkpoint
@@ -111,20 +141,29 @@ langgraph-checkpoint==2.1.1
     #   langgraph-prebuilt
 langgraph-prebuilt==0.6.4
     # via langgraph
-langgraph-sdk==0.2.0
+langgraph-sdk==0.2.4
     # via langgraph
-langsmith==0.4.13
+langsmith==0.4.20
     # via langchain-core
 loguru==0.7.3
     # via -r requirements.in
 lz4==4.3.2
-    # via eventbridge
+    # via
+    #   chronos-client
+    #   eventbridge
 marshmallow==3.20.1
-    # via eventbridge
-mcp==1.12.4
+    # via
+    #   chronos-client
+    #   eventbridge
+mcp==1.13.1
     # via openai-agents
 motor==3.7.1
     # via -r requirements.in
+multidict==6.6.4
+    # via
+    #   aiohttp
+    #   chronos-client
+    #   yarl
 numpy==2.3.2
     # via pandas
 oauth2client==4.1.3
@@ -135,18 +174,20 @@ openai==1.99.9
     # via
     #   -r requirements.in
     #   openai-agents
-openai-agents==0.2.6
+openai-agents==0.2.9
     # via -r requirements.in
 orjson==3.10.10
     # via
+    #   chronos-client
     #   eventbridge
     #   langgraph-sdk
     #   langsmith
 ormsgpack==1.10.0
     # via langgraph-checkpoint
-packaging==25.0
+packaging==23.2
     # via
     #   aiokafka
+    #   chronos-client
     #   eventbridge
     #   langchain-core
     #   langsmith
@@ -154,7 +195,14 @@ packaging==25.0
 pandas==2.3.1
     # via -r requirements.in
 prometheus-client==0.18.0
-    # via eventbridge
+    # via
+    #   chronos-client
+    #   eventbridge
+propcache==0.3.2
+    # via
+    #   aiohttp
+    #   chronos-client
+    #   yarl
 pyasn1==0.6.1
     # via
     #   oauth2client
@@ -179,7 +227,7 @@ pydantic-core==2.33.2
     # via pydantic
 pydantic-settings==2.10.1
     # via mcp
-pymongo==4.14.0
+pymongo==4.14.1
     # via motor
 pyparsing==3.2.3
     # via httplib2
@@ -194,8 +242,10 @@ python-dotenv==1.1.1
     #   pydantic-settings
 python-multipart==0.0.20
     # via mcp
-pytz==2025.2
-    # via pandas
+pytz==2023.3.post1
+    # via
+    #   chronos-client
+    #   pandas
 pyyaml==6.0.2
     # via langchain-core
 referencing==0.36.2
@@ -214,7 +264,7 @@ requests-oauthlib==2.0.0
     # via google-auth-oauthlib
 requests-toolbelt==1.0.0
     # via langsmith
-rpds-py==0.27.0
+rpds-py==0.27.1
     # via
     #   jsonschema
     #   referencing
@@ -233,7 +283,7 @@ sniffio==1.3.1
     #   openai
 sse-starlette==3.0.2
     # via mcp
-starlette==0.47.2
+starlette==0.47.3
     # via
     #   fastapi
     #   mcp
@@ -245,9 +295,11 @@ tqdm==4.67.1
     # via openai
 types-requests==2.32.4.20250809
     # via openai-agents
-typing-extensions==4.14.1
+typing-extensions==4.15.0
     # via
+    #   aiosignal
     #   anyio
+    #   chronos-client
     #   fastapi
     #   langchain-core
     #   openai
@@ -275,5 +327,9 @@ uvicorn==0.35.0
     #   mcp
 xxhash==3.5.0
     # via langgraph
-zstandard==0.23.0
+yarl==1.20.1
+    # via
+    #   aiohttp
+    #   chronos-client
+zstandard==0.24.0
     # via langsmith
