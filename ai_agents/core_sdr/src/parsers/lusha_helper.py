@@ -175,6 +175,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
     print(f"✅ Converted sheets config to Lusha config: {lusha_config}")
     return lusha_config
 
+
 async def get_companies_from_lusha(config: Dict[str, Any], cached_data: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
     """
     Main function to get companies from Lusha using sheets data

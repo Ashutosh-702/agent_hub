@@ -17,6 +17,7 @@ from global_utils.chronos_utils import (
     schedule_lusha_company_collection
 )
 
+
 def convert_objectid_to_string(payload: dict) -> dict:
     """Convert ObjectId values to strings for JSON serialization."""
     converted_payload = payload.copy()
@@ -26,6 +27,7 @@ def convert_objectid_to_string(payload: dict) -> dict:
         if hasattr(value, 'str'):  # Check if it's an ObjectId
             converted_payload[key] = str(value)
     return converted_payload
+
 
 async def initialize_consumer_connections():
     """Initialize database connections for consumer context."""
@@ -37,6 +39,7 @@ async def initialize_consumer_connections():
             db_name="linkedin_sdr"
         )
         print("✅ Database connection initialized for consumer")
+
 
 async def leadgen_batch_processing_handler(message: Any):
     """
@@ -87,6 +90,7 @@ async def leadgen_batch_processing_handler(message: Any):
         traceback.print_exc()
         raise
 
+
 async def process_leadgen_message(request_id: str, campaign_id: str):
     """Process a single leadgen company search request using campaign_id."""
     try:
@@ -117,6 +121,7 @@ async def process_leadgen_message(request_id: str, campaign_id: str):
     except Exception as e:
         print(f"❌ Error processing request {request_id}: {e}")
         raise 
+
 
 async def lusha_company_collection_handler(message: Any):
     """Handler for lusha company collection messages."""
@@ -159,6 +164,7 @@ async def lusha_company_collection_handler(message: Any):
     except Exception as e:
         print(f"❌ Error handling lusha company collection message: {e}")
         raise
+
 
 async def process_lusha_company_collection(campaign_details: Any):
     lusha_company_data = []  # Initialize before try block
@@ -259,6 +265,7 @@ async def process_lusha_company_collection(campaign_details: Any):
         print(f"Returning {len(lusha_company_data)} companies")
         return lusha_company_data
 
+
 async def lusha_company_data_collection(campaign_details: Any):
     all_companies = []
     fetch_company_status = False
@@ -356,12 +363,6 @@ async def lusha_company_data_collection(campaign_details: Any):
             else:
                 print(f"Failed to fetch page {page_num}")
                 break
-        # if fetch_company_status:
-        #     campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-        #     update_campaign_status = await campaigns_dao.update_campaign_status(ObjectId(campaign_details["campaign_id"]), "pending")
-        #     print(f"Updated status of {campaign_details['_id']} to 'processed'")
-        # return all_companies
-        
     except Exception as e:
         print(f"❌ Error occurred during data collection: {str(e)}")
     finally:
@@ -372,3 +373,4 @@ async def lusha_company_data_collection(campaign_details: Any):
             update_campaign_status = await campaigns_dao.update_campaign_status(ObjectId(campaign_details["campaign_id"]), "pending")
             print(f"Updated status of {campaign_details['campaign_id']} to 'pending'")
         return all_companies
+        

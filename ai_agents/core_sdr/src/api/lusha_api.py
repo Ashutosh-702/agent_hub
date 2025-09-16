@@ -2,7 +2,6 @@ from eventbridge.logic.async_kafka_consumer import orjson
 import requests
 import json
 import os
-import time
 from typing import List, Dict, Any, Optional
 
 import urllib3
@@ -15,6 +14,7 @@ from global_utils.chronos_utils import (
 )
 
 urllib3.disable_warnings(InsecureRequestWarning)
+
 
 async def lusha_search_api(
     payload_values: Dict[str, Any],
@@ -66,6 +66,7 @@ async def lusha_search_api(
     else:
         print(f"Search API failed: {response.status_code} - {response.text}")
         return None
+
 
 def build_payload(
     payload_values: Dict[str, Any],
@@ -130,6 +131,7 @@ def build_payload(
             payload_query["pages"]["size"] = pages["size"]
     
     return payload_query
+
 
 async def lusha_collect_companies_from_search(
     payload_values: Dict[str, Any],
@@ -256,6 +258,7 @@ async def lusha_collect_companies_from_search(
         print(f"Returning {len(all_companies)} companies")
         return all_companies
 
+
 def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
     print("Payload_values_for_contact:",
           json.dumps(payload_values_for_contact, indent=2))
@@ -278,7 +281,8 @@ def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict
        return response.json()
     else:
         raise Exception(f"Search API failed: {response.status_code} - {response.text}")
-    
+
+
 def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
     payload_query_for_contact = {
         "pages": {
@@ -302,6 +306,7 @@ def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dic
         ]
 
     return payload_query_for_contact
+
 
 def lusha_contact_enrich_api(request_id: str, contact_id_list: List[str]) -> Dict[str, Any]:
     

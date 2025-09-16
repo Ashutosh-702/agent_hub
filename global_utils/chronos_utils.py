@@ -12,6 +12,7 @@ from typing import Optional
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=env_path)
 
+
 def serialize_for_json(obj):
     """Convert ObjectIds and datetime objects to strings for JSON serialization"""
     if isinstance(obj, ObjectId):
@@ -27,6 +28,7 @@ def serialize_for_json(obj):
     else:
         return obj
 
+
 def get_eta_datetime(eta: int) -> str:
     """Calculate ETA in chronos_client expected format: '%Y-%m-%dT%H:%M:%S'"""
     eta_datetime = (
@@ -38,10 +40,11 @@ def get_eta_datetime(eta: int) -> str:
     # Return in format expected by chronos_client: '%Y-%m-%dT%H:%M:%S' (no timezone)
     return eta_datetime.strftime('%Y-%m-%dT%H:%M:%S')
 
+
 def generate_default_eta_expression(
-    daily_left: Optional[int]=None, 
-    hourly_left: Optional[int]=None, 
-    minute_left: Optional[int]=None,
+    daily_left: Optional[int] = None, 
+    hourly_left: Optional[int] = None, 
+    minute_left: Optional[int] = None,
 ) -> str:
 
     if daily_left != None and daily_left == '0':
@@ -52,6 +55,7 @@ def generate_default_eta_expression(
         return (datetime.utcnow() + timedelta(minutes=1)).isoformat(timespec="seconds")
     else:
         return (datetime.utcnow() + timedelta(seconds=10)).isoformat(timespec="seconds")
+
 
 async def schedule_lusha_company_collection(campaign_details: dict, eta):
     chronos_url = os.getenv("CHRONOS_INTRNL_SVC")
