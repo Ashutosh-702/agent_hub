@@ -333,27 +333,18 @@ async def lusha_company_data_collection(campaign_details: Any):
             page_response = await lusha_search_api(page_payload, all_companies)
 
             if page_response['status_code'] == 429:
-                #need  to loop for try 3 times with sleep
-                for i in range(3):
-                    print(f"retrying {i+1} times")
-                    page_response = await lusha_search_api(page_payload, all_companies)
-                    if page_response['status_code'] == 429:
-                        continue
-                    else:
-                        break
 
-                if page_response['status_code'] == 429:
-                    print(f"❌ rate limit exhausted")
-                    eta = generate_default_eta_expression(
-                        daily_left=page_response['daily_left'], 
-                        hourly_left=page_response['hourly_left'], 
-                        minute_left=page_response['minute_left']
-                    )
-                    page_payload["total_results"] = total_results
-                    page_payload["raw_config"] = campaign_details["raw_config"]
-                    scheduler = await schedule_lusha_company_collection(campaign_details=page_payload, eta=eta)
-                    print(f" lusha company data collection scheduler: {scheduler}")
-                    break
+                print(f"❌ rate limit exhausted")
+                eta = generate_default_eta_expression(
+                    daily_left=page_response['daily_left'], 
+                    hourly_left=page_response['hourly_left'], 
+                    minute_left=page_response['minute_left']
+                )
+                page_payload["total_results"] = total_results
+                page_payload["raw_config"] = campaign_details["raw_config"]
+                scheduler = await schedule_lusha_company_collection(campaign_details=page_payload, eta=eta)
+                print(f" lusha company data collection scheduler: {scheduler}")
+                break
             elif page_response['status_code'] == 201 and "data" in page_response['results']:
                 fetch_company_status = True
                 for company in page_response["results"]["data"]:
