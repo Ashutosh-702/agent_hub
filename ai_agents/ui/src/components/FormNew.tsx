@@ -10,10 +10,10 @@ const regions = [
   'North America',
   'South America', 
   'Europe',
-  'Asia Pacific',
-  'Middle East',
+  'APAC',
+  'EMEA',
   'Africa',
-  'Latam'
+  'LATAM'
 
 ];
 
