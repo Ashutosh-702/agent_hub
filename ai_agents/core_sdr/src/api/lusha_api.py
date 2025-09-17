@@ -12,6 +12,7 @@ from global_utils.chronos_utils import (
     schedule_lusha_company_collection,
     generate_default_eta_expression
 )
+from ai_agents.core_sdr.src.parsers.constants import COMPANY_GROUPINGS
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -102,7 +103,17 @@ def build_payload(
         payload_query["filters"]["companies"]["include"]["subIndustriesIds"] = payload_values["subIndustriesIds"]
 
     if "locations" in payload_values and isinstance(payload_values["locations"], list):
-        payload_query["filters"]["companies"]["include"]["locations"] = [{"country": country} for country in payload_values["locations"]]
+
+        if "location_type" in payload_values and payload_values["location_type"] == "region":
+            payload_query["filters"]["companies"]["include"]["locations"] = []
+
+            for region in payload_values["locations"]:
+                if region in COMPANY_GROUPINGS:
+                    payload_query["filters"]["companies"]["include"]["locations"].append({"country_grouping": COMPANY_GROUPINGS[region]})
+                else:
+                    payload_query["filters"]["companies"]["include"]["locations"].append({"continent": region})
+        else:
+            payload_query["filters"]["companies"]["include"]["locations"] = [{"country": country} for country in payload_values["locations"]]
 
     if "revenue" in payload_values and payload_values["revenue"]:
         revenue = payload_values["revenue"]
