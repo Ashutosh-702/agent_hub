@@ -112,6 +112,7 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
         location_type = sheets_data['target']["location"]['type']
         locations = sheets_data['target']["location"]['names']
         lusha_config["location_type"] = location_type
+        
         if locations:
             for location in locations:
                 if location in LUSHA_COMPANY_CONFIG:

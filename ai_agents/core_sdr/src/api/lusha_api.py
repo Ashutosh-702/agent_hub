@@ -13,6 +13,7 @@ from global_utils.chronos_utils import (
     generate_default_eta_expression
 )
 from ai_agents.core_sdr.src.parsers.constants import COMPANY_GROUPINGS
+
 urllib3.disable_warnings(InsecureRequestWarning)
 
 
@@ -107,7 +108,6 @@ def build_payload(
             payload_query["filters"]["companies"]["include"]["locations"] = []
 
             for region in payload_values["locations"]:
-                
                 if region in COMPANY_GROUPINGS:
                     payload_query["filters"]["companies"]["include"]["locations"].append({"country_grouping": COMPANY_GROUPINGS[region]})
                 else:
