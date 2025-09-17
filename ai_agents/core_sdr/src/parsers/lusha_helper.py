@@ -111,15 +111,8 @@ def sheets_to_lusha_config(sheets_data: Dict[str, Any]) -> Dict[str, Any]:
         lusha_locations = []
         location_type = sheets_data['target']["location"]['type']
         locations = sheets_data['target']["location"]['names']
+        lusha_config["location_type"] = location_type
         if locations:
-            if location_type == "region":
-                lusha_countries = []
-                for location in locations:
-                    if location in LUSHA_REGION_CONFIG:
-                        lusha_countries.extend(LUSHA_REGION_CONFIG[location])
-                    else:
-                        lusha_countries.append(location)
-                locations = lusha_countries
             for location in locations:
                 if location in LUSHA_COMPANY_CONFIG:
                     lusha_locations.append(
