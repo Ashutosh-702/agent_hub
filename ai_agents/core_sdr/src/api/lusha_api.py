@@ -38,12 +38,10 @@ async def lusha_search_api(
         'Content-Type': 'application/json'
     }
     
-    async with loaded_config.http_session.post(
-        url,  json=payload_query, headers=headers,
-    ) as response:
-
-        response.raise_for_status()
-        result = await response.json()
+    response = await loaded_config.http_session.post(
+        url,  json=payload_query, headers=headers
+    )
+    result = await response.json()
     response_data = {}
     response_data['status_code'] = response.status
     if response.status == 201:
