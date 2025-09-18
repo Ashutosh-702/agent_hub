@@ -111,10 +111,6 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
             
         companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         print("Fetching companies from lusha...")
-        cached_data_db = await companies_dao.get_companies({"location.name":config.get("target", {}).get("location", {}).get("names", []), "location.type": config.get("target", {}).get("location", {}).get("type", ""), "profile.industry":config.get("segmentation", {}).get("industry", [])})
-        for company_data in cached_data_db:
-            cached_data.append({'id': company_data['identifiers']['source_id'],'name': company_data['identifiers']['name']})
-        cached_ids = [company['_id'] for company in cached_data_db]
         temp_cached_data = []
         inserted_count = await get_companies_from_lusha(config,temp_cached_data) # List of {'id': int, 'name': str}
         print(f"Found {inserted_count} companies from lusha.")
@@ -124,7 +120,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
         
         campaign_id = config.get('_id')
         print(f"Total new companies added into companies collection: {inserted_count}")
-        
+
         campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         await campaigns_dao.update_campaign_status(campaign_id,"pending")
         print(f"Updated status of {campaign_id} to 'pending'")

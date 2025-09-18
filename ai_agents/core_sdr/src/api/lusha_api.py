@@ -41,9 +41,11 @@ async def lusha_search_api(
     response = await loaded_config.http_session.post(
         url,  json=payload_query, headers=headers
     )
+
     result = await response.json()
     response_data = {}
     response_data['status_code'] = response.status
+
     if response.status == 201:
         response_data['results'] = result
         return response_data
@@ -193,6 +195,7 @@ async def lusha_collect_companies_from_search(
             
         # Process first page data
         page_companies = []
+        
         for company in first_response["results"]["data"]:
             page_companies.append({
                 "id": company["id"], 
