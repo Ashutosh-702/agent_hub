@@ -38,17 +38,18 @@ async def lusha_search_api(
         'Content-Type': 'application/json'
     }
     
-    response = requests.post(
-        url, headers=headers, json=payload_query, verify=False, timeout=30,
-    )
+    async with loaded_config.http_session.post(
+        url,  json=payload_query, headers=headers,
+    ) as response:
 
+        response.raise_for_status()
+        result = await response.json()
     response_data = {}
-    response_data['status_code'] = response.status_code
-
-    if response.status_code == 201:
-        response_data['results'] = response.json()
+    response_data['status_code'] = response.status
+    if response.status == 201:
+        response_data['results'] = result
         return response_data
-    elif response.status_code == 429:
+    elif response.status == 429:
         # Return None to indicate rate limit exhaustion rather than raising exception
         response_headers = dict(response.headers)
         response_data['daily_left'] = response_headers.get(
@@ -67,7 +68,7 @@ async def lusha_search_api(
         print(f"Rate limit exhausted")
         return response_data
     else:
-        print(f"Search API failed: {response.status_code} - {response.text}")
+        print(f"Search API failed: {response.status} - {response.text}")
         return None
 
 
