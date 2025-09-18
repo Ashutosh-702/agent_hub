@@ -115,86 +115,23 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
         for company_data in cached_data_db:
             cached_data.append({'id': company_data['identifiers']['source_id'],'name': company_data['identifiers']['name']})
         cached_ids = [company['_id'] for company in cached_data_db]
-        lusha_company_data = await get_companies_from_lusha(config,cached_data) # List of {'id': int, 'name': str}
-        print(f"Found {len(lusha_company_data)} companies from lusha.")
+        temp_cached_data = []
+        inserted_count = await get_companies_from_lusha(config,temp_cached_data) # List of {'id': int, 'name': str}
+        print(f"Found {inserted_count} companies from lusha.")
         print("Fetching companies from core_signal...")
-        core_signal_company_data = collect_companies_from_search(config, lusha_company_data+cached_data) # List of {'id': int, 'name': str}
-        total_company_data = lusha_company_data+core_signal_company_data
-        companies_list = []
-        if total_company_data:
-            source_id_list = [cached_company["id"] for cached_company in cached_data]
-            for company_data in lusha_company_data:
-                source_id = company_data["id"]
-                if source_id not in source_id_list:  
-                    company_doc = {
-                        "identifiers":{
-                            "source_id": company_data["id"],
-                            "name": company_data["name"],
-                        }, 
-                        "profile":{
-                            "industry": config.get("segmentation")['industry'],  
-                            "revenue_min": config.get("target", "")['revenue_min'],
-                            "revenue_max": config.get("target", "")['revenue_max'],
-                            "employee_count": config.get("target", "")['employee_count'],
-                        },
-                        "location":{
-                            "type": config.get("target", "")['location']['type'],
-                            "name": config.get("target", "")['location']['names'],
-                        },
-                        "source": "lusha",
-                        "metadata":{
-                            "created_at":datetime.utcnow(),
-                            "updated_at":datetime.utcnow(),
-                            "api_response": company_data["api_response_metadata"],
-                        }
-                    }
-                    companies_list.append(company_doc)
-            for company_data in core_signal_company_data:
-                company_doc = {
-                    "identifiers":{
-                        "source_id":company_data["id"],
-                        "name": company_data["name"],
-                    },
-                    "profile":{
-                        "industry": config.get("segmentation")['industry'],  
-                        "revenue_min": config.get("target", "")['revenue_min'],
-                        "revenue_max": config.get("target", "")['revenue_max'],
-                        "employee_count": config.get("target", "")['employee_count'],
-                    },
-                    "location":{
-                        "type": config.get("target", "")['location']['type'],
-                        "name": config.get("target", "")['location']['names'],
-                    },
-                    "source": "coresignal",
-                    "metadata":{
-                        "created_at":datetime.utcnow(),
-                        "updated_at":datetime.utcnow(),
-                        "api_response": company_data["api_response_metadata"],
-                    }
-                }
-                companies_list.append(company_doc)
-            inserted_ids = await companies_dao.create_companies(companies_list)
-            print(f"Total new companies added into companies collection: {len(inserted_ids)}")
-            id_list = inserted_ids + cached_ids
-            campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-            for _id in id_list:
-                mapping_doc = {
-                "campaign_id": config.get("_id"),
-                "company_id": _id,
-                "company_status": False,
-                "metadata":{
-                        "created_at":datetime.utcnow(),
-                        "updated_at":datetime.utcnow(),
-                },
-            }
-                await campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
-            campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-            await campaigns_dao.update_campaign_status(mapping_doc['campaign_id'],"pending")
-            print(f"Updated status of {mapping_doc['campaign_id']} to 'pending'")
+        # core_signal_company_data = collect_companies_from_search(config, cached_data) # List of {'id': int, 'name': str}
+        total_company_data = inserted_count
+        
+        campaign_id = config.get('_id')
+        print(f"Total new companies added into companies collection: {inserted_count}")
+        
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        await campaigns_dao.update_campaign_status(campaign_id,"pending")
+        print(f"Updated status of {campaign_id} to 'pending'")
     except Exception as e:
         print(f"Error while processing company search: {str(e)}")
     return {
-        "companies": total_company_data+cached_data
+        "companies": total_company_data
     }
 if __name__ == '__main__':
     cli()

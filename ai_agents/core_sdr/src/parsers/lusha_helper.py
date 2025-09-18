@@ -183,7 +183,7 @@ async def get_companies_from_lusha(config: Dict[str, Any], cached_data: List[Dic
     
     try:
         companies = await lusha_collect_companies_from_search(lusha_config, cached_data, config)
-        print(f"✅ Retrieved {len(companies)} companies from Lusha")
+        print(f"✅ Retrieved {companies} companies from Lusha")
         return companies
         
     except Exception as e:
