@@ -46,6 +46,9 @@ async def initialize_database():
     loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_sdr")
     # Initialize EventBridge producer in connection manager (pigeon pattern)
     await loaded_config.connection_manager.setup_eventbridge_producer()
+    
+    loaded_config.http_session = aiohttp.ClientSession()
+    print(f"✅ HTTP session initialized {loaded_config.http_session}")
 
 
 async def close_database():
@@ -321,7 +324,7 @@ async def lusha_contact_enrich(request: Request):
         }
         
         if company_names:
-            response = lusha_contact_search_api(payload)
+            response = await lusha_contact_search_api(payload)
             req_id = response.get("requestId", "")
             contacts = response.get("data", [])
             contact_ids = []
@@ -329,7 +332,7 @@ async def lusha_contact_enrich(request: Request):
                 id = contact.get("contactId")
                 contact_ids.append(id)
         if req_id and contact_ids:
-            enriched_contact_data = lusha_contact_enrich_api(req_id, contact_ids)
+            enriched_contact_data = await lusha_contact_enrich_api(req_id, contact_ids)
             if "contacts" in enriched_contact_data:
                 for contact in enriched_contact_data["contacts"]:
                     data = contact.get("data", {})
@@ -685,7 +688,7 @@ def server_main():
     port = int(os.getenv("API_PORT", "80"))
     workers = int(os.getenv("API_WORKERS", "1"))
     reload = os.getenv("API_RELOAD", "false").lower() == "true"
-
+    
     print("=" * 60)
     print("🚀 LEADGEN API SERVER")
     print("=" * 60)

@@ -300,7 +300,7 @@ async def lusha_collect_companies_from_search(
         return total_inserted
 
 
-def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
+async def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
     print("Payload_values_for_contact:",
           json.dumps(payload_values_for_contact, indent=2))
 
@@ -316,12 +316,13 @@ def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict
         'Content-Type': 'application/json'
     }
 
-    response = requests.post(url, headers=headers, json=payload_query, verify=False, timeout=30)
+    response = await loaded_config.http_session.post(url, json=payload_query, headers=headers)
+    result = await response.json()
 
-    if response.status_code == 201:
-       return response.json()
+    if response.status == 201:
+       return result
     else:
-        raise Exception(f"Search API failed: {response.status_code} - {response.text}")
+        raise Exception(f"Search API failed: {response.status}")
 
 
 def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
@@ -349,7 +350,7 @@ def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dic
     return payload_query_for_contact
 
 
-def lusha_contact_enrich_api(request_id: str, contact_id_list: List[str]) -> Dict[str, Any]:
+async def lusha_contact_enrich_api(request_id: str, contact_id_list: List[str]) -> Dict[str, Any]:
     
     url = f"https://api.lusha.com/prospecting/contact/enrich"
     headers = {
@@ -363,9 +364,10 @@ def lusha_contact_enrich_api(request_id: str, contact_id_list: List[str]) -> Dic
         "contactIds": [id for id in contact_id_list]
     }
 
-    response = requests.post(url, headers=headers, json=payload, verify=False, timeout=30)
-    
-    if response.status_code == 201:
-       return response.json()
+    response = await loaded_config.http_session.post(url, json=payload, headers=headers)
+    result = await response.json()
+
+    if response.status == 201:
+       return result
     else:
-        raise Exception(f"Search API failed: {response.status_code} - {response.text}")
+        raise Exception(f"Search API failed: {response.status}")
