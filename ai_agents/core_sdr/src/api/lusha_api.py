@@ -282,7 +282,7 @@ def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict
     url = f"https://api.lusha.com/prospecting/contact/search"
     headers = {
         'accept': 'application/json',
-        "api_key": f"{os.getenv('LUSHA_API_KEY')}",
+        "api_key": f"{loaded_config.lusha_api_key}",
         'Content-Type': 'application/json'
     }
 
@@ -324,7 +324,7 @@ def lusha_contact_enrich_api(request_id: str, contact_id_list: List[str]) -> Dic
     url = f"https://api.lusha.com/prospecting/contact/enrich"
     headers = {
         'accept': 'application/json',
-        "api_key": f"{os.getenv('LUSHA_API_KEY')}",
+        "api_key": f"{loaded_config.lusha_api_key}",
         'Content-Type': 'application/json'
     }
 

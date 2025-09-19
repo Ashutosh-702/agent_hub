@@ -268,9 +268,35 @@ async def run_ai_sdr():
         await run_orchestrated_workflow(ai_sdr_custom_config)
 
     return
+def serialize_objectid(obj):
+    """Convert ObjectIds to strings recursively."""
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    elif isinstance(obj, dict):
+        return {key: serialize_objectid(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_objectid(item) for item in obj]
+    else:
+        return obj
+# here all the data will  comes from paramaters not from body
+@app.get("/api/v1/get_company_mapping_list")
+async def get_company_mapping_list(
+    campaign_id: str,
+    page: int = 1,
+    limit: int = 10
+    ):
+    campaign_company_run_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+    response, pagination_info = await campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": ObjectId(campaign_id)}, page, limit)
+
+    serialized_response = serialize_objectid(response)
+    serialized_pagination = serialize_objectid(pagination_info)
+    return {"status": "success", "company_map_list": serialized_response, "pagination_info": serialized_pagination}
 
 @app.post("/api/v1/lusha_contact_enrichment")
-async def lusha_contact_enrich(campaign_id: str):
+async def lusha_contact_enrich(request: Request):
+    body = await request.json()
+    campaign_id = body.get("campaign_id", "")
+    company_map_list = body.get("company_map_list", [])
     try:    
         if not campaign_id:
             raise ValueError("Campaign Id is required")
@@ -279,13 +305,13 @@ async def lusha_contact_enrich(campaign_id: str):
         campaign_contact_run_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
         companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         
-        company_map_list = await campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
+        # company_map_list = await campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
         company_names = []
         
         if company_map_list:
             for companies in company_map_list[:1]:
                 company_id = companies.get("company_id", "")
-                company_doc = await companies_dao.get_company(company_id)
+                company_doc = await companies_dao.get_company(ObjectId(company_id))
                 company_name = company_doc.get("identifiers",{}).get("name","")
                 company_names.append(company_name)
         
