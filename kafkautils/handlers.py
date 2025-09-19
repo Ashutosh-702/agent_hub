@@ -16,6 +16,7 @@ from global_utils.chronos_utils import (
     generate_default_eta_expression,
     schedule_lusha_company_collection
 )
+from ai_agents.core_sdr.src.parsers.company_saver import insert_companies_batch_to_db, create_campaign_company_mappings_batch
 
 
 def convert_objectid_to_string(payload: dict) -> dict:
@@ -167,7 +168,10 @@ async def lusha_company_collection_handler(message: Any):
 
 
 async def process_lusha_company_collection(campaign_details: Any):
-    lusha_company_data = []  # Initialize before try block
+    lusha_company_data={
+        'company_ids': [],
+        'inserted_ids': []
+    }
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
@@ -183,82 +187,6 @@ async def process_lusha_company_collection(campaign_details: Any):
             print("❌ No company data found")
             return
 
-        companies_list = []
-        cached_data = []
-
-        companies_dao = CompaniesDao(
-            loaded_config.connection_manager.mongo_client
-        )
-
-        config = campaign_details["raw_config"]
-
-        cached_data_db = await companies_dao.get_companies({"location.name":config.get("target", {}).get("location", {}).get("names", []), "location.type": config.get("target", {}).get("location", {}).get("type", ""), "profile.industry":config.get("segmentation", {}).get("industry", [])})
-
-        for company_data in cached_data_db:
-            cached_data.append({'id': company_data['identifiers']['source_id'],'name': company_data['identifiers']['name']})
-
-        cached_ids = [company['_id'] for company in cached_data_db]
-
-        if lusha_company_data:
-            source_id_list = [cached_company["id"] for cached_company in cached_data]
-
-            for company_data in lusha_company_data:
-                source_id = company_data["id"]
-
-                if source_id not in source_id_list:  
-                    company_doc = {
-                        "identifiers": {
-                            "source_id": company_data["id"],
-                            "name": company_data["name"],
-                        }, 
-                        "profile": {
-                            "industry": config.get("segmentation", {}).get("industry", None),  
-                            #here revenue_min, revenue_max, employee_count may not present in the config. need to handle this.
-                            "revenue_min": config.get("target", {}).get("revenue_min", None),
-                            "revenue_max": config.get("target", {}).get("revenue_max", None),
-                            "employee_count": config.get("target", {}).get("employee_count", None),
-                        },
-                        "location": {
-                            "type": config.get("target", {}).get("location", {}).get("type", None),
-                            "name": config.get("target", {}).get("location", {}).get("names", None),
-                        },
-                        "source": "lusha",
-                        "metadata": {
-                            "created_at": datetime.now(timezone.utc),
-                            "updated_at": datetime.now(timezone.utc),
-                            "api_response": company_data["api_response_metadata"],
-                        }
-                    }
-                    companies_list.append(company_doc)
-
-            if len(companies_list) > 0:
-                inserted_ids = await companies_dao.create_companies(companies_list)
-            else:
-                inserted_ids = []
-
-            print(f"Total new companies added into companies collection: {len(inserted_ids)}")
-            id_list = inserted_ids + cached_ids
-            campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-
-            campaign_company_runs_data = await campaign_company_runs_dao.get_campaign_company_runs({
-                "campaign_id": ObjectId(config.get("_id")),
-                 "company_id": {"$in": id_list}
-            })
-
-            for _id in id_list:
-
-                if _id not in [run["company_id"] for run in campaign_company_runs_data]:
-                    mapping_doc = {
-                        "campaign_id": ObjectId(config.get("_id")),
-                        "company_id": ObjectId(_id),
-                        "company_status": False,
-                        "metadata": {
-                            "created_at": datetime.now(timezone.utc),
-                            "updated_at": datetime.now(timezone.utc),
-                        },
-                    }
-                    await campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
-
     except Exception as e:
         print(f"❌ Error occurred during collection: {str(e)}")
     finally:
@@ -267,7 +195,6 @@ async def process_lusha_company_collection(campaign_details: Any):
 
 
 async def lusha_company_data_collection(campaign_details: Any):
-    all_companies = []
     fetch_company_status = False
     try:
         print(f" lusha company data collection campaign_details: {campaign_details}")
@@ -313,7 +240,10 @@ async def lusha_company_data_collection(campaign_details: Any):
                     return []
             elif first_response['status_code'] == 201 and "data" not in first_response['results'] or first_response['status_code'] != 201:
                 print("No data in first response. Returning empty results.")
-                return []
+                return {
+                    'company_ids': [],
+                    'inserted_ids': []
+                }
 
             total_results = first_response["results"]["totalResults"]
             campaign_details["total_results"] = total_results
@@ -321,13 +251,30 @@ async def lusha_company_data_collection(campaign_details: Any):
             print(first_response)
             # Recalculate total_pages with the new total_results
             total_pages = (total_results + page_size - 1) // page_size if total_results > 0 else 1
+            page_companies = []
 
+            companies_dao = CompaniesDao(
+                loaded_config.connection_manager.mongo_client
+            )
+            campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+            raw_config =campaign_details["raw_config"]
             for company in first_response["results"]["data"]:
-                all_companies.append({
+                page_companies.append({
                     "id": company["id"], 
                     "name": company["name"],
                     "api_response_metadata": company
                 })
+
+            # ✅ IMMEDIATE DATABASE INSERTION
+            inserted_count = await insert_companies_batch_to_db(
+                page_companies, raw_config,
+                "lusha", companies_dao)
+
+            # Step 2: Create campaign mappings
+            mappings_created = await create_campaign_company_mappings_batch(
+                inserted_count['company_ids'], raw_config.get("_id"),
+                campaign_company_runs_dao
+            )
         #temp current page
         # per_page = 1
         # total_pages = 2
@@ -337,7 +284,7 @@ async def lusha_company_data_collection(campaign_details: Any):
             print(f" lusha company data collection page_num: {page_num}")
             page_payload = campaign_details.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
-            page_response = await lusha_search_api(page_payload, all_companies)
+            page_response = await lusha_search_api(page_payload)
 
             if page_response['status_code'] == 429:
 
@@ -354,12 +301,25 @@ async def lusha_company_data_collection(campaign_details: Any):
                 break
             elif page_response['status_code'] == 201 and "data" in page_response['results']:
                 fetch_company_status = True
+                page_companies = []
                 for company in page_response["results"]["data"]:
-                    all_companies.append({
+                    page_companies.append({
                         "id": company["id"], 
                         "name": company["name"],
                         "api_response_metadata": company
                     })
+
+                # ✅ IMMEDIATE DATABASE INSERTION
+                inserted_count = await insert_companies_batch_to_db(
+                    page_companies, raw_config,
+                    "lusha", companies_dao
+                )
+
+                # Step 2: Create campaign mappings
+                mappings_created = await create_campaign_company_mappings_batch(
+                    inserted_count['company_ids'], raw_config.get("_id"),
+                    campaign_company_runs_dao
+                )
             else:
                 print(f"Failed to fetch page {page_num}")
                 break
@@ -372,5 +332,5 @@ async def lusha_company_data_collection(campaign_details: Any):
             )
             update_campaign_status = await campaigns_dao.update_campaign_status(ObjectId(campaign_details["campaign_id"]), "pending")
             print(f"Updated status of {campaign_details['campaign_id']} to 'pending'")
-        return all_companies
+        return inserted_count
         

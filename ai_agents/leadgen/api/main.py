@@ -38,6 +38,7 @@ import uvicorn
 from ai_agents.core_sdr.src.api.lusha_api import lusha_contact_enrich_api,lusha_contact_search_api
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
+import aiohttp
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -655,9 +656,10 @@ async def consumer_main():
         print("   ❤️ Starting health check endpoints...")
         asyncio.create_task(_healthz())
         asyncio.create_task(_readyz())
-
         # Start EventBridge consumer
         print("   🚀 Starting EventBridge consumer...")
+        loaded_config.http_session = aiohttp.ClientSession()
+        print(f"✅ HTTP session initialized {loaded_config.http_session}")
         await start_eventbridge_consumer(consumer_type)
 
     except KeyError as e:
