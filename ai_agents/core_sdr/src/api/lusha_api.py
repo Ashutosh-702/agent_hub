@@ -13,7 +13,9 @@ from global_utils.chronos_utils import (
     generate_default_eta_expression
 )
 from ai_agents.core_sdr.src.parsers.constants import COMPANY_GROUPINGS
-
+from ai_agents.core_sdr.src.parsers.company_saver import insert_companies_batch_to_db, create_campaign_company_mappings_batch
+from database.collection_dao.companies import CompaniesDao
+from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 urllib3.disable_warnings(InsecureRequestWarning)
 
 
@@ -36,17 +38,18 @@ async def lusha_search_api(
         'Content-Type': 'application/json'
     }
     
-    response = requests.post(
-        url, headers=headers, json=payload_query, verify=False, timeout=30,
+    response = await loaded_config.http_session.post(
+        url,  json=payload_query, headers=headers
     )
 
+    result = await response.json()
     response_data = {}
-    response_data['status_code'] = response.status_code
+    response_data['status_code'] = response.status
 
-    if response.status_code == 201:
-        response_data['results'] = response.json()
+    if response.status == 201:
+        response_data['results'] = result
         return response_data
-    elif response.status_code == 429:
+    elif response.status == 429:
         # Return None to indicate rate limit exhaustion rather than raising exception
         response_headers = dict(response.headers)
         response_data['daily_left'] = response_headers.get(
@@ -65,7 +68,7 @@ async def lusha_search_api(
         print(f"Rate limit exhausted")
         return response_data
     else:
-        print(f"Search API failed: {response.status_code} - {response.text}")
+        print(f"Search API failed: {response.status} - {response.text}")
         return None
 
 
@@ -149,9 +152,11 @@ async def lusha_collect_companies_from_search(
     cached_data: List[Dict[str, Any]],
     config: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
-    all_companies = []
+    total_inserted = 0
 
     try:
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
         print("working propoer")
         
         page_size = payload_values.get("pages", {}).get("size", 20)
@@ -189,12 +194,27 @@ async def lusha_collect_companies_from_search(
             return []
             
         # Process first page data
+        page_companies = []
+        
         for company in first_response["results"]["data"]:
-            all_companies.append({
+            page_companies.append({
                 "id": company["id"], 
                 "name": company["name"],
                 "api_response_metadata": company
             })
+        
+        # ✅ IMMEDIATE DATABASE INSERTION
+        inserted_count = await insert_companies_batch_to_db(
+            page_companies, config,
+            "lusha", companies_dao)
+
+        # Step 2: Create campaign mappings
+        mappings_created = await create_campaign_company_mappings_batch(
+            inserted_count['company_ids'], config.get("_id"),
+            campaign_company_runs_dao
+        )
+        total_inserted += len(inserted_count['inserted_ids'])
+        print(f"📊 Page 1: Inserted {len(inserted_count['inserted_ids'])} companies")
 
         # Step 2: Calculate total pages needed
         total_results = first_response.get("results", {}).get("totalResults", 0)
@@ -221,8 +241,7 @@ async def lusha_collect_companies_from_search(
             
             if page_response['status_code'] == 429:
                 # Rate limit hit and retries exhausted
-                print(f"Rate limit hit on page {page_num + 1}. "
-                      f"Returning {len(all_companies)} companies collected so far.")
+                print(f"Rate limit hit on page {page_num + 1}. ")
                 rate_limit_hit = True
                 page_payload['raw_config'] = config
 
@@ -242,32 +261,43 @@ async def lusha_collect_companies_from_search(
             elif (page_response['status_code'] == 201
                   and "data" in page_response['results']):
                 # Successfully got data from this page
-                page_companies = 0
+                page_companies = []
                 
                 for company in page_response["results"]["data"]:
-                    all_companies.append({
+                    page_companies.append({
                         "id": company["id"], 
                         "name": company["name"],
                         "api_response_metadata": company
                     })
-                    page_companies += 1
-                print(f"Collected {page_companies} companies from page {page_num + 1}")
+
+                # ✅ IMMEDIATE DATABASE INSERTION
+                inserted_count = await insert_companies_batch_to_db(
+                    page_companies, config,
+                    "lusha", CompaniesDao(loaded_config.connection_manager.mongo_client)
+                )
+                total_inserted += len(inserted_count['inserted_ids'])
+
+                mappings_created = await create_campaign_company_mappings_batch(
+                    inserted_count['company_ids'], config.get("_id"),
+                    campaign_company_runs_dao
+                )
+                print(f"📊 Page {page_num + 1}: Inserted {len(inserted_count['inserted_ids'])} companies")
             else:
                 print(f"Failed to fetch page {page_num}")
                 break
         
         if rate_limit_hit:
             print(f"Collection completed with rate limiting. "
-                  f"Collected {len(all_companies)} companies out of {total_results} total available.")
+                  f"Collected {total_inserted} companies out of {total_results} total available.")
         else:
-            print(f"Collection completed successfully. Collected {len(all_companies)} companies from {total_pages} pages.")
+            print(f"Collection completed successfully. Collected {total_inserted} companies from {total_pages} pages.")
         
         
     except Exception as e:
             raise Exception(f"Error searching companies: {str(e)}")
     finally:
-        print(f"Returning {len(all_companies)} companies")
-        return all_companies
+        print(f"Returning {total_inserted} companies")
+        return total_inserted
 
 
 def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
