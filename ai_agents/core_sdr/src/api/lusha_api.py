@@ -374,3 +374,22 @@ async def lusha_contact_enrich_api(request_id: str, contact_id_list: List[str]) 
        return result
     else:
         raise Exception(f"Search API failed: {response.status}")
+
+
+async def lusha_get_linkedin_contact_details(linkedin_url: str = ""):
+
+    if not linkedin_url:
+        return []
+    url = f"https://api.lusha.com/v2/person?linkedinUrl={linkedin_url}"
+    headers = {
+        'accept': 'application/json',
+        "api_key": f"{loaded_config.lusha_api_key}",
+        'Content-Type': 'application/json'
+    }
+    response = await loaded_config.http_session.get(url, headers=headers)
+    result = await response.json()
+
+    if response.status == 200:
+        return result
+    else:
+        raise Exception(f"linkedin API failed: {response.status}")

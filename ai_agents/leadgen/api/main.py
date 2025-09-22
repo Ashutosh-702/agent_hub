@@ -35,7 +35,7 @@ from kafkautils.consumer.consumer import start_eventbridge_consumer
 from kafkautils.consumer.kafka_config import get_available_consumer_types
 from eventbridge.health import _healthz, _readyz
 import uvicorn
-from ai_agents.core_sdr.src.api.lusha_api import lusha_contact_enrich_api,lusha_contact_search_api
+from ai_agents.core_sdr.src.api.lusha_api import lusha_contact_enrich_api, lusha_contact_search_api, lusha_get_linkedin_contact_details
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 import aiohttp
@@ -451,6 +451,16 @@ async def lusha_contact_enrich(request: Request):
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/v1/get_linkedin_contact_details")
+async def get_linkedin_contact_details(linkedin_url: str):
+    try:
+        response = await lusha_get_linkedin_contact_details(linkedin_url)
+        return {"status": "success", "message": "Linkedin contact details fetched successfully", "data": response}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 
                 
 @app.get("/api/v1/fetch_and_claim_first_campaign")
