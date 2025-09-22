@@ -300,7 +300,7 @@ async def lusha_collect_companies_from_search(
         return total_inserted
 
 
-async def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
+async def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any],) -> Dict[str, Any]:
     print("Payload_values_for_contact:",
           json.dumps(payload_values_for_contact, indent=2))
 
@@ -329,7 +329,7 @@ def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dic
     payload_query_for_contact = {
         "pages": {
             "page": 0,
-            "size": 40
+            "size": 50
         },
         "filters": {
             "companies": {
