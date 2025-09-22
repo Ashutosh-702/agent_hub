@@ -289,49 +289,68 @@ async def get_company_mapping_list(
     serialized_pagination = serialize_objectid(pagination_info)
     return {"status": "success", "company_map_list": serialized_response, "pagination_info": serialized_pagination}
 
+
 @app.post("/api/v1/lusha_get_contact_enrichment")
 async def lusha_contact_enrich(request: Request):
     body = await request.json()
     campaign_id = body.get("campaign_id", "")
     company_map_list = body.get("company_map_list", [])
-    try:    
+    page = body.get("page", 0)
+    page_size = body.get("page_size", 50)
+    try:
         if not campaign_id:
             raise ValueError("Campaign Id is required")
         campaign_id = ObjectId(campaign_id)
-        campaign_company_run_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-        campaign_contact_run_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        
+        campaign_company_run_dao = CampaignCompanyRunsDao(
+            loaded_config.connection_manager.mongo_client)
+        campaign_contact_run_dao = CampaignContactRunsDao(
+            loaded_config.connection_manager.mongo_client)
+        companies_dao = CompaniesDao(
+            loaded_config.connection_manager.mongo_client)
+
         # company_map_list = await campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
         company_names = []
         company_source_id_name_mappings = {}
-        
+
         if company_map_list:
             for companies in company_map_list[:10]:
                 company_id = companies.get("company_id", "")
                 company_doc = await companies_dao.get_company(ObjectId(company_id))
-                company_name = company_doc.get("identifiers",{}).get("name","")
+
+                if not company_doc:
+                    continue
+                company_name = company_doc.get(
+                    "identifiers", {}).get("name", "")
                 company_source_id_name_mappings[company_name] = company_id
                 company_names.append(company_name)
-        
+
         payload = {
+            "page": page,
+            "page_size": page_size,
             "company_names": company_names
         }
-        
+        contact_ids = []
+        result = {
+            'contact_ids': [],
+            'company_source_id_name_mappings': [],
+            'campaign_id': str(campaign_id),
+            'lusha_request_id': "",
+            'total_results': 0
+        }
         if company_names:
             response = await lusha_contact_search_api(payload)
             req_id = response.get("requestId", "")
+            result['lusha_request_id'] = req_id
+            result['total_results'] = response.get("totalResults", 0)
             contacts = response.get("data", [])
-            contact_ids = []
+
             for contact in contacts:
                 id = contact.get("contactId")
                 contact_ids.append(id)
         print("fetching enrich data")
-        result = {}
+
         result['contact_ids'] = contact_ids
         result['company_source_id_name_mappings'] = company_source_id_name_mappings
-        result['lusha_request_id'] = req_id
-        result['campaign_id'] = str(campaign_id)
 
         return result
     except Exception as e:
@@ -426,7 +445,6 @@ async def lusha_contact_enrich(request: Request):
                                     "updated_at": datetime.utcnow()
                                 }
                             },
-
                         )
 
         return {"status": "success", "message": "Data upload is successful"}

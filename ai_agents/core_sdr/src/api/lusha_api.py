@@ -339,6 +339,9 @@ def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dic
     }
     print(f"payload_values: {payload_values_for_contact}")
 
+    if "page" in payload_values_for_contact and payload_values_for_contact["page"]:
+        payload_query_for_contact["pages"]["page"] = payload_values_for_contact["page"]
+
     if "page_size" in payload_values_for_contact and payload_values_for_contact["page_size"]:
         payload_query_for_contact["pages"]["size"] = payload_values_for_contact["page_size"]
 
