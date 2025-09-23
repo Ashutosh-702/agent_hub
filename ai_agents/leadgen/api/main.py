@@ -286,6 +286,12 @@ async def get_company_mapping_list(
     response, pagination_info = await campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": ObjectId(campaign_id)}, page, limit)
 
     serialized_response = serialize_objectid(response)
+
+    for serialized_item in serialized_response:
+        serialized_item.pop("_id")
+        serialized_item.pop("company_status")
+        serialized_item.pop("metadata")
+
     serialized_pagination = serialize_objectid(pagination_info)
     return {"status": "success", "company_map_list": serialized_response, "pagination_info": serialized_pagination}
 
@@ -297,6 +303,7 @@ async def lusha_contact_enrich(request: Request):
     company_map_list = body.get("company_map_list", [])
     page = body.get("page", 0)
     page_size = body.get("page_size", 50)
+    departments = body.get("departments", "")
     try:
         if not campaign_id:
             raise ValueError("Campaign Id is required")
@@ -329,6 +336,9 @@ async def lusha_contact_enrich(request: Request):
             "page_size": page_size,
             "company_names": company_names
         }
+        
+        if departments:
+            payload["departments"] = departments
         contact_ids = []
         result = {
             'contact_ids': [],

@@ -349,6 +349,11 @@ def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dic
         payload_query_for_contact["filters"]["companies"]["include"]['names'] = [
             name for name in payload_values_for_contact["company_names"]
         ]
+    
+    # if "departments" in payload_values_for_contact and payload_values_for_contact["departments"]:
+    #    payload_query_for_contact["filters"]["contacts"]["include"]["departments"] = [
+    #        department for department in payload_values_for_contact["departments"]
+    #    ]
 
     return payload_query_for_contact
 
