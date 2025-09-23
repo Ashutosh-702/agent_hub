@@ -105,7 +105,8 @@ class LushaContactHandler:
                 while True:
                     company_contact_mapping = await self.get_contact_ids_for_companies(company_mappings, page=contact_page, page_size=contact_page_size)
 
-                    if not company_contact_mapping:
+                    if not company_contact_mapping.get("contact_ids"):
+                        print("No contact ids found for companies")
                         break
 
                     # Phase 3: Enrich and store contacts
