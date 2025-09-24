@@ -43,6 +43,7 @@ from ai_agents.leadgen.utils import serialize_objectid
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
+
 async def initialize_database():
     loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_sdr")
     # Initialize EventBridge producer in connection manager (pigeon pattern)
@@ -304,6 +305,7 @@ async def lusha_contact_enrich(request: Request):
     page = body.get("page", 0)
     page_size = body.get("page_size", 50)
     departments = body.get("departments", [])
+
     try:
         if not campaign_id:
             raise ValueError("Campaign Id is required")
@@ -379,6 +381,7 @@ async def lusha_contact_enrich(request: Request):
         "company_source_id_name_mappings", [])
     campaign_id = body.get("campaign_id", "")
     req_id = body.get("lusha_request_id", "")
+    
     try:
         if req_id and contact_ids:
             enriched_contact_data = await lusha_contact_enrich_api(req_id, contact_ids)
@@ -428,7 +431,7 @@ async def lusha_contact_enrich(request: Request):
                             print(
                                 f"Company name not found in company_source_id_name_mappings: {data['companyName']}")
                             continue
-                        
+
                         contact_doc = {
                             "contact_data": {
                                 "firstname": firstname,
