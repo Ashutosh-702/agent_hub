@@ -30,58 +30,58 @@ DEPARTMENT_TO_CATEGORY = {
     # Business Development
     "Business Development": "Business Development",
     "Entrepreneurship": "Business Development",
-    
+
     # Consulting
     "Consulting": "Consulting",
-    
+
     # Customer Service
     "Customer Success and Support": "Customer Service",
-    
+
     # Engineering & Technical
     "Engineering": "Engineering & Technical",
-    
+
     # Finance
     "Finance": "Finance",
     "Accounting": "Finance",
-    
+
     # General Management
     "Program and Project Management": "General Management",
     "Administrative": "General Management",
-    
+
     # Health Care & Medical
     "Healthcare Services": "Health Care & Medical",
-    
+
     # Human Resources
     "Human Resources": "Human Resources",
-    
+
     # Information Technology
     "Information Technology": "Information Technology",
-    
+
     # Legal
     "Legal": "Legal",
-    
+
     # Marketing
     "Marketing": "Marketing",
     "Media and Communication": "Marketing",
-    
+
     # Operations
     "Operations": "Operations",
     "Purchasing": "Operations",
     "Quality Assurance": "Operations",
-    
+
     # Other
     "Arts and Design": "Other",
     "Community and Social Services": "Other",
     "Education": "Other",
     "Military and Protective Services": "Other",
     "Real Estate": "Other",
-    
+
     # Product
     "Product Management": "Product",
-    
+
     # Research & Analytics
     "Research": "Research & Analytics",
-    
+
     # Sales
     "Sales": "Sales"
 }

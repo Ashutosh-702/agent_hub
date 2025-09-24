@@ -307,6 +307,7 @@ async def lusha_contact_enrich(request: Request):
     try:
         if not campaign_id:
             raise ValueError("Campaign Id is required")
+
         campaign_id = ObjectId(campaign_id)
         campaign_company_run_dao = CampaignCompanyRunsDao(
             loaded_config.connection_manager.mongo_client)
@@ -326,6 +327,7 @@ async def lusha_contact_enrich(request: Request):
 
                 if not company_doc:
                     continue
+
                 company_name = company_doc.get(
                     "identifiers", {}).get("name", "")
                 company_source_id_name_mappings[company_name] = company_id
@@ -339,6 +341,7 @@ async def lusha_contact_enrich(request: Request):
 
         if departments:
             payload["departments"] = departments
+
         contact_ids = []
         result = {
             'contact_ids': [],
@@ -347,6 +350,7 @@ async def lusha_contact_enrich(request: Request):
             'lusha_request_id': "",
             'total_results': 0
         }
+
         if company_names:
             response = await lusha_contact_search_api(payload)
             req_id = response.get("requestId", "")
@@ -424,6 +428,7 @@ async def lusha_contact_enrich(request: Request):
                             print(
                                 f"Company name not found in company_source_id_name_mappings: {data['companyName']}")
                             continue
+                        
                         contact_doc = {
                             "contact_data": {
                                 "firstname": firstname,

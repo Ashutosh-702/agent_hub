@@ -327,38 +327,30 @@ async def lusha_contact_search_api(payload_values_for_contact: Dict[str, Any],) 
 
 
 def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
+    page = payload_values_for_contact.get("page", 0)
+    page_size = payload_values_for_contact.get("page_size", 50)
+    company_names = payload_values_for_contact.get("company_names", [])
+    departments = [DEPARTMENT_TO_CATEGORY[department] for department in payload_values_for_contact.get("departments", [])]
+
     payload_query_for_contact = {
         "pages": {
-            "page": 0,
-            "size": 50
+            "page": page,
+            "size": page_size
         },
         "filters": {
             "companies": {
-                "include": {}
+                "include": {
+                    "names": company_names
+                }
             }
         }
     }
     print(f"payload_values: {payload_values_for_contact}")
 
-    if "page" in payload_values_for_contact and payload_values_for_contact["page"]:
-        payload_query_for_contact["pages"]["page"] = payload_values_for_contact["page"]
-
-    if "page_size" in payload_values_for_contact and payload_values_for_contact["page_size"]:
-        payload_query_for_contact["pages"]["size"] = payload_values_for_contact["page_size"]
-
-    if "company_names" in payload_values_for_contact and payload_values_for_contact["company_names"]:
-        payload_query_for_contact["filters"]["companies"]["include"]['names'] = [
-            name for name in payload_values_for_contact["company_names"]
-        ]
-    
-    if "departments" in payload_values_for_contact and payload_values_for_contact["departments"]:
-        departments = [DEPARTMENT_TO_CATEGORY[department] for department in payload_values_for_contact["departments"]]
-        # Initialize contacts filter only when needed
+    if departments:
         payload_query_for_contact["filters"]["contacts"] = {
             "include": {
-                "departments": [
-                    department for department in departments
-                ]
+                "departments": departments
             }
         }
 

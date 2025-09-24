@@ -6,6 +6,7 @@ import aiohttp
 from aiohttp.client_exceptions import ServerDisconnectedError, ClientError
 from typing import Optional
 
+
 class LushaContactHandler:
 
     def __init__(self):
@@ -26,6 +27,7 @@ class LushaContactHandler:
         
         if response.get("company_map_list"):
             all_companies.extend(response["company_map_list"])
+
         # Check if more pages exist
         pagination = response.get("pagination_info", {})
 
@@ -64,6 +66,7 @@ class LushaContactHandler:
                 "lusha_request_id": lusha_request_id,
                 "total_results": total_results
             }
+
         return company_contact_mapping
 
     async def enrich_and_store_contacts(self, company_contact_mapping: dict) -> dict:
@@ -88,6 +91,7 @@ class LushaContactHandler:
 
             if departments:
                 self.departments = departments
+
             print(f"🚀 Starting contact enrichment for campaign: {campaign_id}")
 
             # Phase 1: Get company mappings
@@ -124,15 +128,18 @@ class LushaContactHandler:
 
                     if total_results == 0:
                         break
+
                     calculate_total_pages = (
                         total_results + contact_page_size - 1) // contact_page_size
 
                     if contact_page >= calculate_total_pages:
                         break
+
                     contact_page += 1
 
                 if not pagination_info.get("has_next", False):
                     break
+
                 page += 1
 
             print(" contact enrichment completed successfully")
