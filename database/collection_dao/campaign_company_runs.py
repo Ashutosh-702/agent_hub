@@ -17,3 +17,6 @@ class CampaignCompanyRunsDao(BaseMongoDao):
     
     async def update_campaign_company_run(self, query: Dict[str, Any], update_clause: Dict[str, Any]):
         return await self.update_one(query, update_clause)
+
+    async def get_campaign_company_runs_paginated(self, filter: dict = {}, page: int = 1, limit: int = 100):
+        return await self.get_paginated_response(filter, page_size=limit, page_number=page)

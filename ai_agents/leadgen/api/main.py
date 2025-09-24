@@ -35,17 +35,22 @@ from kafkautils.consumer.consumer import start_eventbridge_consumer
 from kafkautils.consumer.kafka_config import get_available_consumer_types
 from eventbridge.health import _healthz, _readyz
 import uvicorn
-from ai_agents.core_sdr.src.api.lusha_api import lusha_contact_enrich_api,lusha_contact_search_api
+from ai_agents.core_sdr.src.api.lusha_api import lusha_contact_enrich_api, lusha_contact_search_api, lusha_get_linkedin_contact_details
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 import aiohttp
+from ai_agents.leadgen.utils import serialize_objectid
 
 urllib3.disable_warnings(InsecureRequestWarning)
+
 
 async def initialize_database():
     loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_sdr")
     # Initialize EventBridge producer in connection manager (pigeon pattern)
     await loaded_config.connection_manager.setup_eventbridge_producer()
+    
+    loaded_config.http_session = aiohttp.ClientSession()
+    print(f"✅ HTTP session initialized {loaded_config.http_session}")
 
 
 async def close_database():
@@ -270,50 +275,138 @@ async def run_ai_sdr():
 
     return
 
-@app.post("/api/v1/lusha_contact_enrichment")
-async def lusha_contact_enrich(campaign_id: str):
-    try:    
+    
+# here all the data will  comes from paramaters not from body
+@app.get("/api/v1/get_company_mapping_list")
+async def get_company_mapping_list(
+    campaign_id: str,
+    page: int = 1,
+    limit: int = 10
+    ):
+    campaign_company_run_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+    response, pagination_info = await campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": ObjectId(campaign_id)}, page, limit)
+
+    serialized_response = serialize_objectid(response)
+
+    for serialized_item in serialized_response:
+        serialized_item.pop("_id")
+        serialized_item.pop("company_status")
+        serialized_item.pop("metadata")
+
+    serialized_pagination = serialize_objectid(pagination_info)
+    return {"status": "success", "company_map_list": serialized_response, "pagination_info": serialized_pagination}
+
+
+@app.post("/api/v1/lusha_get_contact_enrichment")
+async def lusha_contact_enrich(request: Request):
+    body = await request.json()
+    campaign_id = body.get("campaign_id", "")
+    company_map_list = body.get("company_map_list", [])
+    page = body.get("page", 0)
+    page_size = body.get("page_size", 50)
+    departments = body.get("departments", [])
+
+    try:
         if not campaign_id:
             raise ValueError("Campaign Id is required")
+
         campaign_id = ObjectId(campaign_id)
-        campaign_company_run_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-        campaign_contact_run_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        
-        company_map_list = await campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
+        campaign_company_run_dao = CampaignCompanyRunsDao(
+            loaded_config.connection_manager.mongo_client)
+        campaign_contact_run_dao = CampaignContactRunsDao(
+            loaded_config.connection_manager.mongo_client)
+        companies_dao = CompaniesDao(
+            loaded_config.connection_manager.mongo_client)
+
+        # company_map_list = await campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
         company_names = []
-        
+        company_source_id_name_mappings = {}
+
         if company_map_list:
-            for companies in company_map_list[:1]:
+            for companies in company_map_list[:10]:
                 company_id = companies.get("company_id", "")
-                company_doc = await companies_dao.get_company(company_id)
-                company_name = company_doc.get("identifiers",{}).get("name","")
+                company_doc = await companies_dao.get_company(ObjectId(company_id))
+
+                if not company_doc:
+                    continue
+
+                company_name = company_doc.get(
+                    "identifiers", {}).get("name", "")
+                company_source_id_name_mappings[company_name] = company_id
                 company_names.append(company_name)
-        
+
         payload = {
+            "page": page,
+            "page_size": page_size,
             "company_names": company_names
         }
-        
+
+        if departments:
+            payload["departments"] = departments
+
+        contact_ids = []
+        result = {
+            'contact_ids': [],
+            'company_source_id_name_mappings': [],
+            'campaign_id': str(campaign_id),
+            'lusha_request_id': "",
+            'total_results': 0
+        }
+
         if company_names:
-            response = lusha_contact_search_api(payload)
+            response = await lusha_contact_search_api(payload)
             req_id = response.get("requestId", "")
+            result['lusha_request_id'] = req_id
+            result['total_results'] = response.get("totalResults", 0)
             contacts = response.get("data", [])
-            contact_ids = []
+
             for contact in contacts:
                 id = contact.get("contactId")
                 contact_ids.append(id)
+        print("fetching enrich data")
+
+        result['contact_ids'] = contact_ids
+        result['company_source_id_name_mappings'] = company_source_id_name_mappings
+
+        return result
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/v1/lusha_contact_enrichment")
+async def lusha_contact_enrich(request: Request):
+    body = await request.json()
+    contact_ids = body.get("contact_ids", "")
+    company_source_id_name_mappings = body.get(
+        "company_source_id_name_mappings", [])
+    campaign_id = body.get("campaign_id", "")
+    req_id = body.get("lusha_request_id", "")
+    
+    try:
         if req_id and contact_ids:
-            enriched_contact_data = lusha_contact_enrich_api(req_id, contact_ids)
+            enriched_contact_data = await lusha_contact_enrich_api(req_id, contact_ids)
+            campaign_contact_run_dao = CampaignContactRunsDao(
+                loaded_config.connection_manager.mongo_client)
+            print("fetched enrich data")
+
             if "contacts" in enriched_contact_data:
                 for contact in enriched_contact_data["contacts"]:
                     data = contact.get("data", {})
-                    linkedin_url = data.get("socialLinks", {}).get("linkedin", "")
-                    email_addresses = [e["email"] for e in data.get("emailAddresses", []) if "email" in e]
-                    phone_numbers = [p["number"] for p in data.get("phoneNumbers", []) if "number" in p]
-                    
-                    contact_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
-                    db_contacts = await contact_dao.get_contacts({"linkedin_data.linkedin_url": linkedin_url})
-                    
+                    linkedin_url = data.get(
+                        "socialLinks", {}).get("linkedin", "")
+                    email_addresses = [e["email"] for e in data.get(
+                        "emailAddresses", []) if "email" in e]
+                    phone_numbers = [p["number"] for p in data.get(
+                        "phoneNumbers", []) if "number" in p]
+
+                    contact_dao = ContactsDao(
+                        loaded_config.connection_manager.mongo_client)
+                    db_contacts = await contact_dao.get_contacts(
+                        {
+                            "linkedin_data.linkedin_url": linkedin_url
+                        }
+                    )
+
                     if db_contacts:
                         db_contact = db_contacts[0]
                         await contact_dao.update_one(
@@ -330,10 +423,15 @@ async def lusha_contact_enrich(campaign_id: str):
                         firstname = data["firstName"]
                         lastname = data["lastName"]
                         job_title = data["jobTitle"]
-                    
-                        company_doc = await companies_dao.get_company(ObjectId(company_id))
-                        company_name = company_doc.get("identifiers", {}).get("name", "Unknown Company")
-                        
+
+                        contact_company_id = company_source_id_name_mappings.get(
+                            data["companyName"], "")
+
+                        if not contact_company_id:
+                            print(
+                                f"Company name not found in company_source_id_name_mappings: {data['companyName']}")
+                            continue
+
                         contact_doc = {
                             "contact_data": {
                                 "firstname": firstname,
@@ -341,8 +439,8 @@ async def lusha_contact_enrich(campaign_id: str):
                                 "email": email_addresses,
                                 "phone": phone_numbers,
                                 "jobtitle": job_title,
-                                "company": company_name,
-                                "company_id": ObjectId(company_id)
+                                "company": data["companyName"],
+                                "company_id": ObjectId(contact_company_id)
                             },
                             "linkedin_data": {
                                 "linkedin_url": linkedin_url,
@@ -357,21 +455,30 @@ async def lusha_contact_enrich(campaign_id: str):
                         contact_id = await contact_dao.create_contact(contact_doc)
                         await campaign_contact_run_dao.create_campaign_contact_run(
                             {
-                                "campaign_id": campaign_id,
-                                "company_id": company_id,
+                                "campaign_id": ObjectId(campaign_id),
+                                "company_id": ObjectId(contact_company_id),
                                 "contact_id": contact_id,
                                 "metadata": {
-                                "created_at": datetime.utcnow(),
-                                "updated_at": datetime.utcnow()
-                            }
-                        },
-                            
+                                    "created_at": datetime.utcnow(),
+                                    "updated_at": datetime.utcnow()
+                                }
+                            },
                         )
-        
+
         return {"status": "success", "message": "Data upload is successful"}
-        
+
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@app.get("/api/v1/get_linkedin_contact_details")
+async def get_linkedin_contact_details(linkedin_url: str):
+    try:
+        response = await lusha_get_linkedin_contact_details(linkedin_url)
+        return {"status": "success", "message": "Linkedin contact details fetched successfully", "data": response}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 
                 
 @app.get("/api/v1/fetch_and_claim_first_campaign")
@@ -659,7 +766,7 @@ def server_main():
     port = int(os.getenv("API_PORT", "80"))
     workers = int(os.getenv("API_WORKERS", "1"))
     reload = os.getenv("API_RELOAD", "false").lower() == "true"
-
+    
     print("=" * 60)
     print("🚀 LEADGEN API SERVER")
     print("=" * 60)
