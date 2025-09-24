@@ -16,6 +16,7 @@ from ai_agents.core_sdr.src.parsers.constants import COMPANY_GROUPINGS
 from ai_agents.core_sdr.src.parsers.company_saver import insert_companies_batch_to_db, create_campaign_company_mappings_batch
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from ai_agents.core_sdr.config.department_mappers import DEPARTMENT_TO_CATEGORY
 urllib3.disable_warnings(InsecureRequestWarning)
 
 
@@ -350,10 +351,16 @@ def build_payload_for_contact(payload_values_for_contact: Dict[str, Any]) -> Dic
             name for name in payload_values_for_contact["company_names"]
         ]
     
-    # if "departments" in payload_values_for_contact and payload_values_for_contact["departments"]:
-    #    payload_query_for_contact["filters"]["contacts"]["include"]["departments"] = [
-    #        department for department in payload_values_for_contact["departments"]
-    #    ]
+    if "departments" in payload_values_for_contact and payload_values_for_contact["departments"]:
+        departments = [DEPARTMENT_TO_CATEGORY[department] for department in payload_values_for_contact["departments"]]
+        # Initialize contacts filter only when needed
+        payload_query_for_contact["filters"]["contacts"] = {
+            "include": {
+                "departments": [
+                    department for department in departments
+                ]
+            }
+        }
 
     return payload_query_for_contact
 

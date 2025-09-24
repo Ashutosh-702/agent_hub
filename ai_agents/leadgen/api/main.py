@@ -303,7 +303,7 @@ async def lusha_contact_enrich(request: Request):
     company_map_list = body.get("company_map_list", [])
     page = body.get("page", 0)
     page_size = body.get("page_size", 50)
-    departments = body.get("departments", "")
+    departments = body.get("departments", [])
     try:
         if not campaign_id:
             raise ValueError("Campaign Id is required")
@@ -336,7 +336,7 @@ async def lusha_contact_enrich(request: Request):
             "page_size": page_size,
             "company_names": company_names
         }
-        
+
         if departments:
             payload["departments"] = departments
         contact_ids = []

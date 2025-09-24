@@ -4,13 +4,14 @@ import asyncio
 import sys
 import aiohttp
 from aiohttp.client_exceptions import ServerDisconnectedError, ClientError
-
+from typing import Optional
 
 class LushaContactHandler:
 
     def __init__(self):
        self.base_url = loaded_config.base_url
        self.campaign_id = ""
+       self.departments = []
 
     async def get_company_mappings(self, page: int = 1, limit: int = 100) -> List[dict]:
         all_companies = []
@@ -44,8 +45,10 @@ class LushaContactHandler:
             "campaign_id": self.campaign_id,
             "page": page,
             "page_size": page_size,
-            "company_map_list": company_mappings
+            "company_map_list": company_mappings,
+            "departments": self.departments
         }
+
         response = await self._make_api_call("POST", url, json=payload)
 
         # Map response back to company IDs
@@ -77,11 +80,14 @@ class LushaContactHandler:
         response = await self._make_api_call("POST", url, json=payload)
         return response
 
-    async def process_campaign_contacts(self, campaign_id: str) -> dict:
+    async def process_campaign_contacts(self, campaign_id: str, departments: Optional[List[str]] = None) -> dict:
 
         try:
             loaded_config.http_session = aiohttp.ClientSession()
             self.campaign_id = campaign_id
+
+            if departments:
+                self.departments = departments
             print(f"🚀 Starting contact enrichment for campaign: {campaign_id}")
 
             # Phase 1: Get company mappings
@@ -210,7 +216,7 @@ def main():
 
         app = LushaContactHandler()
         asyncio.run(app.process_campaign_contacts(
-            campaign_id="68d1400db76b00d2f6af7666"))
+            campaign_id="68d1400db76b00d2f6af7666", departments=["Business Development","Administrative"]))
     except KeyboardInterrupt:
         print(f"\n Configuration interrupted. Goodbye!")
     except Exception as e:
