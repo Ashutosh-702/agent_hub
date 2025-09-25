@@ -77,7 +77,7 @@ Please try a different search approach or be more thorough in your analysis.
             print(
                 model, user_prompt, f"Web search analysis for {company.name} (attempt {retry_count + 1})")
             print(model, output_format_prompt,
-                            f"Web search analysis for {company.name} (attempt {retry_count + 1})")
+                  f"Web search analysis for {company.name} (attempt {retry_count + 1})")
 
             response = self.openai_client.responses.create(
                 model=model,
@@ -123,7 +123,7 @@ Please try a different search approach or be more thorough in your analysis.
                 # Remove any markdown formatting if present
                 if analysis_content.startswith('```json'):
                     analysis_content = analysis_content[7:]
-                    
+
                 if analysis_content.startswith('```'):
                     analysis_content = analysis_content[3:]
 
@@ -248,112 +248,118 @@ Please try a different search approach or be more thorough in your analysis.
 
         return fallback_data
 
+    async def company_relevance_check(self, campaign_id: str) -> Any:
 
-async def company_relevance_check(campaign_id: str, config: Dict[str, Any]) -> Any:
+        try:
+            prompts = self.config.get('prompts', {})
+            web_enricher_user_prompt = prompts.get('web', '')
+            prospect_enricher_target_executives = prompts.get('persona', '')
+            custom_prompts = {
+                'web_enricher_user_prompt': web_enricher_user_prompt,
+                'prospect_enricher_target_executives': prospect_enricher_target_executives
+            }
 
-    try:
-        page = 1
-        limit = 50
-        
-        companies_dao = CompaniesDao(
-            loaded_config.connection_manager.mongo_client)
+            self.prompts = PromptsConfig(custom_prompts)
 
-        campaign_company_runs_dao = CampaignCompanyRunsDao(
-            loaded_config.connection_manager.mongo_client)
+            page = 1
+            limit = 50
 
-        company_count = await campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id)})
-        print(f"  Company count: {company_count}")
-        count = 0
-        total_pages = (company_count + limit - 1) // limit
-        print(f"total_pages: {total_pages}")
+            companies_dao = CompaniesDao(
+                loaded_config.connection_manager.mongo_client)
 
-        for page in range(1, total_pages + 1):
+            campaign_company_runs_dao = CampaignCompanyRunsDao(
+                loaded_config.connection_manager.mongo_client)
 
-            campaign_company_runs = await campaign_company_runs_dao.get_campaign_company_runs_paginated(
+            company_count = await campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id)})
+            print(f"  Company count: {company_count}")
+            count = 0
+            total_pages = (company_count + limit - 1) // limit
+            print(f"total_pages: {total_pages}")
+
+            for page in range(1, total_pages + 1):
+
+                campaign_company_runs = await campaign_company_runs_dao.get_campaign_company_runs_paginated(
                     {"campaign_id": ObjectId(campaign_id)}, page=page, limit=limit)
 
-            for campaign_company_run in campaign_company_runs[0]:
-                count += 1
-                company_id = campaign_company_run.get("company_id")
-                company = await companies_dao.get_company(ObjectId(company_id))
-                company_name = safe_extract_array(company, "identifiers", "name")
-    
-                print(f"  current company count: {count}/{company_count}")
-                print(f"  Company: {company_name}")
+                for campaign_company_run in campaign_company_runs[0]:
+                    count += 1
+                    company_id = campaign_company_run.get("company_id")
+                    company = await companies_dao.get_company(ObjectId(company_id))
+                    company_name = self.safe_extract_array(
+                        company, "identifiers", "name")
 
-                company_data = Company(
-                    company_id=str(company.get("_id", "")),
-                    name=safe_extract_array(company, "identifiers", "name"),
-                    industry=safe_extract_array(company, "profile", "industry"),
-                    location=safe_extract_array(company, "location", "name"),
-                    size=safe_extract_array(company, "profile", "employee_count"),
-                )
+                    print(f"  current company count: {count}/{company_count}")
+                    print(f"  Company: {company_name}")
 
-                prompts = config.get('prompts', {})
-                web_enricher_user_prompt = prompts.get('web', '')
-                prospect_enricher_target_executives = prompts.get('persona', '')
-                config['prompts'] = {
-                    'web_enricher_user_prompt': web_enricher_user_prompt,
-                    'prospect_enricher_target_executives': prospect_enricher_target_executives
-                }
-    
-                enricher = CompanyRelevanceCheck(config)
+                    company_data = Company(
+                        company_id=str(company.get("_id", "")),
+                        name=self.safe_extract_array(
+                            company, "identifiers", "name"),
+                        industry=self.safe_extract_array(
+                            company, "profile", "industry"),
+                        location=self.safe_extract_array(
+                            company, "location", "name"),
+                        size=self.safe_extract_array(
+                            company, "profile", "employee_count"),
+                    )
 
-                web_analysis = await enricher.web_search_analysis(company_data)
-    
-                # Log results and create relevance assessment
-                relevance = web_analysis.get('relevance_assessment', {})
-                is_relevant = relevance.get('is_relevant', False)
-                confidence = relevance.get('confidence_level', 'unknown')
-                reasoning = relevance.get('relevance_reason', 'No reasoning provided')
-                key_factors = relevance.get('key_factors', [])
-    
-                campaign_run = campaign_company_run
-                update_data = {
-                    "$set": {
-                        "is_relevant": is_relevant,
-                        "metadata.relevance_reason": reasoning,
-                        "metadata.confidence_level": confidence,
-                        "metadata.key_factors": key_factors,
-                        "metadata.updated_at": datetime.utcnow()
+                    web_analysis = await self.web_search_analysis(company_data)
+
+                    # Log results and create relevance assessment
+                    relevance = web_analysis.get('relevance_assessment', {})
+                    is_relevant = relevance.get('is_relevant', False)
+                    confidence = relevance.get('confidence_level', 'unknown')
+                    reasoning = relevance.get(
+                        'relevance_reason', 'No reasoning provided')
+                    key_factors = relevance.get('key_factors', [])
+
+                    campaign_run = campaign_company_run
+                    update_data = {
+                        "$set": {
+                            "is_relevant": is_relevant,
+                            "metadata.relevance_reason": reasoning,
+                            "metadata.confidence_level": confidence,
+                            "metadata.key_factors": key_factors,
+                            "metadata.updated_at": datetime.utcnow()
+                        }
                     }
-                }
-                # Update the document
-                update_result = await campaign_company_runs_dao.update_campaign_company_run(
-                    {"_id": campaign_run["_id"]},
-                    update_data
-                )      
-                
-                if update_result:
-                    print(f"✅ Campaign company run updated for company {company_name}")
+                    # Update the document
+                    update_result = await campaign_company_runs_dao.update_campaign_company_run(
+                        {"_id": campaign_run["_id"]},
+                        update_data
+                    )
+
+                    if update_result:
+                        print(
+                            f"✅ Campaign company run updated for company {company_name}")
+                    else:
+                        print(
+                            f"❌ Failed to update campaign company run for company {company_name}")
+
+            print(f"total company relevance update: {count}")
+
+        except Exception as e:
+            print(f"error: {e}")
+        finally:
+            return
+
+    def safe_extract_array(self, data, *keys, default=""):
+        """Safely extract from nested dict and handle arrays"""
+        try:
+            value = data
+
+            for key in keys:
+                value = value.get(key, {})
+
+            # Handle array values - take first element or join
+            if isinstance(value, list):
+                if len(value) > 0:
+                    # For arrays, take first element or join with comma
+                    return value[0] if len(value) == 1 else ", ".join(str(v) for v in value)
                 else:
-                    print(f"❌ Failed to update campaign company run for company {company_name}")
-       
-        print(f"total company relevance update: {count}")
+                    return default
 
-    except Exception as e:
-        print(f"error: {e}")
-    finally:
-        return
+            return str(value) if value else default
 
-
-def safe_extract_array(data, *keys, default=""):
-    """Safely extract from nested dict and handle arrays"""
-    try:
-        value = data
-
-        for key in keys:
-            value = value.get(key, {})
-
-        # Handle array values - take first element or join
-        if isinstance(value, list):
-            if len(value) > 0:
-                # For arrays, take first element or join with comma
-                return value[0] if len(value) == 1 else ", ".join(str(v) for v in value)
-            else:
-                return default
-
-        return str(value) if value else default
-
-    except (AttributeError, TypeError, KeyError):
-        return default
+        except (AttributeError, TypeError, KeyError):
+            return default
