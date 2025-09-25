@@ -122,6 +122,7 @@ async def create_campaign_company_mappings_batch(
                 "campaign_id": ObjectId(campaign_id),
                 "company_id": ObjectId(company_id),
                 "company_status": False,
+                "linkedin_contact_status": False,
                 "metadata": {
                     "created_at": datetime.now(timezone.utc),
                     "updated_at": datetime.now(timezone.utc),

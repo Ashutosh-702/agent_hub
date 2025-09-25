@@ -21,6 +21,7 @@ from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.campaigns import CampaignsDao
 from config.loaded_config import loaded_config
 from datetime import datetime
+from ai_agents.core_sdr.src.api.company_relevance_check import company_relevance_check
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
         print(f"Total new companies added into companies collection: {inserted_count}")
 
         campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        await company_relevance_check(campaign_id, config)
         await campaigns_dao.update_campaign_status(campaign_id,"pending")
         print(f"Updated status of {campaign_id} to 'pending'")
     except Exception as e:
