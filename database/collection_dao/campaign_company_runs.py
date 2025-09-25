@@ -20,3 +20,6 @@ class CampaignCompanyRunsDao(BaseMongoDao):
 
     async def get_campaign_company_runs_paginated(self, filter: dict = {}, page: int = 1, limit: int = 100):
         return await self.get_paginated_response(filter, page_size=limit, page_number=page)
+
+    async def get_campaign_company_runs_count(self, filter: dict = {}):
+        return await self.collection.count_documents(filter)

@@ -260,72 +260,85 @@ Please try a different search approach or be more thorough in your analysis.
 async def company_relevance_check(campaign_id: str, config: Dict[str, Any]) -> Any:
 
     try:
+        page = 1
+        limit = 50
+        
         companies_dao = CompaniesDao(
             loaded_config.connection_manager.mongo_client)
 
         campaign_company_runs_dao = CampaignCompanyRunsDao(
             loaded_config.connection_manager.mongo_client)
-        campaign_company_runs = await campaign_company_runs_dao.get_campaign_company_runs(
-            {"campaign_id": ObjectId(campaign_id)})
-        company_count = len(campaign_company_runs)
+
+        company_count = await campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id)})
         clean_log(f"  Company count: {company_count}")
         count = 0
+        total_pages = (company_count + limit - 1) // limit
+        print(f"total_pages: {total_pages}")
 
-        for campaign_company_run in campaign_company_runs:
-            count += 1
-            company_id = campaign_company_run.get("company_id")
-            company = await companies_dao.get_company(ObjectId(company_id))
-            company_name = safe_extract_array(company, "identifiers", "name")
+        for page in range(1, total_pages + 1):
 
-            clean_log(f"  current company count: {count}/{company_count}")
-            detailed_log(f"  Company: {company_name}")
-            company_data = Company(
-                company_id=str(company.get("_id", "")),
-                name=safe_extract_array(company, "identifiers", "name"),
-                industry=safe_extract_array(company, "profile", "industry"),
-                location=safe_extract_array(company, "location", "name"),
-                size=safe_extract_array(company, "profile", "employee_count"),
-            )
-            prompts = config.get('prompts', {})
-            web_enricher_user_prompt = prompts.get('web', '')
-            prospect_enricher_target_executives = prompts.get('persona', '')
-            config['prompts'] = {
-                'web_enricher_user_prompt': web_enricher_user_prompt,
-                'prospect_enricher_target_executives': prospect_enricher_target_executives
-            }
+            campaign_company_runs = await campaign_company_runs_dao.get_campaign_company_runs_paginated(
+                    {"campaign_id": ObjectId(campaign_id)}, page=page, limit=limit)
 
-            enricher = CompanyRelevanceCheck(config)
-            web_analysis = await enricher.web_search_analysis(company_data)
+            for campaign_company_run in campaign_company_runs[0]:
+                count += 1
+                company_id = campaign_company_run.get("company_id")
+                company = await companies_dao.get_company(ObjectId(company_id))
+                company_name = safe_extract_array(company, "identifiers", "name")
+    
+                clean_log(f"  current company count: {count}/{company_count}")
+                detailed_log(f"  Company: {company_name}")
 
-            # Log results and create relevance assessment
-            relevance = web_analysis.get('relevance_assessment', {})
-            is_relevant = relevance.get('is_relevant', False)
-            confidence = relevance.get('confidence_level', 'unknown')
-            reasoning = relevance.get('relevance_reason', 'No reasoning provided')
-            key_factors = relevance.get('key_factors', [])
+                company_data = Company(
+                    company_id=str(company.get("_id", "")),
+                    name=safe_extract_array(company, "identifiers", "name"),
+                    industry=safe_extract_array(company, "profile", "industry"),
+                    location=safe_extract_array(company, "location", "name"),
+                    size=safe_extract_array(company, "profile", "employee_count"),
+                )
 
-            campaign_run = campaign_company_run
-            update_data = {
-                "$set": {
-                    "is_relevant": is_relevant,
-                    "metadata.relevance_reason": reasoning,
-                    "metadata.confidence_level": confidence,
-                    "metadata.key_factors": key_factors,
-                    "metadata.updated_at": datetime.utcnow()
+                prompts = config.get('prompts', {})
+                web_enricher_user_prompt = prompts.get('web', '')
+                prospect_enricher_target_executives = prompts.get('persona', '')
+                config['prompts'] = {
+                    'web_enricher_user_prompt': web_enricher_user_prompt,
+                    'prospect_enricher_target_executives': prospect_enricher_target_executives
                 }
-            }
-            # Update the document
-            update_result = await campaign_company_runs_dao.update_campaign_company_run(
-                {"_id": campaign_run["_id"]},
-                update_data
-            )      
-            
-            if update_result:
-                print(f"✅ Campaign company run updated for company {company_name}")
-            else:
-                print(f"❌ Failed to update campaign company run for company {company_name}")
+    
+                enricher = CompanyRelevanceCheck(config)
+
+                web_analysis = await enricher.web_search_analysis(company_data)
+    
+                # Log results and create relevance assessment
+                relevance = web_analysis.get('relevance_assessment', {})
+                is_relevant = relevance.get('is_relevant', False)
+                confidence = relevance.get('confidence_level', 'unknown')
+                reasoning = relevance.get('relevance_reason', 'No reasoning provided')
+                key_factors = relevance.get('key_factors', [])
+    
+                campaign_run = campaign_company_run
+                update_data = {
+                    "$set": {
+                        "is_relevant": is_relevant,
+                        "metadata.relevance_reason": reasoning,
+                        "metadata.confidence_level": confidence,
+                        "metadata.key_factors": key_factors,
+                        "metadata.updated_at": datetime.utcnow()
+                    }
+                }
+                # Update the document
+                update_result = await campaign_company_runs_dao.update_campaign_company_run(
+                    {"_id": campaign_run["_id"]},
+                    update_data
+                )      
+                
+                if update_result:
+                    print(f"✅ Campaign company run updated for company {company_name}")
+                else:
+                    print(f"❌ Failed to update campaign company run for company {company_name}")
        
         print(f"total company relevance update: {count}")
+
     except Exception as e:
         print(f"error: {e}")
     finally:
