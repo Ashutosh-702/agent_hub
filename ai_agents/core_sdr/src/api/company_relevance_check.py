@@ -6,8 +6,6 @@ from typing import Dict, Any
 import orjson
 from openai import OpenAI
 
-from ai_agents.ai_sdr.sdr.logging_config import log_llm_response, log_llm_request, log_llm_error, clean_log, \
-    detailed_log
 from ai_agents.ai_sdr.sdr.models import Company
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
 from config.loaded_config import loaded_config
@@ -40,16 +38,10 @@ class CompanyRelevanceCheck:
             company, 'location', None) or 'Unknown - MUST FIND'
 
         # Clean log for main status
-        clean_log(f"Web Search Analysis: {company.name}")
-
-        # Detailed logs for extra info
-        detailed_log(f"Web Search Analysis: {company.name}")
-        detailed_log(f"  Website: {company_website}")
-        detailed_log(f"  Industry: {company_industry}")
-        detailed_log(f"  Location: {company_location}")
+        print(f"Web Search Analysis: {company.name}")
 
         if retry_count > 0:
-            detailed_log(f"  Retry Attempt: {retry_count + 1}/4")
+            print(f"  Retry Attempt: {retry_count + 1}/4")
 
         system_prompt = self.prompts.get_prompt(
             "web_enricher_system_prompt",
@@ -80,11 +72,11 @@ Please try a different search approach or be more thorough in your analysis.
 
         try:
             model = "gpt-4o"
-            log_llm_request(
+            print(
                 model, system_prompt, f"Web search analysis for {company.name} (attempt {retry_count + 1})")
-            log_llm_request(
+            print(
                 model, user_prompt, f"Web search analysis for {company.name} (attempt {retry_count + 1})")
-            log_llm_request(model, output_format_prompt,
+            print(model, output_format_prompt,
                             f"Web search analysis for {company.name} (attempt {retry_count + 1})")
 
             response = self.openai_client.responses.create(
@@ -119,12 +111,12 @@ Please try a different search approach or be more thorough in your analysis.
                 input_tokens = getattr(response.usage, 'input_tokens', 0)
                 output_tokens = getattr(response.usage, 'output_tokens', 0)
                 total_tokens = getattr(response.usage, 'total_tokens', 0)
-                detailed_log(
+                print(
                     f"API Usage: {total_tokens:,} tokens (Input: {input_tokens:,}, Output: {output_tokens:,})")
 
             # Extract the analysis from the response
             analysis_content = response.output_text
-            log_llm_response(
+            print(
                 model, analysis_content, f"Web search result for {company.name} (attempt {retry_count + 1})", total_tokens)
 
             try:
@@ -144,49 +136,49 @@ Please try a different search approach or be more thorough in your analysis.
 
                 # Validate that we have meaningful data
                 if self._validate_analysis_data(analysis_data, company.name):
-                    clean_log(f"Web analysis completed: {company.name}")
-                    detailed_log(
+                    print(f"Web analysis completed: {company.name}")
+                    print(
                         f"Web Search Analysis completed for {company.name}")
-                    detailed_log(f"  Status: SUCCESS")
-                    detailed_log(f"  Retry Count: {retry_count}")
-                    detailed_log(
+                    print(f"  Status: SUCCESS")
+                    print(f"  Retry Count: {retry_count}")
+                    print(
                         f"  Data Quality: Valid JSON with required fields")
                     return analysis_data
                 else:
                     # Data validation failed, retry if possible
                     if retry_count < 3:
-                        detailed_log(
+                        print(
                             f"Web search data validation failed for {company.name} (attempt {retry_count + 1}). Retrying...", "warning")
                         context = f"Previous attempt returned incomplete data. Analysis content preview: {str(analysis_data)[:200]}..."
                         return await self.web_search_analysis(company, retry_count + 1, context)
                     else:
-                        clean_log(
+                        print(
                             f"Web search validation failed: {company.name}", "error")
-                        detailed_log(
+                        print(
                             f"Web search data validation failed after {retry_count + 1} attempts for {company.name}", "error")
                         return self._create_fallback_data(company.name, "validation_failed", retry_count + 1, analysis_data)
 
             except Exception as json_error:
                 # JSON parsing failed, retry if possible
                 if retry_count < 3:
-                    detailed_log(
+                    print(
                         f"Web search JSON parse error for {company.name} (attempt {retry_count + 1}): {json_error}. Retrying...", "warning")
                     context = f"Previous attempt failed with JSON parse error. Raw response preview: {analysis_content[:200]}..."
                     return await self.web_search_analysis(company, retry_count + 1, context)
                 else:
-                    log_llm_error(
+                    print(
                         model, f"JSON parse error after {retry_count + 1} attempts: {json_error}", f"Web search for {company.name}")
                     return self._create_fallback_data(company.name, "json_parse_error", retry_count + 1, analysis_content, json_error)
 
         except Exception as e:
             # General error, retry if possible
             if retry_count < 3:
-                detailed_log(
+                print(
                     f"Web search analysis error for {company.name} (attempt {retry_count + 1}): {e}. Retrying...", "warning")
                 context = f"Previous attempt failed with error: {str(e)}"
                 return await self.web_search_analysis(company, retry_count + 1, context)
             else:
-                log_llm_error(
+                print(
                     "gpt-4o", f"Web search failed after {retry_count + 1} attempts: {e}", f"Web search for {company.name}")
                 return self._create_fallback_data(company.name, "api_error", retry_count + 1, None, e)
 
@@ -201,14 +193,14 @@ Please try a different search approach or be more thorough in your analysis.
             relevance = data.get('relevance_assessment', {})
 
             if not isinstance(relevance, dict) or 'is_relevant' not in relevance:
-                detailed_log(
+                print(
                     f"Missing relevance_assessment for {company_name}", "warning")
                 return False
 
             return True
 
         except Exception as e:
-            detailed_log(
+            print(
                 f"Data validation error for {company_name}: {e}", "warning")
             return False
 
@@ -251,7 +243,7 @@ Please try a different search approach or be more thorough in your analysis.
             else:
                 fallback_data["partial_data"] = raw_data
 
-        detailed_log(
+        print(
             f"Created fallback data for {company_name} - Error type: {error_type}, Retry count: {retry_count}", "error")
 
         return fallback_data
@@ -270,7 +262,7 @@ async def company_relevance_check(campaign_id: str, config: Dict[str, Any]) -> A
             loaded_config.connection_manager.mongo_client)
 
         company_count = await campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id)})
-        clean_log(f"  Company count: {company_count}")
+        print(f"  Company count: {company_count}")
         count = 0
         total_pages = (company_count + limit - 1) // limit
         print(f"total_pages: {total_pages}")
@@ -286,8 +278,8 @@ async def company_relevance_check(campaign_id: str, config: Dict[str, Any]) -> A
                 company = await companies_dao.get_company(ObjectId(company_id))
                 company_name = safe_extract_array(company, "identifiers", "name")
     
-                clean_log(f"  current company count: {count}/{company_count}")
-                detailed_log(f"  Company: {company_name}")
+                print(f"  current company count: {count}/{company_count}")
+                print(f"  Company: {company_name}")
 
                 company_data = Company(
                     company_id=str(company.get("_id", "")),
