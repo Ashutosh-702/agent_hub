@@ -2,10 +2,10 @@
 
 from datetime import datetime
 from typing import Dict, Any
+import gc
 
 import orjson
 from openai import OpenAI
-
 from ai_agents.ai_sdr.sdr.models import Company
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
 from config.loaded_config import loaded_config
@@ -335,6 +335,12 @@ Please try a different search approach or be more thorough in your analysis.
                     else:
                         print(
                             f"❌ Failed to update campaign company run for company {company_name}")
+                            
+                    del web_analysis, relevance, company_data, company        
+                    gc.collect()
+                
+                self.openai_client = OpenAI(api_key=loaded_config.openai_api_key)
+                print(f"🔄 OpenAI client reset at company #{count} of {company_count}")
 
             print(f"total company relevance update: {count}")
 
