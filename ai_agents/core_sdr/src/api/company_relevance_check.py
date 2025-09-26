@@ -261,7 +261,7 @@ Please try a different search approach or be more thorough in your analysis.
 
             self.prompts = PromptsConfig(custom_prompts)
 
-            limit = 50
+            limit = 1
 
             companies_dao = CompaniesDao(
                 loaded_config.connection_manager.mongo_client)
@@ -339,14 +339,6 @@ Please try a different search approach or be more thorough in your analysis.
                     else:
                         print(
                             f"❌ Failed to update campaign company run for company {company_name}")
-
-                    del web_analysis, relevance, company_data, company
-                    gc.collect()
-
-                self.openai_client = OpenAI(
-                    api_key=loaded_config.openai_api_key)
-                print(
-                    f"🔄 OpenAI client reset at company #{count} of {company_count}")
 
             print(f"total company relevance update: {count}")
 
