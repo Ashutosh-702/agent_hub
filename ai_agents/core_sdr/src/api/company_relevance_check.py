@@ -261,7 +261,6 @@ Please try a different search approach or be more thorough in your analysis.
 
             self.prompts = PromptsConfig(custom_prompts)
 
-            page = 1
             limit = 50
 
             companies_dao = CompaniesDao(
@@ -270,7 +269,12 @@ Please try a different search approach or be more thorough in your analysis.
             campaign_company_runs_dao = CampaignCompanyRunsDao(
                 loaded_config.connection_manager.mongo_client)
 
-            company_count = await campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id)})
+            filter_criteria = {
+                "campaign_id": ObjectId(campaign_id),
+                "is_relevant": {"$exists": False}
+            }
+
+            company_count = await campaign_company_runs_dao.get_campaign_company_runs_count(filter_criteria)
             print(f"  Company count: {company_count}")
             count = 0
             total_pages = (company_count + limit - 1) // limit
@@ -279,7 +283,7 @@ Please try a different search approach or be more thorough in your analysis.
             for page in range(1, total_pages + 1):
 
                 campaign_company_runs = await campaign_company_runs_dao.get_campaign_company_runs_paginated(
-                    {"campaign_id": ObjectId(campaign_id)}, page=page, limit=limit)
+                    filter_criteria, page=1, limit=limit)
 
                 for campaign_company_run in campaign_company_runs[0]:
                     count += 1
@@ -335,12 +339,14 @@ Please try a different search approach or be more thorough in your analysis.
                     else:
                         print(
                             f"❌ Failed to update campaign company run for company {company_name}")
-                            
-                    del web_analysis, relevance, company_data, company        
+
+                    del web_analysis, relevance, company_data, company
                     gc.collect()
-                
-                self.openai_client = OpenAI(api_key=loaded_config.openai_api_key)
-                print(f"🔄 OpenAI client reset at company #{count} of {company_count}")
+
+                self.openai_client = OpenAI(
+                    api_key=loaded_config.openai_api_key)
+                print(
+                    f"🔄 OpenAI client reset at company #{count} of {company_count}")
 
             print(f"total company relevance update: {count}")
 
