@@ -5,7 +5,7 @@ from typing import Dict, Any
 import gc
 
 import orjson
-from openai import OpenAI
+from openai import AsyncOpenAI
 from ai_agents.ai_sdr.sdr.models import Company
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
 from config.loaded_config import loaded_config
@@ -23,7 +23,7 @@ class CompanyRelevanceCheck:
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.openai_client = OpenAI(api_key=loaded_config.openai_api_key)
+        self.openai_client = AsyncOpenAI(api_key=loaded_config.openai_api_key)
         custom_prompts = config.get('prompts', {})
         self.prompts = PromptsConfig(custom_prompts)
 
@@ -79,7 +79,7 @@ Please try a different search approach or be more thorough in your analysis.
             print(model, output_format_prompt,
                   f"Web search analysis for {company.name} (attempt {retry_count + 1})")
 
-            response = self.openai_client.responses.create(
+            response =  await self.openai_client.responses.create(
                 model=model,
                 input=[
                     {
