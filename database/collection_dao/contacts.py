@@ -16,7 +16,10 @@ class ContactsDao(BaseMongoDao):
     async def get_contacts(self, filters: dict = {}):
         return await self.find_many(filters)
     
-    async def get_contact(self, contact_id: str):
-        return await self.find_one({"_id": contact_id})
+    async def get_contact(self, contact_id: str, projection: dict = None):
+        if projection is None:
+            projection = {}
+
+        return await self.find_one({"_id": contact_id}, projection=projection)
     
 

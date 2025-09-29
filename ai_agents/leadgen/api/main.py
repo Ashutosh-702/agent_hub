@@ -632,7 +632,6 @@ async def get_campaign_contact_data(
     company_id: Optional[str] = None,
     page: int = 1,
     limit: int = 10
-
 ):
     try:
         campaign_contact_runs_dao = CampaignContactRunsDao(
@@ -642,24 +641,43 @@ async def get_campaign_contact_data(
         if company_id:
             filter_query["company_id"] = ObjectId(company_id)
 
-        response = await campaign_contact_runs_dao.get_campaign_contact_runs_paginated(filter_query, page, limit, sort_by=["company_id"])
+        campaign_contact_runs_projection = {
+            "campaign_id": 1,
+            "company_id": 1,
+            "contact_id": 1,
+            "_id": 0
+        }
+
+        contacts_projection = {
+            "contact_data": 1,
+            "linkedin_data": 1,
+            "_id": 0
+        }
+
+        response, pagination_info = await campaign_contact_runs_dao.get_campaign_contact_runs_paginated(
+            filter_query, page,
+            limit, sort_by=["company_id"],
+            projection=campaign_contact_runs_projection
+        )
 
         get_contacts_dao = ContactsDao(
             loaded_config.connection_manager.mongo_client)
 
-        for contact in response[0]:
+        for contact in response:
             contact_id = contact.get("contact_id")
-            contact_doc = await get_contacts_dao.get_contact(contact_id)
+            contact_doc = await get_contacts_dao.get_contact(
+                contact_id,
+                projection=contacts_projection
+            )
 
             if not contact_doc:
                 continue
 
             contact["contact_data"] = contact_doc.get("contact_data")
             contact["linkedin_data"] = contact_doc.get("linkedin_data")
-            contact.pop("metadata")
 
-        serialized_response = serialize_objectid(response[0])
-        return {"status": "success", "data": serialized_response, "pagination_info": response[1]}
+        serialized_response = serialize_objectid(response)
+        return {"status": "success", "data": serialized_response, "pagination_info": pagination_info}
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
