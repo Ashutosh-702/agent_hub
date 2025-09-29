@@ -649,10 +649,10 @@ async def get_campaign_contact_data(
 
         for contact in response[0]:
             contact_id = contact.get("contact_id")
-            contact_doc = await get_contacts_dao.get_contacts({"_id": contact_id})
+            contact_doc = await get_contacts_dao.get_contact(contact_id)
 
             if contact_doc:
-                contact_doc = contact_doc[0]
+                contact_doc = contact_doc
             else:
                 continue
 
