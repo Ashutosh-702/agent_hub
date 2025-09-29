@@ -637,12 +637,12 @@ async def get_campaign_contact_data(
     try:
         campaign_contact_runs_dao = CampaignContactRunsDao(
             loaded_config.connection_manager.mongo_client)
-        filter = {"campaign_id": ObjectId(campaign_id)}
+        filter_query = {"campaign_id": ObjectId(campaign_id)}
 
         if company_id:
-            filter["company_id"] = ObjectId(company_id)
+            filter_query["company_id"] = ObjectId(company_id)
 
-        response = await campaign_contact_runs_dao.get_campaign_contact_runs_paginated(filter, page, limit, sort_by=["company_id"])
+        response = await campaign_contact_runs_dao.get_campaign_contact_runs_paginated(filter_query, page, limit, sort_by=["company_id"])
 
         get_contacts_dao = ContactsDao(
             loaded_config.connection_manager.mongo_client)
@@ -665,6 +665,7 @@ async def get_campaign_contact_data(
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
+        
     
 @app.get("/api/v1/health_check")
 async def health_check() -> Dict[str, Any]:

@@ -9,8 +9,11 @@ class CampaignContactRunsDao(BaseMongoDao):
     async def create_campaign_contact_run(self, campaign_contact_run: dict):
         return await self.insert_one(campaign_contact_run)
     
-    async def get_campaign_contact_runs(self, filter: dict = {}):
-        return await self.find_many(filter)
+    async def get_campaign_contact_runs(self, query: dict = None):
+        if query is None:
+            query = {}
+
+        return await self.find_many(query)
     
     async def get_campaign_contact_run(self, campaign_contact_run_id: str):
         return await self.find_one({"_id": campaign_contact_run_id})
@@ -18,5 +21,8 @@ class CampaignContactRunsDao(BaseMongoDao):
     async def update_campaign_contact_run(self, query: Dict[str, Any], update_clause: Dict[str, Any]):
         return await self.update_one(query, update_clause)
     
-    async def get_campaign_contact_runs_paginated(self, filter: dict = {}, page: int = 1, limit: int = 100, sort_by: list = None):
-        return await self.get_paginated_response(filter, page_size=limit, page_number=page, sort_by=sort_by)
+    async def get_campaign_contact_runs_paginated(self, query: dict = None, page: int = 1, limit: int = 100, sort_by: list = None):
+        if query is None:
+            query = {}
+
+        return await self.get_paginated_response(query, page_size=limit, page_number=page, sort_by=sort_by)
