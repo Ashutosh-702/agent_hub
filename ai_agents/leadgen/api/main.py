@@ -284,7 +284,7 @@ async def get_company_mapping_list(
     limit: int = 10
     ):
     campaign_company_run_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-    response, pagination_info = await campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": ObjectId(campaign_id)}, page, limit)
+    response, pagination_info = await campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": ObjectId(campaign_id), "is_relevant": True}, page, limit)
 
     serialized_response = serialize_objectid(response)
 
