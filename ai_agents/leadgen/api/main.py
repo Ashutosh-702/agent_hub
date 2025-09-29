@@ -624,6 +624,35 @@ async def save_prospects_data_to_mongo(request: Request):
             await campaign_contact_runs_dao.create_campaign_contact_run(campaign_contact_run_doc)
     return {"status": "success"}
 
+
+@app.get("/api/v1/get_campaign_contact_data")
+async def get_campaign_contact_data(
+     campaign_id: str,
+     page: int = 1,
+     limit: int = 10
+    ):
+    try:
+        campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
+        response = await campaign_contact_runs_dao.get_campaign_contact_runs_paginated({"campaign_id": ObjectId(campaign_id)}, page, limit,sort_by=["company_id"])
+        
+        get_contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        for contact in response[0]:
+            contact_id = contact.get("contact_id")
+            contact_doc = await get_contacts_dao.get_contacts({"_id": contact_id})
+            if contact_doc:
+                contact_doc = contact_doc[0]
+            else:
+                continue
+            contact["contact_data"] = contact_doc.get("contact_data")
+            contact["linkedin_data"] = contact_doc.get("linkedin_data")
+            contact.pop("metadata")
+            
+        serialized_response = serialize_objectid(response[0])
+        return {"status": "success", "data": serialized_response, "pagination_info": response[1]}
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    
 @app.get("/api/v1/health_check")
 async def health_check() -> Dict[str, Any]:
     """Basic health check endpoint."""
