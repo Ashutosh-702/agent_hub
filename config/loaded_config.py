@@ -10,4 +10,6 @@ class Settings:
     base_url = os.getenv("BASE_URL","http://0.0.0.0:80")
     lusha_api_key = os.getenv("LUSHA_API_KEY")
     http_session : aiohttp.ClientSession = None
+    openai_api_key = os.getenv("OPENAI_API_KEY", "")
+    
 loaded_config = Settings()
