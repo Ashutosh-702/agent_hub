@@ -40,6 +40,7 @@ import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 import aiohttp
 from ai_agents.leadgen.utils import serialize_objectid
+from typing import Optional
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -624,6 +625,64 @@ async def save_prospects_data_to_mongo(request: Request):
             await campaign_contact_runs_dao.create_campaign_contact_run(campaign_contact_run_doc)
     return {"status": "success"}
 
+
+@app.get("/api/v1/get_campaign_contact_data")
+async def get_campaign_contact_data(
+    campaign_id: str,
+    company_id: Optional[str] = None,
+    page: int = 1,
+    limit: int = 10
+):
+    try:
+        campaign_contact_runs_dao = CampaignContactRunsDao(
+            loaded_config.connection_manager.mongo_client)
+        filter_query = {"campaign_id": ObjectId(campaign_id)}
+
+        if company_id:
+            filter_query["company_id"] = ObjectId(company_id)
+
+        campaign_contact_runs_projection = {
+            "campaign_id": 1,
+            "company_id": 1,
+            "contact_id": 1,
+            "_id": 0
+        }
+
+        contacts_projection = {
+            "contact_data": 1,
+            "linkedin_data": 1,
+            "_id": 0
+        }
+
+        response, pagination_info = await campaign_contact_runs_dao.get_campaign_contact_runs_paginated(
+            filter_query, page,
+            limit, sort_by=["company_id"],
+            projection=campaign_contact_runs_projection
+        )
+
+        get_contacts_dao = ContactsDao(
+            loaded_config.connection_manager.mongo_client)
+
+        for contact in response:
+            contact_id = contact.get("contact_id")
+            contact_doc = await get_contacts_dao.get_contact(
+                contact_id,
+                projection=contacts_projection
+            )
+
+            if not contact_doc:
+                continue
+
+            contact["contact_data"] = contact_doc.get("contact_data")
+            contact["linkedin_data"] = contact_doc.get("linkedin_data")
+
+        serialized_response = serialize_objectid(response)
+        return {"status": "success", "data": serialized_response, "pagination_info": pagination_info}
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+        
+    
 @app.get("/api/v1/health_check")
 async def health_check() -> Dict[str, Any]:
     """Basic health check endpoint."""
