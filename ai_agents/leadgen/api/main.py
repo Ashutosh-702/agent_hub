@@ -40,6 +40,7 @@ import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 import aiohttp
 from ai_agents.leadgen.utils import serialize_objectid
+from typing import Optional
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -627,26 +628,38 @@ async def save_prospects_data_to_mongo(request: Request):
 
 @app.get("/api/v1/get_campaign_contact_data")
 async def get_campaign_contact_data(
-     campaign_id: str,
-     page: int = 1,
-     limit: int = 10
-    ):
+    campaign_id: str,
+    company_id: Optional[str] = None,
+    page: int = 1,
+    limit: int = 10
+
+):
     try:
-        campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
-        response = await campaign_contact_runs_dao.get_campaign_contact_runs_paginated({"campaign_id": ObjectId(campaign_id)}, page, limit,sort_by=["company_id"])
-        
-        get_contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        campaign_contact_runs_dao = CampaignContactRunsDao(
+            loaded_config.connection_manager.mongo_client)
+        filter = {"campaign_id": ObjectId(campaign_id)}
+
+        if company_id:
+            filter["company_id"] = ObjectId(company_id)
+
+        response = await campaign_contact_runs_dao.get_campaign_contact_runs_paginated(filter, page, limit, sort_by=["company_id"])
+
+        get_contacts_dao = ContactsDao(
+            loaded_config.connection_manager.mongo_client)
+
         for contact in response[0]:
             contact_id = contact.get("contact_id")
             contact_doc = await get_contacts_dao.get_contacts({"_id": contact_id})
+
             if contact_doc:
                 contact_doc = contact_doc[0]
             else:
                 continue
+
             contact["contact_data"] = contact_doc.get("contact_data")
             contact["linkedin_data"] = contact_doc.get("linkedin_data")
             contact.pop("metadata")
-            
+
         serialized_response = serialize_objectid(response[0])
         return {"status": "success", "data": serialized_response, "pagination_info": response[1]}
 
