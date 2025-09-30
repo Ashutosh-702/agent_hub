@@ -6,6 +6,8 @@ from typing import List, Dict, Any, OrderedDict
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 
+from config.loaded_config import loaded_config
+
 urllib3.disable_warnings(InsecureRequestWarning)
 
 LUSHA_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "lusha_industry_config.json"
@@ -13,7 +15,7 @@ with open(LUSHA_CONFIG_PATH, "r", encoding="utf-8") as f:
     LUSHA_CONFIG = json.load(f)
     
     
-def search_api(dsl_query: Dict[str, Any]) -> List[int]:
+async def search_api(dsl_query: Dict[str, Any]) -> List[int]:
     items_per_page = 1
     
     url = f"https://api.coresignal.com/cdapi/v2/company_clean/search/es_dsl?items_per_page={items_per_page}"
@@ -27,16 +29,16 @@ def search_api(dsl_query: Dict[str, Any]) -> List[int]:
         'accept': 'application/json'
     }
     
-    response = requests.post(url, headers=headers, data=payload, verify=False, timeout=30)
-    
-    if response.status_code == 200:
-        data = response.json()
-        company_ids = [int(item) for item in data]
+    response = await loaded_config.http_session.post(url, json=payload, headers=headers)
+    result = await response.json()
+
+    if response.status == 200:
+        company_ids = [int(item) for item in result]
         return company_ids
     else:
-        raise Exception(f"Search API failed: {response.status_code} - {response.text}")
+        raise Exception(f"Search API failed: {response.status} - {response.text}")
 
-def collect_api(company_id: int) -> Dict[str, Any]:
+async def collect_api(company_id: int) -> Dict[str, Any]:
     url = f"https://api.coresignal.com/cdapi/v2/company_clean/collect/{company_id}"
     
     headers = {
@@ -45,20 +47,21 @@ def collect_api(company_id: int) -> Dict[str, Any]:
         'Content-Type': 'application/json'
     }
     
-    response = requests.get(url, headers=headers, verify=False, timeout=30)
+    response = await loaded_config.http_session.get(url, headers=headers)
+    result = await response.json()
     
-    if response.status_code == 200:
-        return response.json()
+    if response.status == 200:
+        return result
     else:
-        raise Exception(f"Collect API failed: {response.status_code} - {response.text}")
+        raise Exception(f"Collect API failed: {response.status} - {response.text}")
 
-def collect_companies_from_search(config: Dict[str, Any], exclude_company_list: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
+async def collect_companies_from_search(config: Dict[str, Any], exclude_company_list: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
     companies = []
     try:
         dsl_query = build_payload(config,exclude_company_list)
-        company_ids = search_api(dsl_query)
+        company_ids = await search_api(dsl_query)
         for company_id in company_ids:
-            company_data = collect_api(company_id)
+            company_data = await collect_api(company_id)
             if company_data:
                 companies.append({"id":company_data["id"],"name":company_data["name"],"api_response_metadata": company_data})
     except Exception as e:
