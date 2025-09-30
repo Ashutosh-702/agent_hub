@@ -11,5 +11,9 @@ class Settings:
     lusha_api_key = os.getenv("LUSHA_API_KEY")
     http_session : aiohttp.ClientSession = None
     openai_api_key = os.getenv("OPENAI_API_KEY", "")
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("API_PORT", "80"))
+    workers = int(os.getenv("API_WORKERS", "1"))
+    reload = os.getenv("API_RELOAD", "false").lower() == "true"
     
 loaded_config = Settings()
