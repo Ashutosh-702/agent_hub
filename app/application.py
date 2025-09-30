@@ -8,6 +8,7 @@ from global_utils.web_app import run_on_startup, run_on_shutdown
 from config.loaded_config import loaded_config
 from app.router import api_router
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -24,7 +25,7 @@ async def lifespan(app: FastAPI):
     print("🔒 Shutting down Lead Generation API server...")
     try:
         await run_on_shutdown()
-        
+
     except Exception as e:
         print(f"❌ Shutdown failed: {e}")
 
@@ -37,7 +38,7 @@ def get_app() -> FastAPI:
 
     :return: application.
     """
-    
+
     agent_app = FastAPI(
         debug=loaded_config.debug,
         title="Agent Hub API",
@@ -57,7 +58,6 @@ def get_app() -> FastAPI:
     )
     agent_app.include_router(api_router)
 
-
     def custom_openapi(app: FastAPI):
         openapi_schema = get_openapi(
             title=app.title,
@@ -67,6 +67,7 @@ def get_app() -> FastAPI:
         )
 
         paths = {}
+        
         for path, path_item in openapi_schema["paths"].items():
             paths[f"{path}"] = path_item
 
