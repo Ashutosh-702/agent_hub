@@ -36,4 +36,22 @@ class DictDataResponse(CommonResponseModel):
     """Response model for endpoints returning dictionary data"""
     data: Dict
 
+class FormSubmission(BaseModel):
+    web_prompt: str
+    persona_prompt: str
+    industry: str
+    employee_count: str
+    revenue_min: str
+    revenue_max: str
+    location_type: str
+    location: str
+    keywords: str
+    categories: str
+    currency: str
+    hubspot_email: str
+    product_name: str
+    business_team: str
+    user_email: str
+
+
 

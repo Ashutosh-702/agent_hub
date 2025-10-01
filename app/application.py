@@ -47,7 +47,6 @@ def get_app() -> FastAPI:
         default_response_class=ORJSONResponse,
         lifespan=lifespan,
         openapi_url="/swagger.json",
-        root_path=f"/api/v1",
     )
 
     agent_app.add_middleware(
