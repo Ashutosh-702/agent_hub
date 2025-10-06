@@ -62,9 +62,10 @@ def get_app() -> FastAPI:
     #     allow_headers=["*"]
     # )
 
+    agent_app.include_router(api_router)
     configure_static_serving_production(agent_app)
 
-    agent_app.include_router(api_router)
+    
 
     def custom_openapi(app: FastAPI):
         openapi_schema = get_openapi(
