@@ -15,5 +15,8 @@ class Settings:
     port = int(os.getenv("API_PORT", "80"))
     workers = int(os.getenv("API_WORKERS", "1"))
     reload = os.getenv("API_RELOAD", "false").lower() == "true"
+    serve_static = os.getenv("SERVE_STATIC", "true").lower() == "true"
+    static_path = os.getenv("STATIC_PATH", "/Users/ahmedropewala/PycharmProjects/etc1/agent_hub/ai_agents/ui/dist")
     
 loaded_config = Settings()
+

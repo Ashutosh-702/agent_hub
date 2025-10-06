@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from global_utils.web_app import run_on_startup, run_on_shutdown
 from config.loaded_config import loaded_config
 from app.router import api_router
+from app.static_serving import configure_static_serving_production
 
 
 @asynccontextmanager
@@ -54,12 +55,15 @@ def get_app() -> FastAPI:
         openapi_url="/swagger.json",
     )
 
-    agent_app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:5173", "https://ai-sdr.tmsz0.de"],
-        allow_methods=["*"],
-        allow_headers=["*"]
-    )
+    # agent_app.add_middleware(
+    #     CORSMiddleware,
+    #     allow_origins=["http://localhost:5173", "https://ai-sdr.tmsz0.de"],
+    #     allow_methods=["*"],
+    #     allow_headers=["*"]
+    # )
+
+    configure_static_serving_production(agent_app)
+
     agent_app.include_router(api_router)
 
     def custom_openapi(app: FastAPI):
