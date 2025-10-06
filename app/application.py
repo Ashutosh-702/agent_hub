@@ -13,8 +13,11 @@ from app.router import api_router
 async def lifespan(app: FastAPI):
     # Startup
     print("🚀 Starting Lead Generation API server...")
+
     try:
         await run_on_startup()
+        print("✅ server Startup successful")
+
     except Exception as e:
         print(f"❌ Startup failed: {e}")
         raise
@@ -23,8 +26,10 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     print("🔒 Shutting down Lead Generation API server...")
+
     try:
         await run_on_shutdown()
+        print("✅ server Shutdown successful")
 
     except Exception as e:
         print(f"❌ Shutdown failed: {e}")
