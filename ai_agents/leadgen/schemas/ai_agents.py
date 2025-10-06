@@ -19,23 +19,6 @@ class ResponseData(BaseModel):
         return super().dict(*args, **kwargs)
 
 
-class CommonResponseModel(BaseModel):
-    """Common response fields shared by all API responses"""
-    identifier: str = Field(examples=["7bb3162a-3105-418d-aa6c-21a958ebc236"])
-    success: bool
-    errors: List
-    failed_entries: List
-
-
-class ListDataResponse(CommonResponseModel):
-    """Response model for endpoints returning list data"""
-    data: List
-
-
-class DictDataResponse(CommonResponseModel):
-    """Response model for endpoints returning dictionary data"""
-    data: Dict
-
 class FormSubmission(BaseModel):
     web_prompt: str
     persona_prompt: str
@@ -52,6 +35,3 @@ class FormSubmission(BaseModel):
     product_name: str
     business_team: str
     user_email: str
-
-
-
