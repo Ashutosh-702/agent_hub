@@ -2,14 +2,22 @@ from fastapi import Request, Body
 from typing import Dict, Any
 from ai_agents.leadgen.schemas.ai_agents import FormSubmission
 from ai_agents.leadgen.workflow.ai_agent import ResponseData
-from ai_agents.leadgen.api.main import upload_data_from_form
-
+from ai_agents.leadgen.services.ai_agents_service import LeadgenFormUploadService
 
 async def upload_leadgen_form(request: Request,
     request_data: FormSubmission = Body(),
 ) -> Dict[str, Any]:
-   
-    response_data = ResponseData.model_construct(data={}, success=False)
 
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_form_upload_service = LeadgenFormUploadService()
+
+    response = await leadgen_form_upload_service.upload_leadgen_form(request_data)
+   
+    
     response_data.success = True
+    response_data.data = {
+        "message": "Data uploaded and queued for processing via EventBridge",
+        "campaign_id": response.get("campaign_id")
+    }
+       
     return response_data.dict()

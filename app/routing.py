@@ -6,6 +6,7 @@ from typing import Callable
 import orjson
 from fastapi import Request, Response
 from fastapi.exceptions import HTTPException, RequestValidationError, ResponseValidationError
+from global_utils.exceptions import ApiException
 from fastapi.responses import ORJSONResponse
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
@@ -41,7 +42,7 @@ class CustomRequestRoute(APIRoute):
                 response.content = response.body.strip()
                 return response
 
-            except orjson.JSONDecodeError as exc:
+            except (orjson.JSONDecodeError, ApiException) as exc:
                 return request_exception_handler(method=request.method, url_path=request_data['url_path'],
                                                  request_data=request_data, exc=exc,
                                                  start_time=start_time, status_code=HTTP_400_BAD_REQUEST)
@@ -105,9 +106,11 @@ def request_exception_handler(method=None, url_path=None, request_data=None, exc
     # Use warning for validation errors, exception for others
     if is_validation_error:
         print(
-            f"Validation Error Occurred {str(exc)}", request_data=request_data)
+            f"Validation Error Occurred {str(exc)}")
+        print(f"Request Data: {request_data}")
     else:
-        print(f"Exception Occurred {str(exc)}", request_data=request_data)
+        print(f"Exception Occurred {str(exc)}")
+        print(f"Request Data: {request_data}")
 
     error_response = ResponseData.model_construct(
         errors=request_data["error"], success=False).dict()
