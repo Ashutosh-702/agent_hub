@@ -1,7 +1,7 @@
 """AI agents processing schemas and models."""
 
-from typing import Any, Dict, List, Optional, Union
-from uuid import UUID, uuid4
+from typing import Dict, List, Optional, Union
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
