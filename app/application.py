@@ -55,12 +55,12 @@ def get_app() -> FastAPI:
         openapi_url="/swagger.json",
     )
 
-    # agent_app.add_middleware(
-    #     CORSMiddleware,
-    #     allow_origins=["http://localhost:5173", "https://ai-sdr.tmsz0.de"],
-    #     allow_methods=["*"],
-    #     allow_headers=["*"]
-    # )
+    agent_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "https://ai-sdr.tmsz0.de"],
+        allow_methods=["*"],
+        allow_headers=["*"]
+    )
 
     agent_app.include_router(api_router)
     configure_static_serving_production(agent_app)
