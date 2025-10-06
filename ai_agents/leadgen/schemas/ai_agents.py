@@ -1,4 +1,4 @@
-"""AI Address processing schemas and models."""
+"""AI agents processing schemas and models."""
 
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID, uuid4
