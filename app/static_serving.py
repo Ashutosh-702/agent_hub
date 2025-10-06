@@ -2,10 +2,11 @@
 Static file serving configuration for production
 """
 import os
+import json
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from config.loaded_config import loaded_config
 
 
@@ -63,4 +64,27 @@ def configure_static_serving_production(app: FastAPI):
         })
 
     print("✓ Static file serving configured successfully")
+
+def get_env_config():
+    """Return environment configuration as JavaScript"""
+    config = {
+        "AGENTHUB_MAIN_DOMAIN": os.getenv("AGENTHUB_MAIN_DOMAIN", "http://0.0.0.0:80"),
+        "ENVIRONMENT": os.getenv("ENVIRONMENT", "development"),
+        "VERSION": "2.0.0",
+        "FEATURES": {
+            "document_management": True,
+            "advanced_analytics": True,
+            "export_functionality": True
+        }
+    }
+    config_json = json.dumps(config)
+
+    js_config = f"""
+window.ENV_CONFIG = {config_json};
+window.AGENTHUB_MAIN_DOMAIN = "{config['AGENTHUB_MAIN_DOMAIN']}";
+window.ENVIRONMENT = "{config['ENVIRONMENT']}";
+console.log('Environment configuration loaded:', window.ENV_CONFIG);
+"""
+
+    return Response(content=js_config, media_type="application/javascript")
     

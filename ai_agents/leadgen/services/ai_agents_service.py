@@ -97,3 +97,11 @@ class LeadgenFormUploadService:
         if not value:
             return []
         return sorted([item.strip() for item in value.split(delimiter) if item.strip()])
+
+    async def update_campaign_status(self, campaign_id: str, status: str):
+        response = await self.campaign_dao.update_campaign_status(campaign_id, status)
+
+        if not response:
+            raise ApiException(f"No campaign found with campaign id {campaign_id} to update status or it's already updated")
+
+        return response

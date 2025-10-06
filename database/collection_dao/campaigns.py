@@ -1,3 +1,4 @@
+from bson.objectid import ObjectId
 from database.base_dao import BaseMongoDao
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -13,9 +14,9 @@ class CampaignsDao(BaseMongoDao):
         return await self.find_many(filters)
     
     async def get_campaign(self, campaign_id: str):
-        return await self.find_one({"_id": campaign_id})
+        return await self.find_one({"_id": ObjectId(campaign_id)})
     
     async def update_campaign_status(self, campaign_id: str, status: str):
-        return await self.update_one({"_id": campaign_id}, {"$set": {"lifecycle":{"status": status}}})
+        return await self.update_one({"_id": ObjectId(campaign_id)}, {"$set": {"lifecycle":{"status": status}}})
 
 
