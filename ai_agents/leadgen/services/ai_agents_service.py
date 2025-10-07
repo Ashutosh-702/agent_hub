@@ -4,7 +4,6 @@ import asyncio
 from datetime import datetime
 from typing import Dict, Any, List
 
-from bson import ObjectId
 from structlog.contextvars import bind_contextvars
 
 from config.loaded_config import loaded_config
@@ -130,7 +129,7 @@ class CompanyService:
             loaded_config.connection_manager.mongo_client)
 
     async def get_company_mapping_list(self, query_params: CompanyMappingList):
-        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": ObjectId(query_params.campaign_id), "is_relevant": True}, query_params.page, query_params.limit)
+        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": query_params.campaign_id, "is_relevant": True}, query_params.page, query_params.limit)
 
         if not response:
             raise ApiException(
@@ -147,9 +146,7 @@ class CompanyService:
         return {"company_map_list": serialized_response, "pagination_info": serialized_pagination}
 
     async def fetch_companies_from_mappings(self, query_params: CompanyListWithDetails):
-        campaign_id = ObjectId(query_params.campaign_id)
-
-        mapping_docs = await self.campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
+        mapping_docs = await self.campaign_company_run_dao.get_campaign_company_runs({"campaign_id": query_params.campaign_id})
 
         if not mapping_docs:
             raise ApiException(
@@ -163,9 +160,7 @@ class CompanyService:
             if not company_id:
                 continue
 
-            company_oid = company_id if isinstance(
-                company_id, ObjectId) else ObjectId(company_id)
-            company_doc = await self.companies_dao.get_company(company_oid)
+            company_doc = await self.companies_dao.get_company(company_id)
 
             if not company_doc:
                 continue
@@ -179,7 +174,7 @@ class CompanyService:
             location = company_doc.get("location") or {}
             data_rows.append({
                 "company_name": name,
-                "company_id": str(company_oid),
+                "company_id": str(company_id),
                 "industry": profile.get("industry"),
                 "company_size": profile.get("employeeCount"),
                 "location": location.get("name"),
