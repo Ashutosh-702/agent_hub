@@ -50,3 +50,8 @@ class FormSubmission(BaseModel):
             raise ValueError("user email is invalid")
             
         return user_email
+
+class CompanyMappingList(BaseModel):
+    campaign_id: str
+    page: int = 1
+    limit: int = 10

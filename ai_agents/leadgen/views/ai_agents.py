@@ -1,8 +1,8 @@
-from fastapi import Request, Body
+from fastapi import Request, Body, Depends
 from typing import Dict, Any
-from ai_agents.leadgen.schemas.ai_agents import FormSubmission
+from ai_agents.leadgen.schemas.ai_agents import FormSubmission, CompanyMappingList
 from ai_agents.leadgen.workflow.ai_agent import ResponseData
-from ai_agents.leadgen.services.ai_agents_service import LeadgenFormUploadService
+from ai_agents.leadgen.services.ai_agents_service import LeadgenFormUploadService, CompanyMappingListService
 
 
 async def upload_leadgen_form(request: Request,
@@ -33,4 +33,15 @@ async def update_campaign_status(request: Request, campaign_id: str, status: str
         "campaign_id": campaign_id
     }
     
+    return response_data.dict()
+
+
+async def get_company_mapping_list(query_params: CompanyMappingList= Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_form_upload_service = CompanyMappingListService()
+
+    response = await leadgen_form_upload_service.get_company_mapping_list(query_params)
+    response_data.success = True
+    response_data.data = response.get("company_map_list")
+    response_data.pagination = response.get("pagination_info")
     return response_data.dict()
