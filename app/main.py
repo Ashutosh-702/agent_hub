@@ -3,6 +3,7 @@
 import uvicorn
 from config.loaded_config import loaded_config
 
+
 def main() -> None:
     """Entrypoint of the application."""
     uvicorn.run(
