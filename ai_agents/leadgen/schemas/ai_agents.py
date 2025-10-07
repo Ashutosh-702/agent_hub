@@ -55,3 +55,6 @@ class CompanyMappingList(BaseModel):
     campaign_id: str
     page: int = 1
     limit: int = 10
+
+class CompanyListWithDetails(BaseModel):
+    campaign_id: str
