@@ -1,7 +1,6 @@
 """Main entry point for the agent hub application."""
 
 import uvicorn
-
 from config.loaded_config import loaded_config
 
 def main() -> None:

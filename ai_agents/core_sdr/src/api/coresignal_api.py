@@ -5,7 +5,6 @@ import os
 from typing import List, Dict, Any, OrderedDict
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
-
 from config.loaded_config import loaded_config
 from ai_agents.core_sdr.config.lusha_industry_config import LUSHA_CONFIG
 
@@ -25,7 +24,6 @@ async def search_api(dsl_query: Dict[str, Any]) -> List[int]:
 
     response = await loaded_config.http_session.post(url, json=dsl_query, headers=headers, timeout=30)
     
-
     if response.status != 200:
         error_text = await response.text()
         raise Exception(
@@ -35,7 +33,6 @@ async def search_api(dsl_query: Dict[str, Any]) -> List[int]:
     company_ids = [int(item) for item in result]
     return company_ids
     
-
 
 async def collect_api(company_id: int) -> Dict[str, Any]:
     url = f"https://api.coresignal.com/cdapi/v2/company_clean/collect/{company_id}"
@@ -48,7 +45,6 @@ async def collect_api(company_id: int) -> Dict[str, Any]:
 
     response = await loaded_config.http_session.get(url, headers=headers, timeout=30)
     
-
     if response.status != 200:
         error_text = await response.text()
         raise Exception(
