@@ -1,6 +1,5 @@
 from fastapi.responses import ORJSONResponse, Response
 from fastapi.routing import APIRouter
-
 from app.routing import CustomRequestRoute
 from ai_agents.leadgen.api.routes import router as leadgen_router
 from app.static_serving import get_env_config

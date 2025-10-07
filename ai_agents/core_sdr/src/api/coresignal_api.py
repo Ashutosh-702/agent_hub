@@ -5,15 +5,10 @@ import os
 from typing import List, Dict, Any, OrderedDict
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
-
 from config.loaded_config import loaded_config
+from ai_agents.core_sdr.config.lusha_industry_config import LUSHA_CONFIG
 
 urllib3.disable_warnings(InsecureRequestWarning)
-
-LUSHA_CONFIG_PATH = Path(__file__).resolve(
-).parent.parent.parent / "config" / "lusha_industry_config.json"
-with open(LUSHA_CONFIG_PATH, "r", encoding="utf-8") as f:
-    LUSHA_CONFIG = json.load(f)
 
 
 async def search_api(dsl_query: Dict[str, Any]) -> List[int]:
@@ -21,27 +16,23 @@ async def search_api(dsl_query: Dict[str, Any]) -> List[int]:
 
     url = f"https://api.coresignal.com/cdapi/v2/company_clean/search/es_dsl?items_per_page={items_per_page}"
 
-    if isinstance(dsl_query, str):
-        payload = dsl_query
-    else:
-        payload = json.dumps(dsl_query)
-
     headers = {
         'Content-Type': 'application/json',
         'apikey': os.getenv('CORESIGNAL_API_KEY'),
         'accept': 'application/json'
     }
 
-    response = await loaded_config.http_session.post(url, json=payload, headers=headers)
-    result = await response.json()
-
-    if response.status == 200:
-        company_ids = [int(item) for item in result]
-        return company_ids
-    else:
+    response = await loaded_config.http_session.post(url, json=dsl_query, headers=headers, timeout=30)
+    
+    if response.status != 200:
+        error_text = await response.text()
         raise Exception(
-            f"Search API failed: {response.status} - {response.text}")
-
+            f"Search API failed: {response.status} - {error_text}")
+    
+    result = await response.json()
+    company_ids = [int(item) for item in result]
+    return company_ids
+    
 
 async def collect_api(company_id: int) -> Dict[str, Any]:
     url = f"https://api.coresignal.com/cdapi/v2/company_clean/collect/{company_id}"
@@ -52,14 +43,16 @@ async def collect_api(company_id: int) -> Dict[str, Any]:
         'Content-Type': 'application/json'
     }
 
-    response = await loaded_config.http_session.get(url, headers=headers)
-    result = await response.json()
-
-    if response.status == 200:
-        return result
-    else:
+    response = await loaded_config.http_session.get(url, headers=headers, timeout=30)
+    
+    if response.status != 200:
+        error_text = await response.text()
         raise Exception(
-            f"Collect API failed: {response.status} - {response.text}")
+            f"Collect API failed: {response.status} - {error_text}")
+            
+    result = await response.json()  
+    return result
+       
 
 
 async def collect_companies_from_search(config: Dict[str, Any], exclude_company_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -108,8 +101,8 @@ def build_payload(config: Dict[str, Any], exclude_company_list: List[str]):
     coresignal_lookup = {}
 
     for main in LUSHA_CONFIG:
-        for sub in main["sub_industries"]:
-            coresignal_lookup[sub["value"]] = sub.get("coresignal", [])
+        for sub in main.sub_industries:
+            coresignal_lookup[sub.value] = sub.coresignal or []
 
     mapped_industries = []
 

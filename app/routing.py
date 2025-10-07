@@ -2,7 +2,6 @@
 
 import time
 from typing import Callable
-
 import orjson
 from fastapi import Request, Response
 from fastapi.exceptions import HTTPException, RequestValidationError, ResponseValidationError
@@ -11,7 +10,6 @@ from fastapi.responses import ORJSONResponse
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
-
 from ai_agents.leadgen.schemas.ai_agents import ResponseData
 
 
@@ -34,7 +32,8 @@ class CustomRequestRoute(APIRoute):
                     'status_code': response.status_code,
                     'body': orjson.loads(response.body.decode('utf-8'))
                 }
-                print(f"HTTP request for {request_data['url_path']} with method {request.method}")
+                print(
+                    f"HTTP request for {request_data['url_path']} with method {request.method}")
                 print(f"Request data: {request_data}")
                 print(f"Response data: {response_data}")
 

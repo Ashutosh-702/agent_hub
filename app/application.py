@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import ORJSONResponse
@@ -76,7 +75,7 @@ def get_app() -> FastAPI:
         )
 
         paths = {}
-        
+
         for path, path_item in openapi_schema["paths"].items():
             paths[f"{path}"] = path_item
 
