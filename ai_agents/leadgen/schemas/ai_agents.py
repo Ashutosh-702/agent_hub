@@ -1,8 +1,10 @@
 """AI agents processing schemas and models."""
 
 from typing import Dict, List, Optional, Union
+from re import match
 from uuid import uuid4
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from global_utils.constants import EMAIL_REGEX
 
 
 class ResponseData(BaseModel):
@@ -34,3 +36,17 @@ class FormSubmission(BaseModel):
     product_name: str
     business_team: str
     user_email: str
+
+    @field_validator('hubspot_email')
+    def validate_hubspot_email(cls, hubspot_email):
+        if hubspot_email and hubspot_email.strip() and not match(EMAIL_REGEX, hubspot_email):
+            raise ValueError("hubspot email is invalid")
+
+        return hubspot_email
+
+    @field_validator('user_email')
+    def validate_user_email(cls, user_email):
+        if user_email and user_email.strip() and not match(EMAIL_REGEX, user_email):
+            raise ValueError("user email is invalid")
+            
+        return user_email
