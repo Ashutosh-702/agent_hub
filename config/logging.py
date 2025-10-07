@@ -1,8 +1,10 @@
+import sys
+
 import structlog
 import orjson
 import logging
 from structlog import contextvars
-from structlog.stdlib import BoundLogger
+from structlog.stdlib import BoundLogger, LoggerFactory
 from datetime import datetime
 
 
@@ -14,6 +16,15 @@ def add_timestamp(_, __, event_dict):
 
 def get_logger(*args, **kwargs) -> BoundLogger:
     """Create structlog logger for logging."""
+
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stdout,
+            level=logging.INFO,
+            force=True,
+        )
+
     structlog.configure(
         processors=[
             structlog.processors.TimeStamper(fmt="iso", key="timestamp"),
@@ -29,7 +40,9 @@ def get_logger(*args, **kwargs) -> BoundLogger:
                 ).decode()
             )
         ],
+        logger_factory=LoggerFactory(),
         cache_logger_on_first_use=True,
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
     )
     return structlog.get_logger(**kwargs)
 
