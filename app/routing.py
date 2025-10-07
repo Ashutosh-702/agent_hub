@@ -11,6 +11,7 @@ from fastapi.routing import APIRoute
 from pydantic import ValidationError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 from ai_agents.leadgen.schemas.ai_agents import ResponseData
+from config.logging import logger
 
 
 class CustomRequestRoute(APIRoute):
@@ -32,10 +33,10 @@ class CustomRequestRoute(APIRoute):
                     'status_code': response.status_code,
                     'body': orjson.loads(response.body.decode('utf-8'))
                 }
-                print(
+                logger.info(
                     f"HTTP request for {request_data['url_path']} with method {request.method}")
-                print(f"Request data: {request_data}")
-                print(f"Response data: {response_data}")
+                logger.info(f"Request data: {request_data}")
+                logger.info(f"Response data: {response_data}")
 
                 # Ensure the response content is cleaned from any leading or trailing newline characters
                 response.content = response.body.strip()
@@ -77,10 +78,10 @@ async def process_request_data(request: Request) -> dict:
             headers['x-user-data'] = x_user_data
 
         except Exception as e:
-            print("Failed to parse x-user-data header",
-                  header=x_user_data_str,
-                  error_type=type(e).__name__,
-                  error_message=str(e))
+            logger.debug("Failed to parse x-user-data header",
+                         header=x_user_data_str,
+                         error_type=type(e).__name__,
+                         error_message=str(e))
 
     request_data = {
         'client_host': f"{request.client.host}:{request.client.port}" if request.client else None,
@@ -104,12 +105,9 @@ def request_exception_handler(method=None, url_path=None, request_data=None, exc
 
     # Use warning for validation errors, exception for others
     if is_validation_error:
-        print(
-            f"Validation Error Occurred {str(exc)}")
-        print(f"Request Data: {request_data}")
+        logger.info(f"Validation Error Occurred {str(exc)}", request_data=request_data)
     else:
-        print(f"Exception Occurred {str(exc)}")
-        print(f"Request Data: {request_data}")
+        logger.exception(f"Exception Occurred {str(exc)}", request_data=request_data)
 
     error_response = ResponseData.model_construct(
         errors=request_data["error"], success=False).dict()

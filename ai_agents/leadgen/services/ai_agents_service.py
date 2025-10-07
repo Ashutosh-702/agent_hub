@@ -9,6 +9,8 @@ from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_
 from config.loaded_config import loaded_config
 from database.collection_dao.campaigns import CampaignsDao
 from global_utils.exceptions import ApiException
+from config.logging import logger
+from structlog.contextvars import bind_contextvars
 
 
 class LeadgenFormUploadService:
@@ -48,8 +50,8 @@ class LeadgenFormUploadService:
             event=event,
             event_meta={"service": "leadgen", "campaign_id": str(campaign_id)}
         )
-
-        print(
+        bind_contextvars(operation="upload_leadgen_form", component="ai_agents_service", event_type="success")
+        logger.info(
             f"📤 Campaign ID {str(campaign_id)} queued for processing: {request_id}")
 
         return {
