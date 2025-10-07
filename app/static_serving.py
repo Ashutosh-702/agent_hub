@@ -65,6 +65,7 @@ def configure_static_serving_production(app: FastAPI):
 
     print("✓ Static file serving configured successfully")
 
+
 def get_env_config():
     """Return environment configuration as JavaScript"""
     config = {

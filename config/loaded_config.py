@@ -20,4 +20,3 @@ class Settings:
     static_path = os.getenv("STATIC_PATH", "/Users/ahmedropewala/PycharmProjects/etc1/agent_hub/ai_agents/ui/dist")
     
 loaded_config = Settings()
-

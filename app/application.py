@@ -64,8 +64,6 @@ def get_app() -> FastAPI:
     agent_app.include_router(api_router)
     configure_static_serving_production(agent_app)
 
-    
-
     def custom_openapi(app: FastAPI):
         openapi_schema = get_openapi(
             title=app.title,

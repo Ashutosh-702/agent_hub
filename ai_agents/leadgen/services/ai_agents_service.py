@@ -96,6 +96,7 @@ class LeadgenFormUploadService:
         """Parse string to list with validation"""
         if not value:
             return []
+            
         return sorted([item.strip() for item in value.split(delimiter) if item.strip()])
 
     async def update_campaign_status(self, campaign_id: str, status: str):

@@ -1,5 +1,3 @@
-
-
 class CustomException(Exception):
     DEFAULT_ERROR_MESSAGE = "Exception occurred"
 

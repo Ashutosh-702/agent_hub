@@ -13,8 +13,6 @@ async def upload_leadgen_form(request: Request,
     leadgen_form_upload_service = LeadgenFormUploadService()
 
     response = await leadgen_form_upload_service.upload_leadgen_form(request_data)
-   
-    
     response_data.success = True
     response_data.data = {
         "message": "Data uploaded and queued for processing via EventBridge",
@@ -27,6 +25,7 @@ async def upload_leadgen_form(request: Request,
 async def update_campaign_status(request: Request, campaign_id: str, status: str) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)
     leadgen_form_upload_service = LeadgenFormUploadService()
+    
     await leadgen_form_upload_service.update_campaign_status(campaign_id, status)
     response_data.success = True
     response_data.data = {
