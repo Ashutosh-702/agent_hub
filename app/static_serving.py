@@ -4,10 +4,13 @@ Static file serving configuration for production
 import os
 import json
 from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
+
 from config.loaded_config import loaded_config
+from config.logging import logger
 
 
 def configure_static_serving_production(app: FastAPI):
@@ -19,20 +22,20 @@ def configure_static_serving_production(app: FastAPI):
     static_path = loaded_config.static_path
 
     if not loaded_config.serve_static:
-        print("Static file serving disabled (SERVE_STATIC=false)")
+        logger.info("Static file serving disabled (SERVE_STATIC=false)")
         return
 
     if not os.path.exists(static_path):
-        print(f"WARNING: Static path does not exist: {static_path}")
+        logger.info(f"WARNING: Static path does not exist: {static_path}")
         return
 
     index_path = Path(static_path) / "index.html"
 
     if not index_path.exists():
-        print(f"WARNING: index.html not found in {static_path}")
+        logger.info(f"WARNING: index.html not found in {static_path}")
         return
 
-    print(f"✓ Serving static files from: {static_path}")
+    logger.info(f"✓ Serving static files from: {static_path}")
 
     # Mount static assets
     static_assets_path = Path(static_path) / "app/static"
@@ -40,16 +43,11 @@ def configure_static_serving_production(app: FastAPI):
     if static_assets_path.exists():
         app.mount(
             "/static", StaticFiles(directory=static_assets_path), name="static")
-        print(f"✓ Mounted static assets from: {static_assets_path}")
+        logger.info(f"✓ Mounted static assets from: {static_assets_path}")
 
     # Catch-all route for SPA
     @app.get("/{full_path:path}")
     async def serve_react_app(full_path: str):
-        # Skip API routes and health checks
-        if (full_path.startswith("api/") or
-                full_path in ["_healthz", "_readyz", "env-config"]):
-            raise HTTPException(status_code=404, detail="Not found")
-
         file_path = Path(static_path) / full_path
 
         # Serve static files if they exist
@@ -63,7 +61,7 @@ def configure_static_serving_production(app: FastAPI):
             "Expires": "0"
         })
 
-    print("✓ Static file serving configured successfully")
+    logger.info("✓ Static file serving configured successfully")
 
 
 def get_env_config():
