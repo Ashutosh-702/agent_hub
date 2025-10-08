@@ -1,22 +1,26 @@
 import aiohttp
+from structlog.contextvars import bind_contextvars
+
+from config.logging import logger
 from database.connection_manager import ConnectionManager
 from config.loaded_config import loaded_config
 
 
 async def run_on_startup():
-    print("🚀 connecting to database and eventbridge")
+    bind_contextvars(operation="run_on_startup", component="web_app", event_type="startup")
+    logger.info("🚀 connecting to database and eventbridge")
     await initialize_database()
     await eventbridge_producer()
     await http_session()
    
-    print("✅ Database and EventBridge connected successfully")
-    print("✅ HTTP session initialized")
+    logger.info("✅ Database and EventBridge connected successfully")
+    logger.info("✅ HTTP session initialized")
 
 
 async def run_on_shutdown():
     await close_database()
     await close_http_session()
-    print("✅ Database and session disconnected successfully")
+    logger.info("✅ Database and session disconnected successfully")
 
     
 async def initialize_database():
