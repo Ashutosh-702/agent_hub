@@ -40,14 +40,13 @@ class CampaignService:
         event = {
             "request_id": request_id,
             "action": "process_company_search",
-            "campaign_id": str(campaign_id),  # Only send the ID, not all data
+            "campaign_id": str(campaign_id), 
             "timestamp": asyncio.get_event_loop().time()
         }
 
         await emit_event_helper(
             event_emitter=self.event_emitter,
             topics=self.kafka_config["topics"],
-            # Use actual topic from mapping
             partition_value=request_id,
             event=event,
             event_meta={"service": "leadgen", "campaign_id": str(campaign_id)}
