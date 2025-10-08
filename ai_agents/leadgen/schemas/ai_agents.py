@@ -26,14 +26,14 @@ class FormSubmission(BaseModel):
     web_prompt: str
     persona_prompt: str
     industry: str
-    employee_count: str
-    revenue_min: str
-    revenue_max: str
+    employee_count: Optional[str] = None
+    revenue_min: Optional[str] = None
+    revenue_max: Optional[str] = None
     location_type: str
     location: str
-    keywords: str
-    categories: str
-    currency: str
+    keywords: Optional[str] = None
+    categories: Optional[str] = None
+    currency: Optional[str] = None  
     hubspot_email: str
     product_name: str
     business_team: str
