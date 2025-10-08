@@ -1,21 +1,23 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from structlog.contextvars import bind_contextvars
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from structlog.contextvars import bind_contextvars
 
-from global_utils.web_app import run_on_startup, run_on_shutdown
-from config.loaded_config import loaded_config
 from app.router import api_router
 from app.static_serving import configure_static_serving_production
 from config.logging import logger
+from config.loaded_config import loaded_config
+from global_utils.web_app import run_on_startup, run_on_shutdown
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    bind_contextvars(operation="application_startup", component="application_lifecycle", event_type="startup")
+    bind_contextvars(operation="application_startup",
+                     component="application_lifecycle", event_type="startup")
     logger.info("🚀 Starting Lead Generation API server...")
 
     try:
@@ -29,7 +31,8 @@ async def lifespan(app: FastAPI):
     yield  # Server is running
 
     # Shutdown
-    bind_contextvars(operation="application_shutdown", component="application_lifecycle", event_type="shutdown")
+    bind_contextvars(operation="application_shutdown",
+                     component="application_lifecycle", event_type="shutdown")
     logger.info("🔒 Shutting down Lead Generation API server...")
 
     try:

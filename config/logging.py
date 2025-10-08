@@ -1,11 +1,11 @@
+import logging
 import sys
+from datetime import datetime
 
 import structlog
 import orjson
-import logging
 from structlog import contextvars
 from structlog.stdlib import BoundLogger, LoggerFactory
-from datetime import datetime
 
 
 def add_timestamp(_, __, event_dict):
@@ -47,4 +47,4 @@ def get_logger(*args, **kwargs) -> BoundLogger:
     return structlog.get_logger(**kwargs)
 
 
-logger = get_logger() 
+logger = get_logger()

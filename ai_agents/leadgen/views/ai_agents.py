@@ -1,15 +1,16 @@
 from fastapi import Request, Body, Depends
 from typing import Dict, Any
+
 from ai_agents.leadgen.schemas.ai_agents import (
-    ResponseData, 
-    FormSubmission, 
-    CompanyMappingList, 
+    ResponseData,
+    FormSubmission,
+    CompanyMappingList,
     CompanyListWithDetails
 )
 from ai_agents.leadgen.services.ai_agents_service import LeadgenFormUploadService, CompanyService
 
 
-async def upload_leadgen_form(request: Request,
+async def upload_leadgen_form(
     request_data: FormSubmission = Body(),
 ) -> Dict[str, Any]:
 
@@ -22,25 +23,25 @@ async def upload_leadgen_form(request: Request,
         "message": "Data uploaded and queued for processing via EventBridge",
         "campaign_id": response.get("campaign_id")
     }
-       
+
     return response_data.dict()
 
 
 async def update_campaign_status(request: Request, campaign_id: str, status: str) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)
     leadgen_form_upload_service = LeadgenFormUploadService()
-    
+
     await leadgen_form_upload_service.update_campaign_status(campaign_id, status)
     response_data.success = True
     response_data.data = {
-        "message": "Campaign status updated",   
+        "message": "Campaign status updated",
         "campaign_id": campaign_id
     }
-    
+
     return response_data.dict()
 
 
-async def get_company_mapping_list(query_params: CompanyMappingList= Depends()) -> Dict[str, Any]:
+async def get_company_mapping_list(query_params: CompanyMappingList = Depends()) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)
     leadgen_form_upload_service = CompanyService()
 
@@ -51,7 +52,7 @@ async def get_company_mapping_list(query_params: CompanyMappingList= Depends()) 
     return response_data.dict()
 
 
-async def fetch_companies_from_mappings(query_params: CompanyListWithDetails= Depends()) -> Dict[str, Any]:
+async def fetch_companies_from_mappings(query_params: CompanyListWithDetails = Depends()) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)
     leadgen_form_upload_service = CompanyService()
 

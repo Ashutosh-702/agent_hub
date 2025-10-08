@@ -2,16 +2,18 @@
 
 import time
 from typing import Callable
+
 import orjson
 from fastapi import Request, Response
 from fastapi.exceptions import HTTPException, RequestValidationError, ResponseValidationError
-from global_utils.exceptions import ApiException
 from fastapi.responses import ORJSONResponse
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
+
 from ai_agents.leadgen.schemas.ai_agents import ResponseData
 from config.logging import logger
+from global_utils.exceptions import ApiException
 
 
 class CustomRequestRoute(APIRoute):
@@ -105,9 +107,11 @@ def request_exception_handler(method=None, url_path=None, request_data=None, exc
 
     # Use warning for validation errors, exception for others
     if is_validation_error:
-        logger.info(f"Validation Error Occurred {str(exc)}", request_data=request_data)
+        logger.info(
+            f"Validation Error Occurred {str(exc)}", request_data=request_data)
     else:
-        logger.exception(f"Exception Occurred {str(exc)}", request_data=request_data)
+        logger.exception(
+            f"Exception Occurred {str(exc)}", request_data=request_data)
 
     error_response = ResponseData.model_construct(
         errors=request_data["error"], success=False).dict()

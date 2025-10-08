@@ -1,9 +1,11 @@
 """AI agents processing schemas and models."""
 
-from typing import Dict, List, Optional, Union
 from re import match
+from typing import Dict, List, Optional, Union
 from uuid import uuid4
+
 from pydantic import BaseModel, Field, field_validator
+
 from global_utils.constants import EMAIL_REGEX
 
 
@@ -48,13 +50,15 @@ class FormSubmission(BaseModel):
     def validate_user_email(cls, user_email):
         if user_email and user_email.strip() and not match(EMAIL_REGEX, user_email):
             raise ValueError("user email is invalid")
-            
+
         return user_email
+
 
 class CompanyMappingList(BaseModel):
     campaign_id: str
     page: int = 1
     limit: int = 10
+
 
 class CompanyListWithDetails(BaseModel):
     campaign_id: str

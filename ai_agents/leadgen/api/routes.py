@@ -1,7 +1,13 @@
 from fastapi import APIRouter
+
 from app.routing import CustomRequestRoute
-from ai_agents.leadgen.views.ai_agents import upload_leadgen_form, update_campaign_status, get_company_mapping_list, fetch_companies_from_mappings
 from ai_agents.leadgen.schemas.ai_agents import ResponseData
+from ai_agents.leadgen.views.ai_agents import ( 
+    upload_leadgen_form, 
+    update_campaign_status, 
+    get_company_mapping_list, 
+    fetch_companies_from_mappings
+)
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
 
@@ -10,7 +16,7 @@ router.add_api_route(
     methods=["POST"],
     endpoint=upload_leadgen_form,
     response_model=ResponseData,
-)   
+)
 
 router.add_api_route(
     "/update_campaign_status",

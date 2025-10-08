@@ -4,9 +4,11 @@ Static file serving configuration for production
 import os
 import json
 from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
+
 from config.loaded_config import loaded_config
 from config.logging import logger
 

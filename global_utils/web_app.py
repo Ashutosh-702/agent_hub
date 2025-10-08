@@ -1,9 +1,9 @@
 import aiohttp
 from structlog.contextvars import bind_contextvars
+
 from config.logging import logger
-from database.connection_manager import ConnectionManager
 from config.loaded_config import loaded_config
-from config.logging import logger
+from database.connection_manager import ConnectionManager
 
 
 async def run_on_startup():
