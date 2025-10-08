@@ -50,3 +50,7 @@ class FormSubmission(BaseModel):
             raise ValueError("user email is invalid")
             
         return user_email
+
+class CampaignStatusUpdate(BaseModel):
+    campaign_id: str
+    status: str
