@@ -32,7 +32,6 @@ router.add_api_route(
     response_model=ResponseData,
 )
 
-
 router.add_api_route(
     "/fetch_companies",
     methods=["GET"],
