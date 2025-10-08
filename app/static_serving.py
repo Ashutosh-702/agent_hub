@@ -26,13 +26,13 @@ def configure_static_serving_production(app: FastAPI):
         return
 
     if not os.path.exists(static_path):
-        logger.info(f"Static path does not exist: {static_path}")
+        logger.info(f"WARNING: Static path does not exist: {static_path}")
         return
 
     index_path = Path(static_path) / "index.html"
 
     if not index_path.exists():
-        logger.info(f"index.html not found in {static_path}")
+        logger.info(f"WARNING: index.html not found in {static_path}")
         return
 
     logger.info(f"✓ Serving static files from: {static_path}")
@@ -48,11 +48,6 @@ def configure_static_serving_production(app: FastAPI):
     # Catch-all route for SPA
     @app.get("/{full_path:path}")
     async def serve_react_app(full_path: str):
-        # Skip API routes and health checks
-        if (full_path.startswith("api/") or
-                full_path in ["_healthz", "_readyz", "env-config"]):
-            raise HTTPException(status_code=404, detail="Not found")
-
         file_path = Path(static_path) / full_path
 
         # Serve static files if they exist

@@ -10,6 +10,7 @@ from config.loaded_config import loaded_config
 from config.logging import logger
 from global_utils.exceptions import ApiException
 from ai_agents.leadgen.schemas.ai_agents import (
+    CampaignStatusUpdate,
     CompanyMappingList, 
     CompanyListWithDetails, 
     FormSubmission
@@ -24,7 +25,7 @@ from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
 
 
-class LeadgenFormUploadService:
+class CampaignService:
     def __init__(self):
         self.campaign_dao = CampaignsDao(
             loaded_config.connection_manager.mongo_client)
@@ -35,7 +36,7 @@ class LeadgenFormUploadService:
     async def upload_leadgen_form(self, form_submission: FormSubmission) -> Dict[str, str]:
 
         db_data = self._transform_form_to_db_data(form_submission)
-
+        bind_contextvars(operation="upload_leadgen_form", component="ai_agents_service", event_type="upload_leadgen_form")
         campaign_id = await self.campaign_dao.create_campaign(db_data)
 
         if not campaign_id:
@@ -49,19 +50,18 @@ class LeadgenFormUploadService:
         event = {
             "request_id": request_id,
             "action": "process_company_search",
-            "campaign_id": str(campaign_id),  # Only send the ID, not all data
+            "campaign_id": str(campaign_id), 
             "timestamp": asyncio.get_event_loop().time()
         }
 
         await emit_event_helper(
             event_emitter=self.event_emitter,
             topics=self.kafka_config["topics"],
-            # Use actual topic from mapping
             partition_value=request_id,
             event=event,
             event_meta={"service": "leadgen", "campaign_id": str(campaign_id)}
         )
-        bind_contextvars(operation="upload_leadgen_form", component="ai_agents_service", event_type="success")
+
         logger.info(
             f"📤 Campaign ID {str(campaign_id)} queued for processing: {request_id}")
 
@@ -112,11 +112,11 @@ class LeadgenFormUploadService:
             
         return sorted([item.strip() for item in value.split(delimiter) if item.strip()])
 
-    async def update_campaign_status(self, campaign_id: str, status: str):
-        response = await self.campaign_dao.update_campaign_status(campaign_id, status)
+    async def update_campaign_status(self, campaign_status_update: CampaignStatusUpdate):
+        response = await self.campaign_dao.update_campaign_status(campaign_status_update.campaign_id, campaign_status_update.status)
 
         if not response:
-            raise ApiException(f"No campaign found with campaign id {campaign_id} to update status or it's already updated")
+            raise ApiException(f"No campaign found with campaign id {campaign_status_update.campaign_id} to update status or it's already updated")
 
         return response
 

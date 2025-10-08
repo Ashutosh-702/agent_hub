@@ -35,10 +35,8 @@ class CustomRequestRoute(APIRoute):
                     'status_code': response.status_code,
                     'body': orjson.loads(response.body.decode('utf-8'))
                 }
-                logger.info(
-                    f"HTTP request for {request_data['url_path']} with method {request.method}")
-                logger.info(f"Request data: {request_data}")
-                logger.info(f"Response data: {response_data}")
+                logger.info(f"HTTP request for {request_data['url_path']} with method {request.method}",
+                            request_data=request_data, response_data=response_data)
 
                 # Ensure the response content is cleaned from any leading or trailing newline characters
                 response.content = response.body.strip()
