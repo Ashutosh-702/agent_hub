@@ -17,6 +17,7 @@ from global_utils.chronos_utils import (
     schedule_lusha_company_collection
 )
 from ai_agents.core_sdr.src.parsers.company_saver import insert_companies_batch_to_db, create_campaign_company_mappings_batch
+from integrations.lusha.company_saver import CompanySaver
 
 
 def convert_objectid_to_string(payload: dict) -> dict:
@@ -257,6 +258,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                 loaded_config.connection_manager.mongo_client
             )
             campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+            company_saver = CompanySaver(companies_dao, campaign_company_runs_dao)
             raw_config =campaign_details["raw_config"]
             for company in first_response["results"]["data"]:
                 page_companies.append({
@@ -266,12 +268,12 @@ async def lusha_company_data_collection(campaign_details: Any):
                 })
 
             # ✅ IMMEDIATE DATABASE INSERTION
-            inserted_count = await insert_companies_batch_to_db(
+            inserted_count = await company_saver.insert_companies_batch_to_db(
                 page_companies, raw_config,
-                "lusha", companies_dao)
+                "lusha")
 
             # Step 2: Create campaign mappings
-            mappings_created = await create_campaign_company_mappings_batch(
+            mappings_created = await company_saver.create_campaign_company_mappings_batch(
                 inserted_count['company_ids'], raw_config.get("_id"),
                 campaign_company_runs_dao
             )
@@ -310,15 +312,14 @@ async def lusha_company_data_collection(campaign_details: Any):
                     })
 
                 # ✅ IMMEDIATE DATABASE INSERTION
-                inserted_count = await insert_companies_batch_to_db(
+                inserted_count = await company_saver.insert_companies_batch_to_db(
                     page_companies, raw_config,
-                    "lusha", companies_dao
+                    "lusha"
                 )
 
                 # Step 2: Create campaign mappings
-                mappings_created = await create_campaign_company_mappings_batch(
-                    inserted_count['company_ids'], raw_config.get("_id"),
-                    campaign_company_runs_dao
+                mappings_created = await company_saver.create_campaign_company_mappings_batch(
+                    inserted_count['company_ids'], raw_config.get("_id")
                 )
             else:
                 print(f"Failed to fetch page {page_num}")
