@@ -154,8 +154,6 @@ class LushaAPIClient:
         total_inserted = 0
 
         try:
-            companies_dao = self.companies_dao
-            campaign_company_runs_dao = self.campaign_company_runs_dao
             print("working propoer")
 
             page_size = self.payload_values.get("pages", {}).get("size", 20)
