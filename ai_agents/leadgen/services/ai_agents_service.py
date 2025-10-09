@@ -13,13 +13,16 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CampaignStatusUpdate,
     CompanyMappingList, 
     CompanyListWithDetails, 
-    FormSubmission
+    FormSubmission,
+    CampaignContactData
 )
 from ai_agents.leadgen.utils import serialize_objectid
 
 from database.collection_dao.campaigns import CampaignsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.companies import CompaniesDao
+from database.collection_dao.contacts import ContactsDao
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 
 from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
@@ -185,3 +188,52 @@ class CompanyService:
                 f"No valid companies found in Mongo for campaign {query_params.campaign_id}")
 
         return {"company_details": data_rows}
+
+
+class ContactService:
+    def __init__(self):
+        self.campaign_contact_run_dao = CampaignContactRunsDao(
+            loaded_config.connection_manager.mongo_client)
+        self.contacts_dao = ContactsDao(
+            loaded_config.connection_manager.mongo_client)
+
+    async def get_campaign_contact_data(self, query_params: CampaignContactData):
+        filter_query = {"campaign_id": query_params.campaign_id}
+
+        if query_params.company_id:
+            filter_query["company_id"] = query_params.company_id
+
+        campaign_contact_runs_projection = {
+            "campaign_id": 1,
+            "company_id": 1,
+            "contact_id": 1,
+            "_id": 0
+        }
+
+        contacts_projection = {
+            "contact_data": 1,
+            "linkedin_data": 1,
+            "_id": 0
+        }
+
+        response, pagination_info = await self.campaign_contact_run_dao.get_campaign_contact_runs_paginated(
+            filter_query, query_params.page,
+            query_params.limit, sort_by=["company_id"],
+            projection=campaign_contact_runs_projection
+        )
+
+        for contact in response:
+            contact_id = contact.get("contact_id")
+            contact_doc = await self.contacts_dao.get_contact(
+                contact_id,
+                projection=contacts_projection
+            )
+
+            if not contact_doc:
+                continue
+
+            contact["contact_data"] = contact_doc.get("contact_data")
+            contact["linkedin_data"] = contact_doc.get("linkedin_data")
+
+        serialized_response = serialize_objectid(response)
+        return {"campaign_contact_data": serialized_response, "pagination_info": pagination_info}

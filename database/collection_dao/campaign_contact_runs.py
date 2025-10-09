@@ -30,6 +30,8 @@ class CampaignContactRunsDao(BaseMongoDao):
         if query is None:
             query = {}
 
+        query = self._process_query_objectids(query)
+
         if sort_by is None:
             sort_by = []
 
