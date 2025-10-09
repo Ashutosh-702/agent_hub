@@ -1,7 +1,11 @@
 from typing import Dict, Any, List, OrderedDict
+
+from structlog.contextvars import bind_contextvars
+
 from integrations.lusha.config.lusha_industry_config import LUSHA_CONFIG
 from integrations.lusha.config.country_api_results import LUSHA_COUNTRY_CONFIG
 from integrations.lusha.lusha_api import LushaAPIClient
+from config.logging import logger
 
 
 class LushaHelper:
@@ -28,7 +32,7 @@ class LushaHelper:
             return mapping
 
         except Exception as e:
-            print(f"❌ Error loading industry mapping: {e}")
+            logger.info(f"❌ Error loading industry mapping: {e}")
             return {}
 
     def parse_employee_range(self, range_str: str) -> tuple:
@@ -81,7 +85,7 @@ class LushaHelper:
             "segmentation", {}).get("industry", [])
 
         if not isinstance(industry_names, list):
-            print("⚠️ Expected list for industry names, got:",
+            logger.info("⚠️ Expected list for industry names, got:",
                   type(industry_names))
             industry_names = []
 
@@ -91,7 +95,7 @@ class LushaHelper:
                 if name in self.LUSHA_LOOKUP:
                     sub_ids.append(self.LUSHA_LOOKUP[name])
                 else:
-                    print(f"⚠️ Industry '{name}' not found in mapping")
+                    logger.info(f"⚠️ Industry '{name}' not found in mapping")
             sub_ids = list(OrderedDict.fromkeys(sub_ids))
 
             if sub_ids:
@@ -123,7 +127,7 @@ class LushaHelper:
         revenue_max = sheets_data.get("target", "")['revenue_max']
         currency = sheets_data.get("target", "")['currency']
 
-        print(
+        logger.info(
             f"revenue_min_check: {revenue_min}, revenue_max_check: {revenue_max}, currency: {currency}")
         # here value is coming in this way
         # revenue_min_check: (1,), revenue_max_check: (2,), currency: ('USD',)
@@ -140,54 +144,54 @@ class LushaHelper:
                     min_value, currency_value)
                 max_actual = self.convert_revenue_to_actual(
                     max_value, currency_value)
-                print(f"min_actual: {min_actual}, max_actual: {max_actual}")
+                logger.info(f"min_actual: {min_actual}, max_actual: {max_actual}")
                 if min_actual > 0 or max_actual > 0:
                     lusha_config["revenue"] = {
                         "min": min_actual if min_actual > 0 else 1,
                         "max": max_actual
                     }
             except Exception as e:
-                print(f"⚠️ Error processing revenue: {e}")
+                logger.info(f"⚠️ Error processing revenue: {e}")
 
         if sheets_data.get("target", "")['employee_count']:
             employee_ranges = [
                 range_str for range_str in sheets_data['target']["employee_count"] if range_str]
 
             if employee_ranges and employee_ranges[0] != "null":
-                print(f"employee_ranges: {employee_ranges}")
+                logger.info(f"employee_ranges: {employee_ranges}")
                 sizes = []
 
                 for range in employee_ranges:
-                    print(f"range_value: {range}")
+                    logger.info(f"range_value: {range}")
                     min_emp, max_emp = self.parse_employee_range(range)
                     sizes.append({
                         "min": min_emp,
                         "max": max_emp
                     })
 
-                print(f"sizes: {sizes}")
+                logger.info(f"sizes: {sizes}")
                 lusha_config["sizes"] = sizes
         lusha_config["campaign_id"] = sheets_data.get("_id")
-        print(f"✅ Converted sheets config to Lusha config: {lusha_config}")
+        logger.info(f"✅ Converted sheets config to Lusha config: {lusha_config}")
         return lusha_config
 
     async def get_companies_from_lusha(self, config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Main function to get companies from Lusha using sheets data
         """
-
+        bind_contextvars(operation="get_companies_from_lusha", component="lusha_helper", event_type="lusha_company_search")
         lusha_config = self.sheets_to_lusha_config(config)
-        print("Lusha config:", lusha_config)
+        logger.info(f"Lusha config: {lusha_config}")
         if not lusha_config or len(lusha_config) <= 1:
-            print("❌ No valid Lusha configuration generated")
+            logger.info("❌ No valid Lusha configuration generated")
             return []
 
         try:
             lusha_api_client = LushaAPIClient()
             companies = await lusha_api_client.lusha_collect_companies_from_search(config)
-            print(f"✅ Retrieved {companies} companies from Lusha")
+            logger.info(f"✅ Retrieved {companies} companies from Lusha")
             return companies
 
         except Exception as e:
-            print(f"❌ Error calling Lusha API: {e}")
+            logger.info(f"❌ Error calling Lusha API: {e}")
             return []
