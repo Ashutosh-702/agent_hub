@@ -2,6 +2,7 @@ import os
 from database.connection_manager import ConnectionManager
 import aiohttp
 
+
 class Settings:
     mongo_uri = os.getenv("MONGO_LINKEDIN_SDR_READ_WRITE","mongodb://localhost:27017")
     connection_manager: ConnectionManager = None
@@ -11,5 +12,9 @@ class Settings:
     lusha_api_key = os.getenv("LUSHA_API_KEY")
     http_session : aiohttp.ClientSession = None
     openai_api_key = os.getenv("OPENAI_API_KEY", "")
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("API_PORT", "80"))
+    workers = int(os.getenv("API_WORKERS", "1"))
+    reload = os.getenv("API_RELOAD", "false").lower() == "true"
     
 loaded_config = Settings()

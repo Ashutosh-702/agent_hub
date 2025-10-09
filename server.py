@@ -6,7 +6,7 @@ if not hasattr(loaded_config, 'MODE'):
     loaded_config.MODE = os.getenv("MODE", "server")
 
 if loaded_config.MODE == "server":
-    from ai_agents.leadgen.api.main import server_main
+    from app.main import main as server_main
 
     if __name__ == "__main__":
         server_main()
