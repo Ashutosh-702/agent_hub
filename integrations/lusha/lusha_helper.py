@@ -183,7 +183,7 @@ class LushaHelper:
             return []
 
         try:
-            lusha_api_client = LushaAPIClient(lusha_config)
+            lusha_api_client = LushaAPIClient()
             companies = await lusha_api_client.lusha_collect_companies_from_search(config)
             print(f"✅ Retrieved {companies} companies from Lusha")
             return companies

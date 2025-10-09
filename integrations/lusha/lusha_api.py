@@ -21,7 +21,7 @@ from global_utils.constants import LUSHA_BASE_URL
 urllib3.disable_warnings(InsecureRequestWarning)
 
 class LushaAPIClient:
-    def __init__(self, payload_values: Dict[str, Any]):
+    def __init__(self):
         self.api_key = loaded_config.lusha_api_key
         self.http_session = loaded_config.http_session
         self.headers = {
@@ -29,7 +29,7 @@ class LushaAPIClient:
             "api_key": f"{self.api_key}",
             'Content-Type': 'application/json'
         }
-        self.payload_values: Dict[str, Any] = payload_values
+        self.payload_values: Dict[str, Any] = None
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
         self.company_saver = CompanySaver(self.companies_dao, self.campaign_company_runs_dao)
@@ -149,10 +149,11 @@ class LushaAPIClient:
 
     async def lusha_collect_companies_from_search(
         self,
+        payload_values: Dict[str, Any],
         config: Dict[str, Any],
     ) -> List[Dict[str, Any]]:
         total_inserted = 0
-
+        self.payload_values = payload_values
         try:
             print("working propoer")
 

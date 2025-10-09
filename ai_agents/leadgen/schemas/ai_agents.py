@@ -73,3 +73,7 @@ class CampaignContactData(BaseModel):
     company_id: Optional[str] = None
     page: int = 1
     limit: int = 10
+
+
+class LinkedinContactDetails(BaseModel):
+    linkedin_url: str

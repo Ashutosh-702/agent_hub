@@ -8,7 +8,9 @@ from ai_agents.leadgen.views.ai_agents import (
     get_company_mapping_list, 
     fetch_companies_from_mappings,
     get_campaign_contact_data,
-    fetch_campaign_by_status
+    fetch_campaign_by_status,
+    get_linkedin_contact_details
+
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -52,5 +54,12 @@ router.add_api_route(
     "/fetch_and_claim_first_campaign",
     methods=["GET"],
     endpoint=fetch_campaign_by_status,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/get_linkedin_contact_details",
+    methods=["GET"],
+    endpoint=get_linkedin_contact_details,
     response_model=ResponseData,
 )

@@ -7,7 +7,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     FormSubmission,
     CompanyMappingList,
     CompanyListWithDetails,
-    CampaignContactData
+    CampaignContactData,
+    LinkedinContactDetails
 )
 from ai_agents.leadgen.services.ai_agents_service import CampaignService, CompanyService, ContactService
 
@@ -82,4 +83,17 @@ async def fetch_campaign_by_status(status: str) -> Dict[str, Any]:
     response = await leadgen_form_upload_service.fetch_campaign_by_status(status)
     response_data.success = True
     response_data.data = response.get("config")
+    return response_data.dict()
+
+
+async def get_linkedin_contact_details(query_params: LinkedinContactDetails = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_form_upload_service = ContactService()
+
+    response = await leadgen_form_upload_service.get_linkedin_contact_details(query_params.linkedin_url)
+    contact_data = response.get("contact", {})
+
+    if "error" not in contact_data:
+        response_data.success = True
+    response_data.data = contact_data
     return response_data.dict()

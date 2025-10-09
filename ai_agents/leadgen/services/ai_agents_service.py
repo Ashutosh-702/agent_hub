@@ -26,6 +26,7 @@ from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 
 from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
+from integrations.lusha.lusha_api import LushaAPIClient
 
 
 class CampaignService:
@@ -225,6 +226,8 @@ class ContactService:
             loaded_config.connection_manager.mongo_client)
         self.contacts_dao = ContactsDao(
             loaded_config.connection_manager.mongo_client)
+        self.lusha_api_client = LushaAPIClient()
+
 
     async def get_campaign_contact_data(self, query_params: CampaignContactData):
         filter_query = {"campaign_id": query_params.campaign_id}
@@ -266,3 +269,7 @@ class ContactService:
 
         serialized_response = serialize_objectid(response)
         return {"campaign_contact_data": serialized_response, "pagination_info": pagination_info}
+
+    async def get_linkedin_contact_details(self, linkedin_url: str):
+        response = await self.lusha_api_client.lusha_get_linkedin_contact_details(linkedin_url)
+        return response
