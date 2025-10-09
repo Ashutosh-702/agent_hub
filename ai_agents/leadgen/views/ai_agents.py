@@ -73,3 +73,13 @@ async def get_campaign_contact_data(query_params: CampaignContactData = Depends(
     response_data.data = response.get("campaign_contact_data")
     response_data.pagination = response.get("pagination_info")
     return response_data.dict()
+
+
+async def fetch_campaign_by_status(status: str) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_form_upload_service = CampaignService()
+
+    response = await leadgen_form_upload_service.fetch_campaign_by_status(status)
+    response_data.success = True
+    response_data.data = response.get("config")
+    return response_data.dict()

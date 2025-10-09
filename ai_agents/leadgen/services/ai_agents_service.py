@@ -122,6 +122,35 @@ class CampaignService:
             raise ApiException(f"No campaign found with campaign id {campaign_status_update.campaign_id} to update status or it's already updated")
 
         return response
+    
+    async def fetch_campaign_by_status(self, status: str):
+        campaign = await self.campaign_dao.get_campaign_by_status(status)
+
+        if not campaign:
+            raise ApiException("No campaign found to fetch")
+
+        campaign_id = campaign.get("_id")
+        ownership = campaign.get("ownership", {})
+        prompts = campaign.get("prompts", {})
+        ai_sdr_custom_config = {
+            "HUBSPOT_OWNER_EMAIL": ownership.get("hubspot_email", ""),
+            "USER_EMAIL": ownership.get("user_email", ""),
+            "PRODUCT_NAME": ownership.get("product_name", ""),
+            "BUSINESS_TEAM": ownership.get("business_team", ""),
+            "custom_prompts": {},
+            "CAMPAIGN_ID": str(campaign_id),
+            "DATA_SOURCE_TYPE": "mongo",
+            "target_executives": prompts.get("persona", "")
+        }
+        web_enrichment_prompt = f"""Relevance Criteria: Determine if the company fits either of the following:
+
+        {prompts.get("web", "")}
+
+        Begin your research now using the web search tool to determine if companies match these criteria."""
+        ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
+        ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get(
+            "persona", "")
+        return {"config": ai_sdr_custom_config}
 
 
 class CompanyService:
