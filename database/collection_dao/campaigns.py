@@ -21,5 +21,3 @@ class CampaignsDao(BaseMongoDao):
 
     async def get_campaign_by_status(self, status: str):
         return await self.find_one({"lifecycle.status": status})
-
-
