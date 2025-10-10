@@ -101,7 +101,7 @@ class LushaHelper:
             if sub_ids:
                 lusha_config["subIndustriesIds"] = sub_ids
 
-        if sheets_data.get("target", "")['location']['names']:
+        if sheets_data.get("target", {}).get("location", {}).get("names"):
             lusha_locations = []
             location_type = sheets_data['target']["location"]['type']
             locations = sheets_data['target']["location"]['names']
@@ -131,25 +131,25 @@ class LushaHelper:
             f"revenue_min_check: {revenue_min}, revenue_max_check: {revenue_max}, currency: {currency}")
         # here value is coming in this way
         # revenue_min_check: (1,), revenue_max_check: (2,), currency: ('USD',)
+        
         if revenue_min and revenue_max:
             try:
-                min_value = revenue_min[0] if isinstance(
-                    revenue_min, tuple) else revenue_min
-                max_value = revenue_max[0] if isinstance(
-                    revenue_max, tuple) else revenue_max
-                currency_value = currency[0] if isinstance(
-                    currency, tuple) else currency
+                min_value = self._clean_tuple_value(revenue_min) 
+                max_value = self._clean_tuple_value(revenue_max) 
+                currency_value = self._clean_tuple_value(currency) 
 
                 min_actual = self.convert_revenue_to_actual(
                     min_value, currency_value)
                 max_actual = self.convert_revenue_to_actual(
                     max_value, currency_value)
                 logger.info(f"min_actual: {min_actual}, max_actual: {max_actual}")
+
                 if min_actual > 0 or max_actual > 0:
                     lusha_config["revenue"] = {
                         "min": min_actual if min_actual > 0 else 1,
                         "max": max_actual
                     }
+
             except Exception as e:
                 logger.info(f"⚠️ Error processing revenue: {e}")
 
@@ -171,6 +171,7 @@ class LushaHelper:
 
                 logger.info(f"sizes: {sizes}")
                 lusha_config["sizes"] = sizes
+
         lusha_config["campaign_id"] = sheets_data.get("_id")
         logger.info(f"✅ Converted sheets config to Lusha config: {lusha_config}")
         return lusha_config
@@ -182,16 +183,22 @@ class LushaHelper:
         bind_contextvars(operation="get_companies_from_lusha", component="lusha_helper", event_type="lusha_company_search")
         lusha_config = self.sheets_to_lusha_config(config)
         logger.info(f"Lusha config: {lusha_config}")
+
         if not lusha_config or len(lusha_config) <= 1:
             logger.info("❌ No valid Lusha configuration generated")
             return []
 
         try:
             lusha_api_client = LushaAPIClient()
-            companies = await lusha_api_client.lusha_collect_companies_from_search(config)
+            companies = await lusha_api_client.lusha_collect_companies_from_search(lusha_config, config)
             logger.info(f"✅ Retrieved {companies} companies from Lusha")
             return companies
 
         except Exception as e:
             logger.info(f"❌ Error calling Lusha API: {e}")
             return []
+
+    def _clean_tuple_value(self, value):
+        if value and isinstance(value, tuple) and len(value) > 0:
+            return value[0]
+        return value

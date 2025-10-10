@@ -219,9 +219,6 @@ class LushaAPIClient:
 
             logger.info(f"Total results: {total_results}, Total pages: {total_pages}")
 
-            #temp code
-            # total_pages  = 2 if total_pages > 2 else total_pages
-
             for page_num in range(1, total_pages):
                 logger.info(f"Fetching page {page_num + 1} of {total_pages}")
 
@@ -369,6 +366,7 @@ class LushaAPIClient:
 
         if not linkedin_url:
             return []
+            
         url = f"{LUSHA_BASE_URL}/v2/person?linkedinUrl={linkedin_url}"
         headers = self.headers
         response = await self.http_session.get(url, headers=headers)
