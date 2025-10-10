@@ -79,11 +79,10 @@ def get_env_config():
     config_json = json.dumps(config)
 
     js_config = f"""
-window.ENV_CONFIG = {config_json};
-window.AGENTHUB_MAIN_DOMAIN = "{config['AGENTHUB_MAIN_DOMAIN']}";
-window.ENVIRONMENT = "{config['ENVIRONMENT']}";
-console.log('Environment configuration loaded:', window.ENV_CONFIG);
-"""
+    window.ENV_CONFIG = {config_json};
+    window.AGENTHUB_MAIN_DOMAIN = "{config['AGENTHUB_MAIN_DOMAIN']}";
+    window.ENVIRONMENT = "{config['ENVIRONMENT']}";
+    console.log('Environment configuration loaded:', window.ENV_CONFIG);
+    """.strip()
 
     return Response(content=js_config, media_type="application/javascript")
-    

@@ -1,3 +1,6 @@
+from config.logging import logger
+
+
 class CustomException(Exception):
     DEFAULT_ERROR_MESSAGE = "Exception occurred"
 
@@ -5,7 +8,7 @@ class CustomException(Exception):
         error_message = error_message or self.DEFAULT_ERROR_MESSAGE
         self.error_message = error_message
         super().__init__(self.error_message)
-        print(f"Exception occurred: {self.error_message}")
+        logger.info(f"Exception occurred: {self.error_message}")
 
 
 class ApiException(CustomException):
