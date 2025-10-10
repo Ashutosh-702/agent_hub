@@ -19,6 +19,7 @@ from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from ai_agents.core_sdr.config.department_mappers import DEPARTMENT_TO_CATEGORY
 from global_utils.constants import LUSHA_BASE_URL
 from config.logging import logger
+from global_utils.exceptions import ApiException
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -306,7 +307,7 @@ class LushaAPIClient:
         result = await response.json()
 
         if response.status != 201:
-            raise Exception(f"Search API failed: {response.status}")
+            raise ApiException(f"Search API failed: {response.status}")
             
         return result
 
@@ -355,10 +356,10 @@ class LushaAPIClient:
         response = await self.http_session.post(url, json=payload, headers=headers)
         result = await response.json()
 
-        if response.status == 201:
-           return result
-        else:
-            raise Exception(f"Search API failed: {response.status}")
+        if response.status != 201:
+           raise ApiException(f"Search API failed: {response.status}")
+        
+        return result
 
 
     async def lusha_get_linkedin_contact_details(self,linkedin_url: str = ""):
@@ -371,7 +372,7 @@ class LushaAPIClient:
         response = await self.http_session.get(url, headers=headers)
         result = await response.json()
 
-        if response.status == 200:
-            return result
-        else:
-            raise Exception(f"linkedin API failed: {response.status}")
+        if response.status != 200:
+            raise ApiException(f"linkedin API failed: {response.status}")
+        
+        return result

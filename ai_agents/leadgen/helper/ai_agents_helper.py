@@ -4,6 +4,9 @@ from config.logging import logger
 from config.loaded_config import loaded_config
 from integrations.lusha.lusha_api import LushaAPIClient
 from ai_agents.leadgen.services.ai_agents_service import CompanyService, ContactService
+from ai_agents.leadgen.schemas.contact_models import ContactDocument
+from datetime import datetime
+from bson import ObjectId
 
 
 class LushaContactEnrichmentHelper:
@@ -75,3 +78,83 @@ class LushaContactEnrichmentHelper:
         result['company_source_id_name_mappings'] = company_source_id_name_mappings
 
         return result
+
+    async def lusha_contact_enrichment(self, query_params: LushaContactEnrichment):
+        contact_ids = query_params.contact_ids
+        company_source_id_name_mappings = query_params.company_source_id_name_mappings
+        campaign_id = query_params.campaign_id
+        req_id = query_params.lusha_request_id
+
+        if req_id and contact_ids:
+            enriched_contact_data = await self.lusha_api_client.lusha_contact_enrich_api(req_id, contact_ids)
+            logger.info("fetched enrich data")
+
+            if "contacts" in enriched_contact_data:
+                for contact in enriched_contact_data["contacts"]:
+                    data = contact.get("data", {})
+                    linkedin_url = data.get(
+                        "socialLinks", {}).get("linkedin", "")
+                    email_addresses = [e["email"] for e in data.get(
+                        "emailAddresses", []) if "email" in e]
+                    phone_numbers = [p["number"] for p in data.get(
+                        "phoneNumbers", []) if "number" in p]
+
+                    contact_dao = self.contact_service.contacts_dao
+                    db_contacts = await contact_dao.get_contacts(
+                        {
+                            "linkedin_data.linkedin_url": linkedin_url
+                        }
+                    )
+
+                    if db_contacts:
+                        db_contact = db_contacts[0]
+                        await self.contact_service.update_one(
+                            {"_id": db_contact["_id"]},
+                            {
+                                "$set": {
+                                    "contact_data.email": email_addresses,
+                                    "contact_data.phone": phone_numbers,
+                                    "metadata.updated_at": datetime.utcnow()
+                                }
+                            }
+                        )
+                    else:
+                        firstname = data["firstName"]
+                        lastname = data["lastName"]
+                        job_title = data["jobTitle"]
+
+                        contact_company_id = company_source_id_name_mappings.get(
+                            data["companyName"], "")
+
+                        if not contact_company_id:
+                            print(
+                                f"Company name not found in company_source_id_name_mappings: {data['companyName']}")
+                            continue
+
+                        contact_doc = {
+                            "contact_data": {
+                                "firstname": firstname,
+                                "lastname": lastname,
+                                "email": email_addresses,
+                                "phone": phone_numbers,
+                                "jobtitle": job_title,
+                                "company": data["companyName"],
+                                "company_id": ObjectId(contact_company_id)
+                            },
+                            "linkedin_data": {
+                                "linkedin_url": linkedin_url,
+                                "source": "LUSHA-ENRICHER"
+                            },
+                            "metadata": {
+                                "created_at": datetime.utcnow(),
+                                "updated_at": datetime.utcnow(),
+                                "lusha_raw_data": data
+                            }
+                        }
+                        contact_doc = ContactDocument(**contact_doc)
+                        await self.contact_service.create_contact(contact_doc, campaign_id)
+                        print(f"contact_doc: {contact_doc}")
+
+                        
+
+        return

@@ -18,6 +18,7 @@ from ai_agents.leadgen.schemas.ai_agents import (
     LushaContactEnrichment
 )
 from ai_agents.leadgen.utils import serialize_objectid
+from ai_agents.leadgen.schemas.contact_models import ContactDocument
 
 from database.collection_dao.campaigns import CampaignsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
@@ -339,3 +340,18 @@ class ContactService:
         result['company_source_id_name_mappings'] = company_source_id_name_mappings
 
         return result
+
+    async def create_contact(self, contact_doc: ContactDocument, campaign_id: str):
+        contact_id = await self.contacts_dao.create_contact(contact_doc)
+        await self.campaign_contact_run_dao.create_campaign_contact_run(
+                            {
+                                "campaign_id": campaign_id,
+                                "company_id": contact_doc.contact_data.company_id,
+                                "contact_id": contact_id,
+                                "metadata": {
+                                    "created_at": datetime.utcnow(),
+                                    "updated_at": datetime.utcnow()
+                                }
+                            },
+                        )
+        return

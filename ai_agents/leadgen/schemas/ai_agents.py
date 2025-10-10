@@ -79,10 +79,15 @@ class LinkedinContactDetails(BaseModel):
     linkedin_url: str
 
 
-class LushaContactEnrichment(BaseModel):
+class LushaGetContactEnrichment(BaseModel):
     campaign_id: str
     page: int = 1
     page_size: int = 50
     company_map_list: List[dict]
     departments: List[str]
-    
+
+class LushaContactEnrichment(BaseModel):
+    contact_ids: List[str]
+    company_source_id_name_mappings: dict
+    campaign_id: str
+    lusha_request_id: str
