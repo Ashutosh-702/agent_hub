@@ -2,6 +2,7 @@ from typing import Dict, Any, List, OrderedDict
 
 from structlog.contextvars import bind_contextvars
 
+from integrations.lusha.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
 from integrations.lusha.config.lusha_industry_config import LUSHA_CONFIG
 from integrations.lusha.config.country_api_results import LUSHA_COUNTRY_CONFIG
 from integrations.lusha.lusha_api import LushaAPIClient
@@ -43,7 +44,7 @@ class LushaHelper:
 
         if '+' in range_str:
             min_val = int(range_str.replace('+', ''))
-            return min_val, 150000000000
+            return min_val, MAX_EMPLOYEES
         elif '-' in range_str:
             parts = range_str.split('-')
             if len(parts) == 2:
@@ -64,10 +65,10 @@ class LushaHelper:
 
         try:
             if currency == "INR":
-                revenue_millions = float(revenue_millions) / 87.67
+                revenue_millions = float(revenue_millions) / DOLLAR_TO_INR_RATIO
 
             revenue_float = float(revenue_millions)
-            actual = int(revenue_float * 1000000)
+            actual = int(revenue_float * MILLION_TO_ACTUAL)
             # TODO: Currency conversion logic
 
             return actual
