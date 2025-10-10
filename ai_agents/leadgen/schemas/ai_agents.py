@@ -77,3 +77,12 @@ class CampaignContactData(BaseModel):
 
 class LinkedinContactDetails(BaseModel):
     linkedin_url: str
+
+
+class LushaContactEnrichment(BaseModel):
+    campaign_id: str
+    page: int = 1
+    page_size: int = 50
+    company_map_list: List[dict]
+    departments: List[str]
+    

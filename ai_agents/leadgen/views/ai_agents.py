@@ -8,10 +8,16 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CompanyMappingList,
     CompanyListWithDetails,
     CampaignContactData,
-    LinkedinContactDetails
+    LinkedinContactDetails,
+    LushaContactEnrichment
 )
-from ai_agents.leadgen.services.ai_agents_service import CampaignService, CompanyService, ContactService
+from ai_agents.leadgen.services.ai_agents_service import (
+    CampaignService,
+    CompanyService,
+    ContactService
+)
 
+from ai_agents.leadgen.helper.ai_agents_helper import LushaContactEnrichmentHelper
 
 async def upload_leadgen_form(
     request_data: FormSubmission = Body(),
@@ -96,4 +102,14 @@ async def get_linkedin_contact_details(query_params: LinkedinContactDetails = De
     if "error" not in contact_data:
         response_data.success = True
     response_data.data = contact_data
+    return response_data.dict()
+
+
+async def lusha_get_contact_enrichment(query_params: LushaContactEnrichment) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    lusha_contact_enrichment_helper = LushaContactEnrichmentHelper()
+
+    response = await lusha_contact_enrichment_helper.lusha_get_contact_enrichment(query_params)
+    response_data.success = True
+    response_data.data = response
     return response_data.dict()

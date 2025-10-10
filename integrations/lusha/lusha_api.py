@@ -292,8 +292,7 @@ class LushaAPIClient:
 
     async def lusha_contact_search_api(self,payload_values_for_contact: Dict[str, Any],) -> Dict[str, Any]:
         bind_contextvars(operation="lusha_search_api", component="lusha_api_client", event_type="lusha_contact_search")
-        logger.info("Payload_values_for_contact:",
-              json.dumps(payload_values_for_contact, indent=2))
+        logger.info(f"Payload_values_for_contact: {json.dumps(payload_values_for_contact, indent=2)}")
 
         payload_query = self.build_payload_for_contact( 
             payload_values_for_contact=payload_values_for_contact
@@ -306,10 +305,10 @@ class LushaAPIClient:
         response = await self.http_session.post(url, json=payload_query, headers=headers)
         result = await response.json()
 
-        if response.status == 201:
-           return result
-        else:
+        if response.status != 201:
             raise Exception(f"Search API failed: {response.status}")
+            
+        return result
 
 
     def build_payload_for_contact(self,payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:

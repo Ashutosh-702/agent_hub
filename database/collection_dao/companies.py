@@ -1,6 +1,7 @@
 from database.base_dao import BaseMongoDao
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import List, Dict, Any
+from bson import ObjectId
 
 
 class CompaniesDao(BaseMongoDao):
@@ -17,6 +18,6 @@ class CompaniesDao(BaseMongoDao):
         return await self.find_many(filters)
     
     async def get_company(self, company_id: str):
-        return await self.find_one({"_id": company_id})
+        return await self.find_one({"_id": ObjectId(company_id)})
     
 
