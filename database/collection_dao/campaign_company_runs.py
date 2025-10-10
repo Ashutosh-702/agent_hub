@@ -38,43 +38,6 @@ class CampaignCompanyRunsDao(BaseMongoDao):
     async def get_campaign_company_runs_count(self, query: dict = None):
         if query is None:
             query = {}
+        query = self._process_query_objectids(query)
 
         return await self.collection.count_documents(query)
-
-    def _process_query_objectids(self, query: Dict = None) -> Dict[str, Any]:
-
-        if query is None:
-            return {}
-
-        processed_query = query.copy()
-        objectid_fields = [
-            "_id", "campaign_id", "company_id", "contact_id"
-        ]
-
-        for field in objectid_fields:
-            if field in processed_query and processed_query[field] is not None:
-                if isinstance(processed_query[field], str):
-                    processed_query[field] = self._validate_and_convert_objectid(
-                        processed_query[field], field
-                    )
-                elif isinstance(processed_query[field], list):
-                    # Handle arrays of IDs
-                    processed_query[field] = [
-                        self._validate_and_convert_objectid(
-                            item, f"{field}[{i}]")
-                        for i, item in enumerate(processed_query[field])
-                        if item is not None
-                    ]
-
-        return processed_query
-
-    def _validate_and_convert_objectid(self, value: Union[str, ObjectId], field_name: str = "id") -> ObjectId:
-
-        if isinstance(value, ObjectId):
-            return value
-
-        if not value.strip():
-            raise ApiException(
-                f"{field_name} cannot be empty", status_code=400)
-
-        return ObjectId(value)
