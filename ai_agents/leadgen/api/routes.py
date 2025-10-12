@@ -11,7 +11,8 @@ from ai_agents.leadgen.views.ai_agents import (
     fetch_campaign_by_status,
     get_linkedin_contact_details,
     lusha_get_contact_enrichment,
-    lusha_contact_enrichment
+    lusha_contact_enrichment,
+    save_prospects_data_to_mongo
 
 )
 
@@ -77,5 +78,12 @@ router.add_api_route(
     "/lusha_contact_enrichment",
     methods=["POST"],
     endpoint=lusha_contact_enrichment,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/save_prospects_data_to_mongo",
+    methods=["POST"],
+    endpoint=save_prospects_data_to_mongo,
     response_model=ResponseData,
 )

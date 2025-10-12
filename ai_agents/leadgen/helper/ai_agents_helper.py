@@ -7,9 +7,12 @@ from ai_agents.leadgen.services.ai_agents_service import CompanyService, Contact
 from ai_agents.leadgen.schemas.contact_models import ContactDocument
 from datetime import datetime
 from bson import ObjectId
-
+from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo
+from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.collection_dao.contacts import ContactsDao
 
 class LushaContactEnrichmentHelper:
+
     def __init__(self):
         self.lusha_api_client = LushaAPIClient()
         self.company_service = CompanyService()
@@ -154,7 +157,77 @@ class LushaContactEnrichmentHelper:
                         contact_doc = ContactDocument(**contact_doc)
                         await self.contact_service.create_contact(contact_doc, campaign_id)
                         print(f"contact_doc: {contact_doc}")
-
-                        
-
         return
+
+
+class SaveProspectsDataToMongoHelper:
+
+    def __init__(self):
+        self.contact_service = ContactService()
+        self.company_service = CompanyService()
+        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+
+    async def save_prospects_data_to_mongo(self, query_params: SaveProspectsDataToMongo):
+        prospects = query_params.prospects
+        campaign_id = query_params.campaign_id
+        company_name = query_params.company_name
+        company_id = query_params.company_id
+
+        await self.campaign_company_runs_dao.update_campaign_company_run({"campaign_id":ObjectId(campaign_id),"company_id":ObjectId(company_id)},{
+            "$set":{"company_status":True, "metadata.updated_at":datetime.utcnow()}
+        })
+
+        inserted_ids = []
+
+        for prospect in prospects:
+            linkedin_url = prospect.get("linkedin_profile", "")
+            linkedin_url = linkedin_url.lower().rstrip('/')
+            stored_contacts = await self.contacts_dao.get_contacts({"linkedin_data.linkedin_url":linkedin_url,"contact_data.company_id": ObjectId(company_id)})
+
+            if len(stored_contacts)==0:
+                full_name = prospect.get("name", "")
+                name_parts = full_name.split(" ", 1) if full_name else ["", ""]
+                firstname = name_parts[0]
+                lastname = name_parts[1] if len(name_parts) > 1 else ""
+                contact_doc = {
+                    "contact_data": {
+                        "firstname": firstname,
+                        "lastname": lastname,
+                        "email": prospect.get("email", ""),
+                        "phone": prospect.get("phone_number", ""),
+                        "jobtitle": prospect.get("title", ""),
+                        "company": prospect.get("company", company_name),
+                        "company_id":ObjectId(company_id)
+                    },
+                    "linkedin_data": {
+                        "linkedin_url": linkedin_url,
+                        "source": "AI-SDR"
+                    },
+                    "metadata": {
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+                contact_doc = ContactDocument(**contact_doc)
+                await self.contact_service.create_contact(contact_doc, campaign_id)
+            else:
+                contact = stored_contacts[0]
+                contact_id = contact.get("_id","")
+                inserted_ids.append(contact_id)
+
+        for id in inserted_ids:
+            campaign_contact_run_doc = {
+                "campaign_id": campaign_id,
+                "company_id": company_id,
+                "contact_id":id,
+                "contact_status": False ,
+                "metadata":{
+                    "created_at":datetime.utcnow(),
+                    "updated_at":datetime.utcnow(),
+                }
+            }
+            await self.contact_service.insert_campaign_contact_run(campaign_contact_run_doc)
+
+        logger.info("prospects data saved to mongo")
+        return {"status": "success"}

@@ -91,3 +91,9 @@ class LushaContactEnrichment(BaseModel):
     company_source_id_name_mappings: dict
     campaign_id: str
     lusha_request_id: str
+
+class SaveProspectsDataToMongo(BaseModel):
+    prospects: List[dict]
+    campaign_id: str
+    company_name: str
+    company_id: str

@@ -7,12 +7,14 @@ class CampaignContactRunsDao(BaseMongoDao):
         super().__init__(mongo_client, "campaign_contact_runs")
 
     async def create_campaign_contact_run(self, campaign_contact_run: dict):
+        campaign_contact_run = self._process_query_objectids(campaign_contact_run)
         return await self.insert_one(campaign_contact_run)
     
     async def get_campaign_contact_runs(self, query: dict = None):
         if query is None:
             query = {}
 
+        query = self._process_query_objectids(query)
         return await self.find_many(query)
     
     async def get_campaign_contact_run(self, campaign_contact_run_id: str):

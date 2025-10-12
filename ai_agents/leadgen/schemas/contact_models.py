@@ -41,3 +41,22 @@ class ContactDocument(BaseModel):
             ObjectId: str,
             datetime: lambda v: v.isoformat()
         }
+
+class ContactCampaignMetadata(BaseModel):
+    """Metadata for contact campaign mapping"""
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ContactCampaignMapping(BaseModel):
+    """Contact campaign mapping model"""
+    campaign_id: str
+    company_id: ObjectId
+    contact_id: str
+    metadata: ContactCampaignMetadata
+
+    class Config:
+        arbitrary_types_allowed = True  # For ObjectId support
+        json_encoders = {
+            ObjectId: str,
+            datetime: lambda v: v.isoformat()
+        }

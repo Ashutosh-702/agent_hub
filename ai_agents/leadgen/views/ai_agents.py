@@ -9,7 +9,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CompanyListWithDetails,
     CampaignContactData,
     LinkedinContactDetails,
-    LushaContactEnrichment
+    LushaContactEnrichment,
+    SaveProspectsDataToMongo
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -17,7 +18,7 @@ from ai_agents.leadgen.services.ai_agents_service import (
     ContactService
 )
 
-from ai_agents.leadgen.helper.ai_agents_helper import LushaContactEnrichmentHelper
+from ai_agents.leadgen.helper.ai_agents_helper import LushaContactEnrichmentHelper, SaveProspectsDataToMongoHelper
 
 async def upload_leadgen_form(
     request_data: FormSubmission = Body(),
@@ -120,6 +121,16 @@ async def lusha_contact_enrichment(query_params: LushaContactEnrichment) -> Dict
     lusha_contact_enrichment_helper = LushaContactEnrichmentHelper()
 
     response = await lusha_contact_enrichment_helper.lusha_contact_enrichment(query_params)
+    response_data.success = True
+    response_data.data = response
+    return response_data.dict()
+
+
+async def save_prospects_data_to_mongo(query_params: SaveProspectsDataToMongo) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    save_prospects_data_to_mongo_helper = SaveProspectsDataToMongoHelper()
+
+    response = await save_prospects_data_to_mongo_helper.save_prospects_data_to_mongo(query_params)
     response_data.success = True
     response_data.data = response
     return response_data.dict()
