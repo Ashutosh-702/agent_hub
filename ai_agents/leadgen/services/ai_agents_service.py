@@ -22,7 +22,6 @@ from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.contacts import ContactsDao
 from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
-
 from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import(
     LEADGEN_BATCH_PROCESSING, 
@@ -153,7 +152,8 @@ class CampaignService:
         Begin your research now using the web search tool to determine if companies match these criteria."""
         ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
         ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get(
-            "persona", "")
+            "persona", ""
+        )
         return {"config": ai_sdr_custom_config}
 
 
@@ -197,14 +197,10 @@ class CompanyService:
 
             company_doc = await self.companies_dao.get_company(company_id)
 
-            if not company_doc:
+            if not company_doc or not (company_doc.get("identifiers", {})).get("name"):
                 continue
-
+            
             name = (company_doc.get("identifiers", {})).get("name")
-
-            if not name:
-                continue
-
             profile = company_doc.get("profile") or {}
             location = company_doc.get("location") or {}
             data_rows.append({
@@ -229,7 +225,6 @@ class ContactService:
         self.contacts_dao = ContactsDao(
             loaded_config.connection_manager.mongo_client)
         self.lusha_api_client = LushaAPIClient()
-
 
     async def get_campaign_contact_data(self, query_params: CampaignContactData):
         filter_query = {"campaign_id": query_params.campaign_id}
