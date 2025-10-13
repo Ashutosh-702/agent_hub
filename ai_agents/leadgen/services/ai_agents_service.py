@@ -166,9 +166,9 @@ class CompanyService:
 
     async def get_company_mapping_list(self, query_params: CompanyMappingList):
         projection = {
-        "_id": 0,           
-        "company_status": 0, 
-        "metadata": 0
+            "_id": 0,           
+            "company_status": 0, 
+            "metadata": 0
         }
         response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": query_params.campaign_id, "is_relevant": True}, query_params.page, query_params.limit, projection=projection)
 
