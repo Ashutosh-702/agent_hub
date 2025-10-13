@@ -48,7 +48,7 @@ class LushaAPIClient:
         payload_query = self.build_payload(
             payload_values=self.payload_values,
         )
-        logger.info(f"Payload Query: {json.dumps(payload_query, indent=2)}")
+        logger.info(f"Payload Query:", payload=payload_query)
 
         url = f"{LUSHA_BASE_URL}/prospecting/company/search"
         headers = self.headers
