@@ -53,6 +53,7 @@ class FormSubmission(BaseModel):
 
         return user_email
 
+
 class CampaignStatusUpdate(BaseModel):
     campaign_id: str
     status: str

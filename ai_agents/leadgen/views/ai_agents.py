@@ -98,3 +98,4 @@ async def get_linkedin_contact_details(query_params: LinkedinContactDetails = De
         
     response_data.data = contact_data
     return response_data.dict()
+    

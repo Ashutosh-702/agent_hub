@@ -55,8 +55,10 @@ class CompanySaver:
 
         for company in existing_companies:
             source_id = company.get("identifiers", {}).get("source_id")
+
             if source_id not in existing_source_ids:
                 campaign_company_details['company_ids'].append(company['_id'])
+
             existing_source_ids.add(company.get("identifiers", {}).get("source_id"))
 
         print(f"📊 Found {len(existing_source_ids)} existing companies in database")
@@ -139,3 +141,4 @@ class CompanySaver:
 
         print(f"✅ Created {mappings_created} campaign-company mappings")
         return mappings_created
+        

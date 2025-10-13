@@ -23,4 +23,3 @@ class ContactsDao(BaseMongoDao):
 
         return await self.find_one({"_id": ObjectId(contact_id)}, projection=projection)
     
-

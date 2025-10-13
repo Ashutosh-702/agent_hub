@@ -145,15 +145,14 @@ class CampaignService:
             "DATA_SOURCE_TYPE": "mongo",
             "target_executives": prompts.get("persona", "")
         }
-        web_enrichment_prompt = f"""Relevance Criteria: Determine if the company fits either of the following:
-
-        {prompts.get("web", "")}
-
-        Begin your research now using the web search tool to determine if companies match these criteria."""
-        ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
-        ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get(
-            "persona", ""
+        web_enrichment_prompt = (
+            "Relevance Criteria: Determine if the company fits either of the following:\n\n"
+            f"{prompts.get('web', '')}\n\n"
+            "Begin your research now using the web search tool to determine if companies "
+            "match these criteria."
         )
+        ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
+        ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get("persona", "")
         return {"config": ai_sdr_custom_config}
 
 
@@ -270,6 +269,7 @@ class ContactService:
             )
 
             if not contact_doc:
+                logger.info(f"Contact data is not found for contact id {contact_id}")
                 continue
 
             contact["contact_data"] = contact_doc.get("contact_data")
