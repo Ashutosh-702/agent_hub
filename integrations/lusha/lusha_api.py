@@ -40,6 +40,7 @@ class LushaAPIClient:
             loaded_config.connection_manager.mongo_client)
         self.company_saver = CompanySaver(
             self.companies_dao, self.campaign_company_runs_dao)
+        self.timeout = 30
 
     async def lusha_search_api(self) -> List[int]:
         logger.info(f"Payload_values: {self.payload_values}")
@@ -53,7 +54,8 @@ class LushaAPIClient:
         headers = self.headers
 
         response = await self.http_session.post(
-            url,  json=payload_query, headers=headers
+            url,  json=payload_query, headers=headers, 
+            timeout=self.timeout
         )
 
         result = await response.json()
@@ -318,7 +320,7 @@ class LushaAPIClient:
         url = f"{LUSHA_BASE_URL}/prospecting/contact/search"
         headers = self.headers
 
-        response = await self.http_session.post(url, json=payload_query, headers=headers)
+        response = await self.http_session.post(url, json=payload_query, headers=headers, timeout=self.timeout)
         result = await response.json()
 
         if response.status != 201:
@@ -367,7 +369,7 @@ class LushaAPIClient:
             "contactIds": [id for id in contact_id_list]
         }
 
-        response = await self.http_session.post(url, json=payload, headers=headers)
+        response = await self.http_session.post(url, json=payload, headers=headers, timeout=self.timeout)
         result = await response.json()
 
         if response.status != 201:
@@ -382,7 +384,7 @@ class LushaAPIClient:
 
         url = f"{LUSHA_BASE_URL}/v2/person?linkedinUrl={linkedin_url}"
         headers = self.headers
-        response = await self.http_session.get(url, headers=headers)
+        response = await self.http_session.get(url, headers=headers, timeout=self.timeout)
         result = await response.json()
 
         if response.status != 200:
