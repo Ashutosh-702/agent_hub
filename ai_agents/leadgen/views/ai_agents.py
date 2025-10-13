@@ -102,6 +102,7 @@ async def get_linkedin_contact_details(query_params: LinkedinContactDetails = De
 
     if "error" not in contact_data:
         response_data.success = True
+        
     response_data.data = contact_data
     return response_data.dict()
 

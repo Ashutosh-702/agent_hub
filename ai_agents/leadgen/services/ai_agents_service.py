@@ -19,15 +19,17 @@ from ai_agents.leadgen.schemas.ai_agents import (
 )
 from ai_agents.leadgen.schemas.contact_models import ContactCampaignMapping, ContactDocument
 from ai_agents.leadgen.utils import serialize_objectid
-
 from database.collection_dao.campaigns import CampaignsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.contacts import ContactsDao
 from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
-
 from kafkautils.producer.event_helpers import emit_event_helper
-from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
+from kafkautils.constants import(
+    LEADGEN_BATCH_PROCESSING, 
+    KAFKA_SERVICE_CONFIG_MAPPING, 
+    LeadgenServices
+)
 from integrations.lusha.lusha_api import LushaAPIClient
 
 
@@ -152,7 +154,8 @@ class CampaignService:
         Begin your research now using the web search tool to determine if companies match these criteria."""
         ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
         ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get(
-            "persona", "")
+            "persona", ""
+        )
         return {"config": ai_sdr_custom_config}
 
 
@@ -164,19 +167,18 @@ class CompanyService:
             loaded_config.connection_manager.mongo_client)
 
     async def get_company_mapping_list(self, query_params: CompanyMappingList):
-        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": query_params.campaign_id, "is_relevant": True}, query_params.page, query_params.limit)
+        projection = {
+            "_id": 0,           
+            "company_status": 0, 
+            "metadata": 0
+        }
+        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": query_params.campaign_id, "is_relevant": True}, query_params.page, query_params.limit, projection=projection)
 
         if not response:
             raise ApiException(
                 f"No company mappings found for campaign_id {query_params.campaign_id}")
 
         serialized_response = serialize_objectid(response)
-
-        for serialized_item in serialized_response:
-            serialized_item.pop("_id")
-            serialized_item.pop("company_status")
-            serialized_item.pop("metadata")
-
         serialized_pagination = serialize_objectid(pagination_info)
         return {"company_map_list": serialized_response, "pagination_info": serialized_pagination}
 
@@ -197,14 +199,10 @@ class CompanyService:
 
             company_doc = await self.companies_dao.get_company(company_id)
 
-            if not company_doc:
+            if not company_doc or not (company_doc.get("identifiers", {})).get("name"):
                 continue
-
+            
             name = (company_doc.get("identifiers", {})).get("name")
-
-            if not name:
-                continue
-
             profile = company_doc.get("profile") or {}
             location = company_doc.get("location") or {}
             data_rows.append({
@@ -229,7 +227,6 @@ class ContactService:
         self.contacts_dao = ContactsDao(
             loaded_config.connection_manager.mongo_client)
         self.lusha_api_client = LushaAPIClient()
-
 
     async def get_campaign_contact_data(self, query_params: CampaignContactData):
         filter_query = {"campaign_id": query_params.campaign_id}

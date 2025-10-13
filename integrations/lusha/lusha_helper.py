@@ -47,6 +47,7 @@ class LushaHelper:
             return min_val, MAX_EMPLOYEES
         elif '-' in range_str:
             parts = range_str.split('-')
+
             if len(parts) == 2:
                 return int(parts[0]), int(parts[1])
 
@@ -202,4 +203,5 @@ class LushaHelper:
     def _clean_tuple_value(self, value):
         if value and isinstance(value, tuple) and len(value) > 0:
             return value[0]
+            
         return value
