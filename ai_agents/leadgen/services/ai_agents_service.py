@@ -16,13 +16,15 @@ from ai_agents.leadgen.schemas.ai_agents import (
     FormSubmission
 )
 from ai_agents.leadgen.utils import serialize_objectid
-
 from database.collection_dao.campaigns import CampaignsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.companies import CompaniesDao
-
 from kafkautils.producer.event_helpers import emit_event_helper
-from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
+from kafkautils.constants import(
+    LEADGEN_BATCH_PROCESSING, 
+    KAFKA_SERVICE_CONFIG_MAPPING, 
+    LeadgenServices
+)
 
 
 class CampaignService:
@@ -129,19 +131,18 @@ class CompanyService:
             loaded_config.connection_manager.mongo_client)
 
     async def get_company_mapping_list(self, query_params: CompanyMappingList):
-        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": query_params.campaign_id, "is_relevant": True}, query_params.page, query_params.limit)
+        projection = {
+        "_id": 0,           
+        "company_status": 0, 
+        "metadata": 0
+        }
+        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": query_params.campaign_id, "is_relevant": True}, query_params.page, query_params.limit, projection=projection)
 
         if not response:
             raise ApiException(
                 f"No company mappings found for campaign_id {query_params.campaign_id}")
 
         serialized_response = serialize_objectid(response)
-
-        for serialized_item in serialized_response:
-            serialized_item.pop("_id")
-            serialized_item.pop("company_status")
-            serialized_item.pop("metadata")
-
         serialized_pagination = serialize_objectid(pagination_info)
         return {"company_map_list": serialized_response, "pagination_info": serialized_pagination}
 

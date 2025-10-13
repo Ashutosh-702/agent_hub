@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
+from typing import Union
 
 
 class BaseMongoDao:
@@ -105,3 +107,42 @@ class BaseMongoDao:
 
     async def start_session(self):
         return await self.mongo_client.start_session()
+
+    def _process_query_objectids(self, query: Dict = None) -> Dict[str, Any]:
+
+        if query is None:
+            return {}
+
+        processed_query = query.copy()
+        objectid_fields = [
+            "_id", "campaign_id", "company_id", "contact_id"
+        ]
+
+        for field in objectid_fields:
+            if field in processed_query and processed_query[field] is not None:
+                if isinstance(processed_query[field], str):
+                    processed_query[field] = self._validate_and_convert_objectid(
+                        processed_query[field], field
+                    )
+                elif isinstance(processed_query[field], list):
+                    # Handle arrays of IDs
+                    processed_query[field] = [
+                        self._validate_and_convert_objectid(
+                            item, f"{field}[{i}]")
+                        for i, item in enumerate(processed_query[field])
+                        if item is not None
+                    ]
+
+        return processed_query
+
+    def _validate_and_convert_objectid(self, value: Union[str, ObjectId], field_name: str = "id") -> ObjectId:
+
+        if isinstance(value, ObjectId):
+            return value
+
+        if not value.strip():
+            raise Exception(
+                f"{field_name} cannot be empty", status_code=400)
+
+        return ObjectId(value)
+        
