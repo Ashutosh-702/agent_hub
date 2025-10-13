@@ -169,7 +169,7 @@ async def lusha_company_collection_handler(message: Any):
 
 
 async def process_lusha_company_collection(campaign_details: Any):
-    lusha_company_data={
+    lusha_company_data = {
         'company_ids': [],
         'inserted_ids': []
     }
@@ -203,8 +203,6 @@ async def lusha_company_data_collection(campaign_details: Any):
         page_size = campaign_details["pages"]["size"]
         total_results = campaign_details.get("total_results", 0)
         print(f" lusha company data collection total_results: {total_results}")
-
-        
         # Calculate total_pages regardless of whether we need to fetch results
         total_pages = (total_results + page_size - 1) // page_size if total_results > 0 else 1
         print(f" lusha company data collection calculated total_pages: {total_pages}")
@@ -260,6 +258,7 @@ async def lusha_company_data_collection(campaign_details: Any):
             campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
             company_saver = CompanySaver(companies_dao, campaign_company_runs_dao)
             raw_config =campaign_details["raw_config"]
+            
             for company in first_response["results"]["data"]:
                 page_companies.append({
                     "id": company["id"], 
@@ -333,5 +332,5 @@ async def lusha_company_data_collection(campaign_details: Any):
             )
             update_campaign_status = await campaigns_dao.update_campaign_status(ObjectId(campaign_details["campaign_id"]), "pending")
             print(f"Updated status of {campaign_details['campaign_id']} to 'pending'")
+            
         return inserted_count
-        
