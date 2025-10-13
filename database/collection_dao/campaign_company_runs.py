@@ -7,7 +7,6 @@ from database.base_dao import BaseMongoDao
 from global_utils.exceptions import ApiException
 
 
-
 class CampaignCompanyRunsDao(BaseMongoDao):
     def __init__(self, mongo_client: AsyncIOMotorClient):
         super().__init__(mongo_client, "campaign_company_runs")
@@ -28,12 +27,12 @@ class CampaignCompanyRunsDao(BaseMongoDao):
     async def update_campaign_company_run(self, query: Dict[str, Any], update_clause: Dict[str, Any]):
         return await self.update_one(query, update_clause)
 
-    async def get_campaign_company_runs_paginated(self, query: dict = None, page: int = 1, limit: int = 100):
+    async def get_campaign_company_runs_paginated(self, query: dict = None, page: int = 1, limit: int = 100, projection: dict = None):
         if query is None:
             query = {}
 
         query = self._process_query_objectids(query)
-        return await self.get_paginated_response(query, page_size=limit, page_number=page)
+        return await self.get_paginated_response(query, page_size=limit, page_number=page, projection=projection)
 
     async def get_campaign_company_runs_count(self, query: dict = None):
         if query is None:

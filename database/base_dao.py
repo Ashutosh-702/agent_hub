@@ -1,8 +1,8 @@
 from typing import Any, Dict, List, Optional, Union
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
-from bson.errors import InvalidId
-from config.logging import logger
+from typing import Union
+
 
 class BaseMongoDao:
 
@@ -145,3 +145,4 @@ class BaseMongoDao:
                 f"{field_name} cannot be empty", status_code=400)
 
         return ObjectId(value)
+        
