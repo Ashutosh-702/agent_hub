@@ -334,8 +334,9 @@ export const Form = () => {
         body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
-      if (response.ok && data?.campaign_id) {
-        setSubmittedId(data.campaign_id)
+      
+      if (response.ok && data?.success && data?.data?.campaign_id) {
+        setSubmittedId(data.data.campaign_id)
         setSubmitted(true);
         setForm(Array(24).fill(''));
         setLocationType('');

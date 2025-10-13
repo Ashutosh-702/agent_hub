@@ -9,6 +9,7 @@ from global_utils.web_app import run_on_startup, run_on_shutdown
 from config.loaded_config import loaded_config
 from config.logging import logger
 from app.router import api_router
+from app.static_serving import configure_static_serving_production
 
 
 @asynccontextmanager
@@ -66,7 +67,9 @@ def get_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"]
     )
+
     agent_app.include_router(api_router)
+    configure_static_serving_production(agent_app)
 
     def custom_openapi(app: FastAPI):
         openapi_schema = get_openapi(
