@@ -123,14 +123,18 @@ class BaseMongoDao:
                     processed_query[field] = self._validate_and_convert_objectid(
                         processed_query[field], field
                     )
-                elif isinstance(processed_query[field], list):
+                elif isinstance(processed_query[field], dict) and '$in' in processed_query[field]:
                     # Handle arrays of IDs
-                    processed_query[field] = [
-                        self._validate_and_convert_objectid(
-                            item, f"{field}[{i}]")
-                        for i, item in enumerate(processed_query[field])
-                        if item is not None
-                    ]
+                    valid_items = []
+                    in_operator_values = processed_query[field]['$in']
+
+                    for position, object_id_string in enumerate(in_operator_values):
+                        if object_id_string is not None:
+                            field_name = f"{field}[{position}]"
+                            converted_item = self._validate_and_convert_objectid(object_id_string, field_name)
+                            valid_items.append(converted_item)
+
+                    processed_query[field]['$in'] = valid_items
 
         return processed_query
 
