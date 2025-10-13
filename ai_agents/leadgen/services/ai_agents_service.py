@@ -170,7 +170,16 @@ class CompanyService:
             "company_status": 0, 
             "metadata": 0
         }
-        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": query_params.campaign_id, "is_relevant": True}, query_params.page, query_params.limit, projection=projection)
+        query = {
+            "campaign_id": query_params.campaign_id, 
+            "is_relevant": True
+        }
+        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated(
+            query=query,
+            page=query_params.page,
+            limit=query_params.limit,
+            projection=projection
+        )
 
         if not response:
             raise ApiException(
@@ -193,14 +202,16 @@ class CompanyService:
             company_id = mapping.get("company_id")
 
             if not company_id:
+                logger.info(f"Company id is not found for campaign {query_params.campaign_id}")
                 continue
 
             company_doc = await self.companies_dao.get_company(company_id)
 
-            if not company_doc or not (company_doc.get("identifiers", {})).get("name"):
+            if not company_doc or not company_doc.get("identifiers", {}).get("name"):
+                logger.info(f"Company data is not found for campaign {query_params.campaign_id}")
                 continue
-            
-            name = (company_doc.get("identifiers", {})).get("name")
+
+            name = company_doc.get("identifiers", {}).get("name")
             profile = company_doc.get("profile") or {}
             location = company_doc.get("location") or {}
             data_rows.append({
