@@ -75,6 +75,7 @@ class LushaContactEnrichmentHelper:
             for contact in contacts:
                 id = contact.get("contactId")
                 contact_ids.append(id)
+
         logger.info("fetching enrich data")
 
         result['contact_ids'] = contact_ids
@@ -157,6 +158,7 @@ class LushaContactEnrichmentHelper:
                         contact_doc = ContactDocument(**contact_doc)
                         await self.contact_service.create_contact(contact_doc, campaign_id)
                         print(f"contact_doc: {contact_doc}")
+                        
         return
 
 
