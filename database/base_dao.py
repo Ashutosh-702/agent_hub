@@ -120,9 +120,7 @@ class BaseMongoDao:
         for field in objectid_fields:
             if field in processed_query and processed_query[field] is not None:
                 if isinstance(processed_query[field], str):
-                    processed_query[field] = self._validate_and_convert_objectid(
-                        processed_query[field], field
-                    )
+                    processed_query[field] = self._validate_and_convert_objectid(processed_query[field], field)
                 elif isinstance(processed_query[field], dict) and '$in' in processed_query[field]:
                     # Handle arrays of IDs
                     valid_items = []
