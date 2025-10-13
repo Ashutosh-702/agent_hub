@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
-from typing import Union
 
 
 class BaseMongoDao:
