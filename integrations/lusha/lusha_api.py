@@ -33,16 +33,13 @@ class LushaAPIClient:
             'Content-Type': 'application/json'
         }
         self.payload_values: Dict[str, Any] = None
-        self.companies_dao = CompaniesDao(
-            loaded_config.connection_manager.mongo_client)
-        self.campaign_company_runs_dao = CampaignCompanyRunsDao(
-            loaded_config.connection_manager.mongo_client)
-        self.company_saver = CompanySaver(
-            self.companies_dao, self.campaign_company_runs_dao)
+        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        self.company_saver = CompanySaver(self.companies_dao, self.campaign_company_runs_dao)
         self.timeout = 30
 
     async def lusha_search_api(self) -> List[int]:
-        logger.info(f"Payload_values: {self.payload_values}")
+        logger.info(f"Payload_values:", payload=self.payload_values)
 
         payload_query = self.build_payload(
             payload_values=self.payload_values,
@@ -64,28 +61,27 @@ class LushaAPIClient:
         if response.status == 201:
             response_data['results'] = result
             return response_data
+
         elif response.status == 429:
             # Return None to indicate rate limit exhaustion rather than raising exception
             response_headers = dict(response.headers)
-            response_data['daily_left'] = response_headers.get(
-                'x-daily-requests-left', None)
-
-            response_data['hourly_left'] = response_headers.get(
-                'x-hourly-requests-left', None)
-
-            response_data['minute_left'] = response_headers.get(
-                'x-minute-requests-left', None)
+            response_data['daily_left'] = response_headers.get('x-daily-requests-left', None)
+            response_data['hourly_left'] = response_headers.get('x-hourly-requests-left', None)
+            response_data['minute_left'] = response_headers.get('x-minute-requests-left', None)
 
             logger.info(f"Daily left: {response_data['daily_left']}, "
                         f"Hourly left: {response_data['hourly_left']}, "
                         f"Minute left: {response_data['minute_left']}")
-
             logger.info(f"Rate limit exhausted")
+
             return response_data
+            
         else:
+            error_text = await response.text()
             logger.info(
-                f"Search API failed: {response.status} - {response.text}")
-            return None
+                f"Search API failed: {response.status} - {error_text}")
+
+        return None
 
     def build_payload(
         self,
@@ -137,8 +133,10 @@ class LushaAPIClient:
                     if region in COMPANY_GROUPINGS:
                         include_data["locations"].append(
                             {"country_grouping": COMPANY_GROUPINGS[region]})
+
                     else:
                         include_data["locations"].append({"continent": region})
+
             else:
                 include_data["locations"] = [
                     {"country": country} for country in locations]
@@ -193,7 +191,9 @@ class LushaAPIClient:
                 )
 
                 logger.info(f"Scheduler response: {scheduler_response}")
+
                 return []
+                
             elif (first_response['status_code'] == 201
                   and "data" not in first_response['results']
                   or first_response['status_code'] != 201):
@@ -288,6 +288,7 @@ class LushaAPIClient:
                     )
                     logger.info(
                         f"📊 Page {page_num + 1}: Inserted {len(inserted_count['inserted_ids'])} companies")
+
                 else:
                     logger.info(f"Failed to fetch page {page_num}")
                     break
@@ -295,6 +296,7 @@ class LushaAPIClient:
             if rate_limit_hit:
                 logger.info(f"Collection completed with rate limiting. "
                             f"Collected {total_inserted} companies out of {total_results} total available.")
+
             else:
                 logger.info(
                     f"Collection completed successfully. Collected {total_inserted} companies from {total_pages} pages.")
@@ -303,19 +305,18 @@ class LushaAPIClient:
             raise Exception(f"Error searching companies: {str(e)}")
         finally:
             logger.info(f"Returning {total_inserted} companies")
+
             return total_inserted
 
     async def lusha_contact_search_api(self, payload_values_for_contact: Dict[str, Any],) -> Dict[str, Any]:
-        bind_contextvars(operation="lusha_search_api",
-                         component="lusha_api_client", event_type="lusha_contact_search")
-        logger.info("Payload_values_for_contact:",
-                    json.dumps(payload_values_for_contact, indent=2))
+        bind_contextvars(operation="lusha_search_api", component="lusha_api_client", event_type="lusha_contact_search")
+        logger.info("Payload_values_for_contact:",payload=payload_values_for_contact)
 
         payload_query = self.build_payload_for_contact(
             payload_values_for_contact=payload_values_for_contact
         )
 
-        logger.info(f"Payload Query: {json.dumps(payload_query, indent=2)}")
+        logger.info(f"Payload Query:", payload=payload_query)
         url = f"{LUSHA_BASE_URL}/prospecting/contact/search"
         headers = self.headers
 
@@ -324,6 +325,7 @@ class LushaAPIClient:
 
         if response.status == 201:
            return result
+
         else:
             raise Exception(f"Search API failed: {response.status}")
 
@@ -347,7 +349,7 @@ class LushaAPIClient:
                 }
             }
         }
-        logger.info(f"payload_values: {payload_values_for_contact}")
+        logger.info(f"payload_values:", payload=payload_values_for_contact)
 
         if departments:
             payload_query_for_contact["filters"]["contacts"] = {
@@ -371,14 +373,15 @@ class LushaAPIClient:
         response = await self.http_session.post(url, json=payload, headers=headers, timeout=self.timeout)
         result = await response.json()
 
-        if response.status == 201:
-           return result
-        else:
-            raise Exception(f"Search API failed: {response.status}")
+        if response.status != 201:
+           raise Exception(f"Search API failed: {response.status}")
+        
+        return result
 
     async def lusha_get_linkedin_contact_details(self, linkedin_url: str = ""):
 
         if not linkedin_url:
+            logger.info("No linkedin URL provided")
             return []
 
         url = f"{LUSHA_BASE_URL}/v2/person?linkedinUrl={linkedin_url}"
@@ -386,7 +389,7 @@ class LushaAPIClient:
         response = await self.http_session.get(url, headers=headers, timeout=self.timeout)
         result = await response.json()
 
-        if response.status == 200:
-            return result
-        else:
+        if response.status != 200:
             raise Exception(f"linkedin API failed: {response.status}")
+        
+        return result

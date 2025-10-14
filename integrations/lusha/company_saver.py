@@ -127,8 +127,9 @@ class CompanySaver:
             "company_id": {"$in": company_ids}
         })
 
+        existing_company_ids = {run["company_id"] for run in campaign_company_runs_data}
         for company_id in company_ids:
-            if company_id not in [run["company_id"] for run in campaign_company_runs_data]:
+            if company_id not in existing_company_ids:
                 mapping_doc = {
                     "campaign_id": campaign_id,
                     "company_id": company_id,
@@ -144,4 +145,5 @@ class CompanySaver:
                 mappings_created += 1
 
         logger.info(f"✅ Created {mappings_created} campaign-company mappings")
+        
         return mappings_created

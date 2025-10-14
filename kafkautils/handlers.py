@@ -56,6 +56,7 @@ async def leadgen_batch_processing_handler(message: Any):
 
         if isinstance(message, dict) and 'payload' in message:
             payload = message['payload']
+
         else:
             logger.info(f"🔍 payload missing")
             return
@@ -138,9 +139,8 @@ async def lusha_company_collection_handler(message: Any):
         logger.info(f"🔍 Debug - Full payload structure: {list(payload.keys()) if isinstance(payload, dict) else type(payload)}")
 
         inner_payload = payload.get("payload", payload)  # Try to get nested payload, fallback to original
-
-        logger.info(f"🔍 Debug - Inner payload structure: {list(inner_payload.keys()) if isinstance(inner_payload, dict) else type(inner_payload)}")
-
+        keys_or_type = list(inner_payload.keys()) if isinstance(inner_payload, dict) else type(inner_payload)
+        logger.info(f"🔍 Debug - Inner payload structure: {keys_or_type}")
         inner_payload = inner_payload.get("payload", inner_payload)
         action = inner_payload.get("action")   
         
@@ -180,6 +180,7 @@ async def process_lusha_company_collection(campaign_details: Any):
         logger.info(f"❌ Error occurred during collection: {str(e)}")
     finally:
         logger.info(f"Returning {len(lusha_company_data)} companies")
+
         return lusha_company_data
 
 
@@ -224,9 +225,12 @@ async def lusha_company_data_collection(campaign_details: Any):
                     scheduler = await schedule_lusha_company_collection(campaign_details=api_payload, eta=eta)
 
                     logger.info(f"Scheduler response from handler: {scheduler}")
+
                     return []
+
             elif first_response['status_code'] == 201 and "data" not in first_response['results'] or first_response['status_code'] != 201:
                 logger.info("No data in first response. Returning empty results.")
+
                 return {
                     'company_ids': [],
                     'inserted_ids': []
@@ -287,6 +291,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                 scheduler = await schedule_lusha_company_collection(campaign_details=page_payload, eta=eta)
                 logger.info(f" lusha company data collection scheduler: {scheduler}")
                 break
+
             elif page_response['status_code'] == 201 and "data" in page_response['results']:
                 fetch_company_status = True
                 page_companies = []
@@ -308,6 +313,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                 mappings_created = await company_saver.create_campaign_company_mappings_batch(
                     inserted_count['company_ids'], raw_config.get("_id")
                 )
+                
             else:
                 logger.info(f"Failed to fetch page {page_num}")
                 break
