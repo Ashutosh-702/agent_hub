@@ -178,6 +178,7 @@ async def process_lusha_company_collection(campaign_details: Any):
 
     except Exception as e:
         logger.info(f"❌ Error occurred during collection: {str(e)}")
+        
     finally:
         logger.info(f"Returning {len(lusha_company_data)} companies")
 
@@ -317,8 +318,10 @@ async def lusha_company_data_collection(campaign_details: Any):
             else:
                 logger.info(f"Failed to fetch page {page_num}")
                 break
+
     except Exception as e:
         logger.info(f"❌ Error occurred during data collection: {str(e)}")
+
     finally:
         if fetch_company_status:
             campaigns_dao = CampaignsDao(
