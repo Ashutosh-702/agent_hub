@@ -147,15 +147,14 @@ class CampaignService:
             "DATA_SOURCE_TYPE": "mongo",
             "target_executives": prompts.get("persona", "")
         }
-        web_enrichment_prompt = f"""Relevance Criteria: Determine if the company fits either of the following:
-
-        {prompts.get("web", "")}
-
-        Begin your research now using the web search tool to determine if companies match these criteria."""
-        ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
-        ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get(
-            "persona", ""
+        web_enrichment_prompt = (
+            "Relevance Criteria: Determine if the company fits either of the following:\n\n"
+            f"{prompts.get('web', '')}\n\n"
+            "Begin your research now using the web search tool to determine if companies "
+            "match these criteria."
         )
+        ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
+        ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get("persona", "")
         return {"config": ai_sdr_custom_config}
 
 
@@ -172,7 +171,16 @@ class CompanyService:
             "company_status": 0, 
             "metadata": 0
         }
-        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": query_params.campaign_id, "is_relevant": True}, query_params.page, query_params.limit, projection=projection)
+        query = {
+            "campaign_id": query_params.campaign_id, 
+            "is_relevant": True
+        }
+        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated(
+            query=query,
+            page=query_params.page,
+            limit=query_params.limit,
+            projection=projection
+        )
 
         if not response:
             raise ApiException(
@@ -195,14 +203,16 @@ class CompanyService:
             company_id = mapping.get("company_id")
 
             if not company_id:
+                logger.info(f"Company id is not found for campaign {query_params.campaign_id}")
                 continue
 
             company_doc = await self.companies_dao.get_company(company_id)
 
-            if not company_doc or not (company_doc.get("identifiers", {})).get("name"):
+            if not company_doc or not company_doc.get("identifiers", {}).get("name"):
+                logger.info(f"Company data is not found for campaign {query_params.campaign_id}")
                 continue
-            
-            name = (company_doc.get("identifiers", {})).get("name")
+
+            name = company_doc.get("identifiers", {}).get("name")
             profile = company_doc.get("profile") or {}
             location = company_doc.get("location") or {}
             data_rows.append({
@@ -261,6 +271,7 @@ class ContactService:
             )
 
             if not contact_doc:
+                logger.info(f"Contact data is not found for contact id {contact_id}")
                 continue
 
             contact["contact_data"] = contact_doc.get("contact_data")

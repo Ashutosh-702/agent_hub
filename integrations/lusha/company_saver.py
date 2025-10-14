@@ -1,8 +1,9 @@
 from typing import List, Dict, Any
 from datetime import datetime, timezone
+
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from bson import ObjectId
+from config.logging import logger
 
 
 class CompanySaver:
@@ -12,8 +13,8 @@ class CompanySaver:
 
     async def insert_companies_batch_to_db(
         self,
-        company_data_list: List[Dict[str, Any]], 
-        config: Dict[str, Any], 
+        company_data_list: List[Dict[str, Any]],
+        config: Dict[str, Any],
         source: str,
     ) -> List[str]:  # ✅ Return inserted company IDs instead of count
         """
@@ -21,11 +22,12 @@ class CompanySaver:
         Returns list of inserted company IDs.
         """
         if not company_data_list:
+            logger.info(
+                f"⚠️ No valid company data list found in {source} batch")
             return {
                 'company_ids': [],
                 'inserted_ids': []
             }
-
 
         # ✅ STEP 1: Extract all source IDs from the batch
         batch_source_ids = []
@@ -37,10 +39,10 @@ class CompanySaver:
                 batch_source_ids.append(source_id)
 
         if not batch_source_ids:
-            print(f"⚠️ No valid source IDs found in {source} batch")
+            logger.info(f"⚠️ No valid source IDs found in {source} batch")
             return []
 
-        print(f"🔍 Checking {len(batch_source_ids)} {source} companies against database...")
+        logger.info(f"🔍 Checking {len(batch_source_ids)} {source} companies against database...")
 
         # ✅ STEP 2: Query database to find existing source IDs
         existing_companies = await self.companies_dao.get_companies({
@@ -55,27 +57,29 @@ class CompanySaver:
 
         for company in existing_companies:
             source_id = company.get("identifiers", {}).get("source_id")
+
             if source_id not in existing_source_ids:
                 campaign_company_details['company_ids'].append(company['_id'])
+
             existing_source_ids.add(company.get("identifiers", {}).get("source_id"))
 
-        print(f"📊 Found {len(existing_source_ids)} existing companies in database")
-
+        logger.info(f"📊 Found {len(existing_source_ids)} existing companies in database")
         companies_to_insert = []
-    
+
         for company_data in company_data_list:
             source_id = str(company_data.get("id", ""))
 
             if source_id in existing_source_ids:
+                logger.info(f"🔍 {source_id} already exists in database")
                 continue
-            
+
             company_doc = {
                 "identifiers": {
                     "source_id": source_id,
                     "name": company_data.get("name", ""),
-                }, 
+                },
                 "profile": {
-                    "industry": config.get("segmentation", {}).get("industry"),  
+                    "industry": config.get("segmentation", {}).get("industry"),
                     "revenue_min": config.get("target", {}).get("revenue_min"),
                     "revenue_max": config.get("target", {}).get("revenue_max"),
                     "employee_count": config.get("target", {}).get("employee_count"),
@@ -98,7 +102,8 @@ class CompanySaver:
             inserted_ids = await self.companies_dao.create_companies(companies_to_insert)
             campaign_company_details['company_ids'].extend(inserted_ids)
             campaign_company_details['inserted_ids'].extend(inserted_ids)
-            print(f"✅ Inserted {len(inserted_ids)} new {source} companies")
+            logger.info(
+                f"✅ Inserted {len(inserted_ids)} new {source} companies")
 
         return campaign_company_details
 
@@ -112,30 +117,31 @@ class CompanySaver:
         Returns number of mappings created.
         """
         if not company_ids:
+            logger.info(f"⚠️ No valid company ids found in {campaign_id}")
             return 0
 
         mappings_created = 0
 
         campaign_company_runs_data = await self.campaign_company_runs_dao.get_campaign_company_runs({
-            "campaign_id": ObjectId(campaign_id),
-             "company_id": {"$in": company_ids}
+            "campaign_id": campaign_id,
+            "company_id": {"$in": company_ids}
         })
 
         for company_id in company_ids:
             if company_id not in [run["company_id"] for run in campaign_company_runs_data]:
                 mapping_doc = {
-                    "campaign_id": ObjectId(campaign_id),
-                    "company_id": ObjectId(company_id),
+                    "campaign_id": campaign_id,
+                    "company_id": company_id,
                     "company_status": False,
                     "linkedin_contact_status": False,
                     "metadata": {
                         "created_at": datetime.now(timezone.utc),
                         "updated_at": datetime.now(timezone.utc),
                     },
-                }      
+                }
 
                 await self.campaign_company_runs_dao.create_campaign_company_run(mapping_doc)
                 mappings_created += 1
 
-        print(f"✅ Created {mappings_created} campaign-company mappings")
+        logger.info(f"✅ Created {mappings_created} campaign-company mappings")
         return mappings_created

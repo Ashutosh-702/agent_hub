@@ -12,6 +12,7 @@ class CampaignCompanyRunsDao(BaseMongoDao):
         super().__init__(mongo_client, "campaign_company_runs")
 
     async def create_campaign_company_run(self, campaign_company_run: dict):
+        campaign_company_run = self._process_query_objectids(campaign_company_run)
         return await self.insert_one(campaign_company_run)
 
     async def get_campaign_company_runs(self, query: dict = None):
@@ -37,6 +38,7 @@ class CampaignCompanyRunsDao(BaseMongoDao):
     async def get_campaign_company_runs_count(self, query: dict = None):
         if query is None:
             query = {}
+
         query = self._process_query_objectids(query)
 
         return await self.collection.count_documents(query)

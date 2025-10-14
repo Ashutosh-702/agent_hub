@@ -135,3 +135,4 @@ async def save_prospects_data_to_mongo(query_params: SaveProspectsDataToMongo) -
     response_data.success = True
     response_data.data = response
     return response_data.dict()
+    
