@@ -21,13 +21,14 @@ class CompanySaver:
         Insert companies into database.
         Returns list of inserted company IDs.
         """
+        campaign_company_details = {
+            'company_ids': [],
+            'inserted_ids': []
+        }
+
         if not company_data_list:
-            logger.info(
-                f"⚠️ No valid company data list found in {source} batch")
-            return {
-                'company_ids': [],
-                'inserted_ids': []
-            }
+            logger.info(f"⚠️ No valid company data list found in {source} batch")
+            return campaign_company_details
 
         # ✅ STEP 1: Extract all source IDs from the batch
         batch_source_ids = []
@@ -40,7 +41,7 @@ class CompanySaver:
 
         if not batch_source_ids:
             logger.info(f"⚠️ No valid source IDs found in {source} batch")
-            return []
+            return campaign_company_details
 
         logger.info(f"🔍 Checking {len(batch_source_ids)} {source} companies against database...")
 
@@ -50,10 +51,7 @@ class CompanySaver:
         })
 
         existing_source_ids = set()
-        campaign_company_details = {
-            'company_ids': [],
-            'inserted_ids': []
-        }
+
 
         for company in existing_companies:
             source_id = company.get("identifiers", {}).get("source_id")
@@ -102,8 +100,7 @@ class CompanySaver:
             inserted_ids = await self.companies_dao.create_companies(companies_to_insert)
             campaign_company_details['company_ids'].extend(inserted_ids)
             campaign_company_details['inserted_ids'].extend(inserted_ids)
-            logger.info(
-                f"✅ Inserted {len(inserted_ids)} new {source} companies")
+            logger.info(f"✅ Inserted {len(inserted_ids)} new {source} companies")
 
         return campaign_company_details
 

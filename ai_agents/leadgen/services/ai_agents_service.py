@@ -33,16 +33,18 @@ from integrations.lusha.lusha_api import LushaAPIClient
 
 class CampaignService:
     def __init__(self):
-        self.campaign_dao = CampaignsDao(
-            loaded_config.connection_manager.mongo_client)
+        self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.event_emitter = loaded_config.connection_manager.event_emitter
-        self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[
-            LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
+        self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
 
     async def upload_leadgen_form(self, form_submission: FormSubmission) -> Dict[str, str]:
 
         db_data = self._transform_form_to_db_data(form_submission)
-        bind_contextvars(operation="upload_leadgen_form", component="ai_agents_service", event_type="upload_leadgen_form")
+        bind_contextvars(
+            operation="upload_leadgen_form",
+            component="ai_agents_service", 
+            event_type="upload_leadgen_form"
+        )
         campaign_id = await self.campaign_dao.create_campaign(db_data)
 
         if not campaign_id:
@@ -68,8 +70,7 @@ class CampaignService:
             event_meta={"service": "leadgen", "campaign_id": str(campaign_id)}
         )
 
-        logger.info(
-            f"📤 Campaign ID {str(campaign_id)} queued for processing: {request_id}")
+        logger.info(f"📤 Campaign ID {str(campaign_id)} queued for processing: {request_id}")
 
         return {
             "request_id": request_id,
@@ -278,7 +279,7 @@ class ContactService:
             contact["linkedin_data"] = contact_doc.get("linkedin_data")
 
         serialized_response = serialize_objectid(response)
-        
+
         return {"campaign_contact_data": serialized_response, "pagination_info": pagination_info}
 
     async def get_linkedin_contact_details(self, linkedin_url: str):

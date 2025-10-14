@@ -72,14 +72,13 @@ class LushaAPIClient:
             logger.info(f"Daily left: {response_data['daily_left']}, "
                         f"Hourly left: {response_data['hourly_left']}, "
                         f"Minute left: {response_data['minute_left']}")
-            logger.info(f"Rate limit exhausted")
+            logger.warning(f"Rate limit exhausted")
 
             return response_data
             
         else:
             error_text = await response.text()
-            logger.info(
-                f"Search API failed: {response.status} - {error_text}")
+            logger.warning(f"Search API failed: {response.status} - {error_text}")
 
         return None
 
@@ -176,8 +175,7 @@ class LushaAPIClient:
             first_response = await self.lusha_search_api()
 
             if first_response['status_code'] == 429:
-                logger.info(
-                    "First API call failed or hit rate limit. Returning empty results.")
+                logger.warning("First API call failed or hit rate limit. Returning empty results.")
                 self.payload_values['raw_config'] = config
                 eta = generate_default_eta_expression(
                     daily_left=first_response['daily_left'],
@@ -197,8 +195,7 @@ class LushaAPIClient:
             elif (first_response['status_code'] == 201
                   and "data" not in first_response['results']
                   or first_response['status_code'] != 201):
-                logger.info(
-                    "No data in first response. Returning empty results.")
+                logger.warning("No data in first response. Returning empty results.")
                 return []
 
             # Process first page data
@@ -212,27 +209,20 @@ class LushaAPIClient:
                 })
 
             # ✅ IMMEDIATE DATABASE INSERTION
-            inserted_count = await self.company_saver.insert_companies_batch_to_db(
-                page_companies, config,
-                "lusha")
-
+            inserted_count = await self.company_saver.insert_companies_batch_to_db(page_companies, config, "lusha")
             # Step 2: Create campaign mappings
             mappings_created = await self.company_saver.create_campaign_company_mappings_batch(
                 inserted_count['company_ids'], config.get("_id")
             )
             total_inserted += len(inserted_count['inserted_ids'])
-            logger.info(
-                f"📊 Page 1: Inserted {len(inserted_count['inserted_ids'])} companies")
+            logger.info(f"📊 Page 1: Inserted {len(inserted_count['inserted_ids'])} companies")
 
             # Step 2: Calculate total pages needed
-            total_results = first_response.get(
-                "results", {}).get("totalResults", 0)
+            total_results = first_response.get("results", {}).get("totalResults", 0)
             logger.info(f"Total results for this search: {total_results}")
-            total_pages = (total_results + page_size -
-                           1) // page_size  # Ceiling division
+            total_pages = (total_results + page_size - 1) // page_size  # Ceiling division
 
-            logger.info(
-                f"Total results: {total_results}, Total pages: {total_pages}")
+            logger.info(f"Total results: {total_results}, Total pages: {total_pages}")
 
             for page_num in range(1, total_pages):
                 logger.info(f"Fetching page {page_num + 1} of {total_pages}")
@@ -256,11 +246,7 @@ class LushaAPIClient:
                         hourly_left=page_response['hourly_left'],
                         minute_left=page_response['minute_left']
                     )
-
-                    scheduler_response = await schedule_lusha_company_collection(
-                        self.payload_values, eta
-                    )
-
+                    scheduler_response = await schedule_lusha_company_collection(self.payload_values, eta)
                     logger.info(f"Scheduler response: {scheduler_response}")
                     break
 
@@ -286,8 +272,7 @@ class LushaAPIClient:
                     mappings_created = await self.company_saver.create_campaign_company_mappings_batch(
                         inserted_count['company_ids'], config.get("_id")
                     )
-                    logger.info(
-                        f"📊 Page {page_num + 1}: Inserted {len(inserted_count['inserted_ids'])} companies")
+                    logger.info(f"📊 Page {page_num + 1}: Inserted {len(inserted_count['inserted_ids'])} companies")
 
                 else:
                     logger.info(f"Failed to fetch page {page_num}")
@@ -299,7 +284,8 @@ class LushaAPIClient:
 
             else:
                 logger.info(
-                    f"Collection completed successfully. Collected {total_inserted} companies from {total_pages} pages.")
+                    f"Collection completed successfully. "
+                    f"Collected {total_inserted} companies from {total_pages} pages.")
 
         except Exception as e:
             raise Exception(f"Error searching companies: {str(e)}")
@@ -310,7 +296,7 @@ class LushaAPIClient:
 
     async def lusha_contact_search_api(self, payload_values_for_contact: Dict[str, Any],) -> Dict[str, Any]:
         bind_contextvars(operation="lusha_search_api", component="lusha_api_client", event_type="lusha_contact_search")
-        logger.info("Payload_values_for_contact:",payload=payload_values_for_contact)
+        logger.info(f"Payload_values_for_contact:", payload=payload_values_for_contact)
 
         payload_query = self.build_payload_for_contact(
             payload_values_for_contact=payload_values_for_contact

@@ -124,8 +124,7 @@ class LushaHelper:
         revenue_max = sheets_data.get("target", "")['revenue_max']
         currency = sheets_data.get("target", "")['currency']
 
-        logger.info(
-            f"revenue_min_check: {revenue_min}, revenue_max_check: {revenue_max}, currency: {currency}")
+        logger.info(f"revenue_min_check: {revenue_min}, revenue_max_check: {revenue_max}, currency: {currency}")
         # here value is coming in this way
         # revenue_min_check: (1,), revenue_max_check: (2,), currency: ('USD',)
         
@@ -180,7 +179,7 @@ class LushaHelper:
         logger.info(f"Lusha config: {lusha_config}")
 
         if not lusha_config or len(lusha_config) <= 1:
-            logger.info("❌ No valid Lusha configuration generated")
+            logger.warning("❌ No valid Lusha configuration generated")
             return []
 
         try:
@@ -190,7 +189,7 @@ class LushaHelper:
             return companies
 
         except Exception as e:
-            logger.info(f"❌ Error calling Lusha API: {e}")
+            logger.error(f"❌ Error calling Lusha API: {e}")
             return []
 
     def _clean_tuple_value(self, value):
