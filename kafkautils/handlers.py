@@ -161,6 +161,7 @@ async def process_lusha_company_collection(campaign_details: Any):
         'company_ids': [],
         'inserted_ids': []
     }
+
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
@@ -178,7 +179,7 @@ async def process_lusha_company_collection(campaign_details: Any):
 
     except Exception as e:
         logger.info(f"❌ Error occurred during collection: {str(e)}")
-        
+
     finally:
         logger.info(f"Returning {len(lusha_company_data)} companies")
 
@@ -187,6 +188,7 @@ async def process_lusha_company_collection(campaign_details: Any):
 
 async def lusha_company_data_collection(campaign_details: Any):
     fetch_company_status = False
+    
     try:
         logger.info(f" lusha company data collection campaign_details: {campaign_details}")
         per_page = campaign_details["pages"]["page"]
