@@ -10,7 +10,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CampaignContactData,
     LinkedinContactDetails,
     LushaContactEnrichment,
-    SaveProspectsDataToMongo
+    SaveProspectsDataToMongo,
+    LushaGetContactEnrichment
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -107,7 +108,7 @@ async def get_linkedin_contact_details(query_params: LinkedinContactDetails = De
     return response_data.dict()
 
 
-async def lusha_get_contact_enrichment(query_params: LushaContactEnrichment) -> Dict[str, Any]:
+async def lusha_get_contact_enrichment(query_params: LushaGetContactEnrichment) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)
     lusha_contact_enrichment_helper = LushaContactEnrichmentHelper()
 

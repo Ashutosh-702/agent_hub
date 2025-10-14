@@ -13,7 +13,6 @@ from ai_agents.leadgen.views.ai_agents import (
     lusha_get_contact_enrichment,
     lusha_contact_enrichment,
     save_prospects_data_to_mongo
-
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)

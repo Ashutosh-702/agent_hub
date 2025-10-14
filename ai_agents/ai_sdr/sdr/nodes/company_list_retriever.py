@@ -130,8 +130,8 @@ async def _read_mongo_companies(campaign_id: str) -> pd.DataFrame:
         response = requests.get(f"{BASE_URL}/api/v1/fetch_companies",params={"campaign_id":campaign_id}, verify=False, timeout=30)
         response = response.json()
         df=[]
-        if response.get("status","") == "success":
-            df = pd.DataFrame(response.get("company_df",[]))
+        if response.get("success") == True:
+            df = pd.DataFrame(response.get("data",[]))
         clean_log(f"Read {len(df)} rows from Mongo for campaign {campaign_id}")
         detailed_log(f"Mongo DataFrame columns: {df.columns.tolist()}")
         return df

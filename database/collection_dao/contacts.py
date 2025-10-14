@@ -9,6 +9,7 @@ class ContactsDao(BaseMongoDao):
         super().__init__(mongo_client, "contacts")
 
     async def create_contact(self, contact: dict):
+        contact = self._process_query_objectids(contact)
         return await self.insert_one(contact)
     
     async def create_contacts(self, contacts: List[Dict[str, Any]]):

@@ -15,6 +15,7 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CompanyListWithDetails, 
     FormSubmission,
     CampaignContactData,
+    LushaGetContactEnrichment,
     LushaContactEnrichment
 )
 from ai_agents.leadgen.schemas.contact_models import ContactCampaignMapping, ContactDocument
@@ -284,7 +285,7 @@ class ContactService:
         response = await self.lusha_api_client.lusha_get_linkedin_contact_details(linkedin_url)
         return response
 
-    async def lusha_get_contact_enrichment(self, query_params: LushaContactEnrichment):
+    async def lusha_get_contact_enrichment(self, query_params: LushaGetContactEnrichment):
         campaign_id = query_params.campaign_id
         company_map_list = query_params.company_map_list
         page = query_params.page
@@ -350,10 +351,10 @@ class ContactService:
         return result
 
     async def create_contact(self, contact_doc: ContactDocument, campaign_id: str):
-        contact_id = await self.contacts_dao.create_contact(contact_doc)
+        contact_id = await self.contacts_dao.create_contact(contact_doc.dict())
         contact_data =  {
             "campaign_id": campaign_id,
-            "company_id": contact_doc.contact_data.company_id,
+            "company_id": contact_doc.company_id,
             "contact_id": contact_id,
             "metadata": {
                 "created_at": datetime.utcnow(),
@@ -366,13 +367,14 @@ class ContactService:
     async def insert_campaign_contact_run(self, campaign_contact_run_doc: ContactCampaignMapping):
         query = {
             "campaign_id": campaign_contact_run_doc.get("campaign_id"),
-            "company_id": campaign_contact_run_doc.get("company_id")    ,
-            "contact_id": campaign_contact_run_doc.get("contact_id")
+            "company_id": campaign_contact_run_doc.get("company_id"),
+            "contact_id": campaign_contact_run_doc.get("contact_id"),
+            "metadata": campaign_contact_run_doc.get("metadata")
         }
         check_campaign_contact_run = await self.campaign_contact_run_dao.get_campaign_contact_runs(query)
         
         if check_campaign_contact_run:
             return
         
-        await self.campaign_contact_run_dao.create_campaign_contact_run(campaign_contact_run_doc)
+        await self.campaign_contact_run_dao.create_campaign_contact_run(query)
         return

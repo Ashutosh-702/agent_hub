@@ -257,13 +257,15 @@ class OrchestratedCLIApp:
 
         while True:
             BASE_URL = loaded_config.base_url
-            response = requests.get(f"{BASE_URL}/api/v1/fetch_and_claim_first_campaign", verify=False, timeout=30)
+            response = requests.get(f"{BASE_URL}/api/v1/fetch_and_claim_first_campaign?status=pending", verify=False, timeout=30)
             claimed = response.json()
 
-            if claimed.get("status") == "success" and "config" not in claimed:
+            data = claimed.get("data",{})
+            if claimed.get("status") == "success" and not data:
                 self.print_success("No pending campaigns left")
                 break
-            ai_sdr_custom_config = claimed.get("config",{})
+            
+            ai_sdr_custom_config = data
             campaign_id =ai_sdr_custom_config.get("CAMPAIGN_ID","")
 
             if ai_sdr_custom_config:
