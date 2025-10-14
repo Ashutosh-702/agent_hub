@@ -55,14 +55,10 @@ async def leadgen_batch_processing_handler(message: Any):
         payload = None
 
         if isinstance(message, dict) and 'payload' in message:
-            logger.info(f"🔍 comes to here 1")
             payload = message['payload']
-        elif isinstance(message, dict):
-            logger.info(f"🔍 comes to here 2")
-            payload = message
         else:
-            logger.info(f"🔍 comes to here 3")
-            payload = message
+            logger.info(f"🔍 payload missing")
+            return
 
         logger.info(f"📨 Received leadgen message: {payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'}")
 
