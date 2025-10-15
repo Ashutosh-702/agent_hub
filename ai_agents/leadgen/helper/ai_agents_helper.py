@@ -134,7 +134,12 @@ class LushaContactEnrichmentHelper:
                             {
                                 "campaign_id": campaign_id,
                                 "company_id": company_id,
-                                "contact_id": contact_id
+                                "contact_id": contact_id,
+                                "metadata": {
+                                    "created_at": datetime.utcnow(),
+                                    "updated_at": datetime.utcnow(),
+                                    "lusha_raw_data": data
+                                }
                             }
                         )
                         
