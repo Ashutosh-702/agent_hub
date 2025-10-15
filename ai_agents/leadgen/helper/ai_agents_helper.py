@@ -18,8 +18,7 @@ class LushaContactEnrichmentHelper:
         self.lusha_api_client = LushaAPIClient()
         self.company_service = CompanyService()
         self.contact_service = ContactService()
-        self.companies_dao = CompaniesDao(
-            loaded_config.connection_manager.mongo_client)
+        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
 
     async def lusha_get_contact_enrichment(self, query_params: LushaGetContactEnrichment):
         campaign_id = query_params.campaign_id
