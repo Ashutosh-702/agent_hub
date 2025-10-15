@@ -15,34 +15,39 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CompanyListWithDetails, 
     FormSubmission,
     CampaignContactData,
+    LushaGetContactEnrichment,
     LushaContactEnrichment
 )
 from ai_agents.leadgen.schemas.contact_models import ContactCampaignMapping, ContactDocument
 from ai_agents.leadgen.utils import serialize_objectid
-
 from database.collection_dao.campaigns import CampaignsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.contacts import ContactsDao
 from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
-
 from kafkautils.producer.event_helpers import emit_event_helper
-from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
+from kafkautils.constants import(
+    LEADGEN_BATCH_PROCESSING, 
+    KAFKA_SERVICE_CONFIG_MAPPING, 
+    LeadgenServices
+)
 from integrations.lusha.lusha_api import LushaAPIClient
 
 
 class CampaignService:
     def __init__(self):
-        self.campaign_dao = CampaignsDao(
-            loaded_config.connection_manager.mongo_client)
+        self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.event_emitter = loaded_config.connection_manager.event_emitter
-        self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[
-            LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
+        self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
 
     async def upload_leadgen_form(self, form_submission: FormSubmission) -> Dict[str, str]:
 
         db_data = self._transform_form_to_db_data(form_submission)
-        bind_contextvars(operation="upload_leadgen_form", component="ai_agents_service", event_type="upload_leadgen_form")
+        bind_contextvars(
+            operation="upload_leadgen_form",
+            component="ai_agents_service", 
+            event_type="upload_leadgen_form"
+        )
         campaign_id = await self.campaign_dao.create_campaign(db_data)
 
         if not campaign_id:
@@ -68,8 +73,7 @@ class CampaignService:
             event_meta={"service": "leadgen", "campaign_id": str(campaign_id)}
         )
 
-        logger.info(
-            f"📤 Campaign ID {str(campaign_id)} queued for processing: {request_id}")
+        logger.info(f"📤 Campaign ID {str(campaign_id)} queued for processing: {request_id}")
 
         return {
             "request_id": request_id,
@@ -145,14 +149,15 @@ class CampaignService:
             "DATA_SOURCE_TYPE": "mongo",
             "target_executives": prompts.get("persona", "")
         }
-        web_enrichment_prompt = f"""Relevance Criteria: Determine if the company fits either of the following:
-
-        {prompts.get("web", "")}
-
-        Begin your research now using the web search tool to determine if companies match these criteria."""
+        web_enrichment_prompt = (
+            "Relevance Criteria: Determine if the company fits either of the following:\n\n"
+            f"{prompts.get('web', '')}\n\n"
+            "Begin your research now using the web search tool to determine if companies "
+            "match these criteria."
+        )
         ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
-        ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get(
-            "persona", "")
+        ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get("persona", "")
+
         return {"config": ai_sdr_custom_config}
 
 
@@ -164,20 +169,29 @@ class CompanyService:
             loaded_config.connection_manager.mongo_client)
 
     async def get_company_mapping_list(self, query_params: CompanyMappingList):
-        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": query_params.campaign_id, "is_relevant": True}, query_params.page, query_params.limit)
+        projection = {
+            "_id": 0,           
+            "company_status": 0, 
+            "metadata": 0
+        }
+        query = {
+            "campaign_id": query_params.campaign_id, 
+            "is_relevant": True
+        }
+        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated(
+            query=query,
+            page=query_params.page,
+            limit=query_params.limit,
+            projection=projection
+        )
 
         if not response:
             raise ApiException(
                 f"No company mappings found for campaign_id {query_params.campaign_id}")
 
         serialized_response = serialize_objectid(response)
-
-        for serialized_item in serialized_response:
-            serialized_item.pop("_id")
-            serialized_item.pop("company_status")
-            serialized_item.pop("metadata")
-
         serialized_pagination = serialize_objectid(pagination_info)
+
         return {"company_map_list": serialized_response, "pagination_info": serialized_pagination}
 
     async def fetch_companies_from_mappings(self, query_params: CompanyListWithDetails):
@@ -193,18 +207,16 @@ class CompanyService:
             company_id = mapping.get("company_id")
 
             if not company_id:
+                logger.info(f"Company id is not found for campaign {query_params.campaign_id}")
                 continue
 
             company_doc = await self.companies_dao.get_company(company_id)
 
-            if not company_doc:
+            if not company_doc or not company_doc.get("identifiers", {}).get("name"):
+                logger.info(f"Company data is not found for campaign {query_params.campaign_id}")
                 continue
 
-            name = (company_doc.get("identifiers", {})).get("name")
-
-            if not name:
-                continue
-
+            name = company_doc.get("identifiers", {}).get("name")
             profile = company_doc.get("profile") or {}
             location = company_doc.get("location") or {}
             data_rows.append({
@@ -229,7 +241,6 @@ class ContactService:
         self.contacts_dao = ContactsDao(
             loaded_config.connection_manager.mongo_client)
         self.lusha_api_client = LushaAPIClient()
-
 
     async def get_campaign_contact_data(self, query_params: CampaignContactData):
         filter_query = {"campaign_id": query_params.campaign_id}
@@ -264,24 +275,30 @@ class ContactService:
             )
 
             if not contact_doc:
+                logger.info(f"Contact data is not found for contact id {contact_id}")
                 continue
 
             contact["contact_data"] = contact_doc.get("contact_data")
             contact["linkedin_data"] = contact_doc.get("linkedin_data")
 
         serialized_response = serialize_objectid(response)
+
         return {"campaign_contact_data": serialized_response, "pagination_info": pagination_info}
 
     async def get_linkedin_contact_details(self, linkedin_url: str):
         response = await self.lusha_api_client.lusha_get_linkedin_contact_details(linkedin_url)
+
         return response
 
-    async def lusha_get_contact_enrichment(self, query_params: LushaContactEnrichment):
+    async def lusha_get_contact_enrichment(self, query_params: LushaGetContactEnrichment):
         campaign_id = query_params.campaign_id
         company_map_list = query_params.company_map_list
         page = query_params.page
         page_size = query_params.page_size
         departments = query_params.departments
+
+        if len(company_map_list) > 50:
+            raise ApiException("Company map list should be less than 50")
 
         if not campaign_id:
             raise ValueError("Campaign Id is required")
@@ -289,12 +306,11 @@ class ContactService:
         companies_dao = CompaniesDao(
             loaded_config.connection_manager.mongo_client)
 
-        # company_map_list = await campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
         company_names = []
         company_source_id_name_mappings = {}
 
         if company_map_list:
-            for companies in company_map_list[:10]:
+            for companies in company_map_list:
                 company_id = companies.get("company_id", "")
                 company_doc = await companies_dao.get_company(company_id)
 
@@ -342,10 +358,10 @@ class ContactService:
         return result
 
     async def create_contact(self, contact_doc: ContactDocument, campaign_id: str):
-        contact_id = await self.contacts_dao.create_contact(contact_doc)
+        contact_id = await self.contacts_dao.create_contact(contact_doc.dict())
         contact_data =  {
             "campaign_id": campaign_id,
-            "company_id": contact_doc.contact_data.company_id,
+            "company_id": contact_doc.company_id,
             "contact_id": contact_id,
             "metadata": {
                 "created_at": datetime.utcnow(),
@@ -353,18 +369,21 @@ class ContactService:
             }
         }
         await self.insert_campaign_contact_run(contact_data)
+
         return
 
     async def insert_campaign_contact_run(self, campaign_contact_run_doc: ContactCampaignMapping):
-        query = {
+        contact_data = {
             "campaign_id": campaign_contact_run_doc.get("campaign_id"),
-            "company_id": campaign_contact_run_doc.get("company_id")    ,
-            "contact_id": campaign_contact_run_doc.get("contact_id")
+            "company_id": campaign_contact_run_doc.get("company_id"),
+            "contact_id": campaign_contact_run_doc.get("contact_id"),
+            
         }
-        check_campaign_contact_run = await self.campaign_contact_run_dao.get_campaign_contact_runs(query)
-        
+        check_campaign_contact_run = await self.campaign_contact_run_dao.get_campaign_contact_runs(contact_data)
+        contact_data["metadata"] = campaign_contact_run_doc.get("metadata")
         if check_campaign_contact_run:
             return
         
-        await self.campaign_contact_run_dao.create_campaign_contact_run(campaign_contact_run_doc)
+        await self.campaign_contact_run_dao.create_campaign_contact_run(contact_data)
+        
         return

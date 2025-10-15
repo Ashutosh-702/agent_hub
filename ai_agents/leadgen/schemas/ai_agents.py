@@ -53,6 +53,7 @@ class FormSubmission(BaseModel):
 
         return user_email
 
+
 class CampaignStatusUpdate(BaseModel):
     campaign_id: str
     status: str
@@ -97,3 +98,4 @@ class SaveProspectsDataToMongo(BaseModel):
     campaign_id: str
     company_name: str
     company_id: str
+    
