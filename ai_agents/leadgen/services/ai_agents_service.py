@@ -359,7 +359,6 @@ class ContactService:
 
     async def create_contact(self, contact_doc: ContactDocument, campaign_id: str):
         contact_id = await self.contacts_dao.create_contact(contact_doc.dict())
-        raw_data = contact_doc.get("metadata", {}).get("lusha_raw_data", {})
         contact_data =  {
             "campaign_id": campaign_id,
             "company_id": contact_doc.company_id,
@@ -367,7 +366,6 @@ class ContactService:
             "metadata": {
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow(),
-                "lusha_raw_data": raw_data
             }
         }
         await self.insert_campaign_contact_run(contact_data)

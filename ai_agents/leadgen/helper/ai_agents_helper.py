@@ -138,7 +138,6 @@ class LushaContactEnrichmentHelper:
                                 "metadata": {
                                     "created_at": datetime.utcnow(),
                                     "updated_at": datetime.utcnow(),
-                                    "lusha_raw_data": data
                                 }
                             }
                         )
