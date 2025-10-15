@@ -16,6 +16,7 @@ class ContactsDao(BaseMongoDao):
         return await self.insert_many(contacts)
     
     async def get_contacts(self, filters: dict = {}):
+        filters = self._process_query_objectids(filters)
         return await self.find_many(filters)
     
     async def get_contact(self, contact_id: str, projection: dict = None):

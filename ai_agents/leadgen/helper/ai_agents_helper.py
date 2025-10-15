@@ -214,13 +214,15 @@ class SaveProspectsDataToMongoHelper:
                 name_parts = full_name.split(" ", 1) if full_name else ["", ""]
                 firstname = name_parts[0]
                 lastname = name_parts[1] if len(name_parts) > 1 else ""
+                emails = [prospect.get("email")] if prospect.get("email") else []
+                phones = [prospect.get("phone_number")] if prospect.get("phone_number") else []
                 contact_doc = {
                     "company_id": company_id,
                     "contact_data": {
                         "firstname": firstname,
                         "lastname": lastname,
-                        "email": prospect.get("email", ""),
-                        "phone": prospect.get("phone_number", ""),
+                        "email": emails,
+                        "phone": phones,
                         "jobtitle": prospect.get("title", ""),
                         "company": prospect.get("company", company_name),
                         
@@ -241,6 +243,7 @@ class SaveProspectsDataToMongoHelper:
                 contact = stored_contacts[0]
                 contact_id = contact.get("_id", "")
                 inserted_ids.append(contact_id)
+                logger.info(f"contact already exists, skipping: {contact_id}")
 
         for id in inserted_ids:
             campaign_contact_run_doc = {
