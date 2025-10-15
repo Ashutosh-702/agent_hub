@@ -7,8 +7,7 @@ from urllib3.exceptions import InsecureRequestWarning
 from config.loaded_config import loaded_config
 from config.logging import logger
 from integrations.config.lusha_industry_config import LUSHA_CONFIG
-from integrations.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
-
+from integrations.config.constants import MAX_EMPLOYEES
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -127,7 +126,7 @@ class CoresignalAPIClient:
         for name in industries:
             if name in coresignal_lookup:
                 mapped_industries.extend(coresignal_lookup[name])
-                
+
             else:
                 logger.info(f"⚠️ No CoreSignal mapping found for '{name}'")
     
