@@ -34,6 +34,7 @@ class LushaHelper:
 
         except Exception as e:
             logger.info(f"❌ Error loading industry mapping: {e}")
+
             return {}
 
     def parse_employee_range(self, range_str: str) -> tuple:
@@ -45,6 +46,7 @@ class LushaHelper:
         if '+' in range_str:
             min_val = int(range_str.replace('+', ''))
             return min_val, MAX_EMPLOYEES
+
         elif '-' in range_str:
             parts = range_str.split('-')
 
@@ -83,54 +85,46 @@ class LushaHelper:
         lusha_config = {
             "pages": {"page": 0, "size": 40}
         }
-        industry_names = sheets_data.get(
-            "segmentation", {}).get("industry", [])
+        industry_names = sheets_data.get("segmentation", {}).get("industry", [])
 
         if not isinstance(industry_names, list):
-            logger.info("⚠️ Expected list for industry names, got:",
-                  type(industry_names))
+            logger.info(f"⚠️ Expected list for industry names, got: {type(industry_names)}")
             industry_names = []
 
-        if industry_names:
-            sub_ids = []
-            for name in industry_names:
-                if name in self.LUSHA_LOOKUP:
-                    sub_ids.append(self.LUSHA_LOOKUP[name])
-                else:
-                    logger.info(f"⚠️ Industry '{name}' not found in mapping")
-            sub_ids = list(OrderedDict.fromkeys(sub_ids))
-
-            if sub_ids:
-                lusha_config["subIndustriesIds"] = sub_ids
+        sub_ids = []
+        for name in industry_names:
+            if name in self.LUSHA_LOOKUP:
+                sub_ids.append(self.LUSHA_LOOKUP[name])
+            else:
+                logger.info(f"⚠️ Industry '{name}' not found in mapping")
+                
+        if sub_ids:
+            lusha_config["subIndustriesIds"] = list(OrderedDict.fromkeys(sub_ids))
 
         if sheets_data.get("target", {}).get("location", {}).get("names"):
             lusha_locations = []
             location_type = sheets_data['target']["location"]['type']
             locations = sheets_data['target']["location"]['names']
-            lusha_config["location_type"] = location_type
+            
+            for location in locations:
+                if location in LUSHA_COUNTRY_CONFIG:
+                    lusha_locations.append(
+                        LUSHA_COUNTRY_CONFIG[location].get(
+                            "country", location)
+                    )
 
-            if locations:
-                for location in locations:
-                    if location in LUSHA_COUNTRY_CONFIG:
-                        lusha_locations.append(
-                            LUSHA_COUNTRY_CONFIG[location].get(
-                                "country", location)
-                        )
-                    else:
-                        lusha_locations.append(location)
+                else:
+                    lusha_locations.append(location)
 
-                if lusha_locations:
+            if lusha_locations:
                     lusha_config["locations"] = lusha_locations
-
-            else:
-                lusha_config["locations"] = locations
+                    lusha_config["location_type"] = location_type
 
         revenue_min = sheets_data.get("target", "")['revenue_min']
         revenue_max = sheets_data.get("target", "")['revenue_max']
         currency = sheets_data.get("target", "")['currency']
 
-        logger.info(
-            f"revenue_min_check: {revenue_min}, revenue_max_check: {revenue_max}, currency: {currency}")
+        logger.info(f"revenue_min_check: {revenue_min}, revenue_max_check: {revenue_max}, currency: {currency}")
         # here value is coming in this way
         # revenue_min_check: (1,), revenue_max_check: (2,), currency: ('USD',)
         
@@ -139,11 +133,8 @@ class LushaHelper:
                 min_value = self._clean_tuple_value(revenue_min) 
                 max_value = self._clean_tuple_value(revenue_max) 
                 currency_value = self._clean_tuple_value(currency) 
-
-                min_actual = self.convert_revenue_to_actual(
-                    min_value, currency_value)
-                max_actual = self.convert_revenue_to_actual(
-                    max_value, currency_value)
+                min_actual = self.convert_revenue_to_actual(min_value, currency_value)
+                max_actual = self.convert_revenue_to_actual(max_value, currency_value)
                 logger.info(f"min_actual: {min_actual}, max_actual: {max_actual}")
 
                 if min_actual > 0 or max_actual > 0:
@@ -176,6 +167,7 @@ class LushaHelper:
 
         lusha_config["campaign_id"] = sheets_data.get("_id")
         logger.info(f"✅ Converted sheets config to Lusha config: {lusha_config}")
+
         return lusha_config
 
     async def get_companies_from_lusha(self, config: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -187,7 +179,7 @@ class LushaHelper:
         logger.info(f"Lusha config: {lusha_config}")
 
         if not lusha_config or len(lusha_config) <= 1:
-            logger.info("❌ No valid Lusha configuration generated")
+            logger.warning("❌ No valid Lusha configuration generated")
             return []
 
         try:
@@ -197,7 +189,7 @@ class LushaHelper:
             return companies
 
         except Exception as e:
-            logger.info(f"❌ Error calling Lusha API: {e}")
+            logger.error(f"❌ Error calling Lusha API: {e}")
             return []
 
     def _clean_tuple_value(self, value):

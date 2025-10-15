@@ -70,6 +70,7 @@ async def fetch_companies_from_mappings(query_params: CompanyListWithDetails = D
     response = await leadgen_form_upload_service.fetch_companies_from_mappings(query_params)
     response_data.success = True
     response_data.data = response.get("company_details")
+
     return response_data.dict()
 
 
@@ -81,6 +82,7 @@ async def get_campaign_contact_data(query_params: CampaignContactData = Depends(
     response_data.success = True
     response_data.data = response.get("campaign_contact_data")
     response_data.pagination = response.get("pagination_info")
+
     return response_data.dict()
 
 
@@ -91,6 +93,7 @@ async def fetch_campaign_by_status(status: str) -> Dict[str, Any]:
     response = await leadgen_form_upload_service.fetch_campaign_by_status(status)
     response_data.success = True
     response_data.data = response.get("config")
+
     return response_data.dict()
 
 
@@ -105,6 +108,7 @@ async def get_linkedin_contact_details(query_params: LinkedinContactDetails = De
         response_data.success = True
         
     response_data.data = contact_data
+    
     return response_data.dict()
 
 

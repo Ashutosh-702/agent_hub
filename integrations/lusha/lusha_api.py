@@ -34,16 +34,13 @@ class LushaAPIClient:
             'Content-Type': 'application/json'
         }
         self.payload_values: Dict[str, Any] = None
-        self.companies_dao = CompaniesDao(
-            loaded_config.connection_manager.mongo_client)
-        self.campaign_company_runs_dao = CampaignCompanyRunsDao(
-            loaded_config.connection_manager.mongo_client)
-        self.company_saver = CompanySaver(
-            self.companies_dao, self.campaign_company_runs_dao)
+        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        self.company_saver = CompanySaver(self.companies_dao, self.campaign_company_runs_dao)
         self.timeout = 30
 
     async def lusha_search_api(self) -> List[int]:
-        logger.info(f"Payload_values: {self.payload_values}")
+        logger.info(f"Payload_values:", payload=self.payload_values)
 
         payload_query = self.build_payload(
             payload_values=self.payload_values,
@@ -65,28 +62,26 @@ class LushaAPIClient:
         if response.status == 201:
             response_data['results'] = result
             return response_data
+
         elif response.status == 429:
             # Return None to indicate rate limit exhaustion rather than raising exception
             response_headers = dict(response.headers)
-            response_data['daily_left'] = response_headers.get(
-                'x-daily-requests-left', None)
-
-            response_data['hourly_left'] = response_headers.get(
-                'x-hourly-requests-left', None)
-
-            response_data['minute_left'] = response_headers.get(
-                'x-minute-requests-left', None)
+            response_data['daily_left'] = response_headers.get('x-daily-requests-left', None)
+            response_data['hourly_left'] = response_headers.get('x-hourly-requests-left', None)
+            response_data['minute_left'] = response_headers.get('x-minute-requests-left', None)
 
             logger.info(f"Daily left: {response_data['daily_left']}, "
                         f"Hourly left: {response_data['hourly_left']}, "
                         f"Minute left: {response_data['minute_left']}")
+            logger.warning(f"Rate limit exhausted")
 
-            logger.info(f"Rate limit exhausted")
             return response_data
+            
         else:
-            logger.info(
-                f"Search API failed: {response.status} - {response.text}")
-            return None
+            error_text = await response.text()
+            logger.warning(f"Search API failed: {response.status} - {error_text}")
+
+        return None
 
     def build_payload(
         self,
@@ -138,8 +133,10 @@ class LushaAPIClient:
                     if region in COMPANY_GROUPINGS:
                         include_data["locations"].append(
                             {"country_grouping": COMPANY_GROUPINGS[region]})
+
                     else:
                         include_data["locations"].append({"continent": region})
+
             else:
                 include_data["locations"] = [
                     {"country": country} for country in locations]
@@ -179,8 +176,7 @@ class LushaAPIClient:
             first_response = await self.lusha_search_api()
 
             if first_response['status_code'] == 429:
-                logger.info(
-                    "First API call failed or hit rate limit. Returning empty results.")
+                logger.warning("First API call failed or hit rate limit. Returning empty results.")
                 self.payload_values['raw_config'] = config
                 eta = generate_default_eta_expression(
                     daily_left=first_response['daily_left'],
@@ -194,12 +190,13 @@ class LushaAPIClient:
                 )
 
                 logger.info(f"Scheduler response: {scheduler_response}")
+
                 return []
+                
             elif (first_response['status_code'] == 201
                   and "data" not in first_response['results']
                   or first_response['status_code'] != 201):
-                logger.info(
-                    "No data in first response. Returning empty results.")
+                logger.warning("No data in first response. Returning empty results.")
                 return []
 
             # Process first page data
@@ -213,27 +210,20 @@ class LushaAPIClient:
                 })
 
             # ✅ IMMEDIATE DATABASE INSERTION
-            inserted_count = await self.company_saver.insert_companies_batch_to_db(
-                page_companies, config,
-                "lusha")
-
+            inserted_count = await self.company_saver.insert_companies_batch_to_db(page_companies, config, "lusha")
             # Step 2: Create campaign mappings
             mappings_created = await self.company_saver.create_campaign_company_mappings_batch(
                 inserted_count['company_ids'], config.get("_id")
             )
             total_inserted += len(inserted_count['inserted_ids'])
-            logger.info(
-                f"📊 Page 1: Inserted {len(inserted_count['inserted_ids'])} companies")
+            logger.info(f"📊 Page 1: Inserted {len(inserted_count['inserted_ids'])} companies")
 
             # Step 2: Calculate total pages needed
-            total_results = first_response.get(
-                "results", {}).get("totalResults", 0)
+            total_results = first_response.get("results", {}).get("totalResults", 0)
             logger.info(f"Total results for this search: {total_results}")
-            total_pages = (total_results + page_size -
-                           1) // page_size  # Ceiling division
+            total_pages = (total_results + page_size - 1) // page_size  # Ceiling division
 
-            logger.info(
-                f"Total results: {total_results}, Total pages: {total_pages}")
+            logger.info(f"Total results: {total_results}, Total pages: {total_pages}")
 
             for page_num in range(1, total_pages):
                 logger.info(f"Fetching page {page_num + 1} of {total_pages}")
@@ -257,11 +247,7 @@ class LushaAPIClient:
                         hourly_left=page_response['hourly_left'],
                         minute_left=page_response['minute_left']
                     )
-
-                    scheduler_response = await schedule_lusha_company_collection(
-                        self.payload_values, eta
-                    )
-
+                    scheduler_response = await schedule_lusha_company_collection(self.payload_values, eta)
                     logger.info(f"Scheduler response: {scheduler_response}")
                     break
 
@@ -287,8 +273,8 @@ class LushaAPIClient:
                     mappings_created = await self.company_saver.create_campaign_company_mappings_batch(
                         inserted_count['company_ids'], config.get("_id")
                     )
-                    logger.info(
-                        f"📊 Page {page_num + 1}: Inserted {len(inserted_count['inserted_ids'])} companies")
+                    logger.info(f"📊 Page {page_num + 1}: Inserted {len(inserted_count['inserted_ids'])} companies")
+
                 else:
                     logger.info(f"Failed to fetch page {page_num}")
                     break
@@ -296,27 +282,28 @@ class LushaAPIClient:
             if rate_limit_hit:
                 logger.info(f"Collection completed with rate limiting. "
                             f"Collected {total_inserted} companies out of {total_results} total available.")
+
             else:
                 logger.info(
-                    f"Collection completed successfully. Collected {total_inserted} companies from {total_pages} pages.")
+                    f"Collection completed successfully. "
+                    f"Collected {total_inserted} companies from {total_pages} pages.")
 
         except Exception as e:
             raise Exception(f"Error searching companies: {str(e)}")
         finally:
             logger.info(f"Returning {total_inserted} companies")
+
             return total_inserted
 
     async def lusha_contact_search_api(self, payload_values_for_contact: Dict[str, Any],) -> Dict[str, Any]:
-        bind_contextvars(operation="lusha_search_api",
-                         component="lusha_api_client", event_type="lusha_contact_search")
-        logger.info("Payload_values_for_contact:",
-                    json.dumps(payload_values_for_contact, indent=2))
+        bind_contextvars(operation="lusha_search_api", component="lusha_api_client", event_type="lusha_contact_search")
+        logger.info(f"Payload_values_for_contact:", payload=payload_values_for_contact)
 
         payload_query = self.build_payload_for_contact(
             payload_values_for_contact=payload_values_for_contact
         )
 
-        logger.info(f"Payload Query: {json.dumps(payload_query, indent=2)}")
+        logger.info(f"Payload Query:", payload=payload_query)
         url = f"{LUSHA_BASE_URL}/prospecting/contact/search"
         headers = self.headers
 
@@ -348,7 +335,7 @@ class LushaAPIClient:
                 }
             }
         }
-        logger.info(f"payload_values: {payload_values_for_contact}")
+        logger.info(f"payload_values:", payload=payload_values_for_contact)
 
         if departments:
             payload_query_for_contact["filters"]["contacts"] = {
@@ -380,6 +367,7 @@ class LushaAPIClient:
     async def lusha_get_linkedin_contact_details(self, linkedin_url: str = ""):
 
         if not linkedin_url:
+            logger.info("No linkedin URL provided")
             return []
 
         url = f"{LUSHA_BASE_URL}/v2/person?linkedinUrl={linkedin_url}"

@@ -16,7 +16,6 @@ from global_utils.chronos_utils import (
     generate_default_eta_expression,
     schedule_lusha_company_collection
 )
-from ai_agents.core_sdr.src.parsers.company_saver import insert_companies_batch_to_db, create_campaign_company_mappings_batch
 from integrations.lusha.company_saver import CompanySaver
 from config.logging import logger
 
@@ -56,14 +55,16 @@ async def leadgen_batch_processing_handler(message: Any):
 
         if isinstance(message, dict) and 'payload' in message:
             payload = message['payload']
+
         else:
-            logger.info(f"🔍 payload missing")
+            logger.error(f"🔍 payload missing")
             return
 
-        logger.info(f"📨 Received leadgen message: {payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'}")
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
 
         if not isinstance(payload, dict) or not payload:
-            logger.info("❌ Invalid message payload")
+            logger.error("❌ Invalid message payload")
             return
         
         request_id = payload.get("request_id")
@@ -71,11 +72,11 @@ async def leadgen_batch_processing_handler(message: Any):
         campaign_id = payload.get("campaign_id")  # Now we get campaign_id instead of form_data
         
         if not request_id or not campaign_id:
-            logger.info("❌ Missing request_id or campaign_id in message")
+            logger.error("❌ Missing request_id or campaign_id in message")
             return
         
         if action != "process_company_search":
-            logger.info(f"❌ Unknown action: {action}")
+            logger.error(f"❌ Unknown action: {action}")
             return
         
         logger.info(f"🔄 Processing company search: {request_id}")
@@ -84,7 +85,7 @@ async def leadgen_batch_processing_handler(message: Any):
         await process_leadgen_message(request_id, campaign_id)
         
     except Exception as e:
-        logger.info(f"❌ Error handling leadgen message: {e}")
+        logger.error(f"❌ Error handling leadgen message: {e}")
         import traceback
         traceback.print_exc()
         raise
@@ -104,7 +105,7 @@ async def process_leadgen_message(request_id: str, campaign_id: str):
         campaign_data = await campaigns_dao.get_campaign(campaign_id)
         
         if not campaign_data:
-            logger.info(f"❌ Campaign not found: {campaign_id}")
+            logger.error(f"❌ Campaign not found: {campaign_id}")
             return
         
         logger.info(f"🔍 DEBUG: Campaign data structure: {campaign_data}")
@@ -118,7 +119,7 @@ async def process_leadgen_message(request_id: str, campaign_id: str):
         # print(f"📝 Result: {result}")
         
     except Exception as e:
-        logger.info(f"❌ Error processing request {request_id}: {e}")
+        logger.error(f"❌ Error processing request {request_id}: {e}")
         raise 
 
 
@@ -128,31 +129,32 @@ async def lusha_company_collection_handler(message: Any):
         logger.info(f"📨 Received lusha company collection message: {message}")
         payload = message
 
-        logger.info(f"📨 Received leadgen message: {payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'}")
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
         
         if not isinstance(payload, dict) or not payload:
-            logger.info("❌ Invalid message payload")
+            logger.error("❌ Invalid message payload")
             return
 
         # Handle nested payload structure from Chronos
-        logger.info(f"🔍 Debug - Full payload structure: {list(payload.keys()) if isinstance(payload, dict) else type(payload)}")
+        logger.info(
+            f"Debug - Full payload structure: {list(payload.keys()) if isinstance(payload, dict) else type(payload)}")
 
         inner_payload = payload.get("payload", payload)  # Try to get nested payload, fallback to original
-
-        logger.info(f"🔍 Debug - Inner payload structure: {list(inner_payload.keys()) if isinstance(inner_payload, dict) else type(inner_payload)}")
-
+        keys_or_type = list(inner_payload.keys()) if isinstance(inner_payload, dict) else type(inner_payload)
+        logger.info(f"🔍 Debug - Inner payload structure: {keys_or_type}")
         inner_payload = inner_payload.get("payload", inner_payload)
         action = inner_payload.get("action")   
         
         if action != "process_lusha_company_collection":
-            logger.info(f"❌ Unknown action: {action}")
+            logger.error(f"❌ Unknown action: {action}")
             return
 
         campaign_details = inner_payload.get("campaign_details") 
         await process_lusha_company_collection(campaign_details)
 
     except Exception as e:
-        logger.info(f"❌ Error handling lusha company collection message: {e}")
+        logger.error(f"❌ Error handling lusha company collection message: {e}")
         raise
 
 
@@ -161,6 +163,7 @@ async def process_lusha_company_collection(campaign_details: Any):
         'company_ids': [],
         'inserted_ids': []
     }
+
     try:
         # Initialize database connections for consumer context
         await initialize_consumer_connections()
@@ -173,18 +176,21 @@ async def process_lusha_company_collection(campaign_details: Any):
         logger.info(f"lusha_company_data: {lusha_company_data}")
 
         if not lusha_company_data:
-            logger.info("❌ No company data found")
+            logger.error("❌ No company data found")
             return
 
     except Exception as e:
-        logger.info(f"❌ Error occurred during collection: {str(e)}")
+        logger.error(f"❌ Error occurred during collection: {str(e)}")
+
     finally:
         logger.info(f"Returning {len(lusha_company_data)} companies")
+
         return lusha_company_data
 
 
 async def lusha_company_data_collection(campaign_details: Any):
     fetch_company_status = False
+    
     try:
         logger.info(f" lusha company data collection campaign_details: {campaign_details}")
         per_page = campaign_details["pages"]["page"]
@@ -211,7 +217,7 @@ async def lusha_company_data_collection(campaign_details: Any):
 
                 if first_response['status_code'] == 429:
 
-                    logger.info(f"❌ rate limit exhausted")
+                    logger.warning(f"❌ rate limit exhausted")
                     eta = generate_default_eta_expression(
                         daily_left=first_response['daily_left'], 
                         hourly_left=first_response['hourly_left'], 
@@ -224,9 +230,14 @@ async def lusha_company_data_collection(campaign_details: Any):
                     scheduler = await schedule_lusha_company_collection(campaign_details=api_payload, eta=eta)
 
                     logger.info(f"Scheduler response from handler: {scheduler}")
+
                     return []
-            elif first_response['status_code'] == 201 and "data" not in first_response['results'] or first_response['status_code'] != 201:
+
+            elif (first_response['status_code'] == 201 and 
+                  "data" not in first_response['results']) or \
+                  first_response['status_code'] != 201:
                 logger.info("No data in first response. Returning empty results.")
+
                 return {
                     'company_ids': [],
                     'inserted_ids': []
@@ -234,15 +245,12 @@ async def lusha_company_data_collection(campaign_details: Any):
 
             total_results = first_response["results"]["totalResults"]
             campaign_details["total_results"] = total_results
-            logger.info("got response")
             logger.info(first_response)
             # Recalculate total_pages with the new total_results
             total_pages = (total_results + page_size - 1) // page_size if total_results > 0 else 1
             page_companies = []
 
-            companies_dao = CompaniesDao(
-                loaded_config.connection_manager.mongo_client
-            )
+            companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
             campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
             company_saver = CompanySaver(companies_dao, campaign_company_runs_dao)
             raw_config =campaign_details["raw_config"]
@@ -263,10 +271,8 @@ async def lusha_company_data_collection(campaign_details: Any):
             mappings_created = await company_saver.create_campaign_company_mappings_batch(
                 inserted_count['company_ids'], raw_config.get("_id")
             )
-        #temp current page
-        # per_page = 1
-        # total_pages = 2
-        logger.info(f" lusha company data collection pages: {per_page} page_size: {page_size} totalpages: {total_pages}")
+
+        logger.info(f"lusha company data collection pages:{per_page} page_size: {page_size} totalpages: {total_pages}")
 
         for page_num in range(per_page, total_pages):
             logger.info(f" lusha company data collection page_num: {page_num}")
@@ -276,7 +282,7 @@ async def lusha_company_data_collection(campaign_details: Any):
 
             if page_response['status_code'] == 429:
 
-                logger.info(f"❌ rate limit exhausted")
+                logger.warning(f"❌ rate limit exhausted")
                 eta = generate_default_eta_expression(
                     daily_left=page_response['daily_left'], 
                     hourly_left=page_response['hourly_left'], 
@@ -287,6 +293,7 @@ async def lusha_company_data_collection(campaign_details: Any):
                 scheduler = await schedule_lusha_company_collection(campaign_details=page_payload, eta=eta)
                 logger.info(f" lusha company data collection scheduler: {scheduler}")
                 break
+
             elif page_response['status_code'] == 201 and "data" in page_response['results']:
                 fetch_company_status = True
                 page_companies = []
@@ -299,26 +306,27 @@ async def lusha_company_data_collection(campaign_details: Any):
                     })
 
                 # ✅ IMMEDIATE DATABASE INSERTION
-                inserted_count = await company_saver.insert_companies_batch_to_db(
-                    page_companies, raw_config,
-                    "lusha"
-                )
+                inserted_count = await company_saver.insert_companies_batch_to_db(page_companies, raw_config, "lusha")
 
                 # Step 2: Create campaign mappings
                 mappings_created = await company_saver.create_campaign_company_mappings_batch(
                     inserted_count['company_ids'], raw_config.get("_id")
                 )
+                
             else:
                 logger.info(f"Failed to fetch page {page_num}")
                 break
+
     except Exception as e:
-        logger.info(f"❌ Error occurred during data collection: {str(e)}")
+        logger.error(f"❌ Error occurred during data collection: {str(e)}")
+
     finally:
         if fetch_company_status:
             campaigns_dao = CampaignsDao(
                 loaded_config.connection_manager.mongo_client
             )
-            update_campaign_status = await campaigns_dao.update_campaign_status(campaign_details["campaign_id"]), "pending"
+            update_campaign_status = await campaigns_dao.update_campaign_status(
+                campaign_details["campaign_id"], "pending")
             logger.info(f"Updated status of {campaign_details['campaign_id']} to 'pending'")
             
         return inserted_count
