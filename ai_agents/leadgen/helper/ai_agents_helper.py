@@ -42,8 +42,7 @@ class LushaContactEnrichmentHelper:
                     logger.warning(f"Company not found: {company_id}")
                     continue
 
-                company_name = company_doc.get(
-                    "identifiers", {}).get("name", "")
+                company_name = company_doc.get("identifiers", {}).get("name", "")
                 company_source_id_name_mappings[company_name] = company_id
                 company_names.append(company_name)
 
