@@ -297,18 +297,20 @@ class ContactService:
         page_size = query_params.page_size
         departments = query_params.departments
 
+        if len(company_map_list) > 50:
+            raise ApiException("Company map list should be less than 50")
+
         if not campaign_id:
             raise ValueError("Campaign Id is required")
 
         companies_dao = CompaniesDao(
             loaded_config.connection_manager.mongo_client)
 
-        # company_map_list = await campaign_company_run_dao.get_campaign_company_runs({"campaign_id": campaign_id})
         company_names = []
         company_source_id_name_mappings = {}
 
         if company_map_list:
-            for companies in company_map_list[:10]:
+            for companies in company_map_list:
                 company_id = companies.get("company_id", "")
                 company_doc = await companies_dao.get_company(company_id)
 
