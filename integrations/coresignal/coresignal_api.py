@@ -6,7 +6,9 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from config.loaded_config import loaded_config
 from config.logging import logger
-from integrations.lusha.config.lusha_industry_config import LUSHA_CONFIG
+from integrations.config.lusha_industry_config import LUSHA_CONFIG
+from integrations.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
+
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -38,6 +40,8 @@ class CoresignalAPIClient:
 
         result = await response.json()
         company_ids = [int(item) for item in result]
+        logger.info(f"Company IDs: {company_ids}")
+
         return company_ids
 
 
@@ -48,14 +52,21 @@ class CoresignalAPIClient:
 
         if response.status != 200:
             error_text = await response.text()
+
             raise Exception(
                 f"Collect API failed: {response.status} - {error_text}")
 
         result = await response.json()
+        logger.info(f"Company Data: {result}")
+        
         return result
 
 
-    async def collect_companies_from_search(self,config: Dict[str, Any], exclude_company_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def collect_companies_from_search(
+            self,
+            config: Dict[str, Any], 
+            exclude_company_list: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         companies = []
 
         try:
@@ -67,10 +78,16 @@ class CoresignalAPIClient:
 
                 if company_data:
                     companies.append(
-                        {"id": company_data["id"], "name": company_data["name"], "api_response_metadata": company_data})
+                        {
+                            "id": company_data["id"],
+                            "name": company_data["name"],
+                            "api_response_metadata": company_data
+                        }
+                    )
 
         except Exception as e:
             logger.exception(f"Error collecting company data: {e}")
+
         finally:
             return companies
 
@@ -135,13 +152,15 @@ class CoresignalAPIClient:
             for range_str in employee_ranges:
                 if '+' in range_str:
                     min_val = int(range_str.replace('+', ''))
-                    max_val = 150000000000
+                    max_val = MAX_EMPLOYEES
+
                 elif '-' in range_str:
                     parts = range_str.split('-')
     
                     if len(parts) == 2:
                         min_val = int(parts[0])
                         max_val = int(parts[1])
+
                 else:
                     logger.info(f"Invalid employee count range: {range_str}")
                     continue
@@ -181,6 +200,7 @@ class CoresignalAPIClient:
                     "minimum_should_match": 1
                 }
             })
+
         elif locations and location_type == "region":
             location_should = [
                 {"match": {"location_hq_regions": loc.strip()}}
@@ -193,9 +213,11 @@ class CoresignalAPIClient:
                     "minimum_should_match": 1
                 }
             })
+
         else:
             logger.info("No locations found")
     
         logger.info(f"QUERY: {query}")
+        
         return query
     

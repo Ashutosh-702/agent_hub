@@ -2,9 +2,9 @@ from typing import Dict, Any, List, OrderedDict
 
 from structlog.contextvars import bind_contextvars
 
-from integrations.lusha.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
-from integrations.lusha.config.lusha_industry_config import LUSHA_CONFIG
-from integrations.lusha.config.country_api_results import LUSHA_COUNTRY_CONFIG
+from integrations.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
+from integrations.config.lusha_industry_config import LUSHA_CONFIG
+from integrations.config.country_api_results import LUSHA_COUNTRY_CONFIG
 from integrations.lusha.lusha_api import LushaAPIClient
 from config.logging import logger
 
