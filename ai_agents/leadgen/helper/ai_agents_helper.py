@@ -10,7 +10,7 @@ from ai_agents.leadgen.schemas.contact_models import ContactDocument
 from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.contacts import ContactsDao
-
+from global_utils.exceptions import ApiException
 
 class LushaContactEnrichmentHelper:
 
@@ -28,13 +28,16 @@ class LushaContactEnrichmentHelper:
         departments = query_params.departments
 
         if not campaign_id:
-            raise ValueError("Campaign Id is required")
+            raise ApiException("Campaign Id is required")
+
+        if len(company_map_list) > 10:
+            raise ApiException("Company map list should be less than 10")
 
         company_names = []
         company_source_id_name_mappings = {}
 
         if company_map_list:
-            for companies in company_map_list[:10]:
+            for companies in company_map_list:
                 company_id = companies.get("company_id", "")
                 company_doc = await self.companies_dao.get_company(company_id)
 
