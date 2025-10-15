@@ -1,6 +1,7 @@
 from database.base_dao import BaseMongoDao
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import List, Dict, Any
+from bson import ObjectId
 
 
 class ContactsDao(BaseMongoDao):
@@ -20,6 +21,5 @@ class ContactsDao(BaseMongoDao):
         if projection is None:
             projection = {}
 
-        return await self.find_one({"_id": contact_id}, projection=projection)
+        return await self.find_one({"_id": ObjectId(contact_id)}, projection=projection)
     
-

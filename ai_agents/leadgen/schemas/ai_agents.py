@@ -53,6 +53,7 @@ class FormSubmission(BaseModel):
 
         return user_email
 
+
 class CampaignStatusUpdate(BaseModel):
     campaign_id: str
     status: str
@@ -66,3 +67,14 @@ class CompanyMappingList(BaseModel):
 
 class CompanyListWithDetails(BaseModel):
     campaign_id: str
+
+
+class CampaignContactData(BaseModel):
+    campaign_id: str
+    company_id: Optional[str] = None
+    page: int = 1
+    limit: int = 10
+
+
+class LinkedinContactDetails(BaseModel):
+    linkedin_url: str

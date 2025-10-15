@@ -13,32 +13,38 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CampaignStatusUpdate,
     CompanyMappingList, 
     CompanyListWithDetails, 
-    FormSubmission
+    FormSubmission,
+    CampaignContactData
 )
 from ai_agents.leadgen.utils import serialize_objectid
 from database.collection_dao.campaigns import CampaignsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.companies import CompaniesDao
+from database.collection_dao.contacts import ContactsDao
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import(
     LEADGEN_BATCH_PROCESSING, 
     KAFKA_SERVICE_CONFIG_MAPPING, 
     LeadgenServices
 )
+from integrations.lusha.lusha_api import LushaAPIClient
 
 
 class CampaignService:
     def __init__(self):
-        self.campaign_dao = CampaignsDao(
-            loaded_config.connection_manager.mongo_client)
+        self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.event_emitter = loaded_config.connection_manager.event_emitter
-        self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[
-            LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
+        self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
 
     async def upload_leadgen_form(self, form_submission: FormSubmission) -> Dict[str, str]:
 
         db_data = self._transform_form_to_db_data(form_submission)
-        bind_contextvars(operation="upload_leadgen_form", component="ai_agents_service", event_type="upload_leadgen_form")
+        bind_contextvars(
+            operation="upload_leadgen_form",
+            component="ai_agents_service", 
+            event_type="upload_leadgen_form"
+        )
         campaign_id = await self.campaign_dao.create_campaign(db_data)
 
         if not campaign_id:
@@ -64,8 +70,7 @@ class CampaignService:
             event_meta={"service": "leadgen", "campaign_id": str(campaign_id)}
         )
 
-        logger.info(
-            f"📤 Campaign ID {str(campaign_id)} queued for processing: {request_id}")
+        logger.info(f"📤 Campaign ID {str(campaign_id)} queued for processing: {request_id}")
 
         return {
             "request_id": request_id,
@@ -121,6 +126,36 @@ class CampaignService:
             raise ApiException(f"No campaign found with campaign id {campaign_status_update.campaign_id} to update status or it's already updated")
 
         return response
+    
+    async def fetch_campaign_by_status(self, status: str):
+        campaign = await self.campaign_dao.get_campaign_by_status(status)
+
+        if not campaign:
+            raise ApiException("No campaign found to fetch")
+
+        campaign_id = campaign.get("_id")
+        ownership = campaign.get("ownership", {})
+        prompts = campaign.get("prompts", {})
+        ai_sdr_custom_config = {
+            "HUBSPOT_OWNER_EMAIL": ownership.get("hubspot_email", ""),
+            "USER_EMAIL": ownership.get("user_email", ""),
+            "PRODUCT_NAME": ownership.get("product_name", ""),
+            "BUSINESS_TEAM": ownership.get("business_team", ""),
+            "custom_prompts": {},
+            "CAMPAIGN_ID": str(campaign_id),
+            "DATA_SOURCE_TYPE": "mongo",
+            "target_executives": prompts.get("persona", "")
+        }
+        web_enrichment_prompt = (
+            "Relevance Criteria: Determine if the company fits either of the following:\n\n"
+            f"{prompts.get('web', '')}\n\n"
+            "Begin your research now using the web search tool to determine if companies "
+            "match these criteria."
+        )
+        ai_sdr_custom_config["custom_prompts"]["web_enricher_user_prompt"] = web_enrichment_prompt
+        ai_sdr_custom_config["custom_prompts"]["prospect_enricher_target_executives"] = prompts.get("persona", "")
+
+        return {"config": ai_sdr_custom_config}
 
 
 class CompanyService:
@@ -153,6 +188,7 @@ class CompanyService:
 
         serialized_response = serialize_objectid(response)
         serialized_pagination = serialize_objectid(pagination_info)
+
         return {"company_map_list": serialized_response, "pagination_info": serialized_pagination}
 
     async def fetch_companies_from_mappings(self, query_params: CompanyListWithDetails):
@@ -193,3 +229,60 @@ class CompanyService:
                 f"No valid companies found in Mongo for campaign {query_params.campaign_id}")
 
         return {"company_details": data_rows}
+
+
+class ContactService:
+    def __init__(self):
+        self.campaign_contact_run_dao = CampaignContactRunsDao(
+            loaded_config.connection_manager.mongo_client)
+        self.contacts_dao = ContactsDao(
+            loaded_config.connection_manager.mongo_client)
+        self.lusha_api_client = LushaAPIClient()
+
+    async def get_campaign_contact_data(self, query_params: CampaignContactData):
+        filter_query = {"campaign_id": query_params.campaign_id}
+
+        if query_params.company_id:
+            filter_query["company_id"] = query_params.company_id
+
+        campaign_contact_runs_projection = {
+            "campaign_id": 1,
+            "company_id": 1,
+            "contact_id": 1,
+            "_id": 0
+        }
+
+        contacts_projection = {
+            "contact_data": 1,
+            "linkedin_data": 1,
+            "_id": 0
+        }
+
+        response, pagination_info = await self.campaign_contact_run_dao.get_campaign_contact_runs_paginated(
+            filter_query, query_params.page,
+            query_params.limit, sort_by=["company_id"],
+            projection=campaign_contact_runs_projection
+        )
+
+        for contact in response:
+            contact_id = contact.get("contact_id")
+            contact_doc = await self.contacts_dao.get_contact(
+                contact_id,
+                projection=contacts_projection
+            )
+
+            if not contact_doc:
+                logger.info(f"Contact data is not found for contact id {contact_id}")
+                continue
+
+            contact["contact_data"] = contact_doc.get("contact_data")
+            contact["linkedin_data"] = contact_doc.get("linkedin_data")
+
+        serialized_response = serialize_objectid(response)
+
+        return {"campaign_contact_data": serialized_response, "pagination_info": pagination_info}
+
+    async def get_linkedin_contact_details(self, linkedin_url: str):
+        response = await self.lusha_api_client.lusha_get_linkedin_contact_details(linkedin_url)
+
+        return response

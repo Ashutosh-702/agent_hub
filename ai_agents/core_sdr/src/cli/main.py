@@ -22,6 +22,7 @@ from database.collection_dao.campaigns import CampaignsDao
 from config.loaded_config import loaded_config
 from datetime import datetime
 from ai_agents.core_sdr.src.api.company_relevance_check import CompanyRelevanceCheck
+from integrations.lusha.lusha_helper import LushaHelper
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,9 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
         companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         print("Fetching companies from lusha...")
         temp_cached_data = []
-        inserted_count = await get_companies_from_lusha(config,temp_cached_data) # List of {'id': int, 'name': str}
+        # inserted_count = await get_companies_from_lusha(config,temp_cached_data) # List of {'id': int, 'name': str}
+        lusha_helper = LushaHelper()
+        inserted_count = await lusha_helper.get_companies_from_lusha(config)
         print(f"Found {inserted_count} companies from lusha.")
         print("Fetching companies from core_signal...")
         # core_signal_company_data = collect_companies_from_search(config, cached_data) # List of {'id': int, 'name': str}
