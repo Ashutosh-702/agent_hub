@@ -310,8 +310,8 @@ class LushaAPIClient:
         response = await self.http_session.post(url, json=payload_query, headers=headers, timeout=self.timeout)
         result = await response.json()
 
-        if response.status != 201:
-            raise ApiException(f"Search API failed: {response.status}")
+        if response.status  != 201:
+            raise Exception(f"Search API failed: {response.status}")
             
         return result
 
