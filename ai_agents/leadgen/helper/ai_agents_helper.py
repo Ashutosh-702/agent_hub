@@ -30,8 +30,8 @@ class LushaContactEnrichmentHelper:
         if not campaign_id:
             raise ApiException("Campaign Id is required")
 
-        if len(company_map_list) > 10:
-            raise ApiException("Company map list should be less than 10")
+        # if len(company_map_list) > 10:
+        #     raise ApiException("Company map list should be less than 10")
 
         company_names = []
         company_source_id_name_mappings = {}
