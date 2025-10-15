@@ -10,7 +10,7 @@ from ai_agents.leadgen.schemas.contact_models import ContactDocument
 from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.contacts import ContactsDao
-
+from global_utils.exceptions import ApiException
 
 class LushaContactEnrichmentHelper:
 
@@ -28,13 +28,16 @@ class LushaContactEnrichmentHelper:
         departments = query_params.departments
 
         if not campaign_id:
-            raise ValueError("Campaign Id is required")
+            raise ApiException("Campaign Id is required")
+
+        if len(company_map_list) > 10:
+            raise ApiException("Company map list should be less than 10")
 
         company_names = []
         company_source_id_name_mappings = {}
 
         if company_map_list:
-            for companies in company_map_list[:10]:
+            for companies in company_map_list:
                 company_id = companies.get("company_id", "")
                 company_doc = await self.companies_dao.get_company(company_id)
 
@@ -109,6 +112,15 @@ class LushaContactEnrichmentHelper:
                     if db_contacts:
                         db_contact = db_contacts[0]
                         contact_id = db_contact["_id"]
+                        db_company_name = db_contact.get("contact_data", {}).get("company", "")
+                        company_id = company_source_id_name_mappings.get(db_company_name, "")
+                        logger.info(f"company_id: {company_id} db_company_name: {db_company_name}")
+
+                        if not company_id:
+                            logger.info(f"company mismatch, skipping: {contact_id}")
+                            continue
+
+
                         logger.info(f"contact found, updating contact: {contact_id}")
                         await contact_dao.update_contact(
                             contact_id,
@@ -124,8 +136,12 @@ class LushaContactEnrichmentHelper:
                         await self.contact_service.insert_campaign_contact_run(
                             {
                                 "campaign_id": campaign_id,
-                                "company_id": db_contact["company_id"],
-                                "contact_id": contact_id
+                                "company_id": company_id,
+                                "contact_id": contact_id,
+                                "metadata": {
+                                    "created_at": datetime.utcnow(),
+                                    "updated_at": datetime.utcnow(),
+                                }
                             }
                         )
                         
