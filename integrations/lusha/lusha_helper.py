@@ -92,6 +92,7 @@ class LushaHelper:
             industry_names = []
 
         sub_ids = []
+        
         for name in industry_names:
             if name in self.LUSHA_LOOKUP:
                 sub_ids.append(self.LUSHA_LOOKUP[name])
