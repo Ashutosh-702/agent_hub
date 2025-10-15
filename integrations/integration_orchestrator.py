@@ -25,21 +25,10 @@ class IntegrationOrchestrator:
 
     async def process_company_search(self) -> Dict[str, Any]:
         """Core function to process company search"""
-        # Initialize variables before try block to avoid UnboundLocalError
         total_company_data = []
         
-        try:
-            # Check if connection manager is properly initialized
-            if not loaded_config.connection_manager or not loaded_config.connection_manager.mongo_client:
-                print("❌ Error: Database connection not initialized")
-                
-                return {
-                    "companies": [],
-                    "error": "Database connection not available"
-                }
-                
+        try:    
             print("Fetching companies from lusha...")
-            # inserted_count = await get_companies_from_lusha(config,temp_cached_data)
             inserted_count = await self.lusha_helper.get_companies_from_lusha(self.config)
             print(f"Found {inserted_count} companies from lusha.")
             print("Fetching companies from core_signal...")
@@ -48,7 +37,6 @@ class IntegrationOrchestrator:
             # )
             total_company_data = inserted_count
             print(f"Total new companies added into companies collection: {inserted_count}")
-    
             await self.relevance_check.company_relevance_check(self.campaign_id)
             await self.campaigns_dao.update_campaign_status(self.campaign_id,"pending")
             print(f"Updated status of {self.campaign_id} to 'pending'")
@@ -58,5 +46,5 @@ class IntegrationOrchestrator:
 
         finally:
             return {
-                "companies": total_company_data
+                "companies_fetched": total_company_data
             }
