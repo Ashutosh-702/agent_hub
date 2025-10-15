@@ -39,7 +39,7 @@ class LushaContactEnrichmentHelper:
                 company_doc = await self.companies_dao.get_company(company_id)
 
                 if not company_doc:
-                    logger.error(f"Company not found: {company_id}")
+                    logger.warning(f"Company not found: {company_id}")
                     continue
 
                 company_name = company_doc.get(
