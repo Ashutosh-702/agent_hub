@@ -10,8 +10,10 @@ from bson import ObjectId
 from ai_agents.core_sdr.src.api.lusha_api import lusha_search_api
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from integrations.integration_orchestrator import IntegrationOrchestrator
 from datetime import datetime, timezone
 import time
+
 from global_utils.chronos_utils import (
     generate_default_eta_expression,
     schedule_lusha_company_collection
@@ -113,7 +115,8 @@ async def process_leadgen_message(request_id: str, campaign_id: str):
         logger.info(f"📍 Location: {campaign_data.get('target', {}).get('location', {}).get('names', 'Unknown')}")
         
         # Call the company search process with campaign data
-        result = await process_company_search(campaign_data)
+        orchestrator = IntegrationOrchestrator(campaign_data)
+        await orchestrator.process_company_search()
         
         logger.info(f"✅ Completed processing: {request_id}")
         # print(f"📝 Result: {result}")
