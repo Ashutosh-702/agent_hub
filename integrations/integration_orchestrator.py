@@ -2,12 +2,14 @@
 
 
 from typing import Dict, Any
-from integrations.coresignal.coresignal_api import CoresignalAPIClient
+from integrations import coresignal
+from integrations.coresignal.coresignal_api_client import CoresignalAPIClient
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaigns import CampaignsDao
 from config.loaded_config import loaded_config
 from ai_agents.core_sdr.src.api.company_relevance_check import CompanyRelevanceCheck
 from integrations.lusha.lusha_helper import LushaHelper
+from integrations.coresignal.coresignal_api_client import CoresignalAPIClient
 
 
 class IntegrationOrchestrator:
@@ -15,6 +17,7 @@ class IntegrationOrchestrator:
         self.config = config
         self.coresignal_api = CoresignalAPIClient()
         self.lusha_helper = LushaHelper()
+        self.coresignal_helper = CoresignalAPIClient()
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         self.campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.relevance_check = CompanyRelevanceCheck(self.config)
@@ -29,19 +32,21 @@ class IntegrationOrchestrator:
             # Check if connection manager is properly initialized
             if not loaded_config.connection_manager or not loaded_config.connection_manager.mongo_client:
                 print("❌ Error: Database connection not initialized")
+                
                 return {
                     "companies": [],
                     "error": "Database connection not available"
                 }
                 
             print("Fetching companies from lusha...")
-            # inserted_count = await get_companies_from_lusha(config,temp_cached_data) # List of {'id': int, 'name': str}
+            # inserted_count = await get_companies_from_lusha(config,temp_cached_data)
             inserted_count = await self.lusha_helper.get_companies_from_lusha(self.config)
             print(f"Found {inserted_count} companies from lusha.")
             print("Fetching companies from core_signal...")
-            # core_signal_company_data = collect_companies_from_search(config, cached_data) # List of {'id': int, 'name': str}
+            # core_signal_company_data = await self.coresignal_helper.collect_companies_from_search(
+            #     self.config, cached_data
+            # )
             total_company_data = inserted_count
-            
             print(f"Total new companies added into companies collection: {inserted_count}")
     
             await self.relevance_check.company_relevance_check(self.campaign_id)
@@ -50,6 +55,8 @@ class IntegrationOrchestrator:
 
         except Exception as e:
             print(f"Error while processing company search for campaign {self.campaign_id}: {str(e)}")
-        return {
-            "companies": total_company_data
-        }
+
+        finally:
+            return {
+                "companies": total_company_data
+            }

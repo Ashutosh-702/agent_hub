@@ -116,7 +116,7 @@ async def process_leadgen_message(request_id: str, campaign_id: str):
         
         # Call the company search process with campaign data
         orchestrator = IntegrationOrchestrator(campaign_data)
-        result = await orchestrator.process_company_search(campaign_data)
+        await orchestrator.process_company_search()
         
         logger.info(f"✅ Completed processing: {request_id}")
         # print(f"📝 Result: {result}")

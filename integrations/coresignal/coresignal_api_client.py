@@ -35,6 +35,7 @@ class CoresignalAPIClient:
 
         if response.status != 200:
             error_text = await response.text()
+
             raise Exception(
                 f"Search API failed: {response.status} - {error_text}")
 
@@ -126,6 +127,7 @@ class CoresignalAPIClient:
         for name in industries:
             if name in coresignal_lookup:
                 mapped_industries.extend(coresignal_lookup[name])
+                
             else:
                 logger.info(f"⚠️ No CoreSignal mapping found for '{name}'")
     
@@ -189,11 +191,12 @@ class CoresignalAPIClient:
             })
     
         if locations and location_type == "country":
-            location_should = [
-                {"match": {"location_hq_country": loc.strip()}}
-                for loc in locations
-                if loc.strip()
-            ]
+            location_should = []
+
+            for loc in locations:
+                if loc.strip():
+                    location_should.append({"match": {"location_hq_country": loc.strip()}})
+
             must_clauses.append({
                 "bool": {
                     "should": location_should,
@@ -202,11 +205,12 @@ class CoresignalAPIClient:
             })
 
         elif locations and location_type == "region":
-            location_should = [
-                {"match": {"location_hq_regions": loc.strip()}}
-                for loc in locations
-                if loc.strip()
-            ]
+            location_should = []
+
+            for loc in locations:
+                if loc.strip():
+                    location_should.append({"match": {"location_hq_regions": loc.strip()}})
+
             must_clauses.append({
                 "bool": {
                     "should": location_should,
