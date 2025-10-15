@@ -257,7 +257,7 @@ class OrchestratedCLIApp:
 
         while True:
             BASE_URL = loaded_config.base_url
-            response = requests.get(f"{BASE_URL}/api/v1/fetch_and_claim_first_campaign?", verify=False, timeout=30)
+            response = requests.get(f"{BASE_URL}/api/v1/fetch_and_claim_first_campaign", verify=False, timeout=30)
             claimed = response.json()
 
             if claimed.get("status") == "success" and "config" not in claimed:
