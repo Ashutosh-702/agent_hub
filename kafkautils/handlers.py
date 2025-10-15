@@ -2,7 +2,6 @@
 from time import sleep
 from typing import Any
 import json
-from ai_agents.core_sdr.src.cli.main import process_company_search
 from database.connection_manager import ConnectionManager
 from database.collection_dao.campaigns import CampaignsDao
 from config.loaded_config import loaded_config
