@@ -314,6 +314,7 @@ class ContactService:
         }
         check_campaign_contact_run = await self.campaign_contact_run_dao.get_campaign_contact_runs(contact_data)
         contact_data["metadata"] = campaign_contact_run_doc.get("metadata")
+        
         if check_campaign_contact_run:
             return
         
