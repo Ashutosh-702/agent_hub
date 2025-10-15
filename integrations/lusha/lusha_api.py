@@ -309,11 +309,10 @@ class LushaAPIClient:
         response = await self.http_session.post(url, json=payload_query, headers=headers, timeout=self.timeout)
         result = await response.json()
 
-        if response.status == 201:
-           return result
-
-        else:
+        if response.status  != 201:
             raise Exception(f"Search API failed: {response.status}")
+            
+        return result
 
     def build_payload_for_contact(self, payload_values_for_contact: Dict[str, Any]) -> Dict[str, Any]:
         page = payload_values_for_contact.get("page", 0)
