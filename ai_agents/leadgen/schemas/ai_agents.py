@@ -1,9 +1,11 @@
 """AI agents processing schemas and models."""
 
-from typing import Dict, List, Optional, Union
 from re import match
+from typing import Dict, List, Optional, Union
 from uuid import uuid4
+
 from pydantic import BaseModel, Field, field_validator
+
 from global_utils.constants import EMAIL_REGEX
 
 
@@ -24,14 +26,14 @@ class FormSubmission(BaseModel):
     web_prompt: str
     persona_prompt: str
     industry: str
-    employee_count: str
-    revenue_min: str
-    revenue_max: str
+    employee_count: Optional[str] = None
+    revenue_min: Optional[str] = None
+    revenue_max: Optional[str] = None
     location_type: str
     location: str
-    keywords: str
-    categories: str
-    currency: str
+    keywords: Optional[str] = None
+    categories: Optional[str] = None
+    currency: Optional[str] = None  
     hubspot_email: str
     product_name: str
     business_team: str
@@ -48,9 +50,19 @@ class FormSubmission(BaseModel):
     def validate_user_email(cls, user_email):
         if user_email and user_email.strip() and not match(EMAIL_REGEX, user_email):
             raise ValueError("user email is invalid")
-            
+
         return user_email
 
 class CampaignStatusUpdate(BaseModel):
     campaign_id: str
     status: str
+
+
+class CompanyMappingList(BaseModel):
+    campaign_id: str
+    page: int = 1
+    limit: int = 10
+
+
+class CompanyListWithDetails(BaseModel):
+    campaign_id: str

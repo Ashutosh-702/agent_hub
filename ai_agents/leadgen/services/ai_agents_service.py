@@ -6,13 +6,25 @@ from typing import Dict, Any, List
 
 from structlog.contextvars import bind_contextvars
 
-from ai_agents.leadgen.schemas.ai_agents import FormSubmission, CampaignStatusUpdate
-from kafkautils.producer.event_helpers import emit_event_helper
-from kafkautils.constants import LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices
-from database.collection_dao.campaigns import CampaignsDao
-from global_utils.exceptions import ApiException
-from config.logging import logger
 from config.loaded_config import loaded_config
+from config.logging import logger
+from global_utils.exceptions import ApiException
+from ai_agents.leadgen.schemas.ai_agents import (
+    CampaignStatusUpdate,
+    CompanyMappingList, 
+    CompanyListWithDetails, 
+    FormSubmission
+)
+from ai_agents.leadgen.utils import serialize_objectid
+from database.collection_dao.campaigns import CampaignsDao
+from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.collection_dao.companies import CompaniesDao
+from kafkautils.producer.event_helpers import emit_event_helper
+from kafkautils.constants import(
+    LEADGEN_BATCH_PROCESSING, 
+    KAFKA_SERVICE_CONFIG_MAPPING, 
+    LeadgenServices
+)
 
 
 class CampaignService:
@@ -109,3 +121,75 @@ class CampaignService:
             raise ApiException(f"No campaign found with campaign id {campaign_status_update.campaign_id} to update status or it's already updated")
 
         return response
+
+
+class CompanyService:
+    def __init__(self):
+        self.campaign_company_run_dao = CampaignCompanyRunsDao(
+            loaded_config.connection_manager.mongo_client)
+        self.companies_dao = CompaniesDao(
+            loaded_config.connection_manager.mongo_client)
+
+    async def get_company_mapping_list(self, query_params: CompanyMappingList):
+        projection = {
+            "_id": 0,           
+            "company_status": 0, 
+            "metadata": 0
+        }
+        query = {
+            "campaign_id": query_params.campaign_id, 
+            "is_relevant": True
+        }
+        response, pagination_info = await self.campaign_company_run_dao.get_campaign_company_runs_paginated(
+            query=query,
+            page=query_params.page,
+            limit=query_params.limit,
+            projection=projection
+        )
+
+        if not response:
+            raise ApiException(
+                f"No company mappings found for campaign_id {query_params.campaign_id}")
+
+        serialized_response = serialize_objectid(response)
+        serialized_pagination = serialize_objectid(pagination_info)
+        return {"company_map_list": serialized_response, "pagination_info": serialized_pagination}
+
+    async def fetch_companies_from_mappings(self, query_params: CompanyListWithDetails):
+        mapping_docs = await self.campaign_company_run_dao.get_campaign_company_runs({"campaign_id": query_params.campaign_id})
+
+        if not mapping_docs:
+            raise ApiException(
+                f"No company mappings found for campaign_id {query_params.campaign_id}")
+
+        data_rows = []
+
+        for mapping in mapping_docs:
+            company_id = mapping.get("company_id")
+
+            if not company_id:
+                logger.info(f"Company id is not found for campaign {query_params.campaign_id}")
+                continue
+
+            company_doc = await self.companies_dao.get_company(company_id)
+
+            if not company_doc or not company_doc.get("identifiers", {}).get("name"):
+                logger.info(f"Company data is not found for campaign {query_params.campaign_id}")
+                continue
+
+            name = company_doc.get("identifiers", {}).get("name")
+            profile = company_doc.get("profile") or {}
+            location = company_doc.get("location") or {}
+            data_rows.append({
+                "company_name": name,
+                "company_id": str(company_id),
+                "industry": profile.get("industry"),
+                "company_size": profile.get("employeeCount"),
+                "location": location.get("name"),
+            })
+
+        if not data_rows:
+            raise ApiException(
+                f"No valid companies found in Mongo for campaign {query_params.campaign_id}")
+
+        return {"company_details": data_rows}

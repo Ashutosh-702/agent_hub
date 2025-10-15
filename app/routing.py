@@ -6,14 +6,14 @@ from typing import Callable
 import orjson
 from fastapi import Request, Response
 from fastapi.exceptions import HTTPException, RequestValidationError, ResponseValidationError
-from global_utils.exceptions import ApiException
 from fastapi.responses import ORJSONResponse
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 
-from config.logging import logger
 from ai_agents.leadgen.schemas.ai_agents import ResponseData
+from config.logging import logger
+from global_utils.exceptions import ApiException
 
 
 class CustomRequestRoute(APIRoute):
