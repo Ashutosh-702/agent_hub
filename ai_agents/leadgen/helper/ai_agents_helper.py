@@ -109,6 +109,15 @@ class LushaContactEnrichmentHelper:
                     if db_contacts:
                         db_contact = db_contacts[0]
                         contact_id = db_contact["_id"]
+                        db_company_name = db_contact.get("contact_data", {}).get("company", "")
+                        company_id = company_source_id_name_mappings.get(db_company_name, "")
+                        logger.info(f"company_id: {company_id} db_company_name: {db_company_name}")
+
+                        if not company_id:
+                            logger.info(f"company mismatch, skipping: {contact_id}")
+                            continue
+
+
                         logger.info(f"contact found, updating contact: {contact_id}")
                         await contact_dao.update_contact(
                             contact_id,
@@ -124,7 +133,7 @@ class LushaContactEnrichmentHelper:
                         await self.contact_service.insert_campaign_contact_run(
                             {
                                 "campaign_id": campaign_id,
-                                "company_id": db_contact["company_id"],
+                                "company_id": company_id,
                                 "contact_id": contact_id
                             }
                         )
