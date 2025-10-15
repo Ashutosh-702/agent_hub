@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from ai_agents.leadgen.schemas.ai_agents import LushaContactEnrichment, LushaGetContactEnrichment
 from database.collection_dao.companies import CompaniesDao
 from config.logging import logger
@@ -5,7 +7,6 @@ from config.loaded_config import loaded_config
 from integrations.lusha.lusha_api import LushaAPIClient
 from ai_agents.leadgen.services.ai_agents_service import CompanyService, ContactService
 from ai_agents.leadgen.schemas.contact_models import ContactDocument
-from datetime import datetime
 from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.contacts import ContactsDao
@@ -97,13 +98,9 @@ class LushaContactEnrichmentHelper:
             if "contacts" in enriched_contact_data:
                 for contact in enriched_contact_data["contacts"]:
                     data = contact.get("data", {})
-                    linkedin_url = data.get(
-                        "socialLinks", {}).get("linkedin", "")
-                    email_addresses = [e["email"] for e in data.get(
-                        "emailAddresses", []) if "email" in e]
-                    phone_numbers = [p["number"] for p in data.get(
-                        "phoneNumbers", []) if "number" in p]
-
+                    linkedin_url = data.get("socialLinks", {}).get("linkedin", "")
+                    email_addresses = [email["email"] for email in data.get("emailAddresses", []) if "email" in email]
+                    phone_numbers = [phone["number"] for phone in data.get("phoneNumbers", []) if "number" in phone]
                     contact_dao = self.contact_service.contacts_dao
                     db_contacts = await contact_dao.get_contacts(
                         {
@@ -113,23 +110,26 @@ class LushaContactEnrichmentHelper:
 
                     if db_contacts:
                         db_contact = db_contacts[0]
-                        await contact_dao.update_one(
-                            {"_id": db_contact["_id"]},
+                        logger.info(f"contact found, updating contact: {db_contact['_id']}")
+                        await contact_dao.update_contact(
+                            db_contact["_id"],
                             {
                                 "$set": {
                                     "contact_data.email": email_addresses,
                                     "contact_data.phone": phone_numbers,
-                                    "metadata.updated_at": datetime.utcnow()
+                                    "metadata.updated_at": datetime.utcnow(),
+                                    "metadata.lusha_raw_data": data
                                 }
                             }
                         )
                         await self.contact_service.insert_campaign_contact_run(
                             {
                                 "campaign_id": campaign_id,
-                                "company_id": db_contact["contact_data"]["company_id"],
+                                "company_id": db_contact["company_id"],
                                 "contact_id": db_contact["_id"]
                             }
                         )
+                        
                     else:
                         firstname = data["firstName"]
                         lastname = data["lastName"]
@@ -167,8 +167,7 @@ class LushaContactEnrichmentHelper:
                         await self.contact_service.create_contact(contact_doc, campaign_id)
                         print(f"contact_doc: {contact_doc}")
                         
-
-        return
+        return {"message": "Contact enrichment completed"}
 
 
 class SaveProspectsDataToMongoHelper:
@@ -185,16 +184,28 @@ class SaveProspectsDataToMongoHelper:
         company_name = query_params.company_name
         company_id = query_params.company_id
 
-        await self.campaign_company_runs_dao.update_campaign_company_run({"campaign_id": campaign_id, "company_id": company_id}, {
-            "$set": {"company_status": True, "metadata.updated_at": datetime.utcnow()}
-        })
-
+        await self.campaign_company_runs_dao.update_campaign_company_run(
+            {"campaign_id": campaign_id,
+             "company_id": company_id
+            }, 
+            {
+                "$set": {
+                    "company_status": True,
+                    "metadata.updated_at": datetime.utcnow()
+                }
+            }
+        )
         inserted_ids = []
 
         for prospect in prospects:
             linkedin_url = prospect.get("linkedin_profile", "")
             linkedin_url = linkedin_url.lower().rstrip('/')
-            stored_contacts = await self.contacts_dao.get_contacts({"linkedin_data.linkedin_url": linkedin_url, "contact_data.company_id": company_id})
+            stored_contacts = await self.contacts_dao.get_contacts(
+                {
+                    "linkedin_data.linkedin_url": linkedin_url,
+                    "company_id": company_id
+                }
+            )
 
             if len(stored_contacts) == 0:
                 full_name = prospect.get("name", "")
@@ -223,6 +234,7 @@ class SaveProspectsDataToMongoHelper:
                 }
                 contact_doc = ContactDocument(**contact_doc)
                 await self.contact_service.create_contact(contact_doc, campaign_id)
+
             else:
                 contact = stored_contacts[0]
                 contact_id = contact.get("_id", "")
@@ -242,4 +254,4 @@ class SaveProspectsDataToMongoHelper:
             await self.contact_service.insert_campaign_contact_run(campaign_contact_run_doc)
 
         logger.info("prospects data saved to mongo")
-        return {"status": "success"}
+        return {"message": "Prospects data saved to mongo"}

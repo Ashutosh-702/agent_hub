@@ -23,4 +23,7 @@ class ContactsDao(BaseMongoDao):
             projection = {}
 
         return await self.find_one({"_id": ObjectId(contact_id)}, projection=projection)
+
+    async def update_contact(self, contact_id: str, update_clause: dict):
+        return await self.update_one({"_id": ObjectId(contact_id)}, update_clause)
     

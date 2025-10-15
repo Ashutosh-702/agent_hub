@@ -367,19 +367,21 @@ class ContactService:
             }
         }
         await self.insert_campaign_contact_run(contact_data)
+
         return
 
     async def insert_campaign_contact_run(self, campaign_contact_run_doc: ContactCampaignMapping):
-        query = {
+        contact_data = {
             "campaign_id": campaign_contact_run_doc.get("campaign_id"),
             "company_id": campaign_contact_run_doc.get("company_id"),
             "contact_id": campaign_contact_run_doc.get("contact_id"),
-            "metadata": campaign_contact_run_doc.get("metadata")
+            
         }
-        check_campaign_contact_run = await self.campaign_contact_run_dao.get_campaign_contact_runs(query)
-        
+        check_campaign_contact_run = await self.campaign_contact_run_dao.get_campaign_contact_runs(contact_data)
+        contact_data["metadata"] = campaign_contact_run_doc.get("metadata")
         if check_campaign_contact_run:
             return
         
-        await self.campaign_contact_run_dao.create_campaign_contact_run(query)
+        await self.campaign_contact_run_dao.create_campaign_contact_run(contact_data)
+        
         return

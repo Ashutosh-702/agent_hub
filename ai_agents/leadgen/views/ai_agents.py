@@ -119,6 +119,7 @@ async def lusha_get_contact_enrichment(query_params: LushaGetContactEnrichment) 
     response = await lusha_contact_enrichment_helper.lusha_get_contact_enrichment(query_params)
     response_data.success = True
     response_data.data = response
+    
     return response_data.dict()
 
 
@@ -129,6 +130,7 @@ async def lusha_contact_enrichment(query_params: LushaContactEnrichment) -> Dict
     response = await lusha_contact_enrichment_helper.lusha_contact_enrichment(query_params)
     response_data.success = True
     response_data.data = response
+
     return response_data.dict()
 
 
@@ -139,5 +141,6 @@ async def save_prospects_data_to_mongo(query_params: SaveProspectsDataToMongo) -
     response = await save_prospects_data_to_mongo_helper.save_prospects_data_to_mongo(query_params)
     response_data.success = True
     response_data.data = response
+
     return response_data.dict()
     

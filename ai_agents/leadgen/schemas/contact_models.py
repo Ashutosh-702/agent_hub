@@ -6,12 +6,12 @@ from datetime import datetime
 
 class ContactData(BaseModel):
     """Contact information model"""
-    firstname: str
-    lastname: str
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
     email: List[str] = Field(default_factory=list)
     phone: List[str] = Field(default_factory=list)
     jobtitle: Optional[str] = None
-    company: str
+    company: Optional[str] = None
 
 
 class LinkedInData(BaseModel):
