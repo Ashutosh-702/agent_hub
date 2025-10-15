@@ -110,9 +110,10 @@ class LushaContactEnrichmentHelper:
 
                     if db_contacts:
                         db_contact = db_contacts[0]
-                        logger.info(f"contact found, updating contact: {db_contact['_id']}")
+                        contact_id = db_contact["_id"]
+                        logger.info(f"contact found, updating contact: {contact_id}")
                         await contact_dao.update_contact(
-                            db_contact["_id"],
+                            contact_id,
                             {
                                 "$set": {
                                     "contact_data.email": email_addresses,
@@ -126,20 +127,21 @@ class LushaContactEnrichmentHelper:
                             {
                                 "campaign_id": campaign_id,
                                 "company_id": db_contact["company_id"],
-                                "contact_id": db_contact["_id"]
+                                "contact_id": contact_id
                             }
                         )
                         
                     else:
-                        firstname = data["firstName"]
-                        lastname = data["lastName"]
-                        job_title = data["jobTitle"]
+                        firstname = data.get("firstName", "")
+                        lastname = data.get("lastName", "")
+                        job_title = data.get("jobTitle", "")
+                        company_name = data.get("companyName", "")
 
                         contact_company_id = company_source_id_name_mappings.get(
-                            data["companyName"], "")
+                            company_name, "")
 
                         if not contact_company_id:
-                            print(
+                            logger.info(
                                 f"Company name not found in company_source_id_name_mappings: {data['companyName']}")
                             continue
 
@@ -151,7 +153,7 @@ class LushaContactEnrichmentHelper:
                                 "email": email_addresses,
                                 "phone": phone_numbers,
                                 "jobtitle": job_title,
-                                "company": data["companyName"],
+                                "company": company_name,
                             },
                             "linkedin_data": {
                                 "linkedin_url": linkedin_url,
@@ -165,7 +167,7 @@ class LushaContactEnrichmentHelper:
                         }
                         contact_doc = ContactDocument(**contact_doc)
                         await self.contact_service.create_contact(contact_doc, campaign_id)
-                        print(f"contact_doc: {contact_doc}")
+                        logger.info(f"contact_doc: {contact_doc}")
                         
         return {"message": "Contact enrichment completed"}
 
