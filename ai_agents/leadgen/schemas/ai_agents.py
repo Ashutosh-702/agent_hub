@@ -98,4 +98,7 @@ class SaveProspectsDataToMongo(BaseModel):
     campaign_id: str
     company_name: str
     company_id: str
+
+class CountCompanyMappings(BaseModel):
+    campaign_id: str
     
