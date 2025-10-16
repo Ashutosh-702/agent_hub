@@ -11,7 +11,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     LinkedinContactDetails,
     LushaContactEnrichment,
     SaveProspectsDataToMongo,
-    LushaGetContactEnrichment
+    LushaGetContactEnrichment,
+    CountCompanyMappings
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -139,6 +140,17 @@ async def save_prospects_data_to_mongo(query_params: SaveProspectsDataToMongo) -
     save_prospects_data_to_mongo_helper = SaveProspectsDataToMongoHelper()
 
     response = await save_prospects_data_to_mongo_helper.save_prospects_data_to_mongo(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+
+async def count_company_mappings(query_params: CountCompanyMappings = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_form_upload_service = CompanyService()
+
+    response = await leadgen_form_upload_service.count_company_mappings(query_params)
     response_data.success = True
     response_data.data = response
 
