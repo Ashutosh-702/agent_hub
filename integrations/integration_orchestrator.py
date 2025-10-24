@@ -12,6 +12,7 @@ from integrations.lusha.lusha_helper import LushaHelper
 from integrations.coresignal.coresignal_api_client import CoresignalAPIClient
 from integrations.lusha.lusha_contact_handler import LushaContactHandler
 from integrations.utils import extract_departments_from_config
+from config.logging import logger
 
 
 class IntegrationOrchestrator:
@@ -31,25 +32,25 @@ class IntegrationOrchestrator:
         total_company_data = []
         
         try:    
-            # print("Fetching companies from lusha...")
-            # inserted_count = await self.lusha_helper.get_companies_from_lusha(self.config)
-            # print(f"Found {inserted_count} companies from lusha.")
-            # print("Fetching companies from core_signal...")
-            # # core_signal_company_data = await self.coresignal_helper.collect_companies_from_search(
-            # #     self.config, cached_data
-            # # )
-            # total_company_data = inserted_count
-            # print(f"Total new companies added into companies collection: {inserted_count}")
-            # await self.relevance_check.company_relevance_check(self.campaign_id)
+            logger.info("Fetching companies from lusha...")
+            inserted_count = await self.lusha_helper.get_companies_from_lusha(self.config)
+            logger.info(f"Found {inserted_count} companies from lusha.")
+            logger.info("Fetching companies from core_signal...")
+            # core_signal_company_data = await self.coresignal_helper.collect_companies_from_search(
+            #     self.config, cached_data
+            # )
+            total_company_data = inserted_count
+            logger.info(f"Total new companies added into companies collection: {inserted_count}")
+            await self.relevance_check.company_relevance_check(self.campaign_id)
             departments = extract_departments_from_config(self.config.get("prompts", {}).get("persona", ""))
             await self.lusha_contact_handler.process_campaign_contacts(
-                campaign_id=self.campaign_id, departments=departments
+                campaign_id=str(self.campaign_id), departments=departments
             )
             await self.campaigns_dao.update_campaign_status(self.campaign_id,"pending")
-            print(f"Updated status of {self.campaign_id} to 'pending'")
+            logger.info(f"Updated status of {self.campaign_id} to 'pending'")
 
         except Exception as e:
-            print(f"Error while processing company search for campaign {self.campaign_id}: {str(e)}")
+            logger.error(f"Error while processing company search for campaign {self.campaign_id}: {str(e)}")
 
         finally:
             return {

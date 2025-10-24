@@ -1,6 +1,3 @@
-from eventbridge.logic.async_kafka_consumer import orjson
-import json
-import os
 from typing import List, Dict, Any, Optional
 
 from structlog.contextvars import bind_contextvars
@@ -16,7 +13,7 @@ from ai_agents.core_sdr.src.parsers.constants import COMPANY_GROUPINGS
 from integrations.lusha.company_saver import CompanySaver
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from ai_agents.core_sdr.config.department_mappers import DEPARTMENT_TO_CATEGORY
+from integrations.config.lusha_department_mapper import DEPARTMENT_TO_CATEGORY
 from global_utils.constants import LUSHA_BASE_URL
 from config.logging import logger
 from global_utils.exceptions import ApiException
