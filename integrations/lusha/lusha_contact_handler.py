@@ -1,7 +1,6 @@
-from config.loaded_config import loaded_config
-from typing import List
+from typing import List, Optional
 
-from typing import Optional
+from config.loaded_config import loaded_config
 from ai_agents.leadgen.services.ai_agents_service import ContactService, CompanyService
 from ai_agents.leadgen.schemas.ai_agents import CountCompanyMappings, CompanyMappingList, LushaGetContactEnrichment, LushaContactEnrichment
 from ai_agents.leadgen.helper.ai_agents_helper import LushaContactEnrichmentHelper
@@ -67,6 +66,7 @@ class LushaContactHandler:
 
     async def count_company_mappings(self) -> int:
         response = await self.company_service.count_company_mappings(query_params=CountCompanyMappings(campaign_id=self.campaign_id))
+
         return response.get("count", 0)
 
     async def enrich_and_store_contacts(self, company_contact_mapping: dict) -> dict:
@@ -79,6 +79,7 @@ class LushaContactHandler:
                 lusha_request_id=company_contact_mapping.get("lusha_request_id", ""),
             )
         )
+
         return response.get("data", {})
 
     async def process_campaign_contacts(self, campaign_id: str, departments: Optional[List[str]] = None) -> dict:
@@ -87,7 +88,7 @@ class LushaContactHandler:
             self.campaign_id = campaign_id
 
             logger.info(f"Departments: {departments}")
-            
+
             if departments:
                 self.departments = departments
 
@@ -105,6 +106,7 @@ class LushaContactHandler:
 
             if total_company_mappings == 0:
                 logger.error("No company mappings found")
+
                 return {
                     "status": "success",
                     "message": "No company mappings found"
@@ -144,6 +146,7 @@ class LushaContactHandler:
 
         except Exception as e:
             logger.error(f"❌ Error in contact enrichment: {e}")
+
             return {
                 "status": "error",
                 "message": f"Contact enrichment failed: {str(e)}"
