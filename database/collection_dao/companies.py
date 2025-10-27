@@ -20,4 +20,3 @@ class CompaniesDao(BaseMongoDao):
     async def get_company(self, company_id: str):
         return await self.find_one({"_id": ObjectId(company_id)})
     
-

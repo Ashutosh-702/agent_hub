@@ -329,3 +329,4 @@ class ContactService:
         await self.campaign_contact_run_dao.create_campaign_contact_run(contact_data)
         
         return
+        

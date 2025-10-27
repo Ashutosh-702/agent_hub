@@ -9,8 +9,6 @@ from integrations.lusha.lusha_api import LushaAPIClient
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from integrations.integration_orchestrator import IntegrationOrchestrator
-
-
 from global_utils.chronos_utils import (
     generate_default_eta_expression,
     schedule_lusha_company_collection

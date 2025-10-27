@@ -14,8 +14,9 @@ import aiohttp
 from config.logging import logger
 import traceback
 
-
 urllib3.disable_warnings(InsecureRequestWarning)
+
+
 async def consumer_main():
     """Async consumer startup (following LinkedIn SDR pattern)"""
     consumer_type = os.getenv("CONSUMER_TYPE", "leadgen_batch_consumer")
@@ -62,5 +63,5 @@ async def consumer_main():
         sys.exit(1)
     except Exception as e:
         logger.error(f"❌ Consumer startup failed: {e}")
-        traceback.print_exc()
+        logger.error(f"Traceback: {traceback.format_exc()}")
         sys.exit(1)
