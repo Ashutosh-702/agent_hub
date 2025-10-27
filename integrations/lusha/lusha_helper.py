@@ -44,8 +44,8 @@ class LushaHelper:
         range_str = range_str.strip()
 
         if '+' in range_str:
-            min_val = int(range_str.replace('+', ''))
-            return min_val, MAX_EMPLOYEES
+            min_val = int(range_str.replace('+', '')) + 1
+            return min_val, None
 
         elif '-' in range_str:
             parts = range_str.split('-')
@@ -158,10 +158,12 @@ class LushaHelper:
                 for range in employee_ranges:
                     logger.info(f"range_value: {range}")
                     min_emp, max_emp = self.parse_employee_range(range)
-                    sizes.append({
-                        "min": min_emp,
-                        "max": max_emp
-                    })
+                    size_dict = {"min": min_emp}
+                    
+                    if max_emp:
+                        size_dict["max"] = max_emp
+
+                    sizes.append(size_dict)
 
                 logger.info(f"sizes: {sizes}")
                 lusha_config["sizes"] = sizes
