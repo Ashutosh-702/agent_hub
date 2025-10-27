@@ -42,10 +42,10 @@ class IntegrationOrchestrator:
             total_company_data = inserted_count
             logger.info(f"Total new companies added into companies collection: {inserted_count}")
             await self.relevance_check.company_relevance_check(self.campaign_id)
-            departments = extract_departments_from_config(self.config.get("prompts", {}).get("persona", ""))
-            await self.lusha_contact_handler.process_campaign_contacts(
-                campaign_id=str(self.campaign_id), departments=departments
-            )
+            # departments = extract_departments_from_config(self.config.get("prompts", {}).get("persona", ""))
+            # await self.lusha_contact_handler.process_campaign_contacts(
+            #     campaign_id=str(self.campaign_id), departments=departments
+            # )
             await self.campaigns_dao.update_campaign_status(self.campaign_id,"pending")
             logger.info(f"Updated status of {self.campaign_id} to 'pending'")
 
