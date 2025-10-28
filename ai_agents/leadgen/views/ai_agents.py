@@ -92,9 +92,17 @@ async def fetch_campaign_by_status(status: str) -> Dict[str, Any]:
     leadgen_form_upload_service = CampaignService()
 
     response = await leadgen_form_upload_service.fetch_campaign_by_status(status)
-    response_data.success = True
-    response_data.data = response.get("config")
+    config = response.get("config")
 
+    if not config:
+        response_data.data = {
+            "message": "No campaign found with status",
+        }
+        return response_data.dict()
+    
+    response_data.data = config
+    response_data.success = True
+    
     return response_data.dict()
 
 
