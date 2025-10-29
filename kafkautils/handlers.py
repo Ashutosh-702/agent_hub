@@ -2,16 +2,13 @@
 from time import sleep
 from typing import Any
 import json
-from ai_agents.core_sdr.src.cli.main import process_company_search
 from database.connection_manager import ConnectionManager
 from database.collection_dao.campaigns import CampaignsDao
 from config.loaded_config import loaded_config
-from bson import ObjectId
-from ai_agents.core_sdr.src.api.lusha_api import lusha_search_api
+from integrations.lusha.lusha_api import LushaAPIClient
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from datetime import datetime, timezone
-import time
+from integrations.integration_orchestrator import IntegrationOrchestrator
 from global_utils.chronos_utils import (
     generate_default_eta_expression,
     schedule_lusha_company_collection
@@ -113,7 +110,8 @@ async def process_leadgen_message(request_id: str, campaign_id: str):
         logger.info(f"📍 Location: {campaign_data.get('target', {}).get('location', {}).get('names', 'Unknown')}")
         
         # Call the company search process with campaign data
-        result = await process_company_search(campaign_data)
+        orchestrator = IntegrationOrchestrator(campaign_data)
+        await orchestrator.process_company_search()
         
         logger.info(f"✅ Completed processing: {request_id}")
         # print(f"📝 Result: {result}")
@@ -203,13 +201,14 @@ async def lusha_company_data_collection(campaign_details: Any):
 
         if total_results == 0:
             api_payload = convert_objectid_to_string(campaign_details)
-            first_response = await lusha_search_api(api_payload)
+            lusha_api_client = LushaAPIClient(payload_values=api_payload)
+            first_response = await lusha_api_client.lusha_search_api()
 
             if first_response['status_code'] == 429:
 
                 #need  to loop for try 3 times with sleep
                 for i in range(3):
-                    first_response = await lusha_search_api(api_payload)
+                    first_response = await lusha_api_client.lusha_search_api()
 
                     if first_response['status_code'] == 201:
                         fetch_company_status = True
@@ -278,7 +277,7 @@ async def lusha_company_data_collection(campaign_details: Any):
             logger.info(f" lusha company data collection page_num: {page_num}")
             page_payload = campaign_details.copy()
             page_payload["pages"] = {"page": page_num, "size": page_size}
-            page_response = await lusha_search_api(page_payload)
+            page_response = await lusha_api_client.lusha_search_api(page_payload)
 
             if page_response['status_code'] == 429:
 

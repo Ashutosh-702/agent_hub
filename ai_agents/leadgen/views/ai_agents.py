@@ -8,10 +8,19 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CompanyMappingList,
     CompanyListWithDetails,
     CampaignContactData,
-    LinkedinContactDetails
+    LinkedinContactDetails,
+    LushaContactEnrichment,
+    SaveProspectsDataToMongo,
+    LushaGetContactEnrichment,
+    CountCompanyMappings
 )
-from ai_agents.leadgen.services.ai_agents_service import CampaignService, CompanyService, ContactService
+from ai_agents.leadgen.services.ai_agents_service import (
+    CampaignService,
+    CompanyService,
+    ContactService
+)
 
+from ai_agents.leadgen.helper.ai_agents_helper import LushaContactEnrichmentHelper, SaveProspectsDataToMongoHelper
 
 async def upload_leadgen_form(
     request_data: FormSubmission = Body(),
@@ -83,9 +92,17 @@ async def fetch_campaign_by_status(status: str) -> Dict[str, Any]:
     leadgen_form_upload_service = CampaignService()
 
     response = await leadgen_form_upload_service.fetch_campaign_by_status(status)
-    response_data.success = True
-    response_data.data = response.get("config")
+    config = response.get("config")
 
+    if not config:
+        response_data.data = {
+            "message": "No campaign found with status",
+        }
+        return response_data.dict()
+    
+    response_data.data = config
+    response_data.success = True
+    
     return response_data.dict()
 
 
@@ -101,5 +118,49 @@ async def get_linkedin_contact_details(query_params: LinkedinContactDetails = De
         
     response_data.data = contact_data
     
+    return response_data.dict()
+
+
+async def lusha_get_contact_enrichment(query_params: LushaGetContactEnrichment) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    lusha_contact_enrichment_helper = LushaContactEnrichmentHelper()
+
+    response = await lusha_contact_enrichment_helper.lusha_get_contact_enrichment(query_params)
+    response_data.success = True
+    response_data.data = response
+    
+    return response_data.dict()
+
+
+async def lusha_contact_enrichment(query_params: LushaContactEnrichment) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    lusha_contact_enrichment_helper = LushaContactEnrichmentHelper()
+
+    response = await lusha_contact_enrichment_helper.lusha_contact_enrichment(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+
+async def save_prospects_data_to_mongo(query_params: SaveProspectsDataToMongo) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    save_prospects_data_to_mongo_helper = SaveProspectsDataToMongoHelper()
+
+    response = await save_prospects_data_to_mongo_helper.save_prospects_data_to_mongo(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+
+async def count_company_mappings(query_params: CountCompanyMappings = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_form_upload_service = CompanyService()
+
+    response = await leadgen_form_upload_service.count_company_mappings(query_params)
+    response_data.success = True
+    response_data.data = response
+
     return response_data.dict()
     

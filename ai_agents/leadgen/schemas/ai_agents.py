@@ -78,3 +78,27 @@ class CampaignContactData(BaseModel):
 
 class LinkedinContactDetails(BaseModel):
     linkedin_url: str
+
+
+class LushaGetContactEnrichment(BaseModel):
+    campaign_id: str
+    page: int = 1
+    page_size: int = 50
+    company_map_list: List[dict]
+    departments: List[str]
+
+class LushaContactEnrichment(BaseModel):
+    contact_ids: List[str]
+    company_source_id_name_mappings: dict
+    campaign_id: str
+    lusha_request_id: str
+
+class SaveProspectsDataToMongo(BaseModel):
+    prospects: List[dict]
+    campaign_id: str
+    company_name: str
+    company_id: str
+
+class CountCompanyMappings(BaseModel):
+    campaign_id: str
+    

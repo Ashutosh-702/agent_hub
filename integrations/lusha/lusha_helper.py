@@ -2,9 +2,9 @@ from typing import Dict, Any, List, OrderedDict
 
 from structlog.contextvars import bind_contextvars
 
-from integrations.lusha.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
-from integrations.lusha.config.lusha_industry_config import LUSHA_CONFIG
-from integrations.lusha.config.country_api_results import LUSHA_COUNTRY_CONFIG
+from integrations.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
+from integrations.config.lusha_industry_config import LUSHA_CONFIG
+from integrations.config.country_api_results import LUSHA_COUNTRY_CONFIG
 from integrations.lusha.lusha_api import LushaAPIClient
 from config.logging import logger
 
@@ -44,8 +44,8 @@ class LushaHelper:
         range_str = range_str.strip()
 
         if '+' in range_str:
-            min_val = int(range_str.replace('+', ''))
-            return min_val, MAX_EMPLOYEES
+            min_val = int(range_str.replace('+', '')) + 1
+            return min_val, None
 
         elif '-' in range_str:
             parts = range_str.split('-')
@@ -92,6 +92,7 @@ class LushaHelper:
             industry_names = []
 
         sub_ids = []
+        
         for name in industry_names:
             if name in self.LUSHA_LOOKUP:
                 sub_ids.append(self.LUSHA_LOOKUP[name])
@@ -157,10 +158,12 @@ class LushaHelper:
                 for range in employee_ranges:
                     logger.info(f"range_value: {range}")
                     min_emp, max_emp = self.parse_employee_range(range)
-                    sizes.append({
-                        "min": min_emp,
-                        "max": max_emp
-                    })
+                    size_dict = {"min": min_emp}
+                    
+                    if max_emp:
+                        size_dict["max"] = max_emp
+
+                    sizes.append(size_dict)
 
                 logger.info(f"sizes: {sizes}")
                 lusha_config["sizes"] = sizes

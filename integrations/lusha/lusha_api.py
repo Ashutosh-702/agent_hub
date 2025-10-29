@@ -1,6 +1,3 @@
-from eventbridge.logic.async_kafka_consumer import orjson
-import json
-import os
 from typing import List, Dict, Any, Optional
 
 from structlog.contextvars import bind_contextvars
@@ -16,15 +13,16 @@ from ai_agents.core_sdr.src.parsers.constants import COMPANY_GROUPINGS
 from integrations.lusha.company_saver import CompanySaver
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from ai_agents.core_sdr.config.department_mappers import DEPARTMENT_TO_CATEGORY
+from integrations.config.lusha_department_mapper import DEPARTMENT_TO_CATEGORY
 from global_utils.constants import LUSHA_BASE_URL
 from config.logging import logger
+from global_utils.exceptions import ApiException
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class LushaAPIClient:
-    def __init__(self):
+    def __init__(self, payload_values: Optional[Dict[str, Any]] = None):
         self.api_key = loaded_config.lusha_api_key
         self.http_session = loaded_config.http_session
         self.headers = {
@@ -32,7 +30,7 @@ class LushaAPIClient:
             "api_key": f"{self.api_key}",
             'Content-Type': 'application/json'
         }
-        self.payload_values: Dict[str, Any] = None
+        self.payload_values = payload_values
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
         self.company_saver = CompanySaver(self.companies_dao, self.campaign_company_runs_dao)
@@ -359,7 +357,7 @@ class LushaAPIClient:
         result = await response.json()
 
         if response.status != 201:
-           raise Exception(f"Search API failed: {response.status}")
+           raise ApiException(f"Search API failed: {response.status}")
         
         return result
 
@@ -375,6 +373,6 @@ class LushaAPIClient:
         result = await response.json()
 
         if response.status != 200:
-            raise Exception(f"linkedin API failed: {response.status}")
+            raise ApiException(f"linkedin API failed: {response.status}")
         
         return result
