@@ -13,7 +13,7 @@ openai-agents~=0.2.0
 hubspot-api-client~=12.0.0
 
 # Core SDR Dependencies
-fastapi==0.116.1
+fastapi==0.120.1
 uvicorn==0.35.0
 click~=8.2.1
 python-dateutil==2.9.0
@@ -23,6 +23,8 @@ oauth2client==4.1.3
 structlog==25.4.0
 # Development Dependencies
 motor==3.7.1
+starlette==0.49.1
+
 # Kafka dependencies for Chronos consumer
 # eventbridge @ git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/fynd-event-bridge@bump_reqs_v2.1.0-alpha.4#egg=eventbridge
 # Additional dependencies for production
