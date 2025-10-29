@@ -1,5 +1,6 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
 
 
 class BaseMongoDao:
@@ -105,3 +106,44 @@ class BaseMongoDao:
 
     async def start_session(self):
         return await self.mongo_client.start_session()
+
+    def _process_query_objectids(self, query: Dict = None) -> Dict[str, Any]:
+
+        if query is None:
+            return {}
+
+        processed_query = query.copy()
+        objectid_fields = [
+            "_id", "campaign_id", "company_id", "contact_id"
+        ]
+
+        for field in objectid_fields:
+            if field in processed_query and processed_query[field] is not None:
+                if isinstance(processed_query[field], str):
+                    processed_query[field] = self._validate_and_convert_objectid(processed_query[field], field)
+                elif isinstance(processed_query[field], dict) and '$in' in processed_query[field]:
+                    # Handle arrays of IDs
+                    valid_items = []
+                    in_operator_values = processed_query[field]['$in']
+
+                    for position, object_id_string in enumerate(in_operator_values):
+                        if object_id_string is not None:
+                            field_name = f"{field}[{position}]"
+                            converted_item = self._validate_and_convert_objectid(object_id_string, field_name)
+                            valid_items.append(converted_item)
+
+                    processed_query[field]['$in'] = valid_items
+
+        return processed_query
+
+    def _validate_and_convert_objectid(self, value: Union[str, ObjectId], field_name: str = "id") -> ObjectId:
+
+        if isinstance(value, ObjectId):
+            return value
+
+        if not value.strip():
+            raise Exception(
+                f"{field_name} cannot be empty", status_code=400)
+
+        return ObjectId(value)
+        
