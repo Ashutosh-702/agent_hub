@@ -10,6 +10,7 @@ class Settings:
     MODE = os.getenv("MODE", "server")
     base_url = os.getenv("BASE_URL","http://0.0.0.0:80")
     lusha_api_key = os.getenv("LUSHA_API_KEY")
+    apollo_api_key = os.getenv("APOLLO_API_KEY")
     http_session : aiohttp.ClientSession = None
     openai_api_key = os.getenv("OPENAI_API_KEY", "")
     host = os.getenv("API_HOST", "0.0.0.0")

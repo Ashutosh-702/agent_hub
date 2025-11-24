@@ -12,6 +12,8 @@ from integrations.lusha.lusha_helper import LushaHelper
 from integrations.coresignal.coresignal_api_client import CoresignalAPIClient
 from integrations.lusha.lusha_contact_handler import LushaContactHandler
 from integrations.utils import extract_departments_from_config
+from integrations.apollo import ApolloHelper
+
 from config.logging import logger
 
 
@@ -26,6 +28,7 @@ class IntegrationOrchestrator:
         self.relevance_check = CompanyRelevanceCheck(self.config)
         self.campaign_id = self.config.get('_id')
         self.lusha_contact_handler = LushaContactHandler()
+        self.apollo_helper = ApolloHelper()
 
     async def process_company_search(self) -> Dict[str, Any]:
         """Core function to process company search"""
@@ -33,7 +36,8 @@ class IntegrationOrchestrator:
         
         try:    
             logger.info("Fetching companies from lusha...")
-            inserted_count = await self.lusha_helper.get_companies_from_lusha(self.config)
+            # inserted_count = await self.lusha_helper.get_companies_from_lusha(self.config)
+            inserted_count = await self.apollo_helper.get_companies_from_apollo(self.config)
             logger.info(f"Found {inserted_count} companies from lusha.")
             logger.info("Fetching companies from core_signal...")
             # core_signal_company_data = await self.coresignal_helper.collect_companies_from_search(
