@@ -7,10 +7,11 @@ from config.loaded_config import loaded_config
 from integrations.lusha.lusha_api import LushaAPIClient
 from ai_agents.leadgen.services.ai_agents_service import CompanyService, ContactService
 from ai_agents.leadgen.schemas.contact_models import ContactDocument
-from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo
+from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo, ApolloContactEnrichment
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.contacts import ContactsDao
 from global_utils.exceptions import ApiException
+from integrations.apollo.apollo_helper import ApolloHelper
 
 class LushaContactEnrichmentHelper:
 
@@ -274,3 +275,37 @@ class SaveProspectsDataToMongoHelper:
 
         logger.info("prospects data saved to mongo")
         return {"message": "Prospects data saved to mongo"}
+
+
+class ApolloContactEnrichmentHelper:
+
+    def __init__(self):
+        self.apollo_helper = ApolloHelper()
+
+    async def apollo_contact_enrichment(self, query_params: ApolloContactEnrichment):
+        company_names = query_params.company_name
+        person_seniorities = query_params.person_seniorities
+        number_of_contacts_per_company = query_params.number_of_contacts_per_company
+
+        if not company_names:
+            raise ApiException("Company names are required")
+
+        if not person_seniorities:
+            raise ApiException("Person seniorities are required")
+
+        if not number_of_contacts_per_company:
+            raise ApiException("Number of contacts per company is required")
+        contact_data = {}
+        enriched_data = {}
+        for company_name in company_names:
+            response = await self.apollo_helper.get_company_contacts(company_name, person_seniorities, page=1, per_page=number_of_contacts_per_company, enrich_contacts=True)
+            if response.get('contacts'):
+                contacts = response.get('contacts', [])
+                for contact in contacts:
+                    contact_data = contact.get('contact_data')
+                    enriched_data = contact.get('enriched_data')
+                return {contact_data: contact_data, enriched_data: enriched_data}
+            else:
+                raise ApiException(response.get('message'))
+
+        return {"message": "All company contacts enriched"}

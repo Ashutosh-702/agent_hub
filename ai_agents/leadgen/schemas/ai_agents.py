@@ -101,4 +101,9 @@ class SaveProspectsDataToMongo(BaseModel):
 
 class CountCompanyMappings(BaseModel):
     campaign_id: str
-    
+
+class ApolloContactEnrichment(BaseModel):
+    company_name: List[str]
+    person_seniorities: List[str]
+    number_of_contacts_per_company: int = 100
+    interested_product: str
