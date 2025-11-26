@@ -286,6 +286,7 @@ class ApolloContactEnrichmentHelper:
         self.apollo_helper = ApolloHelper()
         self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][CONTACTS_ENRICHMENT]
         self.event_emitter = loaded_config.connection_manager.event_emitter
+        self.company_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
 
 
     async def apollo_contact_enrichment(self, query_params: ApolloContactEnrichment):
@@ -314,6 +315,25 @@ class ApolloContactEnrichmentHelper:
 
         #============================================
 
+        
+        company_ids = []
+        for company_name in company_names:
+            company_doc = await self.company_dao.get_company_by_filters({"identifiers.name": company_name})
+            if not company_doc:
+                inserted_company_id = await self.company_dao.create_company({
+                    "identifiers": {
+                        "name": company_name
+                    },
+                    "source": "apollo",
+                    "metadata": {
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                })
+                company_ids.append(str(inserted_company_id))
+            else:
+                company_ids.append(str(company_doc["_id"]))
+
         request_id = str(uuid.uuid4())
 
         if not self.event_emitter:
@@ -322,7 +342,7 @@ class ApolloContactEnrichmentHelper:
         event = {
             "request_id": request_id,
             "action": "process_contacts_enrichment",
-            "company_id": str(company_id), 
+            "company_ids": company_ids, 
             "interested_product": interested_product,
             "timestamp": asyncio.get_event_loop().time()
         }
@@ -332,24 +352,22 @@ class ApolloContactEnrichmentHelper:
             topics=self.kafka_config["topics"],
             partition_value=request_id,
             event=event,
-            event_meta={"service": "leadgen", "company_names": company_names}
+            event_meta={"service": "leadgen", "company_ids": company_ids, "interested_product": interested_product}
         )
 
+        logger.info(f"company_ids: {company_ids}")
         logger.info(f"📤 Company Name {company_names} queued for processing: {request_id}")
 
 
-
-
-
-        for company_name in company_names:
-            response = await self.apollo_helper.get_company_contacts(company_name, person_seniorities, page=1, per_page=number_of_contacts_per_company, enrich_contacts=True)
-            if response.get('contacts'):
-                contacts = response.get('contacts', [])
-                for contact in contacts:
-                    contact_data = contact.get('contact_data')
-                    enriched_data = contact.get('enriched_data')
-                return {contact_data: contact_data, enriched_data: enriched_data}
-            else:
-                raise ApiException(response.get('message'))
+        # for company_name in company_names:
+        #     response = await self.apollo_helper.get_company_contacts(company_name, person_seniorities, page=1, per_page=number_of_contacts_per_company, enrich_contacts=True)
+        #     if response.get('contacts'):
+        #         contacts = response.get('contacts', [])
+        #         for contact in contacts:
+        #             contact_data = contact.get('contact_data')
+        #             enriched_data = contact.get('enriched_data')
+        #         return {contact_data: contact_data, enriched_data: enriched_data}
+        #     else:
+        #         raise ApiException(response.get('message'))
 
         return {"message": "All company contacts enriched"}

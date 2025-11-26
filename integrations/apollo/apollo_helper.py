@@ -4,15 +4,25 @@ from structlog.contextvars import bind_contextvars
 
 from integrations.apollo.apollo_api import ApolloAPIClient
 from config.logging import logger
+from ai_agents.core_sdr.src.api.people_relevance_check import PeopleRelevanceCheck
+from database.collection_dao.contacts import ContactsDao
+from database.collection_dao.companies import CompaniesDao
+from config.loaded_config import loaded_config
+from datetime import datetime, timezone
+from bson import ObjectId
 
 
 class ApolloHelper:
     def __init__(self):
-        pass
+        config = {}
+        self.people_relevance_check = PeopleRelevanceCheck(config)
+        self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
 
     async def get_company_contacts(
         self,
         company_name: str,
+        company_id: str,
         person_seniorities: Optional[List[str]] = None,
         contact_email_status: Optional[List[str]] = None,
         page: int = 1,
@@ -22,21 +32,7 @@ class ApolloHelper:
         reveal_phone_number: bool = False,
         additional_params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Main entry point: Get contact list for a company
-        
-        Args:
-            company_name: Name of the company to get contacts for
-            person_seniorities: List of seniority levels (e.g., ['owner', 'founder', 'c_suite'])
-            contact_email_status: List of email statuses (e.g., ['verified', 'likely to engage'])
-            page: Page number for pagination
-            per_page: Number of results per page
-            enrich_contacts: Whether to enrich contact details (requires additional API calls)
-            reveal_personal_emails: Whether to reveal personal emails in enrichment
-            reveal_phone_number: Whether to reveal phone number in enrichment
-            additional_params: Additional search parameters
-        Returns: Contact list with company and contact information
-        """
+ 
         bind_contextvars(
             operation="apollo_get_company_contacts",
             component="apollo_helper",
@@ -109,8 +105,29 @@ class ApolloHelper:
 
         logger.info(f"Found {len(people)} contacts")
 
-        # Step 5: Optionally enrich contacts
+
+        #relevance check for each contact if false remove that  person from the list
+        relevant_people = []
+        for person in people:
+            try:
+                relevance_result = await self.people_relevance_check.web_search_analysis(person)
+                relevance_assessment = relevance_result.get('relevance_assessment', {})
+                is_relevant = relevance_assessment.get('is_relevant', False)
+                if not is_relevant:
+                    relevant_people.append(person)
+                    logger.info(f"Person {person.get('name', 'Unknown')} is relevant - keeping in list")
+                else:
+                    logger.info(f"Person {person.get('name', 'Unknown')} is not relevant - removing from list")
+            except Exception as e:
+                logger.error(f"Error checking relevance for person {person.get('name', 'Unknown')}: {str(e)}")
+                continue
+
+        people = relevant_people
+        logger.info(f"After relevance check: {len(people)} relevant contacts out of {len(people) + (len(people) - len(relevant_people))} total")
+
+        # Step 6: Optionally enrich contacts
         contacts = []
+        stored_contact_ids = []
         if enrich_contacts:
             logger.info("Step 3: Enriching contacts...")
             apollo_client = ApolloAPIClient()
@@ -133,23 +150,27 @@ class ApolloHelper:
                     )
 
                     if enrichment_response.get('status_code') == 200:
-                        contacts.append({
-                            "contact_data": person,
-                            "enriched_data": enrichment_response.get('results', {})
-                        })
+                        enriched_data = enrichment_response.get('results', {})
+
+                        try:
+                            contact_doc = self.transform_apollo_contact_to_db_format(
+                                    person_data=person,
+                                    enriched_data=enriched_data,
+                                    company_id=company_id
+                                )
+                            contact_id = await self.contacts_dao.create_contact(contact_doc)
+                            logger.info(f"Stored contact {person.get('name', 'Unknown')} with ID: {contact_id}")
+                            stored_contact_ids.append(str(contact_id))
+                        except Exception as e:
+                            logger.error(f"Error storing contact {person_id} in database: {str(e)}")
+                            continue
                     else:
                         # Include contact even if enrichment failed
-                        contacts.append({
-                            "contact_data": person,
-                            "enriched_data": None
-                        })
+                        logger.error(f"Failed to enrich contact {person_id}: {enrichment_response.get('error', 'Unknown error')}")
 
                 except Exception as e:
                     logger.error(f"Error enriching contact {person_id}: {str(e)}")
-                    contacts.append({
-                        "contact_data": person,
-                        "enriched_data": None
-                    })
+                    logger.error(f"Failed to enrich contact {person_id}: {str(e)}")
         else:
             # Return contacts without enrichment
             contacts = [{"contact_data": person, "enriched_data": None} for person in people]
@@ -161,7 +182,7 @@ class ApolloHelper:
             "message": f"Retrieved {len(contacts)} contacts",
             "company_name": company_name,
             "organization_ids": organization_ids,
-            "contacts": contacts,
+            "stored_contact_ids": stored_contact_ids,
             "total_contacts": len(contacts),
             "pagination": {
                 "page": page,
@@ -220,11 +241,10 @@ class ApolloHelper:
 
         results = company_search_response.get('results', {})
         organizations = results.get('organizations', [])
-
-        for org in organizations:
-            org_id = org.get('id')
-            if org_id:
-                organization_ids.append(str(org_id))
+        #only take the first organization
+        org_id = organizations[0].get('id')
+        if org_id:
+            organization_ids.append(str(org_id))
 
         logger.info(f"Extracted {len(organization_ids)} organization IDs")
         return organization_ids
@@ -233,12 +253,7 @@ class ApolloHelper:
         self,
         organization_names: List[str]
     ) -> List[str]:
-        """
-        Search for multiple companies and extract all organization IDs
-        Args:
-            organization_names: List of organization names to search for
-        Returns: List of all unique organization IDs found
-        """
+
         all_organization_ids = []
 
         for org_name in organization_names:
@@ -364,20 +379,7 @@ class ApolloHelper:
         reveal_phone_number: bool = False,
         additional_params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Search for people and then enrich them
-        This combines both APIs: first search, then enrich each result
-        Args:
-            person_seniorities: List of seniority levels
-            contact_email_status: List of email statuses
-            organization_ids: List of organization IDs
-            page: Page number
-            per_page: Results per page
-            reveal_personal_emails: Whether to reveal personal emails in enrichment
-            reveal_phone_number: Whether to reveal phone number in enrichment
-            additional_params: Additional search parameters
-        Returns: Combined results with search and enrichment data
-        """
+       
         bind_contextvars(
             operation="apollo_search_and_enrich",
             component="apollo_helper",
@@ -459,21 +461,7 @@ class ApolloHelper:
         reveal_phone_number: bool = False,
         additional_params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Complete Apollo workflow: Company search -> People search -> People enrichment
-        This is the main entry point that orchestrates all three APIs
         
-        Args:
-            organization_names: List of organization names to search for
-            person_seniorities: List of seniority levels (e.g., ['owner', 'founder', 'c_suite'])
-            contact_email_status: List of email statuses (e.g., ['verified', 'likely to engage'])
-            page: Page number for pagination
-            per_page: Number of results per page
-            reveal_personal_emails: Whether to reveal personal emails in enrichment
-            reveal_phone_number: Whether to reveal phone number in enrichment
-            additional_params: Additional search parameters
-        Returns: Complete workflow results
-        """
         bind_contextvars(
             operation="apollo_complete_workflow",
             component="apollo_helper",
@@ -576,4 +564,83 @@ class ApolloHelper:
             "total_people_found": len(people),
             "total_enriched": len(enriched_results)
         }
+
+    def transform_apollo_contact_to_db_format(
+        self, 
+        person_data: Dict[str, Any], 
+        enriched_data: Optional[Dict[str, Any]], 
+        company_id: str
+    ) -> Dict[str, Any]:
+
+        # Extract contact data
+        first_name = person_data.get('first_name') or (person_data.get('name', '').split()[0] if person_data.get('name') else '')
+        last_name = person_data.get('last_name') or (' '.join(person_data.get('name', '').split()[1:]) if person_data.get('name') and len(person_data.get('name', '').split()) > 1 else '')
+        
+        # Extract emails (handle both list and single string)
+        emails = []
+        if person_data.get('email'):
+            if isinstance(person_data['email'], list):
+                emails = person_data['email']
+            else:
+                emails = [person_data['email']]
+        
+        # Extract enriched emails if available
+        if enriched_data:
+            enriched_person = enriched_data.get('person', {})
+            enriched_emails = enriched_person.get('email', [])
+            if enriched_emails:
+                if isinstance(enriched_emails, list):
+                    emails.extend([e.get('address', '') if isinstance(e, dict) else e for e in enriched_emails if e])
+                else:
+                    emails.append(enriched_emails)
+        
+        # Remove duplicates and empty strings
+        emails = list(set([e for e in emails if e]))
+        
+        # Extract phone numbers
+        phones = []
+        if person_data.get('phone_numbers'):
+            if isinstance(person_data['phone_numbers'], list):
+                phones = person_data['phone_numbers']
+            else:
+                phones = [person_data['phone_numbers']]
+        
+        # Extract enriched phone numbers if available
+        if enriched_data:
+            enriched_person = enriched_data.get('person', {})
+            enriched_phones = enriched_person.get('phone_numbers', [])
+            if enriched_phones:
+                if isinstance(enriched_phones, list):
+                    phones.extend([p.get('raw_number', '') or p.get('sanitized_number', '') if isinstance(p, dict) else p for p in enriched_phones if p])
+                else:
+                    phones.append(enriched_phones)
+        
+        # Remove duplicates and empty strings
+        phones = list(set([p for p in phones if p]))
+        
+        # Build contact document
+        contact_doc = {
+            "company_id": ObjectId(company_id),
+            "contact_data": {
+                "firstname": first_name,
+                "lastname": last_name,
+                "email": emails,
+                "phone": phones,
+                "jobtitle": person_data.get('title') or (enriched_data.get('person', {}).get('title') if enriched_data else None),
+                "company": person_data.get('organization_name') or person_data.get('source_organization_name') or ''
+            },
+            "linkedin_data": {
+                "linkedin_url": person_data.get('linkedin_url') or (enriched_data.get('person', {}).get('linkedin_url') if enriched_data else None),
+                "source": "APOLLO-ENRICHER"
+            },
+            "metadata": {
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+                "raw_data": enriched_data.get('person', {})
+            }
+        }
+        
+        return contact_doc
+
+    
 

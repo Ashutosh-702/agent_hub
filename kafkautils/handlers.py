@@ -15,6 +15,7 @@ from global_utils.chronos_utils import (
 )
 from integrations.lusha.company_saver import CompanySaver
 from config.logging import logger
+from integrations.apollo.apollo_helper import ApolloHelper
 
 
 def convert_objectid_to_string(payload: dict) -> dict:
@@ -352,9 +353,9 @@ async def contacts_enrichment_handler(message: Any):
         
         request_id = payload.get("request_id")
         action = payload.get("action")
-        company_id = payload.get("company_id")  # Now we get campaign_id instead of form_data
+        company_ids = payload.get("company_ids")  # Now we get campaign_id instead of form_data
         
-        if not request_id or not company_id:
+        if not request_id or not company_ids:
             logger.error("❌ Missing request_id or campaign_id in message")
             return
         
@@ -364,32 +365,39 @@ async def contacts_enrichment_handler(message: Any):
         
         logger.info(f"🔄 Processing company search: {request_id}")
 
-        await process_contacts_enrichment(request_id, company_id)
+        await process_contacts_enrichment(request_id, company_ids)
 
     except Exception as e:
         logger.error(f"❌ Error handling contacts enrichment message: {e}")
         raise
 
-async def process_contacts_enrichment(request_id: str, company_id: str):
+async def process_contacts_enrichment(request_id: str, company_ids: list):
     """Process a single contacts enrichment request using campaign_id."""
     try:
         logger.info(f"🔍 Processing request: {request_id}")
-        logger.info(f"📋 Campaign ID: {company_id}")
+        logger.info(f"📋 Campaign ID: {company_ids}")
         
         # Initialize database connection if needed
         await initialize_consumer_connections()
         
         # Fetch campaign data from database using campaign_id
         companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        company_data = await companies_dao.get_company(company_id)
+        company_data = await companies_dao.get_companies({"_id": {"$in": company_ids}})
         if not company_data:
-            logger.error(f"❌ Company not found: {company_id}")
+            logger.error(f"❌ Company not found: {company_ids}")
             return
         
-        logger.info(f"🔍 DEBUG: Company data structure: {company_data}")
-        logger.info(f"📊 Company Name: {company_data.get('name', 'Unknown')}")
-        logger.info(f"📍 Location: {company_data.get('location', {}).get('names', 'Unknown')}")
-        
+        person_seniorities = [ "vp", "director"]
+        number_of_contacts_per_company = 2
+        for company in company_data:
+            company_name = company.get("identifiers", {}).get("name", "")
+            company_id = company.get("_id", "")
+            logger.info(f"📊 Company Name: {company_name}")
+            logger.info(f"📍 Company ID: {company_id}")
+            apollo_helper = ApolloHelper()
+            response = await apollo_helper.get_company_contacts(company_name, company_id, person_seniorities, page=1, per_page=number_of_contacts_per_company, enrich_contacts=True)
+            logger.info(f"response: {response}")
+
         return
     except Exception as e:
         logger.error(f"❌ Error processing contacts enrichment: {e}")
