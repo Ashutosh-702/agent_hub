@@ -329,3 +329,68 @@ async def lusha_company_data_collection(campaign_details: Any):
             logger.info(f"Updated status of {campaign_details['campaign_id']} to 'pending'")
             
         return inserted_count
+
+async def contacts_enrichment_handler(message: Any):
+    """Handler for contacts enrichment messages."""
+      # Try different ways to extract the payload
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+
+        else:
+            logger.error(f"🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+        
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        company_id = payload.get("company_id")  # Now we get campaign_id instead of form_data
+        
+        if not request_id or not company_id:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+        
+        if action != "process_contacts_enrichment":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+        
+        logger.info(f"🔄 Processing company search: {request_id}")
+
+        await process_contacts_enrichment(request_id, company_id)
+
+    except Exception as e:
+        logger.error(f"❌ Error handling contacts enrichment message: {e}")
+        raise
+
+async def process_contacts_enrichment(request_id: str, company_id: str):
+    """Process a single contacts enrichment request using campaign_id."""
+    try:
+        logger.info(f"🔍 Processing request: {request_id}")
+        logger.info(f"📋 Campaign ID: {company_id}")
+        
+        # Initialize database connection if needed
+        await initialize_consumer_connections()
+        
+        # Fetch campaign data from database using campaign_id
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        company_data = await companies_dao.get_company(company_id)
+        if not company_data:
+            logger.error(f"❌ Company not found: {company_id}")
+            return
+        
+        logger.info(f"🔍 DEBUG: Company data structure: {company_data}")
+        logger.info(f"📊 Company Name: {company_data.get('name', 'Unknown')}")
+        logger.info(f"📍 Location: {company_data.get('location', {}).get('names', 'Unknown')}")
+        
+        return
+    except Exception as e:
+        logger.error(f"❌ Error processing contacts enrichment: {e}")
+        raise

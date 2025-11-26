@@ -12,7 +12,10 @@ from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.contacts import ContactsDao
 from global_utils.exceptions import ApiException
 from integrations.apollo.apollo_helper import ApolloHelper
-
+from kafkautils.constants import KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices, CONTACTS_ENRICHMENT
+from kafkautils.producer.event_helpers import emit_event_helper
+import uuid
+import asyncio
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -281,11 +284,22 @@ class ApolloContactEnrichmentHelper:
 
     def __init__(self):
         self.apollo_helper = ApolloHelper()
+        self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][CONTACTS_ENRICHMENT]
+        self.event_emitter = loaded_config.connection_manager.event_emitter
+
 
     async def apollo_contact_enrichment(self, query_params: ApolloContactEnrichment):
         company_names = query_params.company_name
         person_seniorities = query_params.person_seniorities
         number_of_contacts_per_company = query_params.number_of_contacts_per_company
+        company_id = "692439c9bbc59b1ac4d235bd"
+        interested_product = query_params.interested_product
+
+        if not company_id:
+            raise ApiException("Company id is required")
+
+        if not interested_product:
+            raise ApiException("Interested product is required")
 
         if not company_names:
             raise ApiException("Company names are required")
@@ -297,6 +311,36 @@ class ApolloContactEnrichmentHelper:
             raise ApiException("Number of contacts per company is required")
         contact_data = {}
         enriched_data = {}
+
+        #============================================
+
+        request_id = str(uuid.uuid4())
+
+        if not self.event_emitter:
+            raise ApiException("EventBridge Producer not initialized")
+
+        event = {
+            "request_id": request_id,
+            "action": "process_contacts_enrichment",
+            "company_id": str(company_id), 
+            "interested_product": interested_product,
+            "timestamp": asyncio.get_event_loop().time()
+        }
+
+        await emit_event_helper(
+            event_emitter=self.event_emitter,
+            topics=self.kafka_config["topics"],
+            partition_value=request_id,
+            event=event,
+            event_meta={"service": "leadgen", "company_names": company_names}
+        )
+
+        logger.info(f"📤 Company Name {company_names} queued for processing: {request_id}")
+
+
+
+
+
         for company_name in company_names:
             response = await self.apollo_helper.get_company_contacts(company_name, person_seniorities, page=1, per_page=number_of_contacts_per_company, enrich_contacts=True)
             if response.get('contacts'):

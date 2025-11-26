@@ -1,9 +1,8 @@
 """Kafka consumer configuration for leadgen service."""
 import os
 from typing import Dict, Any
-from kafkautils.constants import LeadgenServices, LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LUSHA_COMPANY_COLLECTION
-from kafkautils.handlers import leadgen_batch_processing_handler
-from kafkautils.handlers import lusha_company_collection_handler
+from kafkautils.constants import LeadgenServices, LEADGEN_BATCH_PROCESSING, KAFKA_SERVICE_CONFIG_MAPPING, LUSHA_COMPANY_COLLECTION, CONTACTS_ENRICHMENT
+from kafkautils.handlers import lusha_company_collection_handler, leadgen_batch_processing_handler, contacts_enrichment_handler
 
 # Common Consumer Configuration
 COMMON_CONSUMER_CONFIG = {
@@ -39,6 +38,9 @@ KAFKA_CONSUMER_SETTINGS = {
                 },
                 KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LUSHA_COMPANY_COLLECTION]["topics"][0]: {
                     "tasks": [lusha_company_collection_handler]
+                },
+                KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][CONTACTS_ENRICHMENT]["topics"][0]: {
+                    "tasks": [contacts_enrichment_handler]
                 }
             },
         }
