@@ -74,15 +74,15 @@ class ApolloHelper:
             person_seniorities=query_params.person_seniorities,
             contact_email_status=query_params.contact_email_status,
             organization_ids=organization_ids,
-            page=query_params.page,
+            page=1,  # Start from page 1
             per_page=query_params.per_page,
             additional_params=query_params.additional_params
         )
         
-        people_search_response = await self.search_people(query_params=search_params)
+        first_page_response = await self.search_people(query_params=search_params)
 
-        if people_search_response.get('status_code') != 200:
-            logger.error(f"People search failed: {people_search_response}")
+        if first_page_response.get('status_code') != 200:
+            logger.error(f"People search failed: {first_page_response}")
             return {
                 "status": "error",
                 "message": "Failed to search for contacts",
@@ -91,11 +91,10 @@ class ApolloHelper:
                 "contacts": []
             }
 
-        # Step 4: Extract contacts from search results
-        search_results = people_search_response.get('results', {})
-        people = search_results.get('people', [])
-
-        if not people:
+        search_results = first_page_response.get('results', {})
+        total_entries = search_results.get('total_entries', 0)
+        
+        if total_entries == 0:
             logger.info("No contacts found")
             return {
                 "status": "success",
@@ -105,32 +104,75 @@ class ApolloHelper:
                 "contacts": []
             }
 
-        logger.info(f"Found {len(people)} contacts")
+        
+        total_entries = total_entries if total_entries < 100 else 30
+        per_page = query_params.per_page or 10
+        total_pages = (total_entries + per_page - 1) // per_page  # Ceiling division
+        
+        logger.info(f"Total entries: {total_entries}, Total pages: {total_pages}, Per page: {per_page}")
+        
+        # Process first page
+        first_page_result = await self.process_page_of_contacts(
+            people_search_response=first_page_response,
+            query_params=query_params,
+            organization_ids=organization_ids
+        )
+        
+        all_stored_contact_ids = len(first_page_result.get("stored_contact_ids", [])) or 0
+        total_contacts_processed = first_page_result.get("contacts_count", 0)
 
-
-        #relevance check for each contact if false remove that  person from the list
-        relevant_people = []
-
-        for person in people:
+        for page in range(2, total_pages + 1):
             try:
-                relevance_result = await self.people_relevance_check.web_search_analysis(person)
-                relevance_assessment = relevance_result.get('relevance_assessment', {})
-                is_relevant = relevance_assessment.get('is_relevant', False)
-
-                if not is_relevant:
-                    relevant_people.append(person)
-                    logger.info(f"Person {person.get('name', 'Unknown')} is relevant - keeping in list")
-                else:
-                    logger.info(f"Person {person.get('name', 'Unknown')} is not relevant - removing from list")
-
+                logger.info(f"Processing page {page} of {total_pages}...")
+                
+                page_search_params = SearchPeopleSchema(
+                    person_seniorities=query_params.person_seniorities,
+                    contact_email_status=query_params.contact_email_status,
+                    organization_ids=organization_ids,
+                    page=page,
+                    per_page=per_page,
+                    additional_params=query_params.additional_params
+                )
+                
+                page_response = await self.search_people(query_params=page_search_params)
+                
+                page_result = await self.process_page_of_contacts(
+                    people_search_response=page_response,
+                    query_params=query_params,
+                    organization_ids=organization_ids
+                )
+                
+                all_stored_contact_ids += (len(page_result.get("stored_contact_ids", [])) or 0)
+                total_contacts_processed += page_result.get("contacts_count", 0)
+                
             except Exception as e:
-                logger.error(f"Error checking relevance for person {person.get('name', 'Unknown')}: {str(e)}")
+                logger.error(f"Error processing page {page}: {str(e)}")
+                # Continue with next page even if one fails
                 continue
+            
+        logger.info(f"✅ Successfully processed {total_contacts_processed} contacts across {total_pages} pages")
 
-        people = relevant_people
-        logger.info(f"After relevance check: {len(people)} relevant contacts out of {len(people) + (len(people) - len(relevant_people))} total")
+        
+        return {
+            "status": "success",
+            "message": f"Retrieved {total_contacts_processed} contacts",
+            "company_name": query_params.company_name,
+            "company_id": query_params.company_id,
+            "organization_ids": organization_ids,
+            "stored_contact_ids": all_stored_contact_ids,
+            "total_contacts": total_contacts_processed,
+            "pagination": {
+                "total_entries": total_entries,
+                "total_pages": total_pages,
+                "per_page": per_page
+            }
+        }
 
-        # Step 6: Optionally enrich contacts
+    async def enrich_and_store_contacts(
+        self,
+        people: List[Dict[str, Any]],
+        query_params: 'ApolloResponseSchema'
+    ) -> Dict[str, Any]:
         contacts = []
         stored_contact_ids = []
 
@@ -216,19 +258,44 @@ class ApolloHelper:
         logger.info(f"Successfully retrieved {len(contacts)} contacts for company: {query_params.company_name}")
 
         return {
-            "status": "success",
-            "message": f"Retrieved {len(contacts)} contacts",
-            "company_name": query_params.company_name,
-            "company_id": query_params.company_id,
-            "organization_ids": organization_ids,
-            "stored_contact_ids": stored_contact_ids,
-            "total_contacts": len(contacts),
-            "pagination": {
-                "page": query_params.page,
-                "per_page": query_params.per_page,
-                "total_pages": people_search_response.get('results', {}).get('pagination', {}).get('total_pages', 1)
-            }
+            "contacts": contacts,
+            "stored_contact_ids": stored_contact_ids
         }
+
+    async def filter_relevant_people(
+        self,
+        people: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Filter people based on relevance check
+        
+        Args:
+            people: List of person data from Apollo search
+            
+        Returns:
+            List of relevant people
+        """
+        relevant_people = []
+        total_count = len(people)
+
+        for person in people:
+            try:
+                relevance_result = await self.people_relevance_check.web_search_analysis(person)
+                relevance_assessment = relevance_result.get('relevance_assessment', {})
+                is_relevant = relevance_assessment.get('is_relevant', False)
+
+                if not is_relevant:
+                    relevant_people.append(person)
+                    logger.info(f"Person {person.get('name', 'Unknown')} is relevant - keeping in list")
+                else:
+                    logger.info(f"Person {person.get('name', 'Unknown')} is not relevant - removing from list")
+
+            except Exception as e:
+                logger.error(f"Error checking relevance for person {person.get('name', 'Unknown')}: {str(e)}")
+                continue
+
+        logger.info(f"After relevance check: {len(relevant_people)} relevant contacts out of {total_count} total")
+        return relevant_people
 
     async def search_companies(self, organization_name: str) -> Dict[str, Any]:
         bind_contextvars(
@@ -262,11 +329,15 @@ class ApolloHelper:
 
         results = company_search_response.get('results', {})
         organizations = results.get('organizations', [])
-        #only take the first organization
-        org_id = organizations[0].get('id')
 
-        if org_id:
-            organization_ids.append(str(org_id))
+        if organizations and len(organizations) > 0:
+            org_id = organizations[0].get('id')
+
+            if org_id:
+                organization_ids.append(str(org_id))
+        else:
+            logger.warning("No organizations found in search results")
+            return []
 
         logger.info(f"Extracted {len(organization_ids)} organization IDs")
         return organization_ids
@@ -351,10 +422,7 @@ class ApolloHelper:
         enriched_data: Optional[Dict[str, Any]],
         company_id: str
     ) -> Optional[str]:
-        """
-        Check if contact already exists in database by email
-        Returns existing contact_id if found, None otherwise
-        """
+
         if not self.contacts_dao:
             return None
         
@@ -612,6 +680,52 @@ class ApolloHelper:
             import traceback
             logger.error(traceback.format_exc())
             return False
+    
+    async def process_page_of_contacts(
+        self,
+        people_search_response: Dict[str, Any],
+        query_params: 'ApolloResponseSchema',
+        organization_ids: List[str]
+    ) -> Dict[str, Any]:
+        if people_search_response.get('status_code') != 200:
+            logger.error(f"People search failed: {people_search_response}")
+            return {
+                "status": "error",
+                "message": "Failed to search for contacts",
+                "contacts_count": 0,
+                "stored_contact_ids": []
+            }
+
+        # Extract contacts from search results
+        search_results = people_search_response.get('results', {})
+        people = search_results.get('people', [])
+
+        if not people:
+            logger.info("No contacts found in this page")
+            return {
+                "status": "success",
+                "message": "No contacts found",
+                "contacts_count": 0,
+                "stored_contact_ids": []
+            }
+
+        logger.info(f"Found {len(people)} contacts in this page")
+
+        # Filter people based on relevance check
+        people = await self.filter_relevant_people(people)
+
+        # Enrich and store contacts
+        enrichment_result = await self.enrich_and_store_contacts(people, query_params)
+        contacts = enrichment_result["contacts"]
+        stored_contact_ids = enrichment_result["stored_contact_ids"]
+
+        return {
+            "status": "success",
+            "contacts_count": len(contacts),
+            "stored_contact_ids": stored_contact_ids
+        }
+
+    
 
     
 

@@ -318,11 +318,12 @@ class ApolloContactEnrichmentHelper:
         
         company_ids = []
         for company_name in company_names:
-            company_doc = await self.company_dao.get_company_by_filters({"identifiers.name": company_name})
+            company_doc = await self.company_dao.get_company_by_filters({"identifiers.source_name": company_name})
             if not company_doc:
                 inserted_company_id = await self.company_dao.create_company({
                     "identifiers": {
-                        "name": company_name
+                        "name": company_name,
+                        "source_name": company_name
                     },
                     "source": "apollo",
                     "metadata": {
@@ -370,4 +371,4 @@ class ApolloContactEnrichmentHelper:
         #     else:
         #         raise ApiException(response.get('message'))
 
-        return {"message": "All company contacts enriched"}
+        return {"message": "All company contacts enriched", "company_ids": company_ids}
