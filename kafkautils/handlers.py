@@ -17,7 +17,7 @@ from integrations.lusha.company_saver import CompanySaver
 from config.logging import logger
 from integrations.apollo.apollo_helper import ApolloHelper
 from integrations.apollo.schema import ApolloResponseSchema
-from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
+# from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
 
 def convert_objectid_to_string(payload: dict) -> dict:
     """Convert ObjectId values to strings for JSON serialization."""
