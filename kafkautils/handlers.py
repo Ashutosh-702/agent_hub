@@ -16,7 +16,8 @@ from global_utils.chronos_utils import (
 from integrations.lusha.company_saver import CompanySaver
 from config.logging import logger
 from integrations.apollo.apollo_helper import ApolloHelper
-
+from integrations.apollo.schema import ApolloResponseSchema
+from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
 
 def convert_objectid_to_string(payload: dict) -> dict:
     """Convert ObjectId values to strings for JSON serialization."""
@@ -386,17 +387,34 @@ async def process_contacts_enrichment(request_id: str, company_ids: list):
         if not company_data:
             logger.error(f"❌ Company not found: {company_ids}")
             return
+
+        logger.info(f"company_ids: {company_ids}")
         
         person_seniorities = [ "vp", "director"]
         number_of_contacts_per_company = 2
         for company in company_data:
             company_name = company.get("identifiers", {}).get("name", "")
             company_id = company.get("_id", "")
+            logger.info(f"company_data: {company_data}")
             logger.info(f"📊 Company Name: {company_name}")
             logger.info(f"📍 Company ID: {company_id}")
             apollo_helper = ApolloHelper()
-            response = await apollo_helper.get_company_contacts(company_name, company_id, person_seniorities, page=1, per_page=number_of_contacts_per_company, enrich_contacts=True)
-            logger.info(f"response: {response}")
+            
+            # Create ApolloResponseSchema object
+            query_params = ApolloResponseSchema(
+                company_name=company_name,
+                company_id=str(company_id),
+                person_seniorities=person_seniorities,
+                page=1,
+                per_page=number_of_contacts_per_company,
+                enrich_contacts=True
+            )
+            
+            response = await apollo_helper.get_company_contacts(query_params)
+            #send  webhook to the users with the contacts
+            # webhook_sender = ContactHubspotWebhook()
+            # await webhook_sender.send_webhook_for_company(str(company_id))
+            logger.info(f"webhook sent to the users with the contacts")
 
         return
     except Exception as e:

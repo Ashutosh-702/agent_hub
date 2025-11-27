@@ -10,6 +10,9 @@ from database.collection_dao.companies import CompaniesDao
 from config.loaded_config import loaded_config
 from datetime import datetime, timezone
 from bson import ObjectId
+from integrations.apollo.schema import ApolloResponseSchema
+from integrations.apollo.schema import SearchEnrichPeopleSchema
+from integrations.apollo.schema import SearchPeopleSchema
 
 
 class ApolloHelper:
@@ -19,19 +22,7 @@ class ApolloHelper:
         self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
 
-    async def get_company_contacts(
-        self,
-        company_name: str,
-        company_id: str,
-        person_seniorities: Optional[List[str]] = None,
-        contact_email_status: Optional[List[str]] = None,
-        page: int = 1,
-        per_page: int = 10,
-        enrich_contacts: bool = False,
-        reveal_personal_emails: bool = False,
-        reveal_phone_number: bool = False,
-        additional_params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    async def get_company_contacts(self, query_params: ApolloResponseSchema) -> Dict[str, Any]:
  
         bind_contextvars(
             operation="apollo_get_company_contacts",
@@ -39,52 +30,63 @@ class ApolloHelper:
             event_type="apollo_get_company_contacts"
         )
 
-        logger.info(f"Getting contacts for company: {company_name}")
+        logger.info(f"Getting contacts for company: {query_params.company_name}")
 
         # Step 1: Search for company to get organization ID
-        logger.info(f"Step 1: Searching for company '{company_name}'...")
-        company_search_response = await self.search_companies(company_name)
+        logger.info(f"Step 1: Searching for company '{query_params.company_name}'...")
+        company_search_response = await self.search_companies(query_params.company_name)
 
         if company_search_response.get('status_code') != 200:
             logger.error(f"Company search failed: {company_search_response}")
+
             return {
                 "status": "error",
-                "message": f"Failed to find company: {company_name}",
-                "company_name": company_name,
+                "message": f"Failed to find company: {query_params.company_name}",
+                "company_name": query_params.company_name,
                 "contacts": []
             }
 
-        # Step 2: Extract organization IDs
+        # Step 2: Extract organization IDs and update company details to databse
         organization_ids = self.extract_organization_ids(company_search_response)
 
         if not organization_ids:
-            logger.warning(f"No organization IDs found for company: {company_name}")
+            logger.warning(f"No organization IDs found for company: {query_params.company_name}")
+
             return {
                 "status": "error",
-                "message": f"No organization IDs found for company: {company_name}",
-                "company_name": company_name,
+                "message": f"No organization IDs found for company: {query_params.company_name}",
+                "company_name": query_params.company_name,
                 "contacts": []
             }
+
+        await self.update_company_details_from_apollo(
+            company_search_response=company_search_response,
+            company_id=query_params.company_id
+        )
 
         logger.info(f"Found {len(organization_ids)} organization ID(s): {organization_ids}")
 
         # Step 3: Search for people/contacts using organization IDs
         logger.info("Step 2: Searching for contacts...")
-        people_search_response = await self.search_people(
-            person_seniorities=person_seniorities,
-            contact_email_status=contact_email_status,
+        
+        # Create SearchPeopleSchema object
+        search_params = SearchPeopleSchema(
+            person_seniorities=query_params.person_seniorities,
+            contact_email_status=query_params.contact_email_status,
             organization_ids=organization_ids,
-            page=page,
-            per_page=per_page,
-            additional_params=additional_params
+            page=query_params.page,
+            per_page=query_params.per_page,
+            additional_params=query_params.additional_params
         )
+        
+        people_search_response = await self.search_people(query_params=search_params)
 
         if people_search_response.get('status_code') != 200:
             logger.error(f"People search failed: {people_search_response}")
             return {
                 "status": "error",
                 "message": "Failed to search for contacts",
-                "company_name": company_name,
+                "company_name": query_params.company_name,
                 "organization_ids": organization_ids,
                 "contacts": []
             }
@@ -98,7 +100,7 @@ class ApolloHelper:
             return {
                 "status": "success",
                 "message": "No contacts found",
-                "company_name": company_name,
+                "company_name": query_params.company_name,
                 "organization_ids": organization_ids,
                 "contacts": []
             }
@@ -108,16 +110,19 @@ class ApolloHelper:
 
         #relevance check for each contact if false remove that  person from the list
         relevant_people = []
+
         for person in people:
             try:
                 relevance_result = await self.people_relevance_check.web_search_analysis(person)
                 relevance_assessment = relevance_result.get('relevance_assessment', {})
                 is_relevant = relevance_assessment.get('is_relevant', False)
+
                 if not is_relevant:
                     relevant_people.append(person)
                     logger.info(f"Person {person.get('name', 'Unknown')} is relevant - keeping in list")
                 else:
                     logger.info(f"Person {person.get('name', 'Unknown')} is not relevant - removing from list")
+
             except Exception as e:
                 logger.error(f"Error checking relevance for person {person.get('name', 'Unknown')}: {str(e)}")
                 continue
@@ -128,12 +133,14 @@ class ApolloHelper:
         # Step 6: Optionally enrich contacts
         contacts = []
         stored_contact_ids = []
-        if enrich_contacts:
+
+        if query_params.enrich_contacts:
             logger.info("Step 3: Enriching contacts...")
             apollo_client = ApolloAPIClient()
 
             for person in people:
                 person_id = person.get('id')
+
                 if not person_id:
                     # Include contact even if no ID for enrichment
                     contacts.append({
@@ -145,62 +152,85 @@ class ApolloHelper:
                 try:
                     enrichment_response = await apollo_client.apollo_people_enrichment_api(
                         person_id=str(person_id),
-                        reveal_personal_emails=reveal_personal_emails,
-                        reveal_phone_number=reveal_phone_number
+                        reveal_personal_emails=query_params.reveal_personal_emails,
+                        reveal_phone_number=query_params.reveal_phone_number
                     )
 
                     if enrichment_response.get('status_code') == 200:
                         enriched_data = enrichment_response.get('results', {})
 
                         try:
-                            contact_doc = self.transform_apollo_contact_to_db_format(
+                            # Check if contact already exists
+                            existing_contact_id = await self._check_existing_contact(
+                                enriched_data=enriched_data,
+                                company_id=query_params.company_id
+                            )
+                            
+                            if existing_contact_id:
+                                # Contact already exists, use existing ID
+                                logger.info(f"Contact {person.get('name', 'Unknown')} already exists with ID: {existing_contact_id}")
+                                stored_contact_ids.append(existing_contact_id)
+                                contacts.append({
+                                    "contact_data": person,
+                                    "enriched_data": enriched_data,
+                                    "contact_id": existing_contact_id
+                                })
+                            else:
+                                # Contact doesn't exist, create new one
+                                contact_doc = self.transform_apollo_contact_to_db_format(
                                     person_data=person,
                                     enriched_data=enriched_data,
-                                    company_id=company_id
+                                    company_id=query_params.company_id
                                 )
-                            contact_id = await self.contacts_dao.create_contact(contact_doc)
-                            logger.info(f"Stored contact {person.get('name', 'Unknown')} with ID: {contact_id}")
-                            stored_contact_ids.append(str(contact_id))
+                                contact_id = await self.contacts_dao.create_contact(contact_doc)
+                                logger.info(f"Stored new contact {person.get('name', 'Unknown')} with ID: {contact_id}")
+                                stored_contact_ids.append(str(contact_id))
+                                contacts.append({
+                                    "contact_data": person,
+                                    "enriched_data": enriched_data,
+                                    "contact_id": str(contact_id)
+                                })
+                            
                         except Exception as e:
                             logger.error(f"Error storing contact {person_id} in database: {str(e)}")
+                            # Still add to contacts even if storage failed
+                            contacts.append({
+                                "contact_data": person,
+                                "enriched_data": enriched_data
+                            })
                             continue
                     else:
                         # Include contact even if enrichment failed
                         logger.error(f"Failed to enrich contact {person_id}: {enrichment_response.get('error', 'Unknown error')}")
+                        contacts.append({
+                            "contact_data": person,
+                            "enriched_data": None
+                        })
 
                 except Exception as e:
                     logger.error(f"Error enriching contact {person_id}: {str(e)}")
-                    logger.error(f"Failed to enrich contact {person_id}: {str(e)}")
         else:
             # Return contacts without enrichment
             contacts = [{"contact_data": person, "enriched_data": None} for person in people]
 
-        logger.info(f"Successfully retrieved {len(contacts)} contacts for company: {company_name}")
+        logger.info(f"Successfully retrieved {len(contacts)} contacts for company: {query_params.company_name}")
 
         return {
             "status": "success",
             "message": f"Retrieved {len(contacts)} contacts",
-            "company_name": company_name,
+            "company_name": query_params.company_name,
+            "company_id": query_params.company_id,
             "organization_ids": organization_ids,
             "stored_contact_ids": stored_contact_ids,
             "total_contacts": len(contacts),
             "pagination": {
-                "page": page,
-                "per_page": per_page,
-                "total_pages": search_results.get('pagination', {}).get('total_pages', 1)
+                "page": query_params.page,
+                "per_page": query_params.per_page,
+                "total_pages": people_search_response.get('results', {}).get('pagination', {}).get('total_pages', 1)
             }
         }
 
-    async def search_companies(
-        self,
-        organization_name: str
-    ) -> Dict[str, Any]:
-        """
-        Search for companies by organization name
-        Args:
-            organization_name: Name of the organization to search for
-        Returns: Search results with company data including organization IDs
-        """
+    async def search_companies(self, organization_name: str) -> Dict[str, Any]:
         bind_contextvars(
             operation="apollo_search_companies",
             component="apollo_helper",
@@ -223,16 +253,7 @@ class ApolloHelper:
                 "error": str(e)
             }
 
-    def extract_organization_ids(
-        self,
-        company_search_response: Dict[str, Any]
-    ) -> List[str]:
-        """
-        Extract organization IDs from company search results
-        Args:
-            company_search_response: Response from company search API
-        Returns: List of organization IDs
-        """
+    def extract_organization_ids(self, company_search_response: Dict[str, Any]) -> List[str]:
         organization_ids = []
 
         if company_search_response.get('status_code') != 200:
@@ -243,85 +264,42 @@ class ApolloHelper:
         organizations = results.get('organizations', [])
         #only take the first organization
         org_id = organizations[0].get('id')
+
         if org_id:
             organization_ids.append(str(org_id))
 
         logger.info(f"Extracted {len(organization_ids)} organization IDs")
         return organization_ids
 
-    async def search_companies_and_get_organization_ids(
-        self,
-        organization_names: List[str]
-    ) -> List[str]:
-
-        all_organization_ids = []
-
-        for org_name in organization_names:
-            try:
-                search_response = await self.search_companies(org_name)
-                org_ids = self.extract_organization_ids(search_response)
-                all_organization_ids.extend(org_ids)
-            except Exception as e:
-                logger.error(f"Error processing organization {org_name}: {e}")
-                continue
-
-        # Remove duplicates while preserving order
-        unique_ids = list(dict.fromkeys(all_organization_ids))
-        logger.info(f"Found {len(unique_ids)} unique organization IDs from {len(organization_names)} searches")
-        return unique_ids
-
-    def build_search_payload(
-        self,
-        person_seniorities: Optional[List[str]] = None,
-        contact_email_status: Optional[List[str]] = None,
-        organization_ids: Optional[List[str]] = None,
-        page: int = 1,
-        per_page: int = 10,
-        additional_params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    def build_search_payload(self, query_params: SearchPeopleSchema) -> Dict[str, Any]:
 
         payload = {
-            "page": page,
-            "per_page": per_page
+            "page": query_params.page,
+            "per_page": query_params.per_page
         }
 
-        if person_seniorities:
-            payload["person_seniorities"] = person_seniorities
+        if query_params.person_seniorities:
+            payload["person_seniorities"] = query_params.person_seniorities
 
-        if contact_email_status:
-            payload["contact_email_status"] = contact_email_status
+        if query_params.contact_email_status:
+            payload["contact_email_status"] = query_params.contact_email_status
 
-        if organization_ids:
-            payload["organization_ids"] = organization_ids
+        if query_params.organization_ids:
+            payload["organization_ids"] = query_params.organization_ids
 
-        if additional_params:
-            payload["additional_params"] = additional_params
+        if query_params.additional_params:
+            payload["additional_params"] = query_params.additional_params
 
         return payload
 
-    async def search_people(
-        self,
-        person_seniorities: Optional[List[str]] = None,
-        contact_email_status: Optional[List[str]] = None,
-        organization_ids: Optional[List[str]] = None,
-        page: int = 1,
-        per_page: int = 10,
-        additional_params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    async def search_people(self, query_params: SearchPeopleSchema) -> Dict[str, Any]:
         bind_contextvars(
             operation="apollo_search_people",
             component="apollo_helper",
             event_type="apollo_people_search"
         )
 
-        payload = self.build_search_payload(
-            person_seniorities=person_seniorities,
-            contact_email_status=contact_email_status,
-            organization_ids=organization_ids,
-            page=page,
-            per_page=per_page,
-            additional_params=additional_params
-        )
+        payload = self.build_search_payload(query_params=query_params)
 
         logger.info(f"Searching people with payload: {payload}")
 
@@ -338,9 +316,9 @@ class ApolloHelper:
             }
 
     async def enrich_person(
-        self,
-        person_id: str,
-        reveal_personal_emails: bool = False,
+        self, 
+        person_id: str, 
+        reveal_personal_emails: bool = False, 
         reveal_phone_number: bool = False
     ) -> Dict[str, Any]:
 
@@ -367,204 +345,54 @@ class ApolloHelper:
                 "status_code": 500,
                 "error": str(e)
             }
-
-    async def search_and_enrich_people(
-        self,
-        person_seniorities: Optional[List[str]] = None,
-        contact_email_status: Optional[List[str]] = None,
-        organization_ids: Optional[List[str]] = None,
-        page: int = 1,
-        per_page: int = 10,
-        reveal_personal_emails: bool = False,
-        reveal_phone_number: bool = False,
-        additional_params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-       
-        bind_contextvars(
-            operation="apollo_search_and_enrich",
-            component="apollo_helper",
-            event_type="apollo_search_and_enrich"
-        )
-
-        # Step 1: Search for people
-        search_response = await self.search_people(
-            person_seniorities=person_seniorities,
-            contact_email_status=contact_email_status,
-            organization_ids=organization_ids,
-            page=page,
-            per_page=per_page,
-            additional_params=additional_params
-        )
-
-        if search_response.get('status_code') != 200:
-            logger.warning(f"Search failed: {search_response}")
-            return {
-                "search_response": search_response,
-                "enriched_results": []
-            }
-
-        # Step 2: Extract person IDs from search results
-        search_results = search_response.get('results', {})
-        people = search_results.get('people', [])
-
-        if not people:
-            logger.info("No people found in search results")
-            return {
-                "search_response": search_response,
-                "enriched_results": []
-            }
-
-        # Step 3: Enrich each person
-        person_ids = []
-        for person in people:
-            person_id = person.get('id')
-            if person_id:
-                person_ids.append(str(person_id))
-
-        logger.info(f"Found {len(person_ids)} people to enrich")
-
-        enriched_results = []
-        apollo_client = ApolloAPIClient()
-
-        for person_id in person_ids:
-            try:
-                enrichment_response = await apollo_client.apollo_people_enrichment_api(
-                    person_id=person_id,
-                    reveal_personal_emails=reveal_personal_emails,
-                    reveal_phone_number=reveal_phone_number
-                )
-
-                if enrichment_response.get('status_code') == 200:
-                    enriched_results.append(enrichment_response.get('results', {}))
-                else:
-                    logger.warning(f"Failed to enrich person {person_id}")
-
-            except Exception as e:
-                logger.error(f"Error enriching person {person_id}: {str(e)}")
-                continue
-
-        return {
-            "search_response": search_response,
-            "enriched_results": enriched_results,
-            "total_found": len(people),
-            "total_enriched": len(enriched_results)
-        }
-
-    async def complete_apollo_workflow(
-        self,
-        organization_names: List[str],
-        person_seniorities: Optional[List[str]] = None,
-        contact_email_status: Optional[List[str]] = None,
-        page: int = 1,
-        per_page: int = 10,
-        reveal_personal_emails: bool = False,
-        reveal_phone_number: bool = False,
-        additional_params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    
+    async def _check_existing_contact(
+        self, 
+        enriched_data: Optional[Dict[str, Any]],
+        company_id: str
+    ) -> Optional[str]:
+        """
+        Check if contact already exists in database by email
+        Returns existing contact_id if found, None otherwise
+        """
+        if not self.contacts_dao:
+            return None
         
-        bind_contextvars(
-            operation="apollo_complete_workflow",
-            component="apollo_helper",
-            event_type="apollo_complete_workflow"
-        )
-
-        logger.info(f"Starting complete Apollo workflow for organizations: {organization_names}")
-
-        # Step 1: Search for companies and get organization IDs
-        logger.info("Step 1: Searching for companies...")
-        organization_ids = await self.search_companies_and_get_organization_ids(organization_names)
-
-        if not organization_ids:
-            logger.warning("No organization IDs found. Cannot proceed with people search.")
-            return {
-                "status": "error",
-                "message": "No organization IDs found from company search",
-                "organization_ids": [],
-                "search_response": None,
-                "enriched_results": []
-            }
-
-        logger.info(f"Found {len(organization_ids)} organization IDs: {organization_ids}")
-
-        # Step 2: Search for people using organization IDs
-        logger.info("Step 2: Searching for people...")
-        search_response = await self.search_people(
-            person_seniorities=person_seniorities,
-            contact_email_status=contact_email_status,
-            organization_ids=organization_ids,
-            page=page,
-            per_page=per_page,
-            additional_params=additional_params
-        )
-
-        if search_response.get('status_code') != 200:
-            logger.warning(f"People search failed: {search_response}")
-            return {
-                "status": "error",
-                "message": "People search failed",
-                "organization_ids": organization_ids,
-                "search_response": search_response,
-                "enriched_results": []
-            }
-
-        # Step 3: Extract person IDs and enrich them
-        logger.info("Step 3: Enriching people...")
-        search_results = search_response.get('results', {})
-        people = search_results.get('people', [])
-
-        if not people:
-            logger.info("No people found in search results")
-            return {
-                "status": "success",
-                "message": "No people found",
-                "organization_ids": organization_ids,
-                "search_response": search_response,
-                "enriched_results": []
-            }
-
-        # Extract person IDs
-        person_ids = []
-        for person in people:
-            person_id = person.get('id')
-            if person_id:
-                person_ids.append(str(person_id))
-
-        logger.info(f"Found {len(person_ids)} people to enrich")
-
-        # Enrich each person
-        enriched_results = []
-        apollo_client = ApolloAPIClient()
-
-        for person_id in person_ids:
-            try:
-                enrichment_response = await apollo_client.apollo_people_enrichment_api(
-                    person_id=person_id,
-                    reveal_personal_emails=reveal_personal_emails,
-                    reveal_phone_number=reveal_phone_number
-                )
-
-                if enrichment_response.get('status_code') == 200:
-                    enriched_results.append(enrichment_response.get('results', {}))
+        try:
+            # Extract emails only from enriched_data (email is not in person_data)
+            emails = []
+            
+            # Get emails from enriched_data only
+            if enriched_data and enriched_data.get('person', {}).get('email'):
+                enriched_emails = enriched_data['person']['email']
+                if isinstance(enriched_emails, list):
+                    emails.extend([e.get('address', '') if isinstance(e, dict) else e for e in enriched_emails if e])
                 else:
-                    logger.warning(f"Failed to enrich person {person_id}")
-
-            except Exception as e:
-                logger.error(f"Error enriching person {person_id}: {str(e)}")
-                continue
-
-        logger.info(f"Workflow completed. Enriched {len(enriched_results)} out of {len(person_ids)} people")
-
-        return {
-            "status": "success",
-            "message": "Complete workflow executed successfully",
-            "organization_ids": organization_ids,
-            "search_response": search_response,
-            "enriched_results": enriched_results,
-            "total_organizations_found": len(organization_ids),
-            "total_people_found": len(people),
-            "total_enriched": len(enriched_results)
-        }
-
+                    emails.append(enriched_emails)
+            
+            # Remove duplicates and empty strings
+            emails = list(set([e for e in emails if e and e.strip()]))
+            
+            if not emails:
+                logger.info("No email found in enriched_data for duplicate check")
+                return None
+            
+            # Check for existing contact by email
+            existing_contact = await self.contacts_dao.get_contacts({
+                "company_id": ObjectId(company_id),
+                "contact_data.email": {"$in": emails}
+            })
+            
+            if existing_contact:
+                logger.info(f"Found existing contact by email: {emails[0]}")
+                return str(existing_contact[0]['_id'])
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error checking for existing contact: {str(e)}")
+            return None
+    
     def transform_apollo_contact_to_db_format(
         self, 
         person_data: Dict[str, Any], 
@@ -633,14 +461,157 @@ class ApolloHelper:
                 "linkedin_url": person_data.get('linkedin_url') or (enriched_data.get('person', {}).get('linkedin_url') if enriched_data else None),
                 "source": "APOLLO-ENRICHER"
             },
+            "webhook_sent": False,
             "metadata": {
                 "created_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
-                "raw_data": enriched_data.get('person', {})
+                "raw_data": enriched_data
             }
         }
         
         return contact_doc
+
+    def _transform_apollo_company_to_db_format(
+        self,
+        apollo_organization_data: Dict[str, Any],
+        company_id: str
+    ) -> Dict[str, Any]:
+
+        # Extract organization details
+        org_id = apollo_organization_data.get('id', '')
+        org_name = apollo_organization_data.get('name', '')
+        
+        # Extract industry - handle both single and list formats
+        industry = apollo_organization_data.get('industry', '')
+        industries = apollo_organization_data.get('industries', [])
+        if industries:
+            industry = industries  # Use list if available
+        elif industry:
+            industry = [industry]  # Convert to list
+        else:
+            industry = []
+        
+        # Extract location/country
+        country = apollo_organization_data.get('country', '')
+        city = apollo_organization_data.get('city', '')
+        state = apollo_organization_data.get('state', '')
+        
+        # Build location name array
+        location_names = []
+        if country:
+            location_names.append(country)
+        
+        # Extract revenue
+        revenue = apollo_organization_data.get('annual_revenue') or apollo_organization_data.get('organization_revenue')
+        revenue_min = None
+        revenue_max = None
+        if revenue:
+            # Convert to millions for min/max
+            revenue_millions = revenue / 1000000
+            if revenue_millions < 50:
+                revenue_min = "0"
+                revenue_max = "50"
+            elif revenue_millions < 100:
+                revenue_min = "50"
+                revenue_max = "100"
+            elif revenue_millions < 500:
+                revenue_min = "100"
+                revenue_max = "500"
+            else:
+                revenue_min = "500"
+                revenue_max = "1000"
+        
+        # Extract employee count
+        estimated_employees = apollo_organization_data.get('estimated_num_employees', 0)
+        employee_count = []
+        if estimated_employees:
+            if estimated_employees <= 10:
+                employee_count = ["1-10"]
+            elif estimated_employees <= 50:
+                employee_count = ["11-50"]
+            elif estimated_employees <= 200:
+                employee_count = ["51-200"]
+            elif estimated_employees <= 500:
+                employee_count = ["201-500"]
+            elif estimated_employees <= 1000:
+                employee_count = ["501-1000"]
+            else:
+                employee_count = ["1001-5000"]
+        
+        # Build update document
+        update_doc = {
+            "$set": {
+                "identifiers.source_id": str(org_id),
+                "identifiers.name": org_name,
+                "profile.industry": industry,
+                "location.type": "country",
+                "location.name": location_names,
+                "source": "apollo",
+                "metadata.updated_at": datetime.now(timezone.utc),
+                "metadata.api_response": apollo_organization_data
+            }
+        }
+        
+        # Add revenue if available
+        if revenue_min and revenue_max:
+            update_doc["$set"]["profile.revenue_min"] = revenue_min
+            update_doc["$set"]["profile.revenue_max"] = revenue_max
+        
+        # Add employee count if available
+        if employee_count:
+            update_doc["$set"]["profile.employee_count"] = employee_count
+        
+        return update_doc
+
+    async def update_company_details_from_apollo(
+        self,
+        company_search_response: Dict[str, Any],
+        company_id: str
+    ) -> bool:
+
+        if not self.companies_dao:
+            logger.warning("CompaniesDao not initialized - cannot update company")
+            return False
+        
+        try:
+            if company_search_response.get('status_code') != 200:
+                logger.warning("Company search failed, cannot update company details")
+                return False
+            
+            results = company_search_response.get('results', {})
+            organizations = results.get('organizations', [])
+            
+            if not organizations:
+                logger.warning("No organizations found in Apollo response")
+                return False
+            
+            # Use first organization (same as extract_organization_ids does)
+            apollo_org_data = organizations[0]
+            
+            # Transform to database format
+            update_doc = self._transform_apollo_company_to_db_format(
+                apollo_organization_data=apollo_org_data,
+                company_id=company_id
+            )
+            
+            # Update company in database
+            result = await self.companies_dao.update_one(
+                {"_id": ObjectId(company_id)},
+                update_doc
+            )
+            
+            if result > 0:
+                logger.info(f"✅ Updated company details for company_id: {company_id} with Apollo organization data")
+                return True
+            else:
+                logger.warning(f"⚠️ No company found with company_id: {company_id} to update")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error updating company details: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
 
     
 

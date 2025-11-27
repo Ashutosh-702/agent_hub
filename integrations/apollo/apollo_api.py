@@ -8,10 +8,9 @@ from urllib3.exceptions import InsecureRequestWarning
 from config.loaded_config import loaded_config
 from config.logging import logger
 from global_utils.exceptions import ApiException
-
+from global_utils.constants import APOLLO_BASE_URL
 urllib3.disable_warnings(InsecureRequestWarning)
 
-APOLLO_BASE_URL = "https://api.apollo.io/api/v1"
 
 
 def format_apollo_query_params(params: Dict[str, Any]) -> str:
@@ -232,39 +231,3 @@ class ApolloAPIClient:
             logger.warning(f"People enrichment API failed: {response.status} - {error_text}")
             response_data['error'] = error_text
             return response_data
-
-    async def apollo_enrich_multiple_people(
-        self,
-        person_ids: List[str],
-        reveal_personal_emails: bool = False,
-        reveal_phone_number: bool = False
-    ) -> List[Dict[str, Any]]:
-        """
-        Enrich multiple people by their IDs
-        Args:
-            person_ids: List of person IDs to enrich
-            reveal_personal_emails: Whether to reveal personal emails
-            reveal_phone_number: Whether to reveal phone number
-        Returns: List of enriched person data
-        """
-        enriched_results = []
-
-        for person_id in person_ids:
-            try:
-                result = await self.apollo_people_enrichment_api(
-                    person_id=person_id,
-                    reveal_personal_emails=reveal_personal_emails,
-                    reveal_phone_number=reveal_phone_number
-                )
-
-                if result.get('status_code') == 200:
-                    enriched_results.append(result.get('results', {}))
-                else:
-                    logger.warning(f"Failed to enrich person {person_id}: {result.get('error', 'Unknown error')}")
-
-            except Exception as e:
-                logger.error(f"Error enriching person {person_id}: {str(e)}")
-                continue
-
-        return enriched_results
-
