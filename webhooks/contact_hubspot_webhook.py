@@ -22,37 +22,23 @@ class ContactHubspotWebhook:
 
         self.webhook_url = HUBSPOT_BOLTIC_WEBHOOK_URL
         
-        # Initialize DAOs
-        if loaded_config.connection_manager and loaded_config.connection_manager.mongo_client:
-            self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
-            self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-            self.campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-            self.campaign_company_runs_dao = CampaignCompanyRunsDao(
-                loaded_config.connection_manager.mongo_client
-            )
-        else:
-            self.contacts_dao = None
-            self.companies_dao = None
-            self.campaigns_dao = None
-            self.campaign_company_runs_dao = None
-            logger.warning("MongoDB connection not available - webhook functionality limited")
+        self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        self.campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
     
     async def format_phone_number(self, phone: str, country_code: Optional[str] = None) -> str:
         if not phone:
             return ""
         
-        # Remove any existing + and whitespace
         phone = phone.replace(" ", "").replace("\t", "").replace("\n", "").strip().lstrip("+")
         
-        # If already has country code format, return as is
         if phone.startswith("+"):
             return phone
         
-        # If country code provided, prepend it
         if country_code:
             return f"+{country_code}{phone}"
         
-        # Otherwise return with + prefix
         return f"+{phone}"
     
     async def get_company_details(self, company_id: str) -> Dict[str, Any]:
@@ -61,6 +47,7 @@ class ContactHubspotWebhook:
         
         try:
             company_doc = await self.companies_dao.get_company(company_id)
+
             if not company_doc:
                 return {"name": "", "country": "", "industry": ""}
             
