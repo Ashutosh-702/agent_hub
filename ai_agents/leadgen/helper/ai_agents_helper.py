@@ -290,40 +290,27 @@ class ApolloContactEnrichmentHelper:
 
 
     async def apollo_contact_enrichment(self, query_params: ApolloContactEnrichment):
-        company_names = query_params.company_name
-        person_seniorities = query_params.person_seniorities
-        number_of_contacts_per_company = query_params.number_of_contacts_per_company
-        company_id = "692439c9bbc59b1ac4d235bd"
+        company_domains = query_params.company_domain
         interested_product = query_params.interested_product
 
-        if not company_id:
-            raise ApiException("Company id is required")
 
         if not interested_product:
             raise ApiException("Interested product is required")
 
-        if not company_names:
+        if not company_domains:
             raise ApiException("Company names are required")
-
-        if not person_seniorities:
-            raise ApiException("Person seniorities are required")
-
-        if not number_of_contacts_per_company:
-            raise ApiException("Number of contacts per company is required")
-        contact_data = {}
-        enriched_data = {}
 
         #============================================
 
         
         company_ids = []
-        for company_name in company_names:
-            company_doc = await self.company_dao.get_company_by_filters({"identifiers.source_name": company_name})
+        for company_domain in company_domains:
+            company_doc = await self.company_dao.get_company_by_filters({"identifiers.source_domain": company_domain})
             if not company_doc:
                 inserted_company_id = await self.company_dao.create_company({
                     "identifiers": {
-                        "name": company_name,
-                        "source_name": company_name
+                        "name": company_domain,
+                        "source_domain": company_domain
                     },
                     "source": "apollo",
                     "metadata": {
@@ -357,18 +344,6 @@ class ApolloContactEnrichmentHelper:
         )
 
         logger.info(f"company_ids: {company_ids}")
-        logger.info(f"📤 Company Name {company_names} queued for processing: {request_id}")
-
-
-        # for company_name in company_names:
-        #     response = await self.apollo_helper.get_company_contacts(company_name, person_seniorities, page=1, per_page=number_of_contacts_per_company, enrich_contacts=True)
-        #     if response.get('contacts'):
-        #         contacts = response.get('contacts', [])
-        #         for contact in contacts:
-        #             contact_data = contact.get('contact_data')
-        #             enriched_data = contact.get('enriched_data')
-        #         return {contact_data: contact_data, enriched_data: enriched_data}
-        #     else:
-        #         raise ApiException(response.get('message'))
+        logger.info(f"📤 Company Domains {company_domains} queued for processing: {request_id}")
 
         return {"message": "All company contacts enriched", "company_ids": company_ids}

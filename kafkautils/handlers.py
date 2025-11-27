@@ -17,7 +17,7 @@ from integrations.lusha.company_saver import CompanySaver
 from config.logging import logger
 from integrations.apollo.apollo_helper import ApolloHelper
 from integrations.apollo.schema import ApolloResponseSchema
-# from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
+from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
 
 def convert_objectid_to_string(payload: dict) -> dict:
     """Convert ObjectId values to strings for JSON serialization."""
@@ -410,10 +410,10 @@ async def process_contacts_enrichment(request_id: str, company_ids: list):
                 enrich_contacts=True
             )
             
-            response = await apollo_helper.get_company_contacts(query_params)
+            # response = await apollo_helper.get_company_contacts(query_params)
             #send  webhook to the users with the contacts
-            # webhook_sender = ContactHubspotWebhook()
-            # await webhook_sender.send_webhook_for_company(str(company_id))
+            webhook_sender = ContactHubspotWebhook()
+            await webhook_sender.send_webhook_for_company(str(company_id))
             logger.info(f"webhook sent to the users with the contacts")
 
         return
