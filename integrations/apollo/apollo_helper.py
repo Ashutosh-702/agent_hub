@@ -34,21 +34,27 @@ class ApolloHelper:
 
         # Step 1: Search for company to get organization ID
         logger.info(f"Step 1: Searching for company '{query_params.company_name}'...")
-        company_search_response = await self.search_companies(query_params.company_name)
+        # check company exists in the database .  filter is identifiers.source_id this field should exist. 
+        company_doc = await self.companies_dao.get_company_by_filters({"identifiers.source_domain": query_params.company_domain,"identifiers.source_id": {"$exists": True}})
+        organization_ids = []
+        
+        if company_doc:
+            organization_ids.append(str(company_doc["identifiers"]["source_id"]))
+        else:
+            company_search_response = await self.search_companies(query_params.company_domain)
 
-        if company_search_response.get('status_code') != 200:
-            logger.error(f"Company search failed: {company_search_response}")
-
-            return {
-                "status": "error",
-                "message": f"Failed to find company: {query_params.company_name}",
-                "company_name": query_params.company_name,
-                "contacts": []
-            }
+            if company_search_response.get('status_code') != 200:
+                logger.error(f"Company search failed: {company_search_response}")
+                return {
+                    "status": "error",
+                    "message": f"Failed to find company: {query_params.company_name}",
+                    "company_name": query_params.company_name,
+                    "contacts": []
+                }
+            else:
+                organization_ids = self.extract_organization_ids(company_search_response)
 
         # Step 2: Extract organization IDs and update company details to databse
-        organization_ids = self.extract_organization_ids(company_search_response)
-
         if not organization_ids:
             logger.warning(f"No organization IDs found for company: {query_params.company_name}")
 
@@ -59,10 +65,12 @@ class ApolloHelper:
                 "contacts": []
             }
 
-        await self.update_company_details_from_apollo(
-            company_search_response=company_search_response,
-            company_id=query_params.company_id
-        )
+        
+        if not company_doc:
+            await self.update_company_details_from_apollo(
+                company_search_response=company_search_response,
+                company_id=query_params.company_id
+            )
 
         logger.info(f"Found {len(organization_ids)} organization ID(s): {organization_ids}")
 

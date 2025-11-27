@@ -3,6 +3,7 @@ from typing import Optional, List, Dict, Any
 
 class ApolloResponseSchema(BaseModel):
     company_name: str
+    company_domain: Optional[str] = None
     company_id: str
     person_seniorities: Optional[List[str]] = None
     contact_email_status: Optional[List[str]] = None

@@ -394,6 +394,8 @@ async def process_contacts_enrichment(request_id: str, company_ids: list):
         number_of_contacts_per_company = 2
         for company in company_data:
             company_name = company.get("identifiers", {}).get("name", "")
+            company_domain = company.get("identifiers", {}).get("source_domain", "")
+
             company_id = company.get("_id", "")
             logger.info(f"company_data: {company_data}")
             logger.info(f"📊 Company Name: {company_name}")
@@ -403,6 +405,7 @@ async def process_contacts_enrichment(request_id: str, company_ids: list):
             # Create ApolloResponseSchema object
             query_params = ApolloResponseSchema(
                 company_name=company_name,
+                company_domain=company_domain,
                 company_id=str(company_id),
                 person_seniorities=person_seniorities,
                 page=1,
@@ -410,7 +413,7 @@ async def process_contacts_enrichment(request_id: str, company_ids: list):
                 enrich_contacts=True
             )
             
-            # response = await apollo_helper.get_company_contacts(query_params)
+            response = await apollo_helper.get_company_contacts(query_params)
             #send  webhook to the users with the contacts
             webhook_sender = ContactHubspotWebhook()
             await webhook_sender.send_webhook_for_company(str(company_id))
