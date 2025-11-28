@@ -28,3 +28,5 @@ class CompaniesDao(BaseMongoDao):
         filters = self._process_query_objectids(filters)
         return await self.find_one(filters)
     
+    async def update_company(self, company_id: str, update_data: Dict[str, Any]):
+        return await self.update_one({"_id": ObjectId(company_id)}, update_data)

@@ -292,7 +292,7 @@ class ApolloContactEnrichmentHelper:
     async def apollo_contact_enrichment(self, query_params: ApolloContactEnrichment):
         company_domains = query_params.company_domain
         interested_product = query_params.interested_product
-
+        slack_metadata = query_params.slack_metadata
 
         if not interested_product:
             raise ApiException("Interested product is required")
@@ -313,6 +313,7 @@ class ApolloContactEnrichmentHelper:
                         "source_domain": company_domain
                     },
                     "source": "apollo",
+                    "webhook_sent": False,
                     "metadata": {
                         "created_at": datetime.utcnow(),
                         "updated_at": datetime.utcnow()
@@ -320,6 +321,8 @@ class ApolloContactEnrichmentHelper:
                 })
                 company_ids.append(str(inserted_company_id))
             else:
+                #update webhook_sent to False
+                await self.company_dao.update_company(company_doc["_id"], {"webhook_sent": False, "metadata.updated_at": datetime.utcnow()})
                 company_ids.append(str(company_doc["_id"]))
 
         request_id = str(uuid.uuid4())
@@ -332,6 +335,7 @@ class ApolloContactEnrichmentHelper:
             "action": "process_contacts_enrichment",
             "company_ids": company_ids, 
             "interested_product": interested_product,
+            "slack_metadata": slack_metadata,
             "timestamp": asyncio.get_event_loop().time()
         }
 
@@ -340,7 +344,7 @@ class ApolloContactEnrichmentHelper:
             topics=self.kafka_config["topics"],
             partition_value=request_id,
             event=event,
-            event_meta={"service": "leadgen", "company_ids": company_ids, "interested_product": interested_product}
+            event_meta={"service": "leadgen", "company_ids": company_ids, "interested_product": interested_product, "slack_metadata": slack_metadata}
         )
 
         logger.info(f"company_ids: {company_ids}")

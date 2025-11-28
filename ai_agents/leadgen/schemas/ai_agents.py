@@ -106,6 +106,7 @@ class CountCompanyMappings(BaseModel):
 class ApolloContactEnrichment(BaseModel):
     company_domain: List[str] = Field(description="List of company domains to enrich contacts for")
     interested_product: str = Field(description="Interested product to enrich contacts for")
+    slack_metadata: Optional[Dict] = None
 
     @field_validator('company_domain')
     @classmethod

@@ -183,11 +183,14 @@ class ContactHubspotWebhook:
                 "companyIndustry": webhook_data.get("companyIndustry", ""),
                 "contactJobTitle": webhook_data.get("contactJobTitle", ""),
                 "interestedProduct": webhook_data.get("interestedProduct", ""),
+                "slack_metadata": webhook_data.get("slack_metadata", {}),
                 "meta": webhook_data.get("meta", {}),
             }
+            if webhook_data.get("message"):
+                payload["message"] = webhook_data.get("message")
             
             # Validate required fields
-            if not payload["contactEmail"]:
+            if not payload["contactEmail"] and not payload.get("message"):
                 logger.warning(f"⚠️ Skipping webhook for contact {payload['contactFirstName']} {payload['contactLastName']} - no email")
                 return False
 
@@ -216,7 +219,7 @@ class ContactHubspotWebhook:
             logger.error(f"❌ Error sending webhook: {e}")
             return False
     
-    async def send_webhook_for_company(self, company_id: str) -> Dict[str, Any]:
+    async def send_webhook_for_company(self, company_id: str, slack_metadata: dict) -> Dict[str, Any]:
         if not self.contacts_dao:
             logger.error("ContactsDao not initialized")
             return {
@@ -246,14 +249,38 @@ class ContactHubspotWebhook:
             
             if not contacts:
                 logger.info(f"  ⚠️ No contacts found for company {company_id} (all webhooks already sent)")
+                # Get company details to send webhook with message
+                company_details = await self.get_company_details(company_id)
+                company_name = company_details.get("name")
+
+                # Prepare webhook payload with message indicating no contacts
+                webhook_data = {
+                    "companyName": company_name,
+                    "companyCountry": "",
+                    "companyWebsite": "",
+                    "companyIndustry": "",
+                    "contactFirstName": "",
+                    "contactLastName": "",
+                    "contactEmail": "",
+                    "contactPhone": "",
+                    "linkedin_url": "",
+                    "contactCountry": "",
+                    "contactJobTitle": "",
+                    "interestedProduct": interested_product,
+                    "slack_metadata": slack_metadata,
+                    "meta": {},
+                    "message": f"No contacts found for company: {company_name}"
+                }
+                webhook_sent = await self.send_webhook(webhook_data)
                 return {
                     "status": "success",
-                    "message": "No contacts found",
+                    "message": "No contacts found - webhook sent with message",
                     "total_contacts": 0,
-                    "webhook_success": 0,
-                    "webhook_failed": 0
+                    "webhook_success": 1 if webhook_sent else 0,
+                    "webhook_failed": 0 if webhook_sent else 1
                 }
-            
+
+
             logger.info(f"  ✅ Found {len(contacts)} contacts pending webhook")
             
             webhook_success_count = 0
@@ -293,6 +320,7 @@ class ContactHubspotWebhook:
                         "companyIndustry": contact_info["company_industry"],
                         "contactJobTitle": contact_info["job_title"],
                         "interestedProduct": interested_product,
+                        "slack_metadata": slack_metadata,
                         "meta": contact_info["raw_data"]
                     }
                     

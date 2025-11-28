@@ -355,7 +355,7 @@ async def contacts_enrichment_handler(message: Any):
         request_id = payload.get("request_id")
         action = payload.get("action")
         company_ids = payload.get("company_ids")  # Now we get campaign_id instead of form_data
-        
+        slack_metadata = payload.get("slack_metadata", {})
         if not request_id or not company_ids:
             logger.error("❌ Missing request_id or campaign_id in message")
             return
@@ -366,13 +366,13 @@ async def contacts_enrichment_handler(message: Any):
         
         logger.info(f"🔄 Processing company search: {request_id}")
 
-        await process_contacts_enrichment(request_id, company_ids)
+        await process_contacts_enrichment(request_id, company_ids, slack_metadata)
 
     except Exception as e:
         logger.error(f"❌ Error handling contacts enrichment message: {e}")
         raise
 
-async def process_contacts_enrichment(request_id: str, company_ids: list):
+async def process_contacts_enrichment(request_id: str, company_ids: list, slack_metadata: dict):
     """Process a single contacts enrichment request using campaign_id."""
     try:
         logger.info(f"🔍 Processing request: {request_id}")
@@ -416,7 +416,7 @@ async def process_contacts_enrichment(request_id: str, company_ids: list):
             response = await apollo_helper.get_company_contacts(query_params)
             #send  webhook to the users with the contacts
             webhook_sender = ContactHubspotWebhook()
-            await webhook_sender.send_webhook_for_company(str(company_id))
+            await webhook_sender.send_webhook_for_company(str(company_id), slack_metadata)
             logger.info(f"webhook sent to the users with the contacts")
 
         return
