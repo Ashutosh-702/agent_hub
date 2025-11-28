@@ -292,7 +292,7 @@ class ApolloHelper:
                 relevance_assessment = relevance_result.get('relevance_assessment', {})
                 is_relevant = relevance_assessment.get('is_relevant', False)
 
-                if not is_relevant:
+                if is_relevant:
                     relevant_people.append(person)
                     logger.info(f"Person {person.get('name', 'Unknown')} is relevant - keeping in list")
                 else:

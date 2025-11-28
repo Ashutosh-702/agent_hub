@@ -125,7 +125,8 @@ PEOPLE_RELEVANCE_CRITERIA = """
 Seniority- C-level, VPs, Directors, Heads/ Senior Managers.
 Personas- Logistics, Supply Chain, Procurement, Digital Transformation, Digital Initiative, Strategic Initiative, COO, IT/CTO, CIO, Transportation, Last Mile, Business Process Improvement, Business Application, Distribution.
 
-The persona should be focussed towards supply chain or logistics functions. Don't include personas focussed on other functions like marketing, HR, legal, finance etc, irrespective of whether they fall in that seniority bracket or not. I am selling a product which is transportation management system. I only need people who are directly working in this area or segment. This rule doesn't apply to C-level executives (CEO, Founder, Owner etc) and CFOs as they are always relevant for any B2B software purchase.
+If the person has seniority (C-level, VP, Director, Head, Senior Manager,founder, ceo, cfo), accept them directly.
+If not, accept them only if they work in supply chain/logistics/transportation-related functions.
 """
 
 
