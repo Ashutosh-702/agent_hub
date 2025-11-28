@@ -168,7 +168,7 @@ async def count_company_mappings(query_params: CountCompanyMappings = Depends())
     return response_data.dict()
 
 
-async def apollo_contact_enrichment(query_params: ApolloContactEnrichment = Depends()) -> Dict[str, Any]:
+async def apollo_contact_enrichment(query_params: ApolloContactEnrichment = Body()) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)
     apollo_contact_enrichment_helper = ApolloContactEnrichmentHelper()
 
