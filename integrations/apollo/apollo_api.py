@@ -231,3 +231,56 @@ class ApolloAPIClient:
             logger.warning(f"People enrichment API failed: {response.status} - {error_text}")
             response_data['error'] = error_text
             return response_data
+
+    async def apollo_organization_enrich_api(
+        self,
+        domain: str
+    ) -> Dict[str, Any]:
+        """
+        Enrich organization by domain using Apollo API
+        Args:
+            domain: Domain name of the organization (e.g., 'superdry.in')
+        Returns: Response data with status code and organization data
+        """
+        bind_contextvars(
+            operation="apollo_organization_enrich",
+            component="apollo_api_client",
+            event_type="apollo_organization_enrich"
+        )
+        logger.info(f"Enriching organization by domain: {domain}")
+
+        # Build query parameters
+        query_params = {
+            "domain": domain
+        }
+
+        url = f"{APOLLO_BASE_URL}/organizations/enrich?{format_apollo_query_params(query_params)}"
+
+        # Use GET instead of POST
+        response = await self.http_session.get(
+            url,
+            headers=self.headers,
+            timeout=self.timeout
+        )
+
+        result = await response.json()
+        response_data = {
+            'status_code': response.status
+        }
+
+        if response.status == 200:
+            response_data['results'] = result
+            return response_data
+
+        elif response.status == 429:
+            # Rate limit hit
+            response_headers = dict(response.headers)
+            response_data['rate_limit_info'] = response_headers
+            logger.warning(f"Rate limit exhausted: {response.status}")
+            return response_data
+
+        else:
+            error_text = await response.text()
+            logger.warning(f"Organization enrich API failed: {response.status} - {error_text}")
+            response_data['error'] = error_text
+            return response_data

@@ -390,7 +390,7 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
 
         logger.info(f"company_ids: {company_ids}")
         
-        person_seniorities = [ "vp", "director"]
+        person_seniorities = [ "vp", "director", "founder"]
         number_of_contacts_per_company = 2
         for company in company_data:
             company_name = company.get("identifiers", {}).get("name", "")

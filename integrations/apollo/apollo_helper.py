@@ -37,7 +37,7 @@ class ApolloHelper:
         # check company exists in the database .  filter is identifiers.source_id this field should exist. 
         company_doc = await self.companies_dao.get_company_by_filters({"identifiers.source_domain": query_params.company_domain,"identifiers.source_id": {"$exists": True}})
         organization_ids = []
-        
+
         if company_doc:
             organization_ids.append(str(company_doc["identifiers"]["source_id"]))
         else:
@@ -305,20 +305,18 @@ class ApolloHelper:
         logger.info(f"After relevance check: {len(relevant_people)} relevant contacts out of {total_count} total")
         return relevant_people
 
-    async def search_companies(self, organization_name: str) -> Dict[str, Any]:
+    async def search_companies(self, company_domain: str) -> Dict[str, Any]:
         bind_contextvars(
             operation="apollo_search_companies",
             component="apollo_helper",
             event_type="apollo_company_search"
         )
 
-        logger.info(f"Searching for companies with name: {organization_name}")
+        logger.info(f"Searching for companies with domain: {company_domain}")
 
         try:
             apollo_client = ApolloAPIClient()
-            response = await apollo_client.apollo_company_search_api(
-                organization_name=organization_name
-            )
+            response = await apollo_client.apollo_organization_enrich_api(domain=company_domain)
             return response
 
         except Exception as e:
@@ -336,12 +334,12 @@ class ApolloHelper:
             return organization_ids
 
         results = company_search_response.get('results', {})
-        organizations = results.get('organizations', [])
+        organization = results.get('organization', {})
 
-        if organizations and len(organizations) > 0:
-            org_id = organizations[0].get('id')
+        org_id = organization.get('id')
 
-            if org_id:
+
+        if org_id:
                 organization_ids.append(str(org_id))
         else:
             logger.warning("No organizations found in search results")
@@ -621,7 +619,7 @@ class ApolloHelper:
                 "identifiers.name": org_name,
                 "profile.industry": industry,
                 "location.type": "country",
-                "location.name": location_names,
+                "location.name": country,
                 "source": "apollo",
                 "metadata.updated_at": datetime.now(timezone.utc),
                 "metadata.api_response": apollo_organization_data
@@ -655,18 +653,15 @@ class ApolloHelper:
                 return False
             
             results = company_search_response.get('results', {})
-            organizations = results.get('organizations', [])
+            organization = results.get('organization', {})
             
-            if not organizations:
-                logger.warning("No organizations found in Apollo response")
+            if not organization or not organization.get('id'):
+                logger.warning("No organization found in Apollo response")
                 return False
-            
-            # Use first organization (same as extract_organization_ids does)
-            apollo_org_data = organizations[0]
             
             # Transform to database format
             update_doc = self._transform_apollo_company_to_db_format(
-                apollo_organization_data=apollo_org_data,
+                apollo_organization_data=organization,
                 company_id=company_id
             )
             

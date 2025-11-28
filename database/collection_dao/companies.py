@@ -29,4 +29,8 @@ class CompaniesDao(BaseMongoDao):
         return await self.find_one(filters)
     
     async def update_company(self, company_id: str, update_data: Dict[str, Any]):
+        has_operators = any(key.startswith('$') for key in update_data.keys())
+        if not has_operators:
+            update_data = {"$set": update_data}
+            
         return await self.update_one({"_id": ObjectId(company_id)}, update_data)
