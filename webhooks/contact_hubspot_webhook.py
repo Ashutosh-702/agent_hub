@@ -233,7 +233,7 @@ class ContactHubspotWebhook:
         try:
             # Get interested product (still need to fetch from campaign)
             # interested_product = await self.get_interested_product(company_id)
-            interested_product = "TMS"
+            interested_product = "fynd_create"
 
             
             logger.info(f"📇 Processing webhooks for company_id: {company_id}")
