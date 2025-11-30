@@ -406,7 +406,7 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
             contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
             contacts = await contacts_dao.get_contacts({
                 "company_id": company_id,
-                "webhook_sent": False,
+                # "webhook_sent": False,
                 "contact_data.email": {"$ne": []} #only get contacts with email. it should not be empty here email is an array field.
             })
             
