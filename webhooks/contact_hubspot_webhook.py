@@ -336,6 +336,7 @@ class ContactHubspotWebhook:
                                 {"$set": {"webhook_sent": True}}
                             )
                             logger.info(f"    ✅ Updated webhook_sent=True for contact {contact_info['email']}")
+                            break #break the loop after sending webhook to one contact
                         except Exception as e:
                             logger.warning(f"    ⚠️ Failed to update webhook_sent flag: {e}")
                     else:

@@ -18,7 +18,7 @@ from config.logging import logger
 from integrations.apollo.apollo_helper import ApolloHelper
 from integrations.apollo.schema import ApolloResponseSchema
 from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
-
+from database.collection_dao.contacts import ContactsDao
 def convert_objectid_to_string(payload: dict) -> dict:
     """Convert ObjectId values to strings for JSON serialization."""
     converted_payload = payload.copy()
@@ -401,19 +401,29 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
             logger.info(f"📊 Company Name: {company_name}")
             logger.info(f"📍 Company ID: {company_id}")
             apollo_helper = ApolloHelper()
+
+            # if company as  multple unsent contacts, then don't do apollo search
+            contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+            contacts = await contacts_dao.get_contacts({
+                "company_id": company_id,
+                "webhook_sent": False,
+                "contact_data.email": {"$ne": []} #only get contacts with email. it should not be empty here email is an array field.
+            })
             
             # Create ApolloResponseSchema object
-            query_params = ApolloResponseSchema(
-                company_name=company_name,
-                company_domain=company_domain,
-                company_id=str(company_id),
-                person_seniorities=person_seniorities,
-                page=1,
-                per_page=number_of_contacts_per_company,
-                enrich_contacts=True
-            )
-            
-            response = await apollo_helper.get_company_contacts(query_params)
+            if len(contacts) == 0:
+
+                query_params = ApolloResponseSchema(
+                    company_name=company_name,
+                    company_domain=company_domain,
+                    company_id=str(company_id),
+                    person_seniorities=person_seniorities,
+                    page=1,
+                    per_page=number_of_contacts_per_company,
+                    enrich_contacts=True
+                )
+
+                response = await apollo_helper.get_company_contacts(query_params)
             #send  webhook to the users with the contacts
             webhook_sender = ContactHubspotWebhook()
             await webhook_sender.send_webhook_for_company(str(company_id), slack_metadata)
