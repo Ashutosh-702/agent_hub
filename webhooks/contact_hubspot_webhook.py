@@ -241,6 +241,7 @@ class ContactHubspotWebhook:
             # Get only contacts where webhook_sent is False or doesn't exist
             contacts = await self.contacts_dao.get_contacts({
                 "company_id": ObjectId(company_id),
+                "contact_data.email": {"$ne": []}
                 # "$or": [
                 #     {"webhook_sent": False},
                 #     {"webhook_sent": {"$exists": False}}
