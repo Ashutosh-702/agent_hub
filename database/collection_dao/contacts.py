@@ -27,4 +27,8 @@ class ContactsDao(BaseMongoDao):
 
     async def update_contact(self, contact_id: str, update_clause: dict):
         return await self.update_one({"_id": ObjectId(contact_id)}, update_clause)
+
+    async def get_contacts_count(self, filters: dict = {}):
+        filters = self._process_query_objectids(filters)
+        return await self.count_documents(filters)
     

@@ -60,6 +60,10 @@ class BaseMongoDao:
         """Delete multiple documents matching the query."""
         result = await self.collection.delete_many(query)
         return result.deleted_count
+    
+    async def count_documents(self, filters: dict = {}):
+        result = await self.collection.count_documents(filters)
+        return result
 
     async def get_paginated_response(self, filter_query, projection=None, page_size=10, page_number=1,
                                      sort_by=None):

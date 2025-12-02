@@ -132,6 +132,14 @@ class ApolloHelper:
         for page in range(2, total_pages + 1):
             try:
                 logger.info(f"Processing page {page} of {total_pages}...")
+
+                contacts_count = await self.contacts_dao.get_contacts_count({
+                    "company_id": ObjectId(query_params.company_id),
+                    "contact_data.email": {"$ne": []}
+                })
+                if contacts_count > 0:
+                    logger.info(f"Contacts already exist for company: {query_params.company_name} so not searching further")
+                    break
                 
                 page_search_params = SearchPeopleSchema(
                     person_seniorities=query_params.person_seniorities,
