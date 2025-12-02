@@ -204,7 +204,7 @@ class ContactHubspotWebhook:
                 self.webhook_url,
                 json=payload,
                 headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=10)
+                timeout=aiohttp.ClientTimeout(total=15)
             )
             
             if response.status in [200, 201, 202]:
