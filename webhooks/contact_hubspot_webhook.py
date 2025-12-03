@@ -43,19 +43,20 @@ class ContactHubspotWebhook:
     
     async def get_company_details(self, company_id: str) -> Dict[str, Any]:
         if not self.companies_dao:
-            return {"name": "", "country": "", "industry": ""}
+            return {"name": "", "country": "", "industry": "", "website_url": ""}
         
         try:
             company_doc = await self.companies_dao.get_company(company_id)
 
             if not company_doc:
-                return {"name": "", "country": "", "industry": ""}
+                return {"name": "", "country": "", "industry": "", "website_url": ""}
             
             identifiers = company_doc.get("identifiers", {})
             location = company_doc.get("location", {})
             profile = company_doc.get("profile", {})
             
             company_name = identifiers.get("name", "")
+            company_website = identifiers.get("website_url", "")
             industry = profile.get("industry", "")
             # Try different possible fields for country
             company_country = (
@@ -68,11 +69,12 @@ class ContactHubspotWebhook:
             return {
                 "name": company_name,
                 "country": company_country,
-                "industry": industry
+                "industry": industry,
+                "website_url": company_website
             }
         except Exception as e:
             logger.error(f"Error fetching company {company_id}: {e}")
-            return {"name": "", "country": "", "industry": ""}
+            return {"name": "", "country": "", "industry": "", "website_url": ""}
     
     async def get_interested_product(self, company_id: str) -> str:
 
@@ -371,3 +373,234 @@ class ContactHubspotWebhook:
                 "webhook_success": 0,
                 "webhook_failed": 0
             }
+    
+    async def send_company_level_webhook(self, company_id: str, slack_metadata: dict) -> Dict[str, Any]:
+        if not self.contacts_dao:
+            logger.error("ContactsDao not initialized")
+            return {
+                "status": "error",
+                "message": "Database connection not available",
+                "total_contacts": 0,
+                "webhook_success": 0,
+                "webhook_failed": 0
+            }
+        
+        try:
+            # Get interested product
+            interested_product = await self.get_interested_product(company_id)
+            if not interested_product:
+                interested_product = "fynd_create"
+            
+            logger.info(f"📇 Processing company-level webhook for company_id: {company_id}")
+            
+            # Get all contacts for the company (including those already sent)
+            contacts, pagination_info = await self.contacts_dao.get_paginated_contacts({
+                "company_id": ObjectId(company_id),
+                "contact_data.email": {"$ne": []}
+            }, page=1, limit=3
+            )
+            logger.info(f"  ✅ Found {len(contacts)} contacts for company-level webhook")
+            logger.info(f"   Pagination info: {pagination_info}")
+            if not contacts or len(contacts) == 0:
+                logger.info(f"  ⚠️ No contacts found for company {company_id}")
+                # Get company details to send webhook with message
+                company_details = await self.get_company_details(company_id)
+                company_name = company_details.get("name", "")
+                
+                # Prepare webhook payload with message indicating no contacts
+                webhook_data = {
+                    "companyName": company_name,
+                    "companyCountry": company_details.get("country", ""),
+                    "companyWebsite": company_details.get("website_url", ""),
+                    "companyIndustry": company_details.get("industry", ""),
+                    "interestedProduct": interested_product,
+                    "slack_metadata": slack_metadata,
+                    "contact_details": [],
+                    "message": f"No contacts found for company: {company_name}"
+                }
+                
+                webhook_sent = await self.send_company_webhook(webhook_data)
+                return {
+                    "status": "success",
+                    "message": "No contacts found - webhook sent with message",
+                    "total_contacts": 0,
+                    "webhook_success": 1 if webhook_sent else 0,
+                    "webhook_failed": 0 if webhook_sent else 1
+                }
+            
+            logger.info(f"  ✅ Found {len(contacts)} contacts for company-level webhook")
+            
+            # Extract company details from first contact (they should all have same company info)
+            first_contact_info = self.extract_contact_data(contacts[0])
+            
+            # Get company details from database as fallback
+            company_details = await self.get_company_details(company_id)
+            
+            # Build contact_details array
+            contact_details = []
+            for contact_doc in contacts:
+                try:
+                    contact_info = self.extract_contact_data(contact_doc)
+                    
+                    # Skip if no email (required field)
+                    if not contact_info["email"]:
+                        logger.warning(f"    ⚠️ Skipping contact {contact_info['first_name']} {contact_info['last_name']} - no email")
+                        continue
+                    
+                    # Format phone number
+                    contact_phone = await self.format_phone_number(contact_info["phone"])
+                    
+                    # Build contact detail object
+                    contact_detail = {
+                        "contactFirstName": contact_info["first_name"],
+                        "contactLastName": contact_info["last_name"],
+                        "contactEmail": contact_info["email"],
+                        "contactPhone": contact_phone,
+                        "linkedin_url": contact_info["linkedin_url"],
+                        "contactCountry": contact_info["country"],
+                        "contactJobTitle": contact_info["job_title"],
+                        "meta": contact_info["raw_data"]
+                    }
+                    
+                    contact_details.append(contact_detail)
+                    
+                except Exception as e:
+                    logger.error(f"❌ Error processing contact for company-level webhook: {e}")
+                    continue
+            
+            if not contact_details:
+                logger.warning(f"  ⚠️ No valid contacts found after processing")
+                # Send webhook with empty contact_details
+                webhook_data = {
+                    "companyName": company_details.get("name", first_contact_info.get("company_name", "")),
+                    "companyCountry": company_details.get("country", first_contact_info.get("company_country", "")),
+                    "companyWebsite": first_contact_info.get("company_website", ""),
+                    "companyIndustry": company_details.get("industry", first_contact_info.get("company_industry", "")),
+                    "interestedProduct": interested_product,
+                    "slack_metadata": slack_metadata,
+                    "contact_details": [],
+                    "message": "No valid contacts found after processing"
+                }
+                
+                webhook_sent = await self.send_company_webhook(webhook_data)
+                return {
+                    "status": "success",
+                    "message": "No valid contacts - webhook sent with message",
+                    "total_contacts": len(contacts),
+                    "webhook_success": 1 if webhook_sent else 0,
+                    "webhook_failed": 0 if webhook_sent else 1
+                }
+            
+            # Handle industry if it's a list
+            company_industry = company_details.get("industry", first_contact_info.get("company_industry", ""))
+            if isinstance(company_industry, list):
+                company_industry = ", ".join(company_industry) if company_industry else ""
+            
+            # Prepare company-level webhook payload
+            webhook_data = {
+                "companyName": company_details.get("name", first_contact_info.get("company_name", "")),
+                "companyCountry": company_details.get("country", first_contact_info.get("company_country", "")),
+                "companyWebsite": first_contact_info.get("company_website", ""),
+                "companyIndustry": company_industry,
+                "interestedProduct": interested_product,
+                "slack_metadata": slack_metadata,
+                "contact_details": contact_details
+            }
+            
+            # Send company-level webhook
+            webhook_sent = await self.send_company_webhook(webhook_data)
+            
+            if webhook_sent:
+                # Update webhook_sent flag at company level
+                try:
+                    await self.companies_dao.update_company(
+                        company_id,
+                        {"webhook_sent": True}
+                    )
+                    logger.info(f"    ✅ Updated webhook_sent=True for company {company_id}")
+                except Exception as e:
+                    logger.warning(f"    ⚠️ Failed to update webhook_sent flag for company: {e}")
+            
+            logger.info(f"✅ Company-level webhook sending completed for company {company_id}")
+            logger.info(f"   Total contacts: {len(contacts)}")
+            logger.info(f"   Contacts in webhook: {len(contact_details)}")
+            logger.info(f"   Webhook sent: {webhook_sent}")
+            
+            return {
+                "status": "success",
+                "message": "Company-level webhook sending completed",
+                "total_contacts": len(contacts),
+                "contacts_in_webhook": len(contact_details),
+                "webhook_success": 1 if webhook_sent else 0,
+                "webhook_failed": 0 if webhook_sent else 1
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error in send_company_level_webhook: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {
+                "status": "error",
+                "message": f"Error: {str(e)}",
+                "total_contacts": 0,
+                "webhook_success": 0,
+                "webhook_failed": 0
+            }
+    
+    async def send_company_webhook(self, webhook_data: Dict[str, Any]) -> bool:
+        """
+        Send webhook with company-level data structure.
+        This is a separate method for company-level webhooks (different payload structure).
+        
+        Args:
+            webhook_data: Dictionary containing company data and contact_details array
+            
+        Returns:
+            True if webhook sent successfully, False otherwise
+        """
+        try:
+            payload = {
+                "companyName": webhook_data.get("companyName", ""),
+                "companyCountry": webhook_data.get("companyCountry", ""),
+                "companyWebsite": webhook_data.get("companyWebsite", ""),
+                "companyIndustry": webhook_data.get("companyIndustry", ""),
+                "interestedProduct": webhook_data.get("interestedProduct", ""),
+                "slack_metadata": webhook_data.get("slack_metadata", {}),
+                "contact_details": webhook_data.get("contact_details", [])
+            }
+            
+            # Add message if present
+            if webhook_data.get("message"):
+                payload["message"] = webhook_data.get("message")
+            
+            # Validate that we have at least company name or contact_details
+            if not payload["companyName"] and not payload["contact_details"]:
+                logger.warning(f"⚠️ Skipping company-level webhook - no company name or contacts")
+                return False
+            
+            logger.info(f"🔍 Sending company-level webhook to {self.webhook_url}")
+            logger.info(f"   Company: {payload['companyName']}")
+            logger.info(f"   Contacts: {len(payload['contact_details'])}")
+            
+            # Ensure HTTP session exists
+            if not loaded_config.http_session:
+                loaded_config.http_session = aiohttp.ClientSession()
+            
+            response = await loaded_config.http_session.post(
+                self.webhook_url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=aiohttp.ClientTimeout(total=15)
+            )
+            
+            if response.status in [200, 201, 202]:
+                logger.info(f"✅ Company-level webhook sent successfully for {payload['companyName']}")
+                return True
+            else:
+                response_text = await response.text()
+                logger.warning(f"⚠️ Company-level webhook failed with status {response.status} for {payload['companyName']}: {response_text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error sending company-level webhook: {e}")
+            return False

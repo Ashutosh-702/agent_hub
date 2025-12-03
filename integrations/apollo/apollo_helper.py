@@ -577,6 +577,7 @@ class ApolloHelper:
         country = apollo_organization_data.get('country', '')
         city = apollo_organization_data.get('city', '')
         state = apollo_organization_data.get('state', '')
+        website = apollo_organization_data.get('website_url', '')
         
         # Build location name array
         location_names = []
@@ -625,6 +626,7 @@ class ApolloHelper:
             "$set": {
                 "identifiers.source_id": str(org_id),
                 "identifiers.name": org_name,
+                "identifiers.website_url": website,
                 "profile.industry": industry,
                 "location.type": "country",
                 "location.name": country,
