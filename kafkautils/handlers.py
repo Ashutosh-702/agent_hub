@@ -15,8 +15,10 @@ from global_utils.chronos_utils import (
 )
 from integrations.lusha.company_saver import CompanySaver
 from config.logging import logger
-
-
+from integrations.apollo.apollo_helper import ApolloHelper
+from integrations.apollo.schema import ApolloResponseSchema
+from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
+from database.collection_dao.contacts import ContactsDao
 def convert_objectid_to_string(payload: dict) -> dict:
     """Convert ObjectId values to strings for JSON serialization."""
     converted_payload = payload.copy()
@@ -329,3 +331,108 @@ async def lusha_company_data_collection(campaign_details: Any):
             logger.info(f"Updated status of {campaign_details['campaign_id']} to 'pending'")
             
         return inserted_count
+
+async def contacts_enrichment_handler(message: Any):
+    """Handler for contacts enrichment messages."""
+      # Try different ways to extract the payload
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+
+        else:
+            logger.error(f"🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+        
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        company_ids = payload.get("company_ids")  # Now we get campaign_id instead of form_data
+        slack_metadata = payload.get("slack_metadata", {})
+        if not request_id or not company_ids:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+        
+        if action != "process_contacts_enrichment":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+        
+        logger.info(f"🔄 Processing company search: {request_id}")
+
+        await process_contacts_enrichment(request_id, company_ids, slack_metadata)
+
+    except Exception as e:
+        logger.error(f"❌ Error handling contacts enrichment message: {e}")
+        raise
+
+async def process_contacts_enrichment(request_id: str, company_ids: list, slack_metadata: dict):
+    """Process a single contacts enrichment request using campaign_id."""
+    try:
+        logger.info(f"🔍 Processing request: {request_id}")
+        logger.info(f"📋 Campaign ID: {company_ids}")
+        
+        # Initialize database connection if needed
+        await initialize_consumer_connections()
+        
+        # Fetch campaign data from database using campaign_id
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        company_data = await companies_dao.get_companies({"_id": {"$in": company_ids}})
+        if not company_data:
+            logger.error(f"❌ Company not found: {company_ids}")
+            return
+
+        logger.info(f"company_ids: {company_ids}")
+        
+        person_seniorities = [ "vp", "director", "founder", "manager", "head", "partner", "c_suite", "owner"]
+        contact_email_status = ["verified", "unverified", "likely to engage"]
+        number_of_contacts_per_company = 25
+        for company in company_data:
+            company_name = company.get("identifiers", {}).get("name", "")
+            company_domain = company.get("identifiers", {}).get("source_domain", "")
+
+            company_id = company.get("_id", "")
+            logger.info(f"company_data: {company_data}")
+            logger.info(f"📊 Company Name: {company_name}")
+            logger.info(f"📍 Company ID: {company_id}")
+            apollo_helper = ApolloHelper()
+
+            # if company as  multple unsent contacts, then don't do apollo search
+            contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+            contacts = await contacts_dao.get_contacts({
+                "company_id": company_id,
+                # "webhook_sent": False,
+                "contact_data.email": {"$ne": []} #only get contacts with email. it should not be empty here email is an array field.
+            })
+            
+            # Create ApolloResponseSchema object
+            if len(contacts) == 0:
+
+                query_params = ApolloResponseSchema(
+                    company_name=company_name,
+                    company_domain=company_domain,
+                    company_id=str(company_id),
+                    person_seniorities=person_seniorities,
+                    page=1,
+                    per_page=number_of_contacts_per_company,
+                    enrich_contacts=True,
+                    contact_email_status=contact_email_status
+                )
+
+                response = await apollo_helper.get_company_contacts(query_params)
+            #send  webhook to the users with the contacts
+            webhook_sender = ContactHubspotWebhook()
+            # await webhook_sender.send_company_level_webhook(str(company_id), slack_metadata)
+            await webhook_sender.send_webhook_for_company(str(company_id), slack_metadata)
+            logger.info(f"webhook sent to the users with the contacts")
+
+        return
+    except Exception as e:
+        logger.error(f"❌ Error processing contacts enrichment: {e}")
+        raise

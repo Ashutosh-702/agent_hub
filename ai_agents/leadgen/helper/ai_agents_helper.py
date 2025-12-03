@@ -7,11 +7,15 @@ from config.loaded_config import loaded_config
 from integrations.lusha.lusha_api import LushaAPIClient
 from ai_agents.leadgen.services.ai_agents_service import CompanyService, ContactService
 from ai_agents.leadgen.schemas.contact_models import ContactDocument
-from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo
+from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo, ApolloContactEnrichment
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.contacts import ContactsDao
 from global_utils.exceptions import ApiException
-
+from integrations.apollo.apollo_helper import ApolloHelper
+from kafkautils.constants import KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices, CONTACTS_ENRICHMENT
+from kafkautils.producer.event_helpers import emit_event_helper
+import uuid
+import asyncio
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -274,3 +278,76 @@ class SaveProspectsDataToMongoHelper:
 
         logger.info("prospects data saved to mongo")
         return {"message": "Prospects data saved to mongo"}
+
+
+class ApolloContactEnrichmentHelper:
+
+    def __init__(self):
+        self.apollo_helper = ApolloHelper()
+        self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][CONTACTS_ENRICHMENT]
+        self.event_emitter = loaded_config.connection_manager.event_emitter
+        self.company_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+
+
+    async def apollo_contact_enrichment(self, query_params: ApolloContactEnrichment):
+        company_domains = query_params.company_domain
+        interested_product = query_params.interested_product
+        slack_metadata = query_params.slack_metadata
+
+        if not interested_product:
+            raise ApiException("Interested product is required")
+
+        if not company_domains:
+            raise ApiException("Company names are required")
+
+        #============================================
+
+        
+        company_ids = []
+        for company_domain in company_domains:
+            company_doc = await self.company_dao.get_company_by_filters({"identifiers.source_domain": company_domain})
+            if not company_doc:
+                inserted_company_id = await self.company_dao.create_company({
+                    "identifiers": {
+                        "name": company_domain,
+                        "source_domain": company_domain
+                    },
+                    "source": "apollo",
+                    "webhook_sent": False,
+                    "metadata": {
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                })
+                company_ids.append(str(inserted_company_id))
+            else:
+                #update webhook_sent to False
+                await self.company_dao.update_company(company_doc["_id"], {"webhook_sent": False, "metadata.updated_at": datetime.utcnow()})
+                company_ids.append(str(company_doc["_id"]))
+
+        request_id = str(uuid.uuid4())
+
+        if not self.event_emitter:
+            raise ApiException("EventBridge Producer not initialized")
+
+        event = {
+            "request_id": request_id,
+            "action": "process_contacts_enrichment",
+            "company_ids": company_ids, 
+            "interested_product": interested_product,
+            "slack_metadata": slack_metadata,
+            "timestamp": asyncio.get_event_loop().time()
+        }
+
+        await emit_event_helper(
+            event_emitter=self.event_emitter,
+            topics=self.kafka_config["topics"],
+            partition_value=request_id,
+            event=event,
+            event_meta={"service": "leadgen", "company_ids": company_ids, "interested_product": interested_product, "slack_metadata": slack_metadata}
+        )
+
+        logger.info(f"company_ids: {company_ids}")
+        logger.info(f"📤 Company Domains {company_domains} queued for processing: {request_id}")
+
+        return {"message": "All company contacts enriched", "company_ids": company_ids}

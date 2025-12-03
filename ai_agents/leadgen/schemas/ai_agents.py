@@ -1,5 +1,6 @@
 """AI agents processing schemas and models."""
 
+import re
 from re import match
 from typing import Dict, List, Optional, Union
 from uuid import uuid4
@@ -101,4 +102,33 @@ class SaveProspectsDataToMongo(BaseModel):
 
 class CountCompanyMappings(BaseModel):
     campaign_id: str
-    
+
+class ApolloContactEnrichment(BaseModel):
+    company_domain: List[str] = Field(description="List of company domains to enrich contacts for")
+    interested_product: str = Field(description="Interested product to enrich contacts for")
+    slack_metadata: Optional[Dict] = None
+
+    @field_validator('company_domain')
+    @classmethod
+    def validate_domains(cls, v):
+        
+        domain_pattern = re.compile(r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
+        
+        for domain in v:
+            if not isinstance(domain, str):
+                raise ValueError(f"Each domain must be a string, got: {type(domain).__name__}")
+            
+            domain = domain.strip()
+            
+            # Check if domain contains invalid characters/prefixes or doesn't match format
+            has_protocol = domain.startswith('http://') or domain.startswith('https://')
+            has_www = domain.startswith('www.')
+            has_path = '/' in domain
+            has_port = ':' in domain and not domain.startswith('[')  # Exclude IPv6 addresses
+            has_query = '?' in domain or '#' in domain
+            invalid_format = not domain or not domain_pattern.match(domain)
+            
+            if has_protocol or has_www or has_path or has_port or has_query or invalid_format:
+                raise ValueError(f"Invalid domain format: '{domain}'. Expected strict format like 'example.com' (no protocol, www, paths, ports, or query parameters)")
+        
+        return v

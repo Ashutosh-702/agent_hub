@@ -15,8 +15,22 @@ class CompaniesDao(BaseMongoDao):
         return await self.insert_many(companies)
     
     async def get_companies(self, filters: dict = {}):
+        filters = self._process_query_objectids(filters)
         return await self.find_many(filters)
     
     async def get_company(self, company_id: str):
         return await self.find_one({"_id": ObjectId(company_id)})
+
+    async def get_company_by_filters(self, filters: dict = None):
+        if filters is None:
+            filters = {}
+
+        filters = self._process_query_objectids(filters)
+        return await self.find_one(filters)
     
+    async def update_company(self, company_id: str, update_data: Dict[str, Any]):
+        has_operators = any(key.startswith('$') for key in update_data.keys())
+        if not has_operators:
+            update_data = {"$set": update_data}
+            
+        return await self.update_one({"_id": ObjectId(company_id)}, update_data)

@@ -13,7 +13,8 @@ from ai_agents.leadgen.views.ai_agents import (
     lusha_get_contact_enrichment,
     lusha_contact_enrichment,
     save_prospects_data_to_mongo,
-    count_company_mappings
+    count_company_mappings,
+    apollo_contact_enrichment
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -92,5 +93,12 @@ router.add_api_route(
     "/count_company_mappings",
     methods=["GET"],
     endpoint=count_company_mappings,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/apollo_contact_enrichment",
+    methods=["POST"],
+    endpoint=apollo_contact_enrichment,
     response_model=ResponseData,
 )

@@ -12,7 +12,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     LushaContactEnrichment,
     SaveProspectsDataToMongo,
     LushaGetContactEnrichment,
-    CountCompanyMappings
+    CountCompanyMappings,
+    ApolloContactEnrichment
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -21,6 +22,8 @@ from ai_agents.leadgen.services.ai_agents_service import (
 )
 
 from ai_agents.leadgen.helper.ai_agents_helper import LushaContactEnrichmentHelper, SaveProspectsDataToMongoHelper
+from ai_agents.leadgen.helper.ai_agents_helper import ApolloContactEnrichmentHelper
+
 
 async def upload_leadgen_form(
     request_data: FormSubmission = Body(),
@@ -163,4 +166,14 @@ async def count_company_mappings(query_params: CountCompanyMappings = Depends())
     response_data.data = response
 
     return response_data.dict()
-    
+
+
+async def apollo_contact_enrichment(query_params: ApolloContactEnrichment = Body()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    apollo_contact_enrichment_helper = ApolloContactEnrichmentHelper()
+
+    response = await apollo_contact_enrichment_helper.apollo_contact_enrichment(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()

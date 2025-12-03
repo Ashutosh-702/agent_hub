@@ -7,7 +7,7 @@ class LeadgenServices:
 # Topic names
 LEADGEN_BATCH_PROCESSING = "leadgen-batch-processing"
 LUSHA_COMPANY_COLLECTION = "lusha-company-collection"
-
+CONTACTS_ENRICHMENT = "contacts-enrichment"
 # Service configurations mapping
 KAFKA_SERVICE_CONFIG_MAPPING = {
     LeadgenServices.leadgen: {
@@ -18,6 +18,10 @@ KAFKA_SERVICE_CONFIG_MAPPING = {
         LUSHA_COMPANY_COLLECTION: {
             "topics": ["lusha_company_collection"],  # Use underscores to match EventBridge output
             "description": "Process Lusha company collection requests"
+        },
+        CONTACTS_ENRICHMENT: {
+            "topics": ["contacts_enrichment"],  # Use underscores to match EventBridge output
+            "description": "Process contacts enrichment requests"
         }
     }
 }
