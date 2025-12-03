@@ -31,4 +31,12 @@ class ContactsDao(BaseMongoDao):
     async def get_contacts_count(self, filters: dict = {}):
         filters = self._process_query_objectids(filters)
         return await self.count_documents(filters)
+
+    async def get_paginated_contacts(self, filters: dict = {}, page: int = 1, limit: int = 10, projection: dict = None):
+        if projection is None:
+            projection = {}
+
+        filters = self._process_query_objectids(filters)
+        response, pagination_info = await self.get_paginated_response(filters, page_size=limit, page_number=page, projection=projection)
+        return response, pagination_info
     
