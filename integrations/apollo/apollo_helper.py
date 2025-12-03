@@ -484,10 +484,20 @@ class ApolloHelper:
 
         # Extract contact data
         first_name = person_data.get('first_name') or (person_data.get('name', '').split()[0] if person_data.get('name') else '')
-        last_name = person_data.get('last_name') or (' '.join(person_data.get('name', '').split()[1:]) if person_data.get('name') and len(person_data.get('name', '').split()) > 1 else '')
+        last_name = person_data.get('last_name_obfuscated') 
+
+        
         
         # Extract emails (handle both list and single string)
         emails = []
+        phones = []
+
+        if person_data.get('phone_numbers'):
+           if isinstance(person_data['phone_numbers'], list):
+               phones = person_data['phone_numbers']
+           else:
+               phones = [person_data['phone_numbers']]
+
         if person_data.get('email'):
             if isinstance(person_data['email'], list):
                 emails = person_data['email']
@@ -498,32 +508,23 @@ class ApolloHelper:
         if enriched_data:
             enriched_person = enriched_data.get('person', {})
             enriched_emails = enriched_person.get('email', [])
+            last_name = enriched_person.get('last_name', '')
+            enriched_phones = enriched_person.get('phone_numbers', [])
+
             if enriched_emails:
                 if isinstance(enriched_emails, list):
                     emails.extend([e.get('address', '') if isinstance(e, dict) else e for e in enriched_emails if e])
                 else:
                     emails.append(enriched_emails)
-        
-        # Remove duplicates and empty strings
-        emails = list(set([e for e in emails if e]))
-        
-        # Extract phone numbers
-        phones = []
-        if person_data.get('phone_numbers'):
-            if isinstance(person_data['phone_numbers'], list):
-                phones = person_data['phone_numbers']
-            else:
-                phones = [person_data['phone_numbers']]
-        
-        # Extract enriched phone numbers if available
-        if enriched_data:
-            enriched_person = enriched_data.get('person', {})
-            enriched_phones = enriched_person.get('phone_numbers', [])
+
             if enriched_phones:
                 if isinstance(enriched_phones, list):
                     phones.extend([p.get('raw_number', '') or p.get('sanitized_number', '') if isinstance(p, dict) else p for p in enriched_phones if p])
                 else:
                     phones.append(enriched_phones)
+        
+        # Remove duplicates and empty strings
+        emails = list(set([e for e in emails if e]))
         
         # Remove duplicates and empty strings
         phones = list(set([p for p in phones if p]))
@@ -537,7 +538,8 @@ class ApolloHelper:
                 "email": emails,
                 "phone": phones,
                 "jobtitle": person_data.get('title') or (enriched_data.get('person', {}).get('title') if enriched_data else None),
-                "company": person_data.get('organization_name') or person_data.get('source_organization_name') or ''
+                "company": person_data.get('organization',{}).get('name'),
+                "source_id": person_data.get('id') or (enriched_data.get('person', {}).get('id') if enriched_data else None),
             },
             "linkedin_data": {
                 "linkedin_url": person_data.get('linkedin_url') or (enriched_data.get('person', {}).get('linkedin_url') if enriched_data else None),
