@@ -293,14 +293,18 @@ class ApolloHelper:
         """
         relevant_people = []
         total_count = len(people)
-
+        relevant_people_count = 0
         for person in people:
             try:
+                if relevant_people_count >= 1:
+                    logger.info(f"Found 1 relevant people - stopping relevance check")
+                    break
                 relevance_result = await self.people_relevance_check.web_search_analysis(person)
                 relevance_assessment = relevance_result.get('relevance_assessment', {})
                 is_relevant = relevance_assessment.get('is_relevant', False)
 
                 if is_relevant:
+                    relevant_people_count += 1
                     relevant_people.append(person)
                     logger.info(f"Person {person.get('name', 'Unknown')} is relevant - keeping in list")
                 else:

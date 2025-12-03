@@ -391,6 +391,7 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
         logger.info(f"company_ids: {company_ids}")
         
         person_seniorities = [ "vp", "director", "founder", "manager", "head", "partner", "c_suite", "owner"]
+        contact_email_status = ["verified", "unverified", "likely to engage"]
         number_of_contacts_per_company = 25
         for company in company_data:
             company_name = company.get("identifiers", {}).get("name", "")
@@ -420,7 +421,8 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
                     person_seniorities=person_seniorities,
                     page=1,
                     per_page=number_of_contacts_per_company,
-                    enrich_contacts=True
+                    enrich_contacts=True,
+                    contact_email_status=contact_email_status
                 )
 
                 response = await apollo_helper.get_company_contacts(query_params)
