@@ -36,8 +36,8 @@ class IntegrationOrchestrator:
         
         try:    
             logger.info("Fetching companies from lusha...")
-            # inserted_count = await self.lusha_helper.get_companies_from_lusha(self.config)
-            inserted_count = await self.apollo_helper.get_companies_from_apollo(self.config)
+            inserted_count = await self.lusha_helper.get_companies_from_lusha(self.config)
+            # inserted_count = await self.apollo_helper.get_companies_from_apollo(self.config)
             logger.info(f"Found {inserted_count} companies from lusha.")
             logger.info("Fetching companies from core_signal...")
             # core_signal_company_data = await self.coresignal_helper.collect_companies_from_search(
