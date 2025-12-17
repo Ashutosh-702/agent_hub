@@ -196,8 +196,8 @@ class ApolloAPIClient:
         total_inserted = 0
         self.payload_values = payload_values
         try:
-            per_page = min(self.payload_values.get("per_page", 25), 100)
-
+            per_page = min(self.payload_values.get("per_page", 10), 100)
+            per_page = 10
             rate_limit_hit = False
 
             # Step 1: Get first page to determine total results
@@ -242,7 +242,7 @@ class ApolloAPIClient:
             total_results = pagination.get("total_entries", 0)
             # total_pages = pagination.get("total_pages", 1)
 
-            total_pages = 5
+            total_pages = 1
             
             logger.info(f"Total pages: {total_pages}")
 

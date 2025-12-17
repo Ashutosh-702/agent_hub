@@ -307,7 +307,15 @@ Please try a different search approach or be more thorough in your analysis.
                             company, "profile", "employee_count"),
                     )
 
-                    web_analysis = await self.web_search_analysis(company_data)
+                    # web_analysis = await self.web_search_analysis(company_data)
+                    web_analysis = {
+                        "relevance_assessment": {
+                            "is_relevant": True,
+                            "confidence_level": "high",
+                            "reasoning": "Company is relevant",
+                            "key_factors": ["company is relevant"]
+                        }
+                    }
 
                     # Log results and create relevance assessment
                     relevance = web_analysis.get('relevance_assessment', {})

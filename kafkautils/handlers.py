@@ -1,6 +1,6 @@
 """Message handlers for leadgen Kafka consumers."""
 from time import sleep
-from typing import Any
+from typing import Any, Optional
 import json
 from database.connection_manager import ConnectionManager
 from database.collection_dao.campaigns import CampaignsDao
@@ -428,8 +428,8 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
                 response = await apollo_helper.get_company_contacts(query_params)
             #send  webhook to the users with the contacts
             webhook_sender = ContactHubspotWebhook()
-            # await webhook_sender.send_company_level_webhook(str(company_id), slack_metadata)
-            await webhook_sender.send_webhook_for_company(str(company_id), slack_metadata)
+            await webhook_sender.send_company_level_webhook(str(company_id), slack_metadata)
+            # await webhook_sender.send_webhook_for_company(str(company_id), slack_metadata)
             logger.info(f"webhook sent to the users with the contacts")
 
         return

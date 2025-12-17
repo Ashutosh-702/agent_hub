@@ -498,8 +498,8 @@ class ContactHubspotWebhook:
             
             # Prepare company-level webhook payload
             webhook_data = {
-                "companyName": company_details.get("name", first_contact_info.get("company_name", "")),
-                "companyCountry": company_details.get("country", first_contact_info.get("company_country", "")),
+                "companyName": first_contact_info.get("company_name", ""),
+                "companyCountry": first_contact_info.get("company_country", ""),
                 "companyWebsite": first_contact_info.get("company_website", ""),
                 "companyIndustry": company_industry,
                 "interestedProduct": interested_product,
@@ -565,9 +565,10 @@ class ContactHubspotWebhook:
                 "companyWebsite": webhook_data.get("companyWebsite", ""),
                 "companyIndustry": webhook_data.get("companyIndustry", ""),
                 "interestedProduct": webhook_data.get("interestedProduct", ""),
-                "slack_metadata": webhook_data.get("slack_metadata", {}),
                 "contact_details": webhook_data.get("contact_details", [])
             }
+            if webhook_data.get("slack_metadata"):
+                payload["slack_metadata"] = webhook_data.get("slack_metadata")
             
             # Add message if present
             if webhook_data.get("message"):

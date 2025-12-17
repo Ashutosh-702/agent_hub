@@ -13,6 +13,7 @@ class ApolloResponseSchema(BaseModel):
     reveal_personal_emails: bool = False
     reveal_phone_number: bool = False
     additional_params: Optional[Dict[str, Any]] = None
+    organization_id: Optional[str] = None
     
 class SearchEnrichPeopleSchema(BaseModel):
     person_seniorities: Optional[List[str]] = None  

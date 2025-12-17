@@ -36,7 +36,10 @@ class ApolloHelper:
         # Step 1: Search for company to get organization ID
         logger.info(f"Step 1: Searching for company '{query_params.company_name}'...")
         # check company exists in the database .  filter is identifiers.source_id this field should exist. 
-        company_doc = await self.companies_dao.get_company_by_filters({"identifiers.source_domain": query_params.company_domain,"identifiers.source_id": {"$exists": True}})
+        if not query_params.organization_id:
+            company_doc = await self.companies_dao.get_company_by_filters({"identifiers.source_domain": query_params.company_domain,"identifiers.source_id": {"$exists": True}})
+        else:
+            company_doc = await self.companies_dao.get_company_by_filters({"_id": ObjectId(query_params.company_id)})
         organization_ids = []
 
         if company_doc:
@@ -138,7 +141,7 @@ class ApolloHelper:
                     "company_id": ObjectId(query_params.company_id),
                     "contact_data.email": {"$ne": []}
                 })
-                if contacts_count > 0:
+                if contacts_count > 1:
                     logger.info(f"Contacts already exist for company: {query_params.company_name} so not searching further")
                     break
                 
@@ -297,12 +300,14 @@ class ApolloHelper:
         relevant_people_count = 0
         for person in people:
             try:
-                if relevant_people_count >= 1:
+                if relevant_people_count >= 2:
                     logger.info(f"Found 1 relevant people - stopping relevance check")
                     break
-                relevance_result = await self.people_relevance_check.web_search_analysis(person)
-                relevance_assessment = relevance_result.get('relevance_assessment', {})
-                is_relevant = relevance_assessment.get('is_relevant', False)
+                # relevance_result = await self.people_relevance_check.web_search_analysis(person)
+                # relevance_assessment = relevance_result.get('relevance_assessment', {})
+                # is_relevant = relevance_assessment.get('is_relevant', False)
+
+                is_relevant = True
 
                 if is_relevant:
                     relevant_people_count += 1
