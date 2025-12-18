@@ -18,9 +18,11 @@ from global_utils.constants import HUBSPOT_BOLTIC_WEBHOOK_URL
 class ContactHubspotWebhook:
     """Class to handle webhook sending for contacts"""
     
-    def __init__(self):
-
-        self.webhook_url = HUBSPOT_BOLTIC_WEBHOOK_URL
+    def __init__(self, custom_webhook_url: Optional[str] = None):
+        if custom_webhook_url:
+            self.webhook_url = custom_webhook_url
+        else:
+            self.webhook_url = HUBSPOT_BOLTIC_WEBHOOK_URL
         
         self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
