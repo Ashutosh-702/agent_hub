@@ -626,7 +626,7 @@ export const Form = () => {
             {step === 17 && (
               <Select 
                 name={`step_${step}`} 
-                options={["GaaS", "DaaS", "Storefront", "StoreOS", "Konnect", "Commerce B2B", "OMS", "WMS", "TMS", "Fynd Logistics", "AI PIM", "PixelBin"].map(n => ({ label: n, value: n }))}
+                options={["GaaS", "DaaS", "Storefront", "StoreOS", "Konnect", "Commerce B2B", "OMS", "WMS", "TMS", "Fynd Logistics", "AI PIM", "PixelBin", "GlamAR"].map(n => ({ label: n, value: n }))}
                 value={form[step] ? { label: form[step], value: form[step] } : null} 
                 onChange={(selected) => { 
                   const updated = [...form]; 

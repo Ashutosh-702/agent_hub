@@ -389,7 +389,8 @@ class ContactHubspotWebhook:
         
         try:
             # Get interested product
-            interested_product = await self.get_interested_product(company_id)
+            # interested_product = await self.get_interested_product(company_id)
+            interested_product = "GlamAR"
             if not interested_product:
                 interested_product = "fynd_create"
             
