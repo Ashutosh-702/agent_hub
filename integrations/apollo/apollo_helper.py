@@ -838,7 +838,7 @@ class ApolloHelper:
             for location in locations:
                 # Apollo expects location names as-is (e.g., "newyork", "tokyo")
                 # Convert to lowercase and remove spaces for consistency
-                location_clean = location.lower().replace(" ", "")
+                location_clean = location.lower()
                 apollo_locations.append(location_clean)
 
             if apollo_locations:

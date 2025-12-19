@@ -62,12 +62,12 @@ class ApolloAPIClient:
         Returns:
             dict: Response data with status_code and results
         """
-        # logger.info(f"Payload_values:", payload=self.payload_values)
+        logger.info(f"Payload_values:", payload=self.payload_values)
 
         # Build query parameters
         query_params = self.build_query_params(page=page, per_page=per_page)
-        # logger.info(f"Query Params:", payload=query_params)
-        print(f"Query Params:", query_params)
+        logger.info(f"Query Params:", payload=query_params)
+        # print(f"Query Params:", query_params)
         
 
         url = f"{APOLLO_BASE_URL}/mixed_companies/search"
