@@ -62,11 +62,13 @@ class ApolloAPIClient:
         Returns:
             dict: Response data with status_code and results
         """
-        logger.info(f"Payload_values:", payload=self.payload_values)
+        # logger.info(f"Payload_values:", payload=self.payload_values)
 
         # Build query parameters
         query_params = self.build_query_params(page=page, per_page=per_page)
-        logger.info(f"Query Params:", payload=query_params)
+        # logger.info(f"Query Params:", payload=query_params)
+        print(f"Query Params:", query_params)
+        
 
         url = f"{APOLLO_BASE_URL}/mixed_companies/search"
         headers = self.headers
@@ -156,7 +158,7 @@ class ApolloAPIClient:
         if revenue_range:
             if "min" in revenue_range:
                 query_params["revenue_range[min]"] = revenue_range["min"]
-            if "max" in revenue_range:
+            if "max" in revenue_range and revenue_range["max"] > 0:
                 query_params["revenue_range[max]"] = revenue_range["max"]
 
         # Technology UIDs

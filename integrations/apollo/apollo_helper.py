@@ -862,7 +862,7 @@ class ApolloHelper:
 
                 if min_actual > 0 or max_actual > 0:
                     apollo_config["revenue_range"] = {
-                        "min": min_actual if min_actual > 0 else 1,
+                        "min": min_actual,
                         "max": max_actual
                     }
 
