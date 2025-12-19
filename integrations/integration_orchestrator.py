@@ -34,7 +34,11 @@ class IntegrationOrchestrator:
         self.campaign_id = self.config.get('_id')
         self.lusha_contact_handler = LushaContactHandler()
         self.apollo_helper = ApolloHelper()
-        self.webhook_sender = ContactHubspotWebhook(custom_webhook_url="https://asia-south1.api.boltic.io/service/webhook/temporal/v1.0/b156f5b3-c90d-449a-b104-2[…]c/workflows/execute/23e0acf1-75d9-4513-a472-fae927622ae3", campaign_id=self.campaign_id)
+        self.webhook_sender = ContactHubspotWebhook(
+            custom_webhook_url="https://asia-south1.api.boltic.io/service/webhook/temporal/v1.0/b156f5b3-c90d-449a-b104-2[…]c/workflows/execute/23e0acf1-75d9-4513-a472-fae927622ae3",
+            campaign_id=self.campaign_id,
+            source="ai_sdr"
+        )
 
     async def process_company_search(self) -> Dict[str, Any]:
         """Core function to process company search"""
@@ -157,5 +161,5 @@ class IntegrationOrchestrator:
 
         except Exception as e:
             logger.error(f"❌ Error processing company mappings: {e}")
-        raise
+            raise
             
