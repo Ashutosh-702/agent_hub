@@ -18,12 +18,13 @@ from global_utils.constants import HUBSPOT_BOLTIC_WEBHOOK_URL
 class ContactHubspotWebhook:
     """Class to handle webhook sending for contacts"""
     
-    def __init__(self, custom_webhook_url: Optional[str] = None):
+    def __init__(self, custom_webhook_url: Optional[str] = None, campaign_id: Optional[str] = None, source: Optional[str] = None):
         if custom_webhook_url:
             self.webhook_url = custom_webhook_url
         else:
             self.webhook_url = HUBSPOT_BOLTIC_WEBHOOK_URL
-        
+        self.campaign_id = campaign_id
+        self.source = source
         self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         self.campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
@@ -78,26 +79,18 @@ class ContactHubspotWebhook:
             logger.error(f"Error fetching company {company_id}: {e}")
             return {"name": "", "country": "", "industry": "", "website_url": ""}
     
-    async def get_interested_product(self, company_id: str) -> str:
+    async def get_interested_product(self) -> str:
 
-        if not self.campaign_company_runs_dao or not self.campaigns_dao:
+        if not self.campaigns_dao:
             return ""
         
         try:
-            # Get campaign_id from company_id via campaign_company_runs
-            campaign_mappings = await self.campaign_company_runs_dao.get_campaign_company_runs({
-                "company_id": ObjectId(company_id)
-            })
-            
-            if campaign_mappings:
-                # Get campaign_id from first mapping
-                campaign_id = campaign_mappings[0].get("campaign_id")
-                if campaign_id:
-                    campaign_doc = await self.campaigns_dao.get_campaign(str(campaign_id))
-                    if campaign_doc:
-                        return campaign_doc.get("ownership", {}).get("product_name", "")
+            campaign_doc = await self.campaigns_dao.get_campaign(self.campaign_id)
+
+            if campaign_doc:
+                return campaign_doc.get("ownership", {}).get("product_name", "")
         except Exception as e:
-            logger.error(f"Error fetching interested product for company {company_id}: {e}")
+            logger.error(f"Error fetching interested product for campaign {self.campaign_id}: {e}")
         
         return ""
     
@@ -389,8 +382,12 @@ class ContactHubspotWebhook:
         
         try:
             # Get interested product
-            # interested_product = await self.get_interested_product(company_id)
-            interested_product = "GlamAR"
+            interested_product = None
+            if self.campaign_id:
+                interested_product = await self.get_interested_product()
+                #for now, we are using the default product name
+                interested_product = "GlamAR"
+                
             if not interested_product:
                 interested_product = "fynd_create"
             
@@ -572,7 +569,8 @@ class ContactHubspotWebhook:
             }
             if webhook_data.get("slack_metadata"):
                 payload["slack_metadata"] = webhook_data.get("slack_metadata")
-            
+            if self.source:
+                payload["source"] = self.source
             # Add message if present
             if webhook_data.get("message"):
                 payload["message"] = webhook_data.get("message")
