@@ -34,3 +34,11 @@ class CompaniesDao(BaseMongoDao):
             update_data = {"$set": update_data}
             
         return await self.update_one({"_id": ObjectId(company_id)}, update_data)
+    
+    async def get_companies_paginated(self, query: dict = None, page: int = 1, limit: int = 100):
+        if query is None:
+            query = {}
+
+        query = self._process_query_objectids(query)
+        response, pagination_info = await self.get_paginated_response(query, page_size=limit, page_number=page)
+        return response, pagination_info

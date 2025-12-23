@@ -15,7 +15,9 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CompanyListWithDetails, 
     FormSubmission,
     CampaignContactData,
-    CountCompanyMappings
+    CountCompanyMappings,
+    Campaigns,
+    Companies
 )
 from ai_agents.leadgen.schemas.contact_models import ContactCampaignMapping, ContactDocument
 from ai_agents.leadgen.utils import serialize_objectid
@@ -159,6 +161,20 @@ class CampaignService:
 
         return {"config": ai_sdr_custom_config}
 
+    async def get_campaigns(self, query_params: Campaigns):
+        query = {}
+        if query_params.campaign_id:
+            query["_id"] = query_params.campaign_id
+        if query_params.user_email:
+            query["ownership.user_email"] = query_params.user_email
+        if query_params.product_name:
+            query["ownership.product_name"] = query_params.product_name
+        if query_params.status:
+            query["lifecycle.status"] = query_params.status
+        campaigns, pagination_info = await self.campaign_dao.get_campaigns_paginated(query, query_params.page, query_params.limit)
+        serialized_campaigns = serialize_objectid(campaigns)
+        return {"campaigns": serialized_campaigns, "pagination_info": pagination_info}
+
 
 class CompanyService:
     def __init__(self):
@@ -240,6 +256,19 @@ class CompanyService:
         count = await self.campaign_company_run_dao.get_campaign_company_runs_count(query)
         
         return {"count": count}
+
+    async def get_companies(self, query_params: Companies):
+        query = {}
+        if query_params.name:
+            query["identifiers.name"] = {
+                "$regex": query_params.name,
+                "$options": "i"
+            }
+        if query_params.domain:
+            query["identifiers.domain"] = query_params.domain
+        companies, pagination_info = await self.companies_dao.get_companies_paginated(query, query_params.page, query_params.limit)
+        serialized_companies = serialize_objectid(companies)
+        return {"companies": serialized_companies, "pagination_info": pagination_info}
 
 
 class ContactService:

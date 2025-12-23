@@ -10,12 +10,16 @@ from ai_agents.leadgen.schemas.contact_models import ContactDocument
 from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo, ApolloContactEnrichment
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.contacts import ContactsDao
+from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from global_utils.exceptions import ApiException
 from integrations.apollo.apollo_helper import ApolloHelper
 from kafkautils.constants import KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices, CONTACTS_ENRICHMENT
 from kafkautils.producer.event_helpers import emit_event_helper
 import uuid
 import asyncio
+from ai_agents.leadgen.schemas.ai_agents import Campaigns, Companies
+from ai_agents.leadgen.services.ai_agents_service import CampaignService
+
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -351,3 +355,30 @@ class ApolloContactEnrichmentHelper:
         logger.info(f"📤 Company Domains {company_domains} queued for processing: {request_id}")
 
         return {"message": "All company contacts enriched", "company_ids": company_ids}
+
+
+class CampaignsHelper:
+
+    def __init__(self):
+        self.campaign_service = CampaignService()
+        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+
+    async def get_campaigns(self, query_params: Campaigns):
+        campaigns = await self.campaign_service.get_campaigns(query_params)
+        #get company mappings counts for each campaign
+        for campaign in campaigns.get("campaigns"):
+            company_mappings_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign["_id"], "is_relevant": True})
+            campaign["company_mappings_count"] = company_mappings_count
+        return campaigns
+
+class CompaniesHelper:
+
+    def __init__(self):
+        self.company_service = CompanyService()
+        self.contact_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+    async def get_companies_with_contact_counts(self, query_params: Companies):
+        companies = await self.company_service.get_companies(query_params)
+        for company in companies.get("companies"):
+            contact_count, pagination_info = await self.contact_dao.get_paginated_contacts({"company_id": company["_id"]})
+            company["contact_count"] = len(contact_count)
+        return companies

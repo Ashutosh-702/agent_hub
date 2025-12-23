@@ -6,11 +6,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Company Info Form</title>
     <script>
-      const currentURL = window.location.href;
-      const baseDomain = window.location.origin;
-      const isDevelopment = window.location.hostname === 'localhost';
-      const baseURL = isDevelopment ? 'http://0.0.0.0:80' : baseDomain;
-      document.write(`<script src="${baseURL}/env-config" type="text/javascript"><\/script>`);
+      (function() {
+        const isDevelopment = window.location.hostname === 'localhost';
+        const baseDomain = window.location.origin;
+        const baseURL = isDevelopment ? 'http://0.0.0.0:80' : baseDomain;
+        
+        // Create script element to load env-config (non-blocking)
+        var script = document.createElement('script');
+        script.src = baseURL + '/env-config';
+        script.type = 'text/javascript';
+        script.async = false;
+        script.onerror = function() {
+          // Silently fail in development - env-config is optional
+          console.log('env-config not available, using defaults');
+          window.ENV_CONFIG = null;
+        };
+        document.head.appendChild(script);
+      })();
     </script>
   </head>
   <body>

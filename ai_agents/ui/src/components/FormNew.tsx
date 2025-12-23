@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Select from 'react-select';
 import { API_BASE_URL } from '../config/api.js'
 import lushaJson from '../assets/lusha_industry_config.json';
@@ -255,6 +256,7 @@ const stepQuestions = [
 ];
 
 export const Form = () => {
+  const navigate = useNavigate();
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   // Create form array with extra slots for currency, min revenue, max revenue, location type
   const [form, setForm] = useState<string[]>(Array(24).fill(''));
@@ -369,7 +371,14 @@ export const Form = () => {
   return (
     <div className="fullscreen-container" >
       <form onSubmit={handleSubmit} className="step-form full-width-height" >
-        <h1 className="form-title">Company Info Form</h1>
+        <button
+          type="button"
+          className="back-to-campaigns-btn"
+          onClick={() => navigate('/campaign')}
+        >
+          ← Back to Campaigns
+        </button>
+        <h1 className="form-title">Create New Campaign</h1>
         <div className="progress-bar">
           <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
         </div>

@@ -13,7 +13,9 @@ from ai_agents.leadgen.schemas.ai_agents import (
     SaveProspectsDataToMongo,
     LushaGetContactEnrichment,
     CountCompanyMappings,
-    ApolloContactEnrichment
+    ApolloContactEnrichment,
+    Campaigns,
+    Companies
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -23,8 +25,8 @@ from ai_agents.leadgen.services.ai_agents_service import (
 
 from ai_agents.leadgen.helper.ai_agents_helper import LushaContactEnrichmentHelper, SaveProspectsDataToMongoHelper
 from ai_agents.leadgen.helper.ai_agents_helper import ApolloContactEnrichmentHelper
-
-
+from ai_agents.leadgen.helper.ai_agents_helper import CampaignsHelper
+from ai_agents.leadgen.helper.ai_agents_helper import CompaniesHelper
 async def upload_leadgen_form(
     request_data: FormSubmission = Body(),
 ) -> Dict[str, Any]:
@@ -175,5 +177,27 @@ async def apollo_contact_enrichment(query_params: ApolloContactEnrichment = Body
     response = await apollo_contact_enrichment_helper.apollo_contact_enrichment(query_params)
     response_data.success = True
     response_data.data = response
+
+    return response_data.dict()
+
+async def get_campaigns(query_params: Campaigns = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_campaigns_helper = CampaignsHelper()
+
+    response = await leadgen_campaigns_helper.get_campaigns(query_params)
+    response_data.success = True
+    response_data.data = response.get("campaigns")
+    response_data.pagination = response.get("pagination_info")
+
+    return response_data.dict()
+
+async def get_companies(query_params: Companies = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_companies_helper = CompaniesHelper()
+
+    response = await leadgen_companies_helper.get_companies_with_contact_counts(query_params)
+    response_data.success = True
+    response_data.data = response.get("companies")
+    response_data.pagination = response.get("pagination_info")
 
     return response_data.dict()

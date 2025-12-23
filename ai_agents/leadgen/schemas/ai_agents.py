@@ -103,6 +103,19 @@ class SaveProspectsDataToMongo(BaseModel):
 class CountCompanyMappings(BaseModel):
     campaign_id: str
 
+class Campaigns(BaseModel):
+    page: int = 1
+    limit: int = 10
+    user_email: Optional[str] = None
+    product_name: Optional[str] = None
+    campaign_id: Optional[str] = None
+    status: Optional[str] = None
+
+class Companies(BaseModel):
+    page: int = 1
+    limit: int = 10
+    name: Optional[str] = None
+    domain: Optional[str] = None
 class ApolloContactEnrichment(BaseModel):
     company_domain: List[str] = Field(description="List of company domains to enrich contacts for")
     interested_product: str = Field(description="Interested product to enrich contacts for")
