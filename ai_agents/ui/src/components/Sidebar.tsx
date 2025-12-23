@@ -19,6 +19,15 @@ const menuItems: MenuItem[] = [
       { path: '/master-data/companies', label: 'Companies', icon: '🏭' },
     ]
   },
+  { 
+    path: '/prospecting', 
+    label: 'Prospecting', 
+    icon: '🎯',
+    children: [
+      { path: '/prospecting/company', label: 'Company Prospecting', icon: '🔍' },
+      { path: '/prospecting/contact', label: 'Contact Prospecting', icon: '👤' },
+    ]
+  },
 ];
 
 export const Sidebar = () => {

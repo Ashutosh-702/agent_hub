@@ -5,6 +5,7 @@ import { Form } from './components/FormNew';
 import { Companies } from './components/Companies';
 import { CompanyDetails } from './components/CompanyDetails';
 import { CampaignList } from './components/CampaignList';
+import { ComingSoon } from './components/ComingSoon';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 
 function AppContent() {
@@ -14,14 +15,17 @@ function AppContent() {
     <div className="app-layout">
       <Sidebar />
       <main className={`main-content ${isCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/campaign" replace />} />
-          <Route path="/campaign" element={<CampaignList />} />
-          <Route path="/campaign/new" element={<Form />} />
-          <Route path="/master-data" element={<Navigate to="/master-data/companies" replace />} />
-          <Route path="/master-data/companies" element={<Companies />} />
-          <Route path="/master-data/companies/:companyId" element={<CompanyDetails />} />
-        </Routes>
+          <Routes>
+            <Route path="/" element={<Navigate to="/campaign" replace />} />
+            <Route path="/campaign" element={<CampaignList />} />
+            <Route path="/campaign/new" element={<Form />} />
+            <Route path="/master-data" element={<Navigate to="/master-data/companies" replace />} />
+            <Route path="/master-data/companies" element={<Companies />} />
+            <Route path="/master-data/companies/:companyId" element={<CompanyDetails />} />
+            <Route path="/prospecting" element={<Navigate to="/prospecting/company" replace />} />
+            <Route path="/prospecting/company" element={<ComingSoon />} />
+            <Route path="/prospecting/contact" element={<ComingSoon />} />
+          </Routes>
       </main>
     </div>
   );
