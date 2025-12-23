@@ -22,102 +22,77 @@ html, body {
 .main-content {
   flex: 1;
   padding: 2rem;
-  margin-left: 0;
+  margin-left: 260px;
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ===== HAMBURGER BUTTON ===== */
-.hamburger-btn {
-  position: fixed;
-  top: 1.25rem;
-  left: 1.25rem;
-  z-index: 1001;
-  width: 48px;
-  height: 48px;
-  background: rgba(79, 70, 229, 0.9);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 5px;
-  padding: 12px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
+.main-content.sidebar-collapsed {
+  margin-left: 72px;
 }
 
-.hamburger-btn:hover {
-  background: rgba(99, 102, 241, 1);
-  transform: scale(1.05);
-}
-
-.hamburger-line {
-  width: 22px;
-  height: 2.5px;
-  background: #fff;
-  border-radius: 2px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hamburger-line.open:nth-child(1) {
-  transform: rotate(45deg) translate(5px, 5px);
-}
-
-.hamburger-line.open:nth-child(2) {
-  opacity: 0;
-  transform: scaleX(0);
-}
-
-.hamburger-line.open:nth-child(3) {
-  transform: rotate(-45deg) translate(5px, -5px);
-}
-
-/* ===== SIDEBAR ===== */
+/* ===== SIDEBAR (Static with Collapse) ===== */
 .sidebar {
   position: fixed;
   top: 0;
   left: 0;
   height: 100vh;
-  width: 280px;
+  width: 260px;
   background: linear-gradient(180deg, #1e1e3f 0%, #141428 100%);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
-  transform: translateX(-100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  box-shadow: 4px 0 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 4px 0 30px rgba(0, 0, 0, 0.3);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.sidebar.open {
-  transform: translateX(0);
+.sidebar.collapsed {
+  width: 72px;
 }
 
-.sidebar-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 999;
-  animation: fadeIn 0.2s ease;
+/* Toggle Button */
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 1rem;
+  right: -14px;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.sidebar-toggle-btn:hover {
+  transform: scale(1.1);
+  background: linear-gradient(135deg, #818cf8, #a78bfa);
+}
+
+.toggle-icon {
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: bold;
+  line-height: 1;
 }
 
 .sidebar-header {
-  padding: 5rem 1.5rem 2rem;
+  padding: 1.5rem 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-header h2 {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #fff;
   letter-spacing: -0.5px;
@@ -125,28 +100,43 @@ html, body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: font-size 0.3s ease;
+}
+
+.sidebar.collapsed .sidebar-header h2 {
+  font-size: 1.1rem;
 }
 
 .sidebar-nav {
   flex: 1;
-  padding: 1.5rem 1rem;
+  padding: 1rem 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  overflow-y: auto;
 }
 
 .sidebar-link {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
   text-decoration: none;
   color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
-  font-size: 1rem;
+  font-size: 0.95rem;
   transition: all 0.2s ease;
   border: 1px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar.collapsed .sidebar-link {
+  justify-content: center;
+  padding: 0.875rem;
 }
 
 .sidebar-link:hover {
@@ -163,11 +153,18 @@ html, body {
 }
 
 .sidebar-icon {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+  flex-shrink: 0;
 }
 
 .sidebar-label {
   font-family: 'Inter', system-ui, sans-serif;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar.collapsed .sidebar-label {
+  display: none;
 }
 
 /* Sidebar expandable items */
@@ -185,9 +182,13 @@ html, body {
   cursor: pointer;
 }
 
+.sidebar.collapsed .sidebar-parent {
+  justify-content: center;
+}
+
 .sidebar-expand-icon {
   margin-left: auto;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   transition: transform 0.2s ease;
   color: rgba(255, 255, 255, 0.5);
 }
@@ -200,13 +201,24 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  padding-left: 1rem;
+  padding-left: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.sidebar-collapsed-children {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
   margin-top: 0.25rem;
 }
 
 .sidebar-child {
-  padding: 0.75rem 1rem;
-  font-size: 0.9rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+}
+
+.sidebar.collapsed .sidebar-child {
+  padding: 0.625rem;
 }
 
 .sidebar-child .sidebar-icon {
