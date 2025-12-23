@@ -1,69 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../config/api.js';
+import { useLazyGetCompanyDetailsQuery } from '../store';
+import type { Company, Contact, Pagination } from '../store';
 import { Loader } from './shared';
-
-interface Contact {
-  _id: string;
-  company_id: string;
-  contact_data: {
-    firstname: string;
-    lastname: string;
-    email: string[];
-    phone: string[];
-    jobtitle: string;
-    company: string;
-  };
-  linkedin_data: {
-    linkedin_url: string;
-    source: string;
-  };
-  metadata: {
-    created_at: string;
-    updated_at: string;
-  };
-}
-
-interface Company {
-  _id: string;
-  identifiers: {
-    source_id: string;
-    name: string;
-  };
-  profile: {
-    industry: string[];
-    revenue_min: string | null;
-    revenue_max: string | null;
-    employee_count: string[] | null;
-  };
-  location: {
-    type: string;
-    name: string | string[];
-  };
-  source: string;
-  metadata: {
-    created_at: string;
-    updated_at: string;
-  };
-}
-
-interface Pagination {
-  page_size: number;
-  page_number: number;
-  has_next: boolean;
-  total_records: number;
-}
 
 export const CompanyDetails = () => {
   const { companyId } = useParams<{ companyId: string }>();
   const navigate = useNavigate();
   
+  // RTK Query lazy hook for manual triggering (needed for infinite scroll)
+  const [fetchDetails, { isLoading: isInitialLoading, error }] = useLazyGetCompanyDetailsQuery();
+  
   const [company, setCompany] = useState<Company | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   
   // Pagination for contacts
@@ -72,43 +23,30 @@ export const CompanyDetails = () => {
   
   // Ref for scroll container
   const contactsScrollRef = useRef<HTMLDivElement>(null);
-  // Flag to prevent multiple simultaneous fetches
   const isFetchingRef = useRef(false);
 
-  const fetchCompanyDetails = async (pageNum: number, append: boolean = false) => {
+  const fetchCompanyDetails = useCallback(async (pageNum: number, append: boolean = false) => {
     if (!companyId || isFetchingRef.current) return;
     
     isFetchingRef.current = true;
     
     if (append) {
       setIsLoadingMore(true);
-    } else {
-      setIsLoading(true);
     }
-    setError(null);
 
     try {
-      const params = new URLSearchParams({
-        company_id: companyId,
-        page: pageNum.toString(),
-        limit: limit.toString(),
-      });
+      const result = await fetchDetails({ 
+        company_id: companyId, 
+        page: pageNum, 
+        limit 
+      }).unwrap();
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/company_details_with_contacts?${params}`, {
-        method: 'GET',
-        headers: {
-          'accept': 'application/json',
-        },
-      });
-
-      const result = await response.json();
       console.log('API Response page', pageNum, ':', result);
 
-      if (response.ok && result.success) {
+      if (result.success) {
         setCompany(result.data.company);
         
-        // Handle pagination - check both result.pagination and result.data.pagination
-        const paginationData = result.pagination || result.data?.pagination;
+        const paginationData = result.pagination;
         setPagination(paginationData);
         
         const newContacts = result.data.contacts || [];
@@ -123,28 +61,23 @@ export const CompanyDetails = () => {
         if (paginationData && paginationData.has_next !== undefined) {
           setHasMore(paginationData.has_next === true);
         } else {
-          // If no pagination info, check if we got fewer results than limit
           setHasMore(newContacts.length >= limit);
         }
-      } else {
-        setError(result.message || 'Failed to fetch company details');
       }
     } catch (err) {
       console.error('Error fetching company details:', err);
-      setError('Failed to connect to API');
     } finally {
-      setIsLoading(false);
       setIsLoadingMore(false);
       isFetchingRef.current = false;
     }
-  };
+  }, [companyId, fetchDetails, limit]);
 
   useEffect(() => {
     setPage(1);
     setContacts([]);
     setHasMore(true);
     fetchCompanyDetails(1, false);
-  }, [companyId]);
+  }, [companyId, fetchCompanyDetails]);
 
   // Handle scroll to load more
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -154,16 +87,13 @@ export const CompanyDetails = () => {
     const { scrollTop, scrollHeight, clientHeight } = container;
     const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
     
-    console.log('Scroll:', { scrollTop, scrollHeight, clientHeight, scrollPercentage, hasMore });
-    
-    // Load more when scrolled to 80% of the container
     if (scrollPercentage >= 0.8) {
       const nextPage = page + 1;
       console.log('Loading page:', nextPage);
       setPage(nextPage);
       fetchCompanyDetails(nextPage, true);
     }
-  }, [page, isLoadingMore, hasMore]);
+  }, [page, isLoadingMore, hasMore, fetchCompanyDetails]);
 
   const getLocation = (location: Company['location']): string => {
     if (!location?.name) return '-';
@@ -183,7 +113,7 @@ export const CompanyDetails = () => {
     if (Array.isArray(employees)) {
       return employees.join(', ');
     }
-    return employees;
+    return String(employees);
   };
 
   const formatDate = (dateString: string) => {
@@ -213,13 +143,13 @@ export const CompanyDetails = () => {
         {/* Error State */}
         {error && (
           <div className="error-banner">
-            ❌ {error}
+            ❌ Failed to load company details
             <button className="retry-btn" onClick={() => fetchCompanyDetails(1, false)}>Retry</button>
           </div>
         )}
 
         {/* Loading State */}
-        {isLoading ? (
+        {isInitialLoading && !company ? (
           <Loader size="large" text="Loading company details..." />
         ) : company ? (
           <>

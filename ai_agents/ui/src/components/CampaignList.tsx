@@ -1,50 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../config/api.js';
-
-interface Campaign {
-  _id: string;
-  prompts: {
-    web: string;
-    persona: string;
-  };
-  segmentation: {
-    industry: string[];
-    keywords: string;
-    categories: string;
-  };
-  target: {
-    employee_count: string[];
-    revenue_min: string;
-    revenue_max: string;
-    currency: string;
-    location: {
-      type: string;
-      names: string[];
-    };
-  };
-  ownership: {
-    hubspot_email: string;
-    product_name: string;
-    business_team: string;
-    user_email: string;
-  };
-  lifecycle: {
-    status: string;
-  };
-  metadata: {
-    created_at: string;
-    updated_at: string;
-  };
-  company_mappings_count: number;
-}
-
-interface Pagination {
-  page_size: number;
-  page_number: number;
-  has_next: boolean;
-  total_records: number;
-}
+import { useGetCampaignsQuery } from '../store';
+import { Loader } from './shared';
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   active: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981' },
@@ -55,51 +12,14 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 
 export const CampaignList = () => {
   const navigate = useNavigate();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Pagination state
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const limit = 10;
 
-  const fetchCampaigns = async () => {
-    setIsLoading(true);
-    setError(null);
+  // RTK Query hook - handles loading, error, caching automatically
+  const { data, isLoading, error, refetch } = useGetCampaignsQuery({ page, limit });
 
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      });
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/campaigns?${params}`, {
-        method: 'GET',
-        headers: {
-          'accept': 'application/json',
-        },
-      });
-
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setCampaigns(result.data || []);
-        setPagination(result.pagination || null);
-      } else {
-        setError(result.message || 'Failed to fetch campaigns');
-      }
-    } catch (err) {
-      console.error('Error fetching campaigns:', err);
-      setError('Failed to connect to API');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCampaigns();
-  }, [page]);
+  const campaigns = data?.data || [];
+  const pagination = data?.pagination;
 
   const formatDate = (dateString: string) => {
     try {
@@ -115,15 +35,11 @@ export const CampaignList = () => {
   };
 
   const handlePrevPage = () => {
-    if (page > 1) {
-      setPage(page - 1);
-    }
+    if (page > 1) setPage(page - 1);
   };
 
   const handleNextPage = () => {
-    if (pagination?.has_next) {
-      setPage(page + 1);
-    }
+    if (pagination?.has_next) setPage(page + 1);
   };
 
   return (
@@ -147,17 +63,14 @@ export const CampaignList = () => {
         {/* Error State */}
         {error && (
           <div className="error-banner">
-            ❌ {error}
-            <button className="retry-btn" onClick={fetchCampaigns}>Retry</button>
+            ❌ Failed to load campaigns
+            <button className="retry-btn" onClick={() => refetch()}>Retry</button>
           </div>
         )}
 
         {/* Loading State */}
         {isLoading ? (
-          <div className="loading-state">
-            <div className="loading-spinner"></div>
-            <p>Loading campaigns...</p>
-          </div>
+          <Loader size="large" text="Loading campaigns..." />
         ) : (
           <>
             {/* Campaigns Table */}

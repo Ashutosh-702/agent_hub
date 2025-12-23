@@ -1,96 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../config/api.js';
-
-interface Company {
-  _id: string;
-  identifiers: {
-    source_id: string;
-    name: string;
-  };
-  profile: {
-    industry: string[];
-    revenue_min: string | null;
-    revenue_max: string | null;
-    employee_count: string[] | null;
-  };
-  location: {
-    type: string;
-    name: string[];
-  };
-  source: string;
-  metadata: {
-    created_at: string;
-    updated_at: string;
-    api_response: {
-      primary_domain?: string;
-      website_url?: string;
-      [key: string]: any;
-    };
-  };
-  contact_count: number;
-}
-
-interface Pagination {
-  page_size: number;
-  page_number: number;
-  has_next: boolean;
-  total_records: number;
-}
+import { useGetCompaniesQuery } from '../store';
+import { Loader } from './shared';
+import type { Company } from '../store';
 
 export const Companies = () => {
   const navigate = useNavigate();
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Pagination & search state
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
   const [searchName, setSearchName] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const limit = 10;
 
-  const fetchCompanies = async () => {
-    setIsLoading(true);
-    setError(null);
+  // RTK Query hook - handles loading, error, caching automatically
+  const { data, isLoading, error, refetch } = useGetCompaniesQuery({ 
+    page, 
+    limit, 
+    name: searchName || undefined 
+  });
 
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      });
-
-      if (searchName.trim()) {
-        params.append('name', searchName.trim());
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/companies?${params}`, {
-        method: 'GET',
-        headers: {
-          'accept': 'application/json',
-        },
-      });
-
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setCompanies(result.data || []);
-        setPagination(result.pagination || null);
-      } else {
-        setError(result.message || 'Failed to fetch companies');
-      }
-    } catch (err) {
-      console.error('Error fetching companies:', err);
-      setError('Failed to connect to API');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCompanies();
-  }, [page, searchName]);
+  const companies = data?.data || [];
+  const pagination = data?.pagination;
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,15 +34,11 @@ export const Companies = () => {
   };
 
   const handlePrevPage = () => {
-    if (page > 1) {
-      setPage(page - 1);
-    }
+    if (page > 1) setPage(page - 1);
   };
 
   const handleNextPage = () => {
-    if (pagination?.has_next) {
-      setPage(page + 1);
-    }
+    if (pagination?.has_next) setPage(page + 1);
   };
 
   const getDomain = (company: Company): string => {
@@ -137,7 +62,7 @@ export const Companies = () => {
     if (Array.isArray(company.profile.employee_count)) {
       return company.profile.employee_count[0] || '-';
     }
-    return company.profile.employee_count;
+    return String(company.profile.employee_count);
   };
 
   return (
@@ -173,17 +98,14 @@ export const Companies = () => {
         {/* Error State */}
         {error && (
           <div className="error-banner">
-            ❌ {error}
-            <button className="retry-btn" onClick={fetchCompanies}>Retry</button>
+            ❌ Failed to load companies
+            <button className="retry-btn" onClick={() => refetch()}>Retry</button>
           </div>
         )}
 
         {/* Loading State */}
         {isLoading ? (
-          <div className="loading-state">
-            <div className="loading-spinner"></div>
-            <p>Loading companies...</p>
-          </div>
+          <Loader size="large" text="Loading companies..." />
         ) : (
           <>
             {/* Companies Table */}
