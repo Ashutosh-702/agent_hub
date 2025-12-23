@@ -369,7 +369,7 @@ export const Form = () => {
         <button
           type="button"
           className="back-to-campaigns-btn"
-          onClick={() => navigate('/campaign')}
+          onClick={() => navigate('/master-data/campaign')}
         >
           ← Back to Campaigns
         </button>

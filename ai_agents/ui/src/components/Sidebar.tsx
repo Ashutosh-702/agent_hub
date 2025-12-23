@@ -10,12 +10,12 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { path: '/campaign', label: 'Campaign', icon: '📋' },
   { 
     path: '/master-data', 
     label: 'Master Data', 
     icon: '🏢',
     children: [
+      { path: '/master-data/campaign', label: 'Campaign', icon: '📋' },
       { path: '/master-data/companies', label: 'Companies', icon: '🏭' },
     ]
   },

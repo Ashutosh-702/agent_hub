@@ -16,10 +16,11 @@ function AppContent() {
       <Sidebar />
       <main className={`main-content ${isCollapsed ? 'sidebar-collapsed' : ''}`}>
           <Routes>
-            <Route path="/" element={<Navigate to="/campaign" replace />} />
-            <Route path="/campaign" element={<CampaignList />} />
-            <Route path="/campaign/new" element={<Form />} />
-            <Route path="/master-data" element={<Navigate to="/master-data/companies" replace />} />
+            <Route path="/" element={<Navigate to="/master-data/campaign" replace />} />
+            <Route path="/campaign" element={<Navigate to="/master-data/campaign" replace />} />
+            <Route path="/master-data" element={<Navigate to="/master-data/campaign" replace />} />
+            <Route path="/master-data/campaign" element={<CampaignList />} />
+            <Route path="/master-data/campaign/new" element={<Form />} />
             <Route path="/master-data/companies" element={<Companies />} />
             <Route path="/master-data/companies/:companyId" element={<CompanyDetails />} />
             <Route path="/prospecting" element={<Navigate to="/prospecting/company" replace />} />

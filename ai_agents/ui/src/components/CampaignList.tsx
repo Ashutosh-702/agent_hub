@@ -53,7 +53,7 @@ export const CampaignList = () => {
           </div>
           <button
             className="create-campaign-btn"
-            onClick={() => navigate('/campaign/new')}
+            onClick={() => navigate('/master-data/campaign/new')}
           >
             <span className="btn-icon">+</span>
             Create New Campaign
@@ -95,7 +95,7 @@ export const CampaignList = () => {
                           <p>No campaigns yet</p>
                           <button
                             className="create-campaign-btn-small"
-                            onClick={() => navigate('/campaign/new')}
+                            onClick={() => navigate('/master-data/campaign/new')}
                           >
                             Create your first campaign
                           </button>
