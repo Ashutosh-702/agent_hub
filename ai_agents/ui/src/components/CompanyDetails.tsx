@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api.js';
-import { Loader } from './Loader';
+import { Loader } from './shared';
 
 interface Contact {
   _id: string;

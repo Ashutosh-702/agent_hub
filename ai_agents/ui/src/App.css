@@ -846,6 +846,219 @@ html, body {
   margin: 0.5rem 0 0 0;
 }
 
+/* ===== SHARED COMPONENTS ===== */
+
+/* Empty State Component */
+.empty-state-component {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.5rem 0;
+}
+
+.empty-state-description {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin: 0 0 1rem 0;
+}
+
+.empty-state-btn {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.empty-state-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+/* Error Banner Component */
+.error-banner-component {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.error-message {
+  color: #dc2626;
+  font-size: 0.95rem;
+}
+
+.error-retry-btn {
+  padding: 0.5rem 1rem;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.error-retry-btn:hover {
+  background: #b91c1c;
+}
+
+/* Status Badge Component */
+.status-badge-component {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+/* Pagination Component */
+.pagination-component {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.pagination-info {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Search Bar Component */
+.search-bar-component {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.search-bar-input {
+  flex: 1;
+  max-width: 400px;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-bar-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.search-bar-btn {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.search-bar-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.search-bar-clear-btn {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+  background: #ffffff;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-bar-clear-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* Page Header Component */
+.page-header-component {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.page-header-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.page-header-subtitle {
+  color: #6b7280;
+  margin: 0.25rem 0 0 0;
+  font-size: 1rem;
+}
+
+/* Back Button Component */
+.back-button-component {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  background: transparent;
+  color: #6366f1;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 1.5rem;
+}
+
+.back-button-component:hover {
+  background: #f3f4f6;
+  border-color: #6366f1;
+}
+
 /* Error Banner */
 .error-banner {
   display: flex;
