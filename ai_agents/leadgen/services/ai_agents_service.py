@@ -17,7 +17,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CampaignContactData,
     CountCompanyMappings,
     Campaigns,
-    Companies
+    Companies,
+    CompanyContacts
 )
 from ai_agents.leadgen.schemas.contact_models import ContactCampaignMapping, ContactDocument
 from ai_agents.leadgen.utils import serialize_objectid
@@ -271,6 +272,14 @@ class CompanyService:
         return {"companies": serialized_companies, "pagination_info": pagination_info}
 
 
+    async def get_company_details(self, company_id: str):
+        company = await self.companies_dao.get_company(company_id)
+        if not company:
+            raise ApiException(f"Company not found with id {company_id}")
+        serialized_company = serialize_objectid(company)
+        return {"company": serialized_company}
+
+
 class ContactService:
     def __init__(self):
         self.campaign_contact_run_dao = CampaignContactRunsDao(
@@ -354,4 +363,10 @@ class ContactService:
             return
         
         await self.campaign_contact_run_dao.create_campaign_contact_run(contact_data) 
+
+    async def get_company_contacts(self, query_params: CompanyContacts):
+        query = {"company_id": query_params.company_id}
+        contacts, pagination_info = await self.contacts_dao.get_paginated_contacts(query, query_params.page, query_params.limit)
+        serialized_contacts = serialize_objectid(contacts)
+        return {"company_contacts": serialized_contacts, "pagination_info": pagination_info}
                

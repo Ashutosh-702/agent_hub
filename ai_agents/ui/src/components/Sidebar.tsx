@@ -16,7 +16,6 @@ const menuItems: MenuItem[] = [
     icon: '🏢',
     children: [
       { path: '/master-data/companies', label: 'Companies', icon: '🏭' },
-      { path: '/master-data/contacts', label: 'Contacts', icon: '👤' },
     ]
   },
 ];

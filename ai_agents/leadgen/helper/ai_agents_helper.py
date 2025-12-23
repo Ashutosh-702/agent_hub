@@ -17,9 +17,9 @@ from kafkautils.constants import KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices, 
 from kafkautils.producer.event_helpers import emit_event_helper
 import uuid
 import asyncio
-from ai_agents.leadgen.schemas.ai_agents import Campaigns, Companies
+from ai_agents.leadgen.schemas.ai_agents import Campaigns, Companies, CompanyContacts
 from ai_agents.leadgen.services.ai_agents_service import CampaignService
-
+from ai_agents.leadgen.utils import serialize_objectid
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -379,6 +379,13 @@ class CompaniesHelper:
     async def get_companies_with_contact_counts(self, query_params: Companies):
         companies = await self.company_service.get_companies(query_params)
         for company in companies.get("companies"):
-            contact_count, pagination_info = await self.contact_dao.get_paginated_contacts({"company_id": company["_id"]})
-            company["contact_count"] = len(contact_count)
+            contact_count = await self.contact_dao.get_contacts_count({"company_id": company["_id"]})
+            company["contact_count"] = contact_count
         return companies
+
+    async def get_company_details_with_contacts(self, query_params: CompanyContacts):
+        company = await self.company_service.get_company_details(query_params.company_id)
+        contacts, pagination_info = await self.contact_dao.get_paginated_contacts({"company_id": query_params.company_id}, query_params.page, query_params.limit)
+        serialized_company = serialize_objectid(company)
+        serialized_contacts = serialize_objectid(contacts)
+        return {"company": serialized_company, "contacts": serialized_contacts, "pagination_info": pagination_info}

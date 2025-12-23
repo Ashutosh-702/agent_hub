@@ -116,6 +116,12 @@ class Companies(BaseModel):
     limit: int = 10
     name: Optional[str] = None
     domain: Optional[str] = None
+
+class CompanyContacts(BaseModel):
+    company_id: str
+    page: int = 1
+    limit: int = 10
+
 class ApolloContactEnrichment(BaseModel):
     company_domain: List[str] = Field(description="List of company domains to enrich contacts for")
     interested_product: str = Field(description="Interested product to enrich contacts for")

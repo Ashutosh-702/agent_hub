@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api.js';
 
 interface Company {
@@ -38,6 +39,7 @@ interface Pagination {
 }
 
 export const Companies = () => {
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,14 +50,6 @@ export const Companies = () => {
   const [limit] = useState(10);
   const [searchName, setSearchName] = useState('');
   const [searchInput, setSearchInput] = useState('');
-
-  // Search modal state
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const [searchDomain, setSearchDomain] = useState('');
-  const [interestedProduct, setInterestedProduct] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<any>(null);
-  const [searchError, setSearchError] = useState<string | null>(null);
 
   const fetchCompanies = async () => {
     setIsLoading(true);
@@ -122,56 +116,6 @@ export const Companies = () => {
     }
   };
 
-  // Domain search functions
-  const handleDomainSearch = async () => {
-    if (!searchDomain.trim()) {
-      setSearchError('Please enter a company domain');
-      return;
-    }
-
-    setIsSearching(true);
-    setSearchError(null);
-    setSearchResult(null);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/apollo_contact_enrichment`, {
-        method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          company_domain: [searchDomain.trim()],
-          interested_product: interestedProduct || 'General',
-          slack_metadata: {},
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSearchResult(data);
-        // Refresh the list after successful search
-        fetchCompanies();
-      } else {
-        setSearchError(data.message || 'Failed to search company');
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      setSearchError('Failed to connect to API');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const closeModal = () => {
-    setShowSearchModal(false);
-    setSearchDomain('');
-    setInterestedProduct('');
-    setSearchResult(null);
-    setSearchError(null);
-  };
-
   const getDomain = (company: Company): string => {
     return company.metadata?.api_response?.primary_domain || 
            company.metadata?.api_response?.website_url?.replace(/^https?:\/\//, '').replace(/\/$/, '') || 
@@ -205,13 +149,6 @@ export const Companies = () => {
             <h1 className="companies-title">Companies</h1>
             <p className="companies-subtitle">View and search company information</p>
           </div>
-          <button
-            className="search-company-btn"
-            onClick={() => setShowSearchModal(true)}
-          >
-            <span className="btn-icon">🔍</span>
-            Search Company
-          </button>
         </div>
 
         {/* Search Bar */}
@@ -269,18 +206,16 @@ export const Companies = () => {
                         <div className="empty-state-content">
                           <span className="empty-icon">🏢</span>
                           <p>No companies found</p>
-                          <button
-                            className="search-company-btn-small"
-                            onClick={() => setShowSearchModal(true)}
-                          >
-                            Search for a company
-                          </button>
                         </div>
                       </td>
                     </tr>
                   ) : (
                     companies.map((company) => (
-                      <tr key={company._id}>
+                      <tr 
+                        key={company._id} 
+                        className="clickable-row"
+                        onClick={() => navigate(`/master-data/companies/${company._id}`)}
+                      >
                         <td className="company-name">{company.identifiers?.name || '-'}</td>
                         <td className="company-domain">{getDomain(company)}</td>
                         <td title={company.profile?.industry?.join(', ')}>{getIndustry(company)}</td>
@@ -291,11 +226,15 @@ export const Companies = () => {
                           </span>
                         </td>
                         <td>
-                          <button className="action-btn" title="View Details">
+                          <button 
+                            className="action-btn" 
+                            title="View Details"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/master-data/companies/${company._id}`);
+                            }}
+                          >
                             👁️
-                          </button>
-                          <button className="action-btn" title="Refresh">
-                            🔄
                           </button>
                         </td>
                       </tr>
@@ -335,70 +274,6 @@ export const Companies = () => {
           </>
         )}
       </div>
-
-      {/* Search Modal */}
-      {showSearchModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Search Company</h2>
-              <button className="modal-close-btn" onClick={closeModal}>×</button>
-            </div>
-            
-            <div className="modal-body">
-              <div className="form-group">
-                <label htmlFor="domain">Company Domain *</label>
-                <input
-                  type="text"
-                  id="domain"
-                  className="modal-input"
-                  placeholder="e.g., example.com"
-                  value={searchDomain}
-                  onChange={(e) => setSearchDomain(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="product">Interested Product</label>
-                <input
-                  type="text"
-                  id="product"
-                  className="modal-input"
-                  placeholder="e.g., GaaS, DaaS, Storefront"
-                  value={interestedProduct}
-                  onChange={(e) => setInterestedProduct(e.target.value)}
-                />
-              </div>
-
-              {searchError && (
-                <div className="search-error">
-                  ❌ {searchError}
-                </div>
-              )}
-
-              {searchResult && (
-                <div className="search-result">
-                  <h3>Search Result</h3>
-                  <pre>{JSON.stringify(searchResult, null, 2)}</pre>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer">
-              <button className="modal-cancel-btn" onClick={closeModal}>
-                Cancel
-              </button>
-              <button
-                className="modal-search-btn"
-                onClick={handleDomainSearch}
-                disabled={isSearching}
-              >
-                {isSearching ? 'Searching...' : 'Search'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
