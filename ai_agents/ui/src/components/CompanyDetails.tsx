@@ -2,8 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useLazyGetCompanyDetailsQuery } from '../store';
 import type { Company, Contact, Pagination } from '../store';
-import { InfoGrid, Loader } from './shared';
-import type { InfoGridItem } from './shared';
+import { Button, Link, NotificationBanner, SelectorDropdown, Spinner, Typography } from 'novus';
 
 type CompanyDetailsNavState =
   | {
@@ -151,28 +150,13 @@ export const CompanyDetails = () => {
     }
   };
 
-  const companyInfoItems: InfoGridItem[] = company
-    ? [
-        { label: 'Source', value: company.source || '-', valueClassName: 'source-badge' },
-        { label: 'Industry', value: getIndustries(company.profile?.industry) },
-        { label: 'Employees', value: getEmployees(company.profile?.employee_count) },
-        { label: 'Location', value: getLocation(company.location) },
-        {
-          label: 'Revenue Range',
-          value:
-            company.profile?.revenue_min && company.profile?.revenue_max
-              ? `$${company.profile.revenue_min}M - $${company.profile.revenue_max}M`
-              : '-',
-        },
-        { label: 'Created', value: formatDate(company.metadata?.created_at) },
-      ]
-    : [];
-
   return (
     <div className="company-details-container">
       <div className="company-details-card">
         {/* Back Button */}
-        <button
+        <Button
+          type="tertiary"
+          appearance="default"
           className="back-to-companies-btn"
           onClick={() => {
             if (isFromCampaign && navState?.campaignId) {
@@ -183,26 +167,64 @@ export const CompanyDetails = () => {
           }}
         >
           ← Back
-        </button>
+        </Button>
 
         {/* Error State */}
         {error && (
-          <div className="error-banner">
-            ❌ Failed to load company details
-            <button className="retry-btn" onClick={() => fetchCompanyDetails(1, false)}>Retry</button>
-          </div>
+          <NotificationBanner
+            appearance="negative"
+            type="inline"
+            title="Failed to load company details"
+            description="Please try again."
+            primaryButtonText="Retry"
+            onPrimaryClick={() => fetchCompanyDetails(1, false)}
+            showIcon
+          />
         )}
 
         {/* Loading State */}
         {isInitialLoading && !company ? (
-          <Loader size="large" text="Loading company details..." />
+          <div style={{ padding: '2rem 0' }}>
+            <Spinner size="l" label="Loading company details..." labelPlacement="bottom" />
+          </div>
         ) : company ? (
           <>
             {/* Company Info Section */}
             <div className="company-info-section">
-              <h1 className="company-details-title">{company.identifiers?.name || 'Unknown Company'}</h1>
+              <Typography variant="heading-xl" type="h1" className="company-details-title">
+                {company.identifiers?.name || 'Unknown Company'}
+              </Typography>
               
-              <InfoGrid className="company-info-grid" items={companyInfoItems} />
+              <div className="company-info-grid">
+                <div className="info-item">
+                  <label>Source</label>
+                  <span className="source-badge">{company.source || '-'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Industry</label>
+                  <span>{getIndustries(company.profile?.industry)}</span>
+                </div>
+                <div className="info-item">
+                  <label>Employees</label>
+                  <span>{getEmployees(company.profile?.employee_count)}</span>
+                </div>
+                <div className="info-item">
+                  <label>Location</label>
+                  <span>{getLocation(company.location)}</span>
+                </div>
+                <div className="info-item">
+                  <label>Revenue Range</label>
+                  <span>
+                    {company.profile?.revenue_min && company.profile?.revenue_max
+                      ? `$${company.profile.revenue_min}M - $${company.profile.revenue_max}M`
+                      : '-'}
+                  </span>
+                </div>
+                <div className="info-item">
+                  <label>Created</label>
+                  <span>{formatDate(company.metadata?.created_at)}</span>
+                </div>
+              </div>
             </div>
 
             {/* Contacts Section */}
@@ -225,7 +247,7 @@ export const CompanyDetails = () => {
                   ) : (
                     contacts.map((contact) => (
                       <div key={contact._id} className="contact-card">
-                        <div className="contact-card-grid">
+                        <div className={`contact-card-grid ${showContactManualShortlisting ? 'has-shortlist' : ''}`}>
                           <div className="contact-col name-col">
                             <span className="col-label">Name</span>
                             <span className="col-value name">
@@ -255,31 +277,38 @@ export const CompanyDetails = () => {
                           <div className="contact-col">
                             <span className="col-label">LinkedIn</span>
                             {contact.linkedin_data?.linkedin_url ? (
-                              <a 
-                                href={contact.linkedin_data.linkedin_url} 
-                                target="_blank" 
+                              <Link
+                                href={contact.linkedin_data.linkedin_url}
+                                target="_blank"
                                 rel="noopener noreferrer"
+                                size="s"
+                                subtle
                                 className="linkedin-link"
                               >
                                 View Profile
-                              </a>
+                              </Link>
                             ) : <span className="col-value">-</span>}
                           </div>
                           {showContactManualShortlisting && (
                             <div className="contact-col">
                               <span className="col-label">Shortlist</span>
-                              <select
-                                className="status-filter-select"
-                                value={String(manualContactStatus[contact._id] ?? false)}
-                                onChange={(e) => {
-                                  const next = e.target.value === 'true';
+                              <SelectorDropdown
+                                label={(manualContactStatus[contact._id] ?? false) ? 'Shortlisted' : 'Not Shortlisted'}
+                                options={[
+                                  { label: 'Shortlisted', value: 'true' },
+                                  { label: 'Not Shortlisted', value: 'false' },
+                                ]}
+                                value={{
+                                  label: (manualContactStatus[contact._id] ?? false) ? 'Shortlisted' : 'Not Shortlisted',
+                                  value: String(manualContactStatus[contact._id] ?? false),
+                                }}
+                                onChange={(opt: any) => {
+                                  const next = opt?.value === 'true';
                                   setManualContactStatus(prev => ({ ...prev, [contact._id]: next }));
                                 }}
-                                title="Mock update (API will be added later)"
-                              >
-                                <option value="true">Shortlisted</option>
-                                <option value="false">Not Shortlisted</option>
-                              </select>
+                                size="s"
+                                menuWidth={180}
+                              />
                             </div>
                           )}
                         </div>
@@ -291,7 +320,7 @@ export const CompanyDetails = () => {
                 {/* Loading more indicator */}
                 {isLoadingMore && (
                   <div className="load-more-indicator">
-                    <Loader size="small" text="Loading more contacts..." />
+                    <Spinner size="s" label="Loading more contacts..." labelPlacement="end" />
                   </div>
                 )}
                 

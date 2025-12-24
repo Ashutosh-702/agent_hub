@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetCompaniesQuery } from '../store';
-import { DataTable, EmptyState, ErrorBanner, Loader, PageHeader, Pagination } from './shared';
-import type { DataTableColumn } from './shared';
+import { Button, CounterBadge, EmptyState, Input, NotificationBanner, Pagination, Spinner, Typography } from 'novus';
+import viteLogo from '/vite.svg';
 import type { Company } from '../store';
 
 export const Companies = () => {
@@ -66,123 +66,130 @@ export const Companies = () => {
     return String(company.profile.employee_count);
   };
 
-  const columns: Array<DataTableColumn<Company>> = [
-    {
-      id: 'name',
-      header: 'Company Name',
-      cell: (company) => <span className="company-name">{company.identifiers?.name || '-'}</span>,
-    },
-    {
-      id: 'domain',
-      header: 'Domain',
-      cell: (company) => <span className="company-domain">{getDomain(company)}</span>,
-    },
-    {
-      id: 'industry',
-      header: 'Industry',
-      cell: (company) => (
-        <span title={company.profile?.industry?.join(', ') || ''}>{getIndustry(company)}</span>
-      ),
-    },
-    {
-      id: 'employees',
-      header: 'Employees',
-      cell: (company) => getEmployees(company),
-    },
-    {
-      id: 'contacts',
-      header: 'Contacts',
-      cell: (company) => (
-        <span className="contact-count-badge">{company.contact_count || 0}</span>
-      ),
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: (company) => (
-        <button
-          className="action-btn"
-          title="View Details"
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/master-data/companies/${company._id}`);
-          }}
-        >
-          👁️
-        </button>
-      ),
-    },
-  ];
-
   return (
     <div className="companies-container">
       <div className="companies-card">
         {/* Header */}
         <div className="companies-header">
-          <PageHeader
-            variant="inline"
-            title="Companies"
-            subtitle="View and search company information"
-            titleClassName="companies-title"
-            subtitleClassName="companies-subtitle"
-          />
+          <div>
+            <Typography variant="heading-xl" type="h1" className="companies-title">
+              Companies
+            </Typography>
+            <Typography variant="body-m" type="p" className="companies-subtitle">
+              View and search company information
+            </Typography>
+          </div>
         </div>
 
         {/* Search Bar */}
         <form onSubmit={handleSearchSubmit} className="companies-filter-bar">
-          <input
-            type="text"
-            className="companies-filter-input"
-            placeholder="Search by company name..."
+          <Input
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by company name..."
+            onChange={(e: any) => setSearchInput(e.target.value)}
+            size="m"
+            className="companies-filter-input"
+            label=""
           />
-          <button type="submit" className="companies-filter-btn">
+          <Button type="primary" appearance="default" size="m" className="companies-filter-btn">
             Search
-          </button>
+          </Button>
           {searchName && (
-            <button type="button" className="companies-clear-btn" onClick={clearSearch}>
+            <Button type="secondary" appearance="default" size="m" className="companies-clear-btn" onClick={clearSearch}>
               Clear
-            </button>
+            </Button>
           )}
         </form>
 
         {/* Error State */}
-        {error && <ErrorBanner message="Failed to load companies" onRetry={() => refetch()} />}
+        {error && (
+          <NotificationBanner
+            appearance="negative"
+            type="inline"
+            title="Failed to load companies"
+            description="Please try again."
+            primaryButtonText="Retry"
+            onPrimaryClick={() => refetch()}
+            showIcon
+          />
+        )}
 
         {/* Loading State */}
         {isLoading ? (
-          <Loader size="large" text="Loading companies..." />
+          <div style={{ padding: '2rem 0' }}>
+            <Spinner size="l" label="Loading companies..." labelPlacement="bottom" />
+          </div>
         ) : (
           <>
             {/* Companies Table */}
             <div className="companies-table-wrapper">
-              <DataTable<Company>
-                rows={companies}
-                columns={columns}
-                getRowKey={(c) => c._id}
-                onRowClick={(c) => navigate(`/master-data/companies/${c._id}`)}
-                rowClassName={() => 'clickable-row'}
-                tableClassName="companies-table"
-                emptyState={
-                  <div className="empty-state">
-                    <div className="empty-state-content">
-                      <EmptyState icon="🏢" title="No companies found" />
-                    </div>
-                  </div>
-                }
-              />
+              <table className="companies-table">
+                <thead>
+                  <tr>
+                    <th>Company Name</th>
+                    <th>Domain</th>
+                    <th>Industry</th>
+                    <th>Employees</th>
+                    <th>Contacts</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {companies.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="empty-state">
+                        <div className="empty-state-content">
+                          <EmptyState
+                            type="single"
+                            imageURL={viteLogo}
+                            title="No companies found"
+                            description="Try adjusting your search."
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    companies.map((company) => (
+                      <tr
+                        key={company._id}
+                        className="clickable-row"
+                        onClick={() => navigate(`/master-data/companies/${company._id}`)}
+                      >
+                        <td className="company-name">{company.identifiers?.name || '-'}</td>
+                        <td className="company-domain">{getDomain(company)}</td>
+                        <td title={company.profile?.industry?.join(', ') || ''}>{getIndustry(company)}</td>
+                        <td>{getEmployees(company)}</td>
+                        <td>
+                          <CounterBadge content={company.contact_count || 0} />
+                        </td>
+                        <td>
+                          <Button
+                            size="s"
+                            type="tertiary"
+                            appearance="default"
+                            onClick={(e: any) => {
+                              e.stopPropagation();
+                              navigate(`/master-data/companies/${company._id}`);
+                            }}
+                          >
+                            View
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
 
             {/* Pagination */}
             {pagination && companies.length > 0 && (
               <Pagination
-                currentPage={pagination.page_number}
-                totalRecords={pagination.total_records}
-                pageSize={limit}
-                hasNext={pagination.has_next}
-                onPrevious={handlePrevPage}
-                onNext={handleNextPage}
+                total={pagination.total_records}
+                defaultPageSize={[limit]}
+                value={{ currentActivePage: page, currentPageSize: limit }}
+                onPreviousClick={handlePrevPage}
+                onNextClick={handleNextPage}
               />
             )}
           </>

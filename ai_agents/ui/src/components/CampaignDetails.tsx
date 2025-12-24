@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGetCampaignDetailsQuery } from '../store';
 import type { CampaignCompany } from '../store';
-import { InfoGrid, Loader } from './shared';
-import type { InfoGridItem } from './shared';
+import { Badge, Button, NotificationBanner, SelectorDropdown, Spinner, Typography } from 'novus';
 
 // Polling interval in milliseconds (5 seconds)
 const POLLING_INTERVAL = 5000;
@@ -142,64 +141,76 @@ export const CampaignDetails = () => {
     setPage(1); // Reset to first page when filter changes
   };
 
-  const infoItems: InfoGridItem[] = campaign
-    ? [
-        { label: 'Business Team', value: campaign.ownership?.business_team || '-' },
-        { label: 'Owner Email', value: campaign.ownership?.user_email || '-' },
-        { label: 'HubSpot Email', value: campaign.ownership?.hubspot_email || '-' },
-        { label: 'Shortlisting Approach', value: shortlistingApproachLabel(campaign.shortlisting_approach) },
-        { label: 'Target Industries', value: campaign.segmentation?.industry?.join(', ') || '-' },
-        { label: 'Employee Range', value: campaign.target?.employee_count?.join(', ') || '-' },
-        {
-          label: 'Revenue Range',
-          value:
-            campaign.target?.revenue_min && campaign.target?.revenue_max
-              ? `$${campaign.target.revenue_min}M - $${campaign.target.revenue_max}M`
-              : '-',
-        },
-        { label: 'Locations', value: campaign.target?.location?.names?.join(', ') || '-' },
-        { label: 'Created', value: formatDate(campaign.metadata?.created_at) },
-      ]
-    : [];
+  const statusToBadgeState = (status?: string) => {
+    switch (status) {
+      case 'active':
+      case 'started':
+        return 'success';
+      case 'paused':
+        return 'warning';
+      case 'completed':
+        return 'neutral';
+      default:
+        return 'default';
+    }
+  };
+
+  const statusFilterOptions = [
+    { label: 'All', value: 'all' },
+    { label: 'Shortlisted', value: 'true' },
+    { label: 'Not Shortlisted', value: 'false' },
+  ];
+
+  const selectedStatusFilterOption =
+    statusFilterOptions.find(o => o.value === statusFilter) || statusFilterOptions[0];
 
   return (
     <div className="campaign-details-container">
       <div className="campaign-details-card">
         {/* Back Button */}
-        <button
-          className="back-to-campaigns-btn"
+        <Button
+          type="tertiary"
+          appearance="default"
           onClick={() => navigate('/master-data/campaign')}
+          className="back-to-campaigns-btn"
         >
           ← Back to Campaigns
-        </button>
+        </Button>
 
         {/* Error State */}
         {error && (
-          <div className="error-banner">
-            ❌ Failed to load campaign details
-            <button className="retry-btn" onClick={() => refetch()}>Retry</button>
-          </div>
+          <NotificationBanner
+            appearance="negative"
+            type="inline"
+            title="Failed to load campaign details"
+            description="Please try again."
+            primaryButtonText="Retry"
+            onPrimaryClick={() => refetch()}
+            showIcon
+          />
         )}
 
         {/* Loading State */}
         {isLoading ? (
-          <Loader size="large" text="Loading campaign details..." />
+          <div style={{ padding: '2rem 0' }}>
+            <Spinner size="l" label="Loading campaign details..." labelPlacement="bottom" />
+          </div>
         ) : campaign ? (
           <>
             {/* Campaign Info Section */}
             <div className="campaign-info-section">
               <div className="campaign-details-header">
                 <div>
-                  <h1 className="campaign-details-title">
+                  <Typography variant="heading-xl" type="h1" className="campaign-details-title">
                     {campaign.ownership?.product_name || 'Campaign'}
-                  </h1>
+                  </Typography>
                   <p className="campaign-id">ID: {campaignId}</p>
                 </div>
                 <div className="campaign-status-area">
                   {/* Polling indicator */}
                   {isBackgroundFetching && (
                     <div className="polling-indicator" title="Auto-refreshing...">
-                      <Loader size="small" />
+                      <Spinner size="s" />
                     </div>
                   )}
                   {isPolling && !isBackgroundFetching && (
@@ -207,19 +218,54 @@ export const CampaignDetails = () => {
                       🔄 Live
                     </span>
                   )}
-                  <span
-                    className="campaign-status-badge"
-                    style={{
-                      backgroundColor: statusColors[campaign.lifecycle?.status]?.bg || statusColors.draft.bg,
-                      color: statusColors[campaign.lifecycle?.status]?.text || statusColors.draft.text,
-                    }}
-                  >
+                  <Badge state={statusToBadgeState(campaign.lifecycle?.status)} emphasis="subtle">
                     {campaign.lifecycle?.status || 'unknown'}
-                  </span>
+                  </Badge>
                 </div>
               </div>
 
-              <InfoGrid className="campaign-info-grid" items={infoItems} />
+              <div className="campaign-info-grid">
+                <div className="info-item">
+                  <label>Business Team</label>
+                  <span>{campaign.ownership?.business_team || '-'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Owner Email</label>
+                  <span>{campaign.ownership?.user_email || '-'}</span>
+                </div>
+                <div className="info-item">
+                  <label>HubSpot Email</label>
+                  <span>{campaign.ownership?.hubspot_email || '-'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Shortlisting Approach</label>
+                  <span>{shortlistingApproachLabel(campaign.shortlisting_approach)}</span>
+                </div>
+                <div className="info-item">
+                  <label>Target Industries</label>
+                  <span>{campaign.segmentation?.industry?.join(', ') || '-'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Employee Range</label>
+                  <span>{campaign.target?.employee_count?.join(', ') || '-'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Revenue Range</label>
+                  <span>
+                    {campaign.target?.revenue_min && campaign.target?.revenue_max
+                      ? `$${campaign.target.revenue_min}M - $${campaign.target.revenue_max}M`
+                      : '-'}
+                  </span>
+                </div>
+                <div className="info-item">
+                  <label>Locations</label>
+                  <span>{campaign.target?.location?.names?.join(', ') || '-'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Created</label>
+                  <span>{formatDate(campaign.metadata?.created_at)}</span>
+                </div>
+              </div>
 
               {/* Progress Stats */}
               <div className="campaign-progress-section">
@@ -248,17 +294,13 @@ export const CampaignDetails = () => {
                 
                 {/* Status Filter */}
                 <div className="status-filter">
-                  <label>Filter by status:</label>
-                  <select 
-                    value={statusFilter} 
-                    onChange={(e) => handleStatusFilterChange(e.target.value as CompanyStatusFilter)}
-                    className="status-filter-select"
-                    title="Filters the list only (does not update status)"
-                  >
-                    <option value="all">All</option>
-                    <option value="true">Shortlisted</option>
-                    <option value="false">Not Shortlisted</option>
-                  </select>
+                  <SelectorDropdown
+                    label="Status"
+                    options={statusFilterOptions}
+                    value={selectedStatusFilterOption}
+                    onChange={(opt: any) => handleStatusFilterChange((opt?.value || 'all') as CompanyStatusFilter)}
+                    size="s"
+                  />
                 </div>
               </div>
 
@@ -313,20 +355,24 @@ export const CampaignDetails = () => {
                           </td>
                           <td>
                             {isManualCompanyShortlisting ? (
-                              <select
-                                className="status-filter-select"
-                                value={String(getEffectiveCompanyStatus(company))}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  const next = e.target.value === 'true';
-                                  setManualCompanyStatus(prev => ({ ...prev, [company._id]: next }));
-                                }}
-                                title="Mock update (API will be added later)"
-                              >
-                                <option value="true">Shortlisted</option>
-                                <option value="false">Not Shortlisted</option>
-                              </select>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <SelectorDropdown
+                                  label={getEffectiveCompanyStatus(company) ? 'Shortlisted' : 'Not Shortlisted'}
+                                  options={[
+                                    { label: 'Shortlisted', value: 'true' },
+                                    { label: 'Not Shortlisted', value: 'false' },
+                                  ]}
+                                  value={{
+                                    label: getEffectiveCompanyStatus(company) ? 'Shortlisted' : 'Not Shortlisted',
+                                    value: String(getEffectiveCompanyStatus(company)),
+                                  }}
+                                  onChange={(opt: any) => {
+                                    const next = opt?.value === 'true';
+                                    setManualCompanyStatus(prev => ({ ...prev, [company._id]: next }));
+                                  }}
+                                  size="s"
+                                />
+                              </div>
                             ) : (
                               <span
                                 className="status-badge"
@@ -374,10 +420,12 @@ export const CampaignDetails = () => {
                               : '-'}
                           </td>
                           <td>
-                            <button 
-                              className="action-btn" 
-                              title="View Company"
-                              onClick={(e) => {
+                            <Button
+                              type="tertiary"
+                              appearance="default"
+                              size="s"
+                              className="action-btn"
+                              onClick={(e: any) => {
                                 e.stopPropagation();
                                 navigate(`/master-data/companies/${company.company_id}`, {
                                   state: {
@@ -388,8 +436,8 @@ export const CampaignDetails = () => {
                                 });
                               }}
                             >
-                              👁️
-                            </button>
+                              View
+                            </Button>
                           </td>
                         </tr>
                       ))
@@ -407,21 +455,13 @@ export const CampaignDetails = () => {
                     {pagination.total_records > 0 && ` (${pagination.total_records} total)`}
                   </div>
                   <div className="pagination-controls">
-                    <button
-                      className="pagination-btn"
-                      onClick={handlePrevPage}
-                      disabled={page === 1}
-                    >
+                    <Button type="secondary" appearance="default" size="s" className="pagination-btn" onClick={handlePrevPage} disabled={page === 1}>
                       ← Previous
-                    </button>
+                    </Button>
                     <span className="pagination-current">Page {page}</span>
-                    <button
-                      className="pagination-btn"
-                      onClick={handleNextPage}
-                      disabled={!pagination.has_next}
-                    >
+                    <Button type="secondary" appearance="default" size="s" className="pagination-btn" onClick={handleNextPage} disabled={!pagination.has_next}>
                       Next →
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
