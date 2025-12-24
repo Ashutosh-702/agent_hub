@@ -1,0 +1,146 @@
+/*
+  Novus Overrides (UI Parity Layer)
+  --------------------------------
+  Goal: Keep using Novus components, but visually match the pre-Novus UI.
+
+  Rules:
+  - Keep overrides SCOPED (prefer .sidebar / specific class hooks)
+  - Keep overrides MINIMAL (only where Novus defaults fight our UI)
+  - Use our existing semantic classnames (action-btn, pagination-btn, etc.)
+*/
+
+/* ========== SIDEBAR (Novus Button -> looks like old sidebar links) ========== */
+
+/* Novus Button adds its own padding/min-width; override for our round toggle */
+.sidebar .sidebar-toggle-btn {
+  padding: 0 !important;
+  min-width: 28px !important;
+  line-height: 1 !important;
+}
+
+/* When `sidebar-link` is rendered as a Novus <Button>, neutralize button defaults */
+.sidebar button.sidebar-link {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  min-height: unset !important;
+  height: auto !important;
+  width: 100% !important;
+  padding: 0.875rem 1rem !important;
+  justify-content: flex-start !important;
+  /* Ensure Novus doesn't paint link text as blue */
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Novus Button renders content inside `.novus-btn-content` which may set its own color.
+   Force it to inherit sidebar link colors for consistency. */
+.sidebar button.sidebar-link .novus-btn-content,
+.sidebar button.sidebar-link .novus-btn-content * {
+  color: inherit !important;
+}
+
+.sidebar button.sidebar-link:hover {
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: #fff !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+.sidebar button.sidebar-link:hover .novus-btn-content,
+.sidebar button.sidebar-link:hover .novus-btn-content * {
+  color: inherit !important;
+}
+
+.sidebar button.sidebar-link.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.2)) !important;
+  color: #fff !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2) !important;
+}
+
+.sidebar button.sidebar-link.active .novus-btn-content,
+.sidebar button.sidebar-link.active .novus-btn-content * {
+  color: inherit !important;
+}
+
+.sidebar.collapsed button.sidebar-link {
+  justify-content: center !important;
+  padding: 0.875rem !important;
+}
+
+/* ========== LISTS / TABLE ACTIONS ========== */
+
+.novus-btn.action-btn {
+  background: none !important;
+  border: none !important;
+  padding: 0.5rem !important;
+  cursor: pointer !important;
+  font-size: 1rem !important;
+  opacity: 0.6 !important;
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+  box-shadow: none !important;
+  min-width: unset !important;
+}
+
+.novus-btn.action-btn:hover:not(:disabled) {
+  opacity: 1 !important;
+  transform: scale(1.1) !important;
+}
+
+/* ========== PAGINATION (Novus Button -> old pagination buttons) ========== */
+
+.novus-btn.pagination-btn {
+  padding: 0.5rem 1rem !important;
+  background: #ffffff !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  min-width: unset !important;
+}
+
+/* ========== COMPANIES SEARCH BAR (Novus Input/Button -> old look) ========== */
+
+.novus-input.companies-filter-input {
+  padding: 0.75rem 1rem !important;
+  font-size: 0.95rem !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.novus-btn.companies-filter-btn {
+  padding: 0.75rem 1.25rem !important;
+  font-size: 0.95rem !important;
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+
+.novus-btn.companies-clear-btn {
+  padding: 0.75rem 1.25rem !important;
+  font-size: 0.95rem !important;
+  background: #ffffff !important;
+  color: #6b7280 !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+}
+
+/* ========== COMING SOON (Novus Typography -> dark background text colors) ========== */
+
+.coming-soon-subtitle,
+.coming-soon-subtitle * {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.coming-soon-description,
+.coming-soon-description * {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+

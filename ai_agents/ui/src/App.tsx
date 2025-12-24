@@ -1,4 +1,5 @@
 import './App.css';
+import './novus-overrides.css';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Form } from './components/FormNew';

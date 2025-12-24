@@ -69,13 +69,6 @@ html, body {
   box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4);
 }
 
-/* Novus Button adds its own padding/min-width; override for our round toggle */
-.sidebar .sidebar-toggle-btn {
-  padding: 0 !important;
-  min-width: 28px !important;
-  line-height: 1 !important;
-}
-
 .sidebar-toggle-btn:hover {
   transform: scale(1.1);
   background: linear-gradient(135deg, #818cf8, #a78bfa);
@@ -141,59 +134,9 @@ html, body {
   overflow: hidden;
 }
 
-/* When `sidebar-link` is rendered as a Novus <Button>, neutralize button defaults
-   so the sidebar keeps the original "link-like" look. */
-.sidebar button.sidebar-link {
-  background: transparent !important;
-  border: 1px solid transparent !important;
-  box-shadow: none !important;
-  min-height: unset !important;
-  height: auto !important;
-  width: 100% !important;
-  padding: 0.875rem 1rem !important;
-  justify-content: flex-start !important;
-  /* Ensure Novus doesn't paint link text as blue */
-  color: rgba(255, 255, 255, 0.7) !important;
-}
-
-/* Novus Button renders content inside `.novus-btn-content` which may set its own color.
-   Force it to inherit sidebar link colors for consistency (e.g. Prospecting section). */
-.sidebar button.sidebar-link .novus-btn-content,
-.sidebar button.sidebar-link .novus-btn-content * {
-  color: inherit !important;
-}
-
-.sidebar button.sidebar-link:hover {
-  background: rgba(99, 102, 241, 0.15) !important;
-  color: #fff !important;
-  border-color: rgba(99, 102, 241, 0.3) !important;
-}
-
-.sidebar button.sidebar-link:hover .novus-btn-content,
-.sidebar button.sidebar-link:hover .novus-btn-content * {
-  color: inherit !important;
-}
-
-.sidebar button.sidebar-link.active {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.2)) !important;
-  color: #fff !important;
-  border-color: rgba(99, 102, 241, 0.5) !important;
-  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2) !important;
-}
-
-.sidebar button.sidebar-link.active .novus-btn-content,
-.sidebar button.sidebar-link.active .novus-btn-content * {
-  color: inherit !important;
-}
-
 .sidebar.collapsed .sidebar-link {
   justify-content: center;
   padding: 0.875rem;
-}
-
-.sidebar.collapsed button.sidebar-link {
-  justify-content: center !important;
-  padding: 0.875rem !important;
 }
 
 .sidebar-link:hover {
@@ -682,17 +625,6 @@ html, body {
   color: rgba(255, 255, 255, 0.6);
   line-height: 1.6;
   margin-bottom: 2rem;
-}
-
-/* Novus Typography applies its own default text color; force our intended colors */
-.coming-soon-subtitle,
-.coming-soon-subtitle * {
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-
-.coming-soon-description,
-.coming-soon-description * {
-  color: rgba(255, 255, 255, 0.6) !important;
 }
 
 .coming-soon-decoration {
@@ -1359,23 +1291,6 @@ html, body {
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-.novus-btn.action-btn {
-  background: none !important;
-  border: none !important;
-  padding: 0.5rem !important;
-  cursor: pointer !important;
-  font-size: 1rem !important;
-  opacity: 0.6 !important;
-  transition: opacity 0.15s ease, transform 0.15s ease !important;
-  box-shadow: none !important;
-  min-width: unset !important;
-}
-
-.novus-btn.action-btn:hover:not(:disabled) {
-  opacity: 1 !important;
-  transform: scale(1.1) !important;
-}
-
 .action-btn:hover {
   opacity: 1;
   transform: scale(1.1);
@@ -1802,17 +1717,6 @@ html, body {
   transition: all 0.15s ease;
 }
 
-.novus-btn.pagination-btn {
-  padding: 0.5rem 1rem !important;
-  background: #ffffff !important;
-  color: #374151 !important;
-  border: 1px solid #d1d5db !important;
-  border-radius: 6px !important;
-  font-weight: 500 !important;
-  box-shadow: none !important;
-  min-width: unset !important;
-}
-
 .pagination-btn:hover:not(:disabled) {
   background: #f3f4f6;
   border-color: #6366f1;
@@ -2015,14 +1919,6 @@ html, body {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.novus-input.companies-filter-input {
-  padding: 0.75rem 1rem !important;
-  font-size: 0.95rem !important;
-  border: 1px solid #d1d5db !important;
-  border-radius: 8px !important;
-  box-shadow: none !important;
-}
-
 .companies-filter-input:focus {
   outline: none;
   border-color: #10b981;
@@ -2041,17 +1937,6 @@ html, body {
   transition: all 0.2s ease;
 }
 
-.novus-btn.companies-filter-btn {
-  padding: 0.75rem 1.25rem !important;
-  font-size: 0.95rem !important;
-  background: linear-gradient(135deg, #10b981, #059669) !important;
-  color: #ffffff !important;
-  border: none !important;
-  border-radius: 8px !important;
-  font-weight: 600 !important;
-  box-shadow: none !important;
-}
-
 .companies-filter-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
@@ -2067,17 +1952,6 @@ html, body {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
-}
-
-.novus-btn.companies-clear-btn {
-  padding: 0.75rem 1.25rem !important;
-  font-size: 0.95rem !important;
-  background: #ffffff !important;
-  color: #6b7280 !important;
-  border: 1px solid #d1d5db !important;
-  border-radius: 8px !important;
-  font-weight: 500 !important;
-  box-shadow: none !important;
 }
 
 .companies-clear-btn:hover {
