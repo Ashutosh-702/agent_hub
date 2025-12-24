@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetCompaniesQuery } from '../store';
-import { Button, CounterBadge, EmptyState, Input, NotificationBanner, Pagination, Spinner, Typography } from 'novus';
+import { Button, CounterBadge, EmptyState, Input, NotificationBanner, Spinner, Typography } from 'novus';
 import viteLogo from '/vite.svg';
 import type { Company } from '../store';
 
@@ -167,12 +167,13 @@ export const Companies = () => {
                             size="s"
                             type="tertiary"
                             appearance="default"
+                            className="action-btn"
                             onClick={(e: any) => {
                               e.stopPropagation();
                               navigate(`/master-data/companies/${company._id}`);
                             }}
                           >
-                            View
+                            👁️
                           </Button>
                         </td>
                       </tr>
@@ -184,13 +185,36 @@ export const Companies = () => {
 
             {/* Pagination */}
             {pagination && companies.length > 0 && (
-              <Pagination
-                total={pagination.total_records}
-                defaultPageSize={[limit]}
-                value={{ currentActivePage: page, currentPageSize: limit }}
-                onPreviousClick={handlePrevPage}
-                onNextClick={handleNextPage}
-              />
+              <div className="pagination-component">
+                <div className="pagination-info">
+                  Showing page {pagination.page_number}
+                  {pagination.total_records > 0 && ` of ${Math.ceil(pagination.total_records / limit)}`}
+                  {pagination.total_records > 0 && ` (${pagination.total_records} total)`}
+                </div>
+                <div className="pagination-controls">
+                  <Button
+                    type="secondary"
+                    appearance="default"
+                    size="s"
+                    className="pagination-btn"
+                    onClick={handlePrevPage}
+                    disabled={page === 1}
+                  >
+                    ← Previous
+                  </Button>
+                  <span className="pagination-current">Page {page}</span>
+                  <Button
+                    type="secondary"
+                    appearance="default"
+                    size="s"
+                    className="pagination-btn"
+                    onClick={handleNextPage}
+                    disabled={!pagination.has_next}
+                  >
+                    Next →
+                  </Button>
+                </div>
+              </div>
             )}
           </>
         )}

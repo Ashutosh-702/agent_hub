@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { Button, Typography } from 'novus';
 import { useSidebar } from '../context/SidebarContext';
 
 interface MenuItem {
@@ -51,18 +52,23 @@ export const Sidebar = () => {
   return (
     <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       {/* Toggle Button */}
-      <button
+      <Button
+        type="tertiary"
+        appearance="default"
+        size="xs"
         className="sidebar-toggle-btn"
         onClick={toggleSidebar}
         aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         <span className="toggle-icon">{isCollapsed ? '→' : '←'}</span>
-      </button>
+      </Button>
 
       {/* Header */}
       <div className="sidebar-header">
-        <h2>{isCollapsed ? 'AH' : 'Agent Hub'}</h2>
+        <Typography variant="heading-m" type="h2">
+          {isCollapsed ? 'AH' : 'Agent Hub'}
+        </Typography>
       </div>
 
       {/* Navigation */}
@@ -71,7 +77,10 @@ export const Sidebar = () => {
           <div key={item.path} className="sidebar-item-wrapper">
             {item.children ? (
               <>
-                <button
+                <Button
+                  type="tertiary"
+                  appearance="default"
+                  size="m"
                   className={`sidebar-link sidebar-parent ${isChildActive(item) ? 'active' : ''}`}
                   onClick={() => !isCollapsed && toggleExpand(item.path)}
                   title={isCollapsed ? item.label : undefined}
@@ -85,7 +94,7 @@ export const Sidebar = () => {
                       </span>
                     </>
                   )}
-                </button>
+                </Button>
                 {!isCollapsed && expandedItems.includes(item.path) && (
                   <div className="sidebar-children">
                     {item.children.map((child) => (

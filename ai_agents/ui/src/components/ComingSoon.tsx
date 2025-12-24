@@ -1,4 +1,5 @@
 import { useLocation } from 'react-router-dom';
+import { Typography } from 'novus';
 
 export const ComingSoon = () => {
   const location = useLocation();
@@ -14,11 +15,15 @@ export const ComingSoon = () => {
     <div className="coming-soon-page">
       <div className="coming-soon-content">
         <div className="coming-soon-icon">🚀</div>
-        <h1 className="coming-soon-title">Coming Soon</h1>
-        <p className="coming-soon-subtitle">{getPageName()}</p>
-        <p className="coming-soon-description">
+        <Typography variant="heading-xl" type="h1" className="coming-soon-title">
+          Coming Soon
+        </Typography>
+        <Typography variant="body-l" type="p" className="coming-soon-subtitle">
+          {getPageName()}
+        </Typography>
+        <Typography variant="body-m" type="p" className="coming-soon-description">
           We're working hard to bring you this feature. Stay tuned for updates!
-        </p>
+        </Typography>
         <div className="coming-soon-decoration">
           <span className="dot"></span>
           <span className="dot"></span>
