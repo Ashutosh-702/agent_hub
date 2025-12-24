@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useLazyGetCompanyDetailsQuery } from '../store';
 import type { Company, Contact, Pagination } from '../store';
-import { Loader } from './shared';
+import { InfoGrid, Loader } from './shared';
+import type { InfoGridItem } from './shared';
 
 type CompanyDetailsNavState =
   | {
@@ -150,6 +151,23 @@ export const CompanyDetails = () => {
     }
   };
 
+  const companyInfoItems: InfoGridItem[] = company
+    ? [
+        { label: 'Source', value: company.source || '-', valueClassName: 'source-badge' },
+        { label: 'Industry', value: getIndustries(company.profile?.industry) },
+        { label: 'Employees', value: getEmployees(company.profile?.employee_count) },
+        { label: 'Location', value: getLocation(company.location) },
+        {
+          label: 'Revenue Range',
+          value:
+            company.profile?.revenue_min && company.profile?.revenue_max
+              ? `$${company.profile.revenue_min}M - $${company.profile.revenue_max}M`
+              : '-',
+        },
+        { label: 'Created', value: formatDate(company.metadata?.created_at) },
+      ]
+    : [];
+
   return (
     <div className="company-details-container">
       <div className="company-details-card">
@@ -184,36 +202,7 @@ export const CompanyDetails = () => {
             <div className="company-info-section">
               <h1 className="company-details-title">{company.identifiers?.name || 'Unknown Company'}</h1>
               
-              <div className="company-info-grid">
-                <div className="info-item">
-                  <label>Source</label>
-                  <span className="source-badge">{company.source || '-'}</span>
-                </div>
-                <div className="info-item">
-                  <label>Industry</label>
-                  <span>{getIndustries(company.profile?.industry)}</span>
-                </div>
-                <div className="info-item">
-                  <label>Employees</label>
-                  <span>{getEmployees(company.profile?.employee_count)}</span>
-                </div>
-                <div className="info-item">
-                  <label>Location</label>
-                  <span>{getLocation(company.location)}</span>
-                </div>
-                <div className="info-item">
-                  <label>Revenue Range</label>
-                  <span>
-                    {company.profile?.revenue_min && company.profile?.revenue_max
-                      ? `$${company.profile.revenue_min}M - $${company.profile.revenue_max}M`
-                      : '-'}
-                  </span>
-                </div>
-                <div className="info-item">
-                  <label>Created</label>
-                  <span>{formatDate(company.metadata?.created_at)}</span>
-                </div>
-              </div>
+              <InfoGrid className="company-info-grid" items={companyInfoItems} />
             </div>
 
             {/* Contacts Section */}

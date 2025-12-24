@@ -309,7 +309,7 @@ export const Form = () => {
     e.preventDefault();
 
     const payload = {
-      web_prompt: [
+  web_prompt: [
         form[5] && `Comprehensive Outline: ${form[5]}`,
         form[6] && `Mandatory Criteria: ${form[6]}`,
         form[7] && `Relevant Business Models: ${form[7]}`,
@@ -317,21 +317,21 @@ export const Form = () => {
         form[9] && `Exclusion Criteria: ${form[9]}`,
         form[10] && `Reference Companies: ${form[10]}`,
         form[11] && `Other Validations by user: ${form[11]}`
-      ].filter(Boolean).join('\n\n'),
+  ].filter(Boolean).join('\n\n'),
 
-      persona_prompt: [
+  persona_prompt: [
         form[14] && `Job Title(s) of People to be searched: ${form[14]}`, 
         form[15] && `Seniority Level(s): ${form[15]}`,
         form[16] && `Department(s) of people to be searched: ${form[16]}`
-      ].filter(Boolean).join('\n\n'),
+  ].filter(Boolean).join('\n\n'),
 
       industry: form[1],
       employee_count: form[2] || 'null',
-      currency: "USD", 
-      revenue_min: form[21] || 'null',
-      revenue_max: form[22] || 'null',
+  currency: "USD", 
+  revenue_min: form[21] || 'null',
+  revenue_max: form[22] || 'null',
       location: form[4],
-      location_type: locationType,
+  location_type: locationType,
       keywords: 'null',
       categories: 'null',
       hubspot_email: form[17],
@@ -339,8 +339,8 @@ export const Form = () => {
       business_team: form[19],
       user_email: form[20],
       shortlisting_approach: form[0] || 'overall_ai'
-    };
-
+};
+  
     console.log('Payload:', payload);
 
     try {
@@ -751,7 +751,7 @@ export const Form = () => {
                     <div className="campaign-id-display">
                       <span className="label">Campaign ID:</span>
                       <code>{submittedId}</code>
-                    </div>
+                  </div>
                     <p className="success-note">
                       Your campaign has been created and is now being processed.
                     </p>

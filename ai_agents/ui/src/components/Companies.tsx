@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetCompaniesQuery } from '../store';
-import { Loader } from './shared';
+import { DataTable, EmptyState, ErrorBanner, Loader, PageHeader, Pagination } from './shared';
+import type { DataTableColumn } from './shared';
 import type { Company } from '../store';
 
 export const Companies = () => {
@@ -65,15 +66,66 @@ export const Companies = () => {
     return String(company.profile.employee_count);
   };
 
+  const columns: Array<DataTableColumn<Company>> = [
+    {
+      id: 'name',
+      header: 'Company Name',
+      cell: (company) => <span className="company-name">{company.identifiers?.name || '-'}</span>,
+    },
+    {
+      id: 'domain',
+      header: 'Domain',
+      cell: (company) => <span className="company-domain">{getDomain(company)}</span>,
+    },
+    {
+      id: 'industry',
+      header: 'Industry',
+      cell: (company) => (
+        <span title={company.profile?.industry?.join(', ') || ''}>{getIndustry(company)}</span>
+      ),
+    },
+    {
+      id: 'employees',
+      header: 'Employees',
+      cell: (company) => getEmployees(company),
+    },
+    {
+      id: 'contacts',
+      header: 'Contacts',
+      cell: (company) => (
+        <span className="contact-count-badge">{company.contact_count || 0}</span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: (company) => (
+        <button
+          className="action-btn"
+          title="View Details"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/master-data/companies/${company._id}`);
+          }}
+        >
+          👁️
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="companies-container">
       <div className="companies-card">
         {/* Header */}
         <div className="companies-header">
-          <div>
-            <h1 className="companies-title">Companies</h1>
-            <p className="companies-subtitle">View and search company information</p>
-          </div>
+          <PageHeader
+            variant="inline"
+            title="Companies"
+            subtitle="View and search company information"
+            titleClassName="companies-title"
+            subtitleClassName="companies-subtitle"
+          />
         </div>
 
         {/* Search Bar */}
@@ -96,12 +148,7 @@ export const Companies = () => {
         </form>
 
         {/* Error State */}
-        {error && (
-          <div className="error-banner">
-            ❌ Failed to load companies
-            <button className="retry-btn" onClick={() => refetch()}>Retry</button>
-          </div>
-        )}
+        {error && <ErrorBanner message="Failed to load companies" onRetry={() => refetch()} />}
 
         {/* Loading State */}
         {isLoading ? (
@@ -110,88 +157,33 @@ export const Companies = () => {
           <>
             {/* Companies Table */}
             <div className="companies-table-wrapper">
-              <table className="companies-table">
-                <thead>
-                  <tr>
-                    <th>Company Name</th>
-                    <th>Domain</th>
-                    <th>Industry</th>
-                    <th>Employees</th>
-                    <th>Contacts</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {companies.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="empty-state">
-                        <div className="empty-state-content">
-                          <span className="empty-icon">🏢</span>
-                          <p>No companies found</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    companies.map((company) => (
-                      <tr 
-                        key={company._id} 
-                        className="clickable-row"
-                        onClick={() => navigate(`/master-data/companies/${company._id}`)}
-                      >
-                        <td className="company-name">{company.identifiers?.name || '-'}</td>
-                        <td className="company-domain">{getDomain(company)}</td>
-                        <td title={company.profile?.industry?.join(', ')}>{getIndustry(company)}</td>
-                        <td>{getEmployees(company)}</td>
-                        <td>
-                          <span className="contact-count-badge">
-                            {company.contact_count || 0}
-                          </span>
-                        </td>
-                        <td>
-                          <button 
-                            className="action-btn" 
-                            title="View Details"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/master-data/companies/${company._id}`);
-                            }}
-                          >
-                            👁️
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              <DataTable<Company>
+                rows={companies}
+                columns={columns}
+                getRowKey={(c) => c._id}
+                onRowClick={(c) => navigate(`/master-data/companies/${c._id}`)}
+                rowClassName={() => 'clickable-row'}
+                tableClassName="companies-table"
+                emptyState={
+                  <div className="empty-state">
+                    <div className="empty-state-content">
+                      <EmptyState icon="🏢" title="No companies found" />
+                    </div>
+                  </div>
+                }
+              />
             </div>
 
             {/* Pagination */}
             {pagination && companies.length > 0 && (
-              <div className="pagination-container">
-                <div className="pagination-info">
-                  Showing page {pagination.page_number} 
-                  {pagination.total_records > 0 && ` of ${Math.ceil(pagination.total_records / limit)}`}
-                  {pagination.total_records > 0 && ` (${pagination.total_records} total)`}
-                </div>
-                <div className="pagination-controls">
-                  <button
-                    className="pagination-btn"
-                    onClick={handlePrevPage}
-                    disabled={page === 1}
-                  >
-                    ← Previous
-                  </button>
-                  <span className="pagination-current">Page {page}</span>
-                  <button
-                    className="pagination-btn"
-                    onClick={handleNextPage}
-                    disabled={!pagination.has_next}
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
+              <Pagination
+                currentPage={pagination.page_number}
+                totalRecords={pagination.total_records}
+                pageSize={limit}
+                hasNext={pagination.has_next}
+                onPrevious={handlePrevPage}
+                onNext={handleNextPage}
+              />
             )}
           </>
         )}

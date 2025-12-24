@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetCampaignsQuery } from '../store';
-import { Loader } from './shared';
+import { DataTable, EmptyState, ErrorBanner, Loader, PageHeader, Pagination } from './shared';
+import type { DataTableColumn } from './shared';
+import type { Campaign } from '../store';
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   active: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981' },
@@ -42,24 +44,82 @@ export const CampaignList = () => {
     if (pagination?.has_next) setPage(page + 1);
   };
 
+  const columns: Array<DataTableColumn<Campaign>> = [
+    {
+      id: 'campaignId',
+      header: 'Campaign ID',
+      cell: (campaign) => (
+        <span className="campaign-name" title={campaign._id}>
+          {campaign._id.slice(0, 8)}...
+        </span>
+      ),
+    },
+    {
+      id: 'product',
+      header: 'Product',
+      cell: (campaign) => (
+        <span className="product-badge">{campaign.ownership?.product_name || 'N/A'}</span>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: (campaign) => (
+        <span
+          className="status-badge"
+          style={{
+            backgroundColor: statusColors[campaign.lifecycle?.status]?.bg || statusColors.draft.bg,
+            color: statusColors[campaign.lifecycle?.status]?.text || statusColors.draft.text,
+          }}
+        >
+          {campaign.lifecycle?.status || 'unknown'}
+        </span>
+      ),
+    },
+    {
+      id: 'companies',
+      header: 'Companies',
+      cell: (campaign) => campaign.company_mappings_count || 0,
+    },
+    {
+      id: 'created',
+      header: 'Created',
+      cell: (campaign) => formatDate(campaign.metadata?.created_at),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: (campaign) => (
+        <button
+          className="action-btn"
+          title="View Details"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/master-data/campaign/${campaign._id}`);
+          }}
+        >
+          👁️
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="campaign-list-container">
       <div className="campaign-list-card">
         {/* Header */}
         <div className="campaign-list-header">
-          <div>
-            <h1 className="campaign-list-title">Campaigns</h1>
-            <p className="campaign-list-subtitle">View all your outreach campaigns</p>
-          </div>
+          <PageHeader
+            variant="inline"
+            title="Campaigns"
+            subtitle="View all your outreach campaigns"
+            titleClassName="campaign-list-title"
+            subtitleClassName="campaign-list-subtitle"
+          />
         </div>
 
         {/* Error State */}
-        {error && (
-          <div className="error-banner">
-            ❌ Failed to load campaigns
-            <button className="retry-btn" onClick={() => refetch()}>Retry</button>
-          </div>
-        )}
+        {error && <ErrorBanner message="Failed to load campaigns" onRetry={() => refetch()} />}
 
         {/* Loading State */}
         {isLoading ? (
@@ -68,101 +128,37 @@ export const CampaignList = () => {
           <>
             {/* Campaigns Table */}
             <div className="campaigns-table-wrapper">
-              <table className="campaigns-table">
-                <thead>
-                  <tr>
-                    <th>Campaign ID</th>
-                    <th>Product</th>
-                    <th>Status</th>
-                    <th>Companies</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {campaigns.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="empty-state">
-                        <div className="empty-state-content">
-                          <span className="empty-icon">📋</span>
-                          <p>No campaigns yet</p>
-                          <p className="empty-state-hint">Go to Prospecting → Wide Prospecting to create a campaign</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    campaigns.map((campaign) => (
-                      <tr 
-                        key={campaign._id}
-                        className="clickable-row"
-                        onClick={() => navigate(`/master-data/campaign/${campaign._id}`)}
-                      >
-                        <td className="campaign-name" title={campaign._id}>
-                          {campaign._id.slice(0, 8)}...
-                        </td>
-                        <td>
-                          <span className="product-badge">
-                            {campaign.ownership?.product_name || 'N/A'}
-                          </span>
-                        </td>
-                        <td>
-                          <span
-                            className="status-badge"
-                            style={{
-                              backgroundColor: statusColors[campaign.lifecycle?.status]?.bg || statusColors.draft.bg,
-                              color: statusColors[campaign.lifecycle?.status]?.text || statusColors.draft.text,
-                            }}
-                          >
-                            {campaign.lifecycle?.status || 'unknown'}
-                          </span>
-                        </td>
-                        <td>{campaign.company_mappings_count || 0}</td>
-                        <td>{formatDate(campaign.metadata?.created_at)}</td>
-                        <td>
-                          <button 
-                            className="action-btn" 
-                            title="View Details"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/master-data/campaign/${campaign._id}`);
-                            }}
-                          >
-                            👁️
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              <DataTable<Campaign>
+                rows={campaigns}
+                columns={columns}
+                getRowKey={(c) => c._id}
+                onRowClick={(c) => navigate(`/master-data/campaign/${c._id}`)}
+                rowClassName={() => 'clickable-row'}
+                tableClassName="campaigns-table"
+                emptyState={
+                  <div className="empty-state">
+                    <div className="empty-state-content">
+                      <EmptyState
+                        icon="📋"
+                        title="No campaigns yet"
+                        description="Go to Prospecting → Wide Prospecting to create a campaign"
+                      />
+                    </div>
+                  </div>
+                }
+              />
             </div>
 
             {/* Pagination */}
             {pagination && campaigns.length > 0 && (
-              <div className="pagination-container">
-                <div className="pagination-info">
-                  Showing page {pagination.page_number} 
-                  {pagination.total_records > 0 && ` of ${Math.ceil(pagination.total_records / limit)}`}
-                  {pagination.total_records > 0 && ` (${pagination.total_records} total)`}
-                </div>
-                <div className="pagination-controls">
-                  <button
-                    className="pagination-btn"
-                    onClick={handlePrevPage}
-                    disabled={page === 1}
-                  >
-                    ← Previous
-                  </button>
-                  <span className="pagination-current">Page {page}</span>
-                  <button
-                    className="pagination-btn"
-                    onClick={handleNextPage}
-                    disabled={!pagination.has_next}
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
+              <Pagination
+                currentPage={pagination.page_number}
+                totalRecords={pagination.total_records}
+                pageSize={limit}
+                hasNext={pagination.has_next}
+                onPrevious={handlePrevPage}
+                onNext={handleNextPage}
+              />
             )}
           </>
         )}

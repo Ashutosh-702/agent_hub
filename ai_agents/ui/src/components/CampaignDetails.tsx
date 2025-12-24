@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGetCampaignDetailsQuery } from '../store';
 import type { CampaignCompany } from '../store';
-import { Loader } from './shared';
+import { InfoGrid, Loader } from './shared';
+import type { InfoGridItem } from './shared';
 
 // Polling interval in milliseconds (5 seconds)
 const POLLING_INTERVAL = 5000;
@@ -141,6 +142,26 @@ export const CampaignDetails = () => {
     setPage(1); // Reset to first page when filter changes
   };
 
+  const infoItems: InfoGridItem[] = campaign
+    ? [
+        { label: 'Business Team', value: campaign.ownership?.business_team || '-' },
+        { label: 'Owner Email', value: campaign.ownership?.user_email || '-' },
+        { label: 'HubSpot Email', value: campaign.ownership?.hubspot_email || '-' },
+        { label: 'Shortlisting Approach', value: shortlistingApproachLabel(campaign.shortlisting_approach) },
+        { label: 'Target Industries', value: campaign.segmentation?.industry?.join(', ') || '-' },
+        { label: 'Employee Range', value: campaign.target?.employee_count?.join(', ') || '-' },
+        {
+          label: 'Revenue Range',
+          value:
+            campaign.target?.revenue_min && campaign.target?.revenue_max
+              ? `$${campaign.target.revenue_min}M - $${campaign.target.revenue_max}M`
+              : '-',
+        },
+        { label: 'Locations', value: campaign.target?.location?.names?.join(', ') || '-' },
+        { label: 'Created', value: formatDate(campaign.metadata?.created_at) },
+      ]
+    : [];
+
   return (
     <div className="campaign-details-container">
       <div className="campaign-details-card">
@@ -198,48 +219,7 @@ export const CampaignDetails = () => {
                 </div>
               </div>
 
-              <div className="campaign-info-grid">
-                <div className="info-item">
-                  <label>Business Team</label>
-                  <span>{campaign.ownership?.business_team || '-'}</span>
-                </div>
-                <div className="info-item">
-                  <label>Owner Email</label>
-                  <span>{campaign.ownership?.user_email || '-'}</span>
-                </div>
-                <div className="info-item">
-                  <label>HubSpot Email</label>
-                  <span>{campaign.ownership?.hubspot_email || '-'}</span>
-                </div>
-                <div className="info-item">
-                  <label>Shortlisting Approach</label>
-                  <span>{shortlistingApproachLabel(campaign.shortlisting_approach)}</span>
-                </div>
-                <div className="info-item">
-                  <label>Target Industries</label>
-                  <span>{campaign.segmentation?.industry?.join(', ') || '-'}</span>
-                </div>
-                <div className="info-item">
-                  <label>Employee Range</label>
-                  <span>{campaign.target?.employee_count?.join(', ') || '-'}</span>
-                </div>
-                <div className="info-item">
-                  <label>Revenue Range</label>
-                  <span>
-                    {campaign.target?.revenue_min && campaign.target?.revenue_max
-                      ? `$${campaign.target.revenue_min}M - $${campaign.target.revenue_max}M`
-                      : '-'}
-                  </span>
-                </div>
-                <div className="info-item">
-                  <label>Locations</label>
-                  <span>{campaign.target?.location?.names?.join(', ') || '-'}</span>
-                </div>
-                <div className="info-item">
-                  <label>Created</label>
-                  <span>{formatDate(campaign.metadata?.created_at)}</span>
-                </div>
-              </div>
+              <InfoGrid className="campaign-info-grid" items={infoItems} />
 
               {/* Progress Stats */}
               <div className="campaign-progress-section">
