@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGetCampaignsQuery } from '../store';
 import { Loader } from './shared';
 
@@ -10,6 +11,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 };
 
 export const CampaignList = () => {
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const limit = 10;
 
@@ -90,7 +92,11 @@ export const CampaignList = () => {
                     </tr>
                   ) : (
                     campaigns.map((campaign) => (
-                      <tr key={campaign._id}>
+                      <tr 
+                        key={campaign._id}
+                        className="clickable-row"
+                        onClick={() => navigate(`/master-data/campaign/${campaign._id}`)}
+                      >
                         <td className="campaign-name" title={campaign._id}>
                           {campaign._id.slice(0, 8)}...
                         </td>
@@ -113,11 +119,15 @@ export const CampaignList = () => {
                         <td>{campaign.company_mappings_count || 0}</td>
                         <td>{formatDate(campaign.metadata?.created_at)}</td>
                         <td>
-                          <button className="action-btn" title="View">
+                          <button 
+                            className="action-btn" 
+                            title="View Details"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/master-data/campaign/${campaign._id}`);
+                            }}
+                          >
                             👁️
-                          </button>
-                          <button className="action-btn" title="Edit">
-                            ✏️
                           </button>
                         </td>
                       </tr>

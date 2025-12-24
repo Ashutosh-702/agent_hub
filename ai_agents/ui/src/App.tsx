@@ -5,6 +5,7 @@ import { Form } from './components/FormNew';
 import { Companies } from './components/Companies';
 import { CompanyDetails } from './components/CompanyDetails';
 import { CampaignList } from './components/CampaignList';
+import { CampaignDetails } from './components/CampaignDetails';
 import { ComingSoon } from './components/ComingSoon';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 
@@ -20,6 +21,7 @@ function AppContent() {
             <Route path="/campaign" element={<Navigate to="/master-data/campaign" replace />} />
             <Route path="/master-data" element={<Navigate to="/master-data/campaign" replace />} />
             <Route path="/master-data/campaign" element={<CampaignList />} />
+            <Route path="/master-data/campaign/:campaignId" element={<CampaignDetails />} />
             <Route path="/master-data/companies" element={<Companies />} />
             <Route path="/master-data/companies/:companyId" element={<CompanyDetails />} />
             <Route path="/prospecting" element={<Navigate to="/prospecting/wide" replace />} />

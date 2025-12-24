@@ -702,11 +702,25 @@ export const Form = () => {
 
         {submitted && (
               <div className="success-message">
-                ✅ Submitted successfully!
+                <div className="success-icon">✅</div>
+                <h2>Campaign Created Successfully!</h2>
                 {submittedId && (
-                  <div style={{ marginTop: 8 }}>
-                    <strong>Please store this Campaign ID and share with the technical team for updates:</strong> <code>{submittedId}</code>
-                  </div>
+                  <>
+                    <div className="campaign-id-display">
+                      <span className="label">Campaign ID:</span>
+                      <code>{submittedId}</code>
+                    </div>
+                    <p className="success-note">
+                      Your campaign has been created and is now being processed.
+                    </p>
+                    <button
+                      type="button"
+                      className="check-progress-btn"
+                      onClick={() => navigate(`/master-data/campaign/${submittedId}`)}
+                    >
+                      📊 Check Progress
+                    </button>
+                  </>
                 )}
               </div>
             )}
