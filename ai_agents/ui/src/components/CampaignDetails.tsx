@@ -22,12 +22,25 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 
 type CompanyStatusFilter = 'all' | 'true' | 'false';
 
+const shortlistingApproachLabel = (value?: string) => {
+  if (!value) return '-';
+  const normalized = value.trim().toLowerCase();
+  const map: Record<string, string> = {
+    manual_company: 'Manual Company Shortlisting',
+    overall_manual: 'Overall Manual Shortlisting (Company + Contact)',
+    overall_ai: 'Overall AI Shortlisting (Company + Contact)',
+  };
+  return map[normalized] || value;
+};
+
 export const CampaignDetails = () => {
   const { campaignId } = useParams<{ campaignId: string }>();
   const navigate = useNavigate();
   
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<CompanyStatusFilter>('all');
+  // Local-only (mock) overrides for manual shortlisting mode; keyed by campaign_company mapping `_id`
+  const [manualCompanyStatus, setManualCompanyStatus] = useState<Record<string, boolean>>({});
   const limit = 10;
 
   // Convert filter value to API param
@@ -58,6 +71,24 @@ export const CampaignDetails = () => {
   const campaign = data?.data?.campaign;
   const companies = data?.data?.companies || [];
   const pagination = data?.pagination;
+  const isManualCompanyShortlisting =
+    campaign?.shortlisting_approach === 'manual_company' ||
+    campaign?.shortlisting_approach === 'overall_manual';
+
+  const getEffectiveCompanyStatus = (company: CampaignCompany) => {
+    const override = manualCompanyStatus[company._id];
+    return override !== undefined ? override : company.company_status;
+  };
+
+  const displayedCompanies =
+    statusFilter === 'all'
+      ? companies
+      : companies.filter(c => String(getEffectiveCompanyStatus(c)) === statusFilter);
+
+  // Reset local overrides when switching campaigns
+  useEffect(() => {
+    setManualCompanyStatus({});
+  }, [campaignId]);
 
   // Update polling state based on campaign lifecycle status
   useEffect(() => {
@@ -87,9 +118,9 @@ export const CampaignDetails = () => {
   };
 
   const getStatusStats = () => {
-    const stats = { shortlisted: 0, notShortlisted: 0, total: companies.length };
-    companies.forEach(c => {
-      if (c.company_status) stats.shortlisted++;
+    const stats = { shortlisted: 0, notShortlisted: 0, total: displayedCompanies.length };
+    displayedCompanies.forEach(c => {
+      if (getEffectiveCompanyStatus(c)) stats.shortlisted++;
       else stats.notShortlisted++;
     });
     return stats;
@@ -181,6 +212,10 @@ export const CampaignDetails = () => {
                   <span>{campaign.ownership?.hubspot_email || '-'}</span>
                 </div>
                 <div className="info-item">
+                  <label>Shortlisting Approach</label>
+                  <span>{shortlistingApproachLabel(campaign.shortlisting_approach)}</span>
+                </div>
+                <div className="info-item">
                   <label>Target Industries</label>
                   <span>{campaign.segmentation?.industry?.join(', ') || '-'}</span>
                 </div>
@@ -233,11 +268,12 @@ export const CampaignDetails = () => {
                 
                 {/* Status Filter */}
                 <div className="status-filter">
-                  <label>Status:</label>
+                  <label>Filter by status:</label>
                   <select 
                     value={statusFilter} 
                     onChange={(e) => handleStatusFilterChange(e.target.value as CompanyStatusFilter)}
                     className="status-filter-select"
+                    title="Filters the list only (does not update status)"
                   >
                     <option value="all">All</option>
                     <option value="true">Shortlisted</option>
@@ -260,7 +296,7 @@ export const CampaignDetails = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {companies.length === 0 ? (
+                    {displayedCompanies.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="empty-state">
                           <div className="empty-state-content">
@@ -278,25 +314,50 @@ export const CampaignDetails = () => {
                         </td>
                       </tr>
                     ) : (
-                      companies.map((company: CampaignCompany) => (
+                      displayedCompanies.map((company: CampaignCompany) => (
                         <tr 
                           key={company._id}
                           className="clickable-row"
-                          onClick={() => navigate(`/master-data/companies/${company.company_id}`)}
+                          onClick={() =>
+                            navigate(`/master-data/companies/${company.company_id}`, {
+                              state: {
+                                from: 'campaign',
+                                campaignId,
+                                shortlistingApproach: campaign?.shortlisting_approach,
+                              },
+                            })
+                          }
                         >
                           <td className="company-id-cell" title={company.company_id}>
                             {company.company_id.slice(0, 12)}...
                           </td>
                           <td>
-                            <span
-                              className="status-badge"
-                              style={{
-                                backgroundColor: statusColors[String(company.company_status)]?.bg,
-                                color: statusColors[String(company.company_status)]?.text,
-                              }}
-                            >
-                              {company.company_status ? 'Shortlisted' : 'Not Shortlisted'}
-                            </span>
+                            {isManualCompanyShortlisting ? (
+                              <select
+                                className="status-filter-select"
+                                value={String(getEffectiveCompanyStatus(company))}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  const next = e.target.value === 'true';
+                                  setManualCompanyStatus(prev => ({ ...prev, [company._id]: next }));
+                                }}
+                                title="Mock update (API will be added later)"
+                              >
+                                <option value="true">Shortlisted</option>
+                                <option value="false">Not Shortlisted</option>
+                              </select>
+                            ) : (
+                              <span
+                                className="status-badge"
+                                style={{
+                                  backgroundColor: statusColors[String(company.company_status)]?.bg,
+                                  color: statusColors[String(company.company_status)]?.text,
+                                }}
+                              >
+                                {company.company_status ? 'Shortlisted' : 'Not Shortlisted'}
+                              </span>
+                            )}
                           </td>
                           <td>
                             <span
@@ -338,7 +399,13 @@ export const CampaignDetails = () => {
                               title="View Company"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/master-data/companies/${company.company_id}`);
+                                navigate(`/master-data/companies/${company.company_id}`, {
+                                  state: {
+                                    from: 'campaign',
+                                    campaignId,
+                                    shortlistingApproach: campaign?.shortlisting_approach,
+                                  },
+                                });
                               }}
                             >
                               👁️

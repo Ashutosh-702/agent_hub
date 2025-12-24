@@ -2,6 +2,8 @@ import { baseApi } from './baseApi';
 
 export interface Campaign {
   _id: string;
+  // Selected during campaign creation (optional for backwards compatibility)
+  shortlisting_approach?: string;
   prompts: {
     web: string;
     persona: string;
@@ -77,6 +79,7 @@ export interface CreateCampaignPayload {
   product_name: string;
   business_team: string;
   user_email: string;
+  shortlisting_approach: string;
 }
 
 export interface CreateCampaignResponse {

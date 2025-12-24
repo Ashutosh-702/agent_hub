@@ -1,12 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useLazyGetCompanyDetailsQuery } from '../store';
 import type { Company, Contact, Pagination } from '../store';
 import { Loader } from './shared';
 
+type CompanyDetailsNavState =
+  | {
+      from: 'campaign';
+      campaignId?: string;
+      shortlistingApproach?: string;
+    }
+  | undefined;
+
 export const CompanyDetails = () => {
   const { companyId } = useParams<{ companyId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navState = location.state as CompanyDetailsNavState;
+  const isFromCampaign = navState?.from === 'campaign';
+  // Contacts should be manually shortlisted only for `overall_manual`
+  const isOverallManualShortlisting = navState?.shortlistingApproach === 'overall_manual';
+  const showContactManualShortlisting = isFromCampaign && isOverallManualShortlisting;
   
   // RTK Query lazy hook for manual triggering (needed for infinite scroll)
   const [fetchDetails, { isLoading: isInitialLoading, error }] = useLazyGetCompanyDetailsQuery();
@@ -16,6 +30,8 @@ export const CompanyDetails = () => {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  // Local-only (mock) overrides for manual contact shortlisting; keyed by contact `_id`
+  const [manualContactStatus, setManualContactStatus] = useState<Record<string, boolean>>({});
   
   // Pagination for contacts
   const [page, setPage] = useState(1);
@@ -79,6 +95,11 @@ export const CompanyDetails = () => {
     fetchCompanyDetails(1, false);
   }, [companyId, fetchCompanyDetails]);
 
+  // Reset local overrides when switching companies
+  useEffect(() => {
+    setManualContactStatus({});
+  }, [companyId]);
+
   // Handle scroll to load more
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const container = e.currentTarget;
@@ -135,9 +156,15 @@ export const CompanyDetails = () => {
         {/* Back Button */}
         <button
           className="back-to-companies-btn"
-          onClick={() => navigate('/master-data/companies')}
+          onClick={() => {
+            if (isFromCampaign && navState?.campaignId) {
+              navigate(`/master-data/campaign/${navState.campaignId}`);
+              return;
+            }
+            navigate('/master-data/companies');
+          }}
         >
-          ← Back to Companies
+          ← Back
         </button>
 
         {/* Error State */}
@@ -249,6 +276,23 @@ export const CompanyDetails = () => {
                               </a>
                             ) : <span className="col-value">-</span>}
                           </div>
+                          {showContactManualShortlisting && (
+                            <div className="contact-col">
+                              <span className="col-label">Shortlist</span>
+                              <select
+                                className="status-filter-select"
+                                value={String(manualContactStatus[contact._id] ?? false)}
+                                onChange={(e) => {
+                                  const next = e.target.value === 'true';
+                                  setManualContactStatus(prev => ({ ...prev, [contact._id]: next }));
+                                }}
+                                title="Mock update (API will be added later)"
+                              >
+                                <option value="true">Shortlisted</option>
+                                <option value="false">Not Shortlisted</option>
+                              </select>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))

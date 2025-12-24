@@ -26,8 +26,8 @@ class ResponseData(BaseModel):
 
 
 class FormSubmission(BaseModel):
-    web_prompt: str
-    persona_prompt: str
+    web_prompt: Optional[str] = None
+    persona_prompt: Optional[str] = None
     industry: str
     employee_count: Optional[str] = None
     revenue_min: Optional[str] = None
@@ -41,6 +41,7 @@ class FormSubmission(BaseModel):
     product_name: str
     business_team: str
     user_email: str
+    shortlisting_approach: str
 
     @field_validator('hubspot_email')
     def validate_hubspot_email(cls, hubspot_email):

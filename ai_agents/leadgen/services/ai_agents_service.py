@@ -111,6 +111,7 @@ class CampaignService:
                 "user_email": form_submission.user_email
             },
             "lifecycle": {"status": "active"},
+            "shortlisting_approach": form_submission.shortlisting_approach,
             "metadata": {
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow()

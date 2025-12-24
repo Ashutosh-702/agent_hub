@@ -825,6 +825,67 @@ html, body {
   cursor: not-allowed;
 }
 
+/* Shortlisting Approach Options */
+.shortlisting-approach-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.shortlisting-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shortlisting-option:hover {
+  border-color: #6366f1;
+  background: #f5f3ff;
+}
+
+.shortlisting-option.selected {
+  border-color: #6366f1;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+.shortlisting-option input[type="radio"] {
+  margin-top: 0.25rem;
+  width: 20px;
+  height: 20px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+.shortlisting-option .option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.shortlisting-option .option-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.shortlisting-option .option-description {
+  font-size: 0.9rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.shortlisting-option.selected .option-label {
+  color: #4f46e5;
+}
+
 /* Success text */
 .success-message {
   text-align: center;
