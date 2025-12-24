@@ -87,6 +87,40 @@ export interface CreateCampaignResponse {
   message?: string;
 }
 
+// Campaign Details with Companies
+export interface CampaignCompany {
+  _id: string;
+  campaign_id: string;
+  company_id: string;
+  company_status: boolean;
+  linkedin_contact_status: boolean;
+  is_relevant: boolean;
+  metadata: {
+    created_at: string;
+    updated_at: string;
+    confidence_level?: string;
+    key_factors?: string[];
+    relevance_reason?: string;
+  };
+}
+
+export interface CampaignDetailsResponse {
+  success: boolean;
+  data: {
+    campaign: Campaign;
+    companies: CampaignCompany[];
+  };
+  pagination: Pagination | null;
+  errors: string[];
+}
+
+export interface GetCampaignDetailsParams {
+  campaign_id: string;
+  company_status?: boolean;
+  page: number;
+  limit: number;
+}
+
 export const campaignApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getCampaigns: builder.query<CampaignsResponse, GetCampaignsParams>({
@@ -113,8 +147,32 @@ export const campaignApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ['Campaign'],
     }),
+    
+    getCampaignDetails: builder.query<CampaignDetailsResponse, GetCampaignDetailsParams>({
+      query: ({ campaign_id, company_status, page, limit }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          page: page.toString(),
+          limit: limit.toString(),
+        });
+        
+        // Only add company_status if it's explicitly true or false
+        if (company_status !== undefined) {
+          params.append('company_status', company_status.toString());
+        }
+        
+        return `/api/v1/campaign_details_with_companies?${params}`;
+      },
+      providesTags: (_result, _error, { campaign_id }) => [
+        { type: 'Campaign', id: campaign_id },
+      ],
+    }),
   }),
 });
 
-export const { useGetCampaignsQuery, useCreateCampaignMutation } = campaignApi;
+export const { 
+  useGetCampaignsQuery, 
+  useCreateCampaignMutation,
+  useGetCampaignDetailsQuery,
+} = campaignApi;
 

@@ -17,7 +17,8 @@ from ai_agents.leadgen.views.ai_agents import (
     apollo_contact_enrichment,
     get_campaigns,
     get_companies,
-    get_company_details_with_contacts
+    get_company_details_with_contacts,
+    get_campaign_details_with_companies
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -124,5 +125,12 @@ router.add_api_route(
     "/company_details_with_contacts",
     methods=["GET"],
     endpoint=get_company_details_with_contacts,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/campaign_details_with_companies",
+    methods=["GET"],
+    endpoint=get_campaign_details_with_companies,
     response_model=ResponseData,
 )

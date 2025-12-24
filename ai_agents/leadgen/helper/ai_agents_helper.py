@@ -20,6 +20,7 @@ import asyncio
 from ai_agents.leadgen.schemas.ai_agents import Campaigns, Companies, CompanyContacts
 from ai_agents.leadgen.services.ai_agents_service import CampaignService
 from ai_agents.leadgen.utils import serialize_objectid
+from ai_agents.leadgen.schemas.ai_agents import CampaignDetailsWithCompanies
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -370,6 +371,17 @@ class CampaignsHelper:
             company_mappings_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign["_id"], "is_relevant": True})
             campaign["company_mappings_count"] = company_mappings_count
         return campaigns
+
+    async def get_campaign_details_with_companies(self, query_params: CampaignDetailsWithCompanies):
+        campaign = await self.campaign_service.get_campaign_details(query_params.campaign_id)
+        query = {}
+        query["campaign_id"] = query_params.campaign_id
+        if query_params.company_status != None:
+            query["is_relevant"] = query_params.company_status
+        companies, pagination_info = await self.campaign_company_runs_dao.get_campaign_company_runs_paginated(query, query_params.page, query_params.limit)
+        serialized_campaign = serialize_objectid(campaign)
+        serialized_companies = serialize_objectid(companies)
+        return {"campaign": serialized_campaign, "companies": serialized_companies, "pagination_info": pagination_info}
 
 class CompaniesHelper:
 

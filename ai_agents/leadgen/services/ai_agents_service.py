@@ -176,6 +176,13 @@ class CampaignService:
         serialized_campaigns = serialize_objectid(campaigns)
         return {"campaigns": serialized_campaigns, "pagination_info": pagination_info}
 
+    async def get_campaign_details(self, campaign_id: str):
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException(f"Campaign not found with id {campaign_id}")
+        serialized_campaign = serialize_objectid(campaign)
+        return {"campaign": serialized_campaign}
+
 
 class CompanyService:
     def __init__(self):

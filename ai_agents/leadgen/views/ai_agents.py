@@ -16,7 +16,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     ApolloContactEnrichment,
     Campaigns,
     Companies,
-    CompanyContacts
+    CompanyContacts,
+    CampaignDetailsWithCompanies
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -213,4 +214,15 @@ async def get_company_details_with_contacts(query_params: CompanyContacts = Depe
     response_data.data["contacts"] = response.get("contacts")
     response_data.pagination = response.get("pagination_info")
 
+    return response_data.dict()
+
+async def get_campaign_details_with_companies(query_params: CampaignDetailsWithCompanies = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_campaigns_helper = CampaignsHelper()
+
+    response = await leadgen_campaigns_helper.get_campaign_details_with_companies(query_params)
+    response_data.success = True
+    response_data.data = response.get("campaign")
+    response_data.data["companies"] = response.get("companies")
+    response_data.pagination = response.get("pagination_info")
     return response_data.dict()

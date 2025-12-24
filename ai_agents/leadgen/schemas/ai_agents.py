@@ -5,8 +5,10 @@ from re import match
 from typing import Dict, List, Optional, Union
 from uuid import uuid4
 
+from attr.converters import optional
 from pydantic import BaseModel, Field, field_validator
 
+from database.collection_dao import campaign_company_runs
 from global_utils.constants import EMAIL_REGEX
 
 
@@ -121,6 +123,13 @@ class CompanyContacts(BaseModel):
     company_id: str
     page: int = 1
     limit: int = 10
+
+class CampaignDetailsWithCompanies(BaseModel):
+    campaign_id: str
+    company_status: Optional[bool] = None
+    page: int = 1
+    limit: int = 10
+
 
 class ApolloContactEnrichment(BaseModel):
     company_domain: List[str] = Field(description="List of company domains to enrich contacts for")

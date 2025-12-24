@@ -44,7 +44,8 @@ class IntegrationOrchestrator:
         """Core function to process company search"""
         total_company_data = []
         
-        try:    
+        try:
+            await self.campaigns_dao.update_campaign_status(self.campaign_id,"started")
             logger.info("Fetching companies from lusha...")
             # inserted_count = await self.lusha_helper.get_companies_from_lusha(self.config)
             inserted_count = await self.apollo_helper.get_companies_from_apollo(self.config)
@@ -68,6 +69,8 @@ class IntegrationOrchestrator:
 
         except Exception as e:
             logger.error(f"Error while processing company search for campaign {self.campaign_id}: {str(e)}")
+            await self.campaigns_dao.update_campaign_status(self.campaign_id,"failed")
+        
 
         finally:
             return {

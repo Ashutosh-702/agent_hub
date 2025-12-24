@@ -1,138 +1,75 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGetCampaignDetailsQuery } from '../store';
+import type { CampaignCompany } from '../store';
 import { Loader } from './shared';
 
-// Mock data for campaign details
-const mockCampaignData = {
-  _id: '68d1402f508284770d48685c',
-  ownership: {
-    product_name: 'Fynd Platform',
-    hubspot_email: 'sales@fynd.com',
-    business_team: 'Enterprise Sales',
-    user_email: 'john.doe@fynd.com',
-  },
-  lifecycle: {
-    status: 'active',
-  },
-  segmentation: {
-    industry: ['Technology', 'E-commerce'],
-    keywords: 'saas, platform, retail',
-    categories: 'B2B, Enterprise',
-  },
-  target: {
-    employee_count: ['201-500', '501-1000'],
-    revenue_min: '10',
-    revenue_max: '100',
-    currency: 'USD',
-    location: {
-      type: 'country',
-      names: ['United States', 'India', 'UK'],
-    },
-  },
-  metadata: {
-    created_at: '2025-01-15T10:30:00.000Z',
-    updated_at: '2025-01-20T14:45:00.000Z',
-  },
-  company_mappings_count: 15,
-};
-
-// Mock companies data
-const mockCompanies = [
-  {
-    _id: '1',
-    name: 'TechCorp Solutions',
-    domain: 'techcorp.com',
-    industry: 'Technology',
-    employees: '201-500',
-    status: 'enriched',
-    contacts_count: 8,
-  },
-  {
-    _id: '2',
-    name: 'RetailMax Inc',
-    domain: 'retailmax.io',
-    industry: 'E-commerce',
-    employees: '501-1000',
-    status: 'pending',
-    contacts_count: 0,
-  },
-  {
-    _id: '3',
-    name: 'CloudNine Systems',
-    domain: 'cloudnine.tech',
-    industry: 'Cloud Computing',
-    employees: '51-200',
-    status: 'enriched',
-    contacts_count: 12,
-  },
-  {
-    _id: '4',
-    name: 'DataFlow Analytics',
-    domain: 'dataflow.ai',
-    industry: 'Data Analytics',
-    employees: '11-50',
-    status: 'processing',
-    contacts_count: 3,
-  },
-  {
-    _id: '5',
-    name: 'FinServe Global',
-    domain: 'finserve.com',
-    industry: 'Finance',
-    employees: '1001-5000',
-    status: 'enriched',
-    contacts_count: 15,
-  },
-  {
-    _id: '6',
-    name: 'HealthTech Pro',
-    domain: 'healthtechpro.com',
-    industry: 'Healthcare',
-    employees: '201-500',
-    status: 'failed',
-    contacts_count: 0,
-  },
-  {
-    _id: '7',
-    name: 'EduLearn Platform',
-    domain: 'edulearn.io',
-    industry: 'Education',
-    employees: '51-200',
-    status: 'enriched',
-    contacts_count: 6,
-  },
-  {
-    _id: '8',
-    name: 'LogiChain Solutions',
-    domain: 'logichain.com',
-    industry: 'Logistics',
-    employees: '501-1000',
-    status: 'pending',
-    contacts_count: 0,
-  },
-];
+// Polling interval in milliseconds (5 seconds)
+const POLLING_INTERVAL = 5000;
 
 const statusColors: Record<string, { bg: string; text: string }> = {
-  enriched: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981' },
-  pending: { bg: 'rgba(156, 163, 175, 0.15)', text: '#9ca3af' },
-  processing: { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' },
-  failed: { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444' },
+  true: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981' },
+  false: { bg: 'rgba(245, 158, 11, 0.15)', text: '#f59e0b' },
   active: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981' },
+  started: { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' },
   completed: { bg: 'rgba(99, 102, 241, 0.15)', text: '#6366f1' },
   draft: { bg: 'rgba(156, 163, 175, 0.15)', text: '#9ca3af' },
   paused: { bg: 'rgba(245, 158, 11, 0.15)', text: '#f59e0b' },
+  high: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981' },
+  medium: { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' },
+  low: { bg: 'rgba(245, 158, 11, 0.15)', text: '#f59e0b' },
 };
+
+type CompanyStatusFilter = 'all' | 'true' | 'false';
 
 export const CampaignDetails = () => {
   const { campaignId } = useParams<{ campaignId: string }>();
   const navigate = useNavigate();
   
-  // Simulate loading state
-  const [isLoading] = useState(false);
-  
-  // Use mock data
-  const campaign = mockCampaignData;
-  const companies = mockCompanies;
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<CompanyStatusFilter>('all');
+  const limit = 10;
+
+  // Convert filter value to API param
+  const getCompanyStatusParam = (): boolean | undefined => {
+    if (statusFilter === 'true') return true;
+    if (statusFilter === 'false') return false;
+    return undefined; // 'all' - don't send parameter
+  };
+
+  // State to track if polling is active
+  const [isPolling, setIsPolling] = useState(false);
+
+  // RTK Query hook with conditional polling
+  const { data, isLoading, isFetching, error, refetch } = useGetCampaignDetailsQuery(
+    {
+      campaign_id: campaignId || '',
+      company_status: getCompanyStatusParam(),
+      page,
+      limit,
+    },
+    { 
+      skip: !campaignId,
+      // Poll every 5 seconds only if campaign status is 'started'
+      pollingInterval: isPolling ? POLLING_INTERVAL : 0,
+    }
+  );
+
+  const campaign = data?.data?.campaign;
+  const companies = data?.data?.companies || [];
+  const pagination = data?.pagination;
+
+  // Update polling state based on campaign lifecycle status
+  useEffect(() => {
+    if (campaign?.lifecycle?.status === 'started') {
+      setIsPolling(true);
+    } else {
+      setIsPolling(false);
+    }
+  }, [campaign?.lifecycle?.status]);
+
+  // Show polling indicator when fetching in background (not initial load)
+  const isBackgroundFetching = isFetching && !isLoading;
 
   const formatDate = (dateString: string) => {
     try {
@@ -150,21 +87,28 @@ export const CampaignDetails = () => {
   };
 
   const getStatusStats = () => {
-    const stats = {
-      enriched: 0,
-      pending: 0,
-      processing: 0,
-      failed: 0,
-    };
+    const stats = { shortlisted: 0, notShortlisted: 0, total: companies.length };
     companies.forEach(c => {
-      if (stats[c.status as keyof typeof stats] !== undefined) {
-        stats[c.status as keyof typeof stats]++;
-      }
+      if (c.company_status) stats.shortlisted++;
+      else stats.notShortlisted++;
     });
     return stats;
   };
 
   const stats = getStatusStats();
+
+  const handlePrevPage = () => {
+    if (page > 1) setPage(page - 1);
+  };
+
+  const handleNextPage = () => {
+    if (pagination?.has_next) setPage(page + 1);
+  };
+
+  const handleStatusFilterChange = (newFilter: CompanyStatusFilter) => {
+    setStatusFilter(newFilter);
+    setPage(1); // Reset to first page when filter changes
+  };
 
   return (
     <div className="campaign-details-container">
@@ -177,10 +121,18 @@ export const CampaignDetails = () => {
           ← Back to Campaigns
         </button>
 
+        {/* Error State */}
+        {error && (
+          <div className="error-banner">
+            ❌ Failed to load campaign details
+            <button className="retry-btn" onClick={() => refetch()}>Retry</button>
+          </div>
+        )}
+
         {/* Loading State */}
         {isLoading ? (
           <Loader size="large" text="Loading campaign details..." />
-        ) : (
+        ) : campaign ? (
           <>
             {/* Campaign Info Section */}
             <div className="campaign-info-section">
@@ -189,17 +141,30 @@ export const CampaignDetails = () => {
                   <h1 className="campaign-details-title">
                     {campaign.ownership?.product_name || 'Campaign'}
                   </h1>
-                  <p className="campaign-id">ID: {campaignId || campaign._id}</p>
+                  <p className="campaign-id">ID: {campaignId}</p>
                 </div>
-                <span
-                  className="campaign-status-badge"
-                  style={{
-                    backgroundColor: statusColors[campaign.lifecycle?.status]?.bg,
-                    color: statusColors[campaign.lifecycle?.status]?.text,
-                  }}
-                >
-                  {campaign.lifecycle?.status}
-                </span>
+                <div className="campaign-status-area">
+                  {/* Polling indicator */}
+                  {isBackgroundFetching && (
+                    <div className="polling-indicator" title="Auto-refreshing...">
+                      <Loader size="small" />
+                    </div>
+                  )}
+                  {isPolling && !isBackgroundFetching && (
+                    <span className="polling-badge" title="Auto-refresh active">
+                      🔄 Live
+                    </span>
+                  )}
+                  <span
+                    className="campaign-status-badge"
+                    style={{
+                      backgroundColor: statusColors[campaign.lifecycle?.status]?.bg || statusColors.draft.bg,
+                      color: statusColors[campaign.lifecycle?.status]?.text || statusColors.draft.text,
+                    }}
+                  >
+                    {campaign.lifecycle?.status || 'unknown'}
+                  </span>
+                </div>
               </div>
 
               <div className="campaign-info-grid">
@@ -245,21 +210,17 @@ export const CampaignDetails = () => {
               <div className="campaign-progress-section">
                 <h3>Company Progress</h3>
                 <div className="progress-stats">
-                  <div className="stat-card enriched">
-                    <span className="stat-number">{stats.enriched}</span>
-                    <span className="stat-label">Enriched</span>
+                  <div className="stat-card total">
+                    <span className="stat-number">{pagination?.total_records || stats.total}</span>
+                    <span className="stat-label">Total Companies</span>
                   </div>
-                  <div className="stat-card processing">
-                    <span className="stat-number">{stats.processing}</span>
-                    <span className="stat-label">Processing</span>
+                  <div className="stat-card enriched">
+                    <span className="stat-number">{stats.shortlisted}</span>
+                    <span className="stat-label">Shortlisted</span>
                   </div>
                   <div className="stat-card pending">
-                    <span className="stat-number">{stats.pending}</span>
-                    <span className="stat-label">Pending</span>
-                  </div>
-                  <div className="stat-card failed">
-                    <span className="stat-number">{stats.failed}</span>
-                    <span className="stat-label">Failed</span>
+                    <span className="stat-number">{stats.notShortlisted}</span>
+                    <span className="stat-label">Not Shortlisted</span>
                   </div>
                 </div>
               </div>
@@ -268,19 +229,33 @@ export const CampaignDetails = () => {
             {/* Companies Section */}
             <div className="campaign-companies-section">
               <div className="section-header">
-                <h2>Companies ({companies.length})</h2>
+                <h2>Companies {pagination?.total_records ? `(${pagination.total_records})` : `(${companies.length})`}</h2>
+                
+                {/* Status Filter */}
+                <div className="status-filter">
+                  <label>Status:</label>
+                  <select 
+                    value={statusFilter} 
+                    onChange={(e) => handleStatusFilterChange(e.target.value as CompanyStatusFilter)}
+                    className="status-filter-select"
+                  >
+                    <option value="all">All</option>
+                    <option value="true">Shortlisted</option>
+                    <option value="false">Not Shortlisted</option>
+                  </select>
+                </div>
               </div>
 
               <div className="campaign-companies-table-wrapper">
                 <table className="campaign-companies-table">
                   <thead>
                     <tr>
-                      <th>Company Name</th>
-                      <th>Domain</th>
-                      <th>Industry</th>
-                      <th>Employees</th>
+                      <th>Company ID</th>
                       <th>Status</th>
-                      <th>Contacts</th>
+                      <th>LinkedIn Status</th>
+                      <th>Relevant</th>
+                      <th>Confidence</th>
+                      <th>Relevance Reason</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -290,36 +265,72 @@ export const CampaignDetails = () => {
                         <td colSpan={7} className="empty-state">
                           <div className="empty-state-content">
                             <span className="empty-icon">🏢</span>
-                            <p>No companies in this campaign yet</p>
+                            <p>No companies found</p>
+                            {statusFilter !== 'all' && (
+                              <button 
+                                className="clear-filter-btn"
+                                onClick={() => handleStatusFilterChange('all')}
+                              >
+                                Clear filter
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
                     ) : (
-                      companies.map((company) => (
+                      companies.map((company: CampaignCompany) => (
                         <tr 
                           key={company._id}
                           className="clickable-row"
-                          onClick={() => navigate(`/master-data/companies/${company._id}`)}
+                          onClick={() => navigate(`/master-data/companies/${company.company_id}`)}
                         >
-                          <td className="company-name">{company.name}</td>
-                          <td className="company-domain">{company.domain}</td>
-                          <td>{company.industry}</td>
-                          <td>{company.employees}</td>
+                          <td className="company-id-cell" title={company.company_id}>
+                            {company.company_id.slice(0, 12)}...
+                          </td>
                           <td>
                             <span
                               className="status-badge"
                               style={{
-                                backgroundColor: statusColors[company.status]?.bg,
-                                color: statusColors[company.status]?.text,
+                                backgroundColor: statusColors[String(company.company_status)]?.bg,
+                                color: statusColors[String(company.company_status)]?.text,
                               }}
                             >
-                              {company.status}
+                              {company.company_status ? 'Shortlisted' : 'Not Shortlisted'}
                             </span>
                           </td>
                           <td>
-                            <span className="contact-count-badge">
-                              {company.contacts_count}
+                            <span
+                              className="status-badge"
+                              style={{
+                                backgroundColor: statusColors[String(company.linkedin_contact_status)]?.bg,
+                                color: statusColors[String(company.linkedin_contact_status)]?.text,
+                              }}
+                            >
+                              {company.linkedin_contact_status ? 'Done' : 'Pending'}
                             </span>
+                          </td>
+                          <td>
+                            <span className={`relevance-badge ${company.is_relevant ? 'relevant' : 'not-relevant'}`}>
+                              {company.is_relevant ? '✓ Yes' : '✗ No'}
+                            </span>
+                          </td>
+                          <td>
+                            {company.metadata?.confidence_level && (
+                              <span
+                                className="confidence-badge"
+                                style={{
+                                  backgroundColor: statusColors[company.metadata.confidence_level]?.bg,
+                                  color: statusColors[company.metadata.confidence_level]?.text,
+                                }}
+                              >
+                                {company.metadata.confidence_level}
+                              </span>
+                            )}
+                          </td>
+                          <td className="relevance-reason-cell" title={company.metadata?.relevance_reason}>
+                            {company.metadata?.relevance_reason 
+                              ? company.metadata.relevance_reason.slice(0, 50) + '...'
+                              : '-'}
                           </td>
                           <td>
                             <button 
@@ -327,7 +338,7 @@ export const CampaignDetails = () => {
                               title="View Company"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/master-data/companies/${company._id}`);
+                                navigate(`/master-data/companies/${company.company_id}`);
                               }}
                             >
                               👁️
@@ -339,11 +350,43 @@ export const CampaignDetails = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              {pagination && companies.length > 0 && (
+                <div className="pagination-container">
+                  <div className="pagination-info">
+                    Showing page {pagination.page_number} 
+                    {pagination.total_records > 0 && ` of ${Math.ceil(pagination.total_records / limit)}`}
+                    {pagination.total_records > 0 && ` (${pagination.total_records} total)`}
+                  </div>
+                  <div className="pagination-controls">
+                    <button
+                      className="pagination-btn"
+                      onClick={handlePrevPage}
+                      disabled={page === 1}
+                    >
+                      ← Previous
+                    </button>
+                    <span className="pagination-current">Page {page}</span>
+                    <button
+                      className="pagination-btn"
+                      onClick={handleNextPage}
+                      disabled={!pagination.has_next}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
+        ) : (
+          <div className="empty-state-content" style={{ padding: '3rem', textAlign: 'center' }}>
+            <span className="empty-icon">📋</span>
+            <p>Campaign not found</p>
+          </div>
         )}
       </div>
     </div>
   );
 };
-
