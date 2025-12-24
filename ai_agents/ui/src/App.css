@@ -847,6 +847,12 @@ html, body {
   margin: 0;
 }
 
+.empty-state-hint {
+  font-size: 0.9rem !important;
+  color: #9ca3af !important;
+  font-style: italic;
+}
+
 .create-campaign-btn-small {
   padding: 0.75rem 1.25rem;
   font-size: 0.9rem;

@@ -20,12 +20,12 @@ function AppContent() {
             <Route path="/campaign" element={<Navigate to="/master-data/campaign" replace />} />
             <Route path="/master-data" element={<Navigate to="/master-data/campaign" replace />} />
             <Route path="/master-data/campaign" element={<CampaignList />} />
-            <Route path="/master-data/campaign/new" element={<Form />} />
             <Route path="/master-data/companies" element={<Companies />} />
             <Route path="/master-data/companies/:companyId" element={<CompanyDetails />} />
-            <Route path="/prospecting" element={<Navigate to="/prospecting/company" replace />} />
+            <Route path="/prospecting" element={<Navigate to="/prospecting/wide" replace />} />
             <Route path="/prospecting/company" element={<ComingSoon />} />
             <Route path="/prospecting/contact" element={<ComingSoon />} />
+            <Route path="/prospecting/wide" element={<Form />} />
           </Routes>
       </main>
     </div>

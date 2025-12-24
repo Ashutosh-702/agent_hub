@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useGetCampaignsQuery } from '../store';
 import { Loader } from './shared';
 
@@ -11,7 +10,6 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 };
 
 export const CampaignList = () => {
-  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const limit = 10;
 
@@ -49,15 +47,8 @@ export const CampaignList = () => {
         <div className="campaign-list-header">
           <div>
             <h1 className="campaign-list-title">Campaigns</h1>
-            <p className="campaign-list-subtitle">Manage your outreach campaigns</p>
+            <p className="campaign-list-subtitle">View all your outreach campaigns</p>
           </div>
-          <button
-            className="create-campaign-btn"
-            onClick={() => navigate('/master-data/campaign/new')}
-          >
-            <span className="btn-icon">+</span>
-            Create New Campaign
-          </button>
         </div>
 
         {/* Error State */}
@@ -93,12 +84,7 @@ export const CampaignList = () => {
                         <div className="empty-state-content">
                           <span className="empty-icon">📋</span>
                           <p>No campaigns yet</p>
-                          <button
-                            className="create-campaign-btn-small"
-                            onClick={() => navigate('/master-data/campaign/new')}
-                          >
-                            Create your first campaign
-                          </button>
+                          <p className="empty-state-hint">Go to Prospecting → Wide Prospecting to create a campaign</p>
                         </div>
                       </td>
                     </tr>
