@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { Button, NotificationBanner, Typography } from 'novus';
 import { useNavigate } from 'react-router-dom';
 import { ProspectingWizardLayout } from './ProspectingWizardLayout';
@@ -33,10 +34,10 @@ export const ProspectingDefineFilters = () => {
 
   const removeChip = (list: Chip[], id: string) => list.filter(c => c.id !== id);
 
-  const addChip = (setter: (v: Chip[]) => void, prefix: string) => {
+  const addChip = (setter: Dispatch<SetStateAction<Chip[]>>, prefix: string) => {
     const label = window.prompt('Enter value');
     if (!label) return;
-    setter(prev => [...prev, { id: `${prefix}-${Date.now()}`, label }]);
+    setter((prev) => [...prev, { id: `${prefix}-${Date.now()}`, label }]);
   };
 
   return (

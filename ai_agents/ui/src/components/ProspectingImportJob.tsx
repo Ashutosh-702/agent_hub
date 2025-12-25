@@ -59,7 +59,7 @@ export const ProspectingImportJob = () => {
     >
       <div className="figma-wizard-inline-banner">
         <NotificationBanner
-          appearance={isComplete ? 'positive' : 'info'}
+          appearance={isComplete ? 'positive' : 'neutral'}
           type="inline"
           title={isComplete ? undefined : undefined}
           description={
@@ -129,9 +129,11 @@ export const ProspectingImportJob = () => {
                   value={importLimit}
                   onChange={(opt: any) => setImportLimit(opt)}
                 />
-                <Typography variant="body-s" type="p" className="figma-muted" style={{ marginTop: 6 }}>
-                  We&apos;ll import up to {importLimit.value} contacts
-                </Typography>
+                <div style={{ marginTop: 6 }}>
+                  <Typography variant="body-s" type="p" className="figma-muted">
+                    We&apos;ll import up to {importLimit.value} contacts
+                  </Typography>
+                </div>
               </div>
             </div>
 

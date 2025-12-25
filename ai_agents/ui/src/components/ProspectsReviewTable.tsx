@@ -21,7 +21,7 @@ export type ProspectCompany = {
 
 const confidenceBadge = (c: Confidence) => {
   if (c === 'high') return { state: 'success' as const, label: 'high confidence' };
-  if (c === 'medium') return { state: 'info' as const, label: 'medium confidence' };
+  if (c === 'medium') return { state: 'neutral' as const, label: 'medium confidence' };
   return { state: 'warning' as const, label: 'low confidence' };
 };
 
