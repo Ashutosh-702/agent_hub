@@ -8,7 +8,9 @@ export const baseApi = createApi({
     baseUrl: API_BASE_URL,
     prepareHeaders: (headers) => {
       headers.set('accept', 'application/json');
-      headers.set('Content-Type', 'application/json');
+      // Do NOT force Content-Type globally.
+      // Some endpoints (e.g. PATCH with only query params) have no body and may reject an explicit JSON Content-Type.
+      // fetchBaseQuery will automatically set application/json when a JSON body is present.
       return headers;
     },
   }),

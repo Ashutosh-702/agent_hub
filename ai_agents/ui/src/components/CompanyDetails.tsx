@@ -39,6 +39,16 @@ export const CompanyDetails = () => {
   const limit = 5;
 
   const [updateCampaignContactRun] = useUpdateCampaignContactRunMutation();
+
+  const shortlistOptions = [
+    { label: 'Shortlisted', value: 'true' },
+    { label: 'Not Shortlisted', value: 'false' },
+  ];
+
+  // For campaign_contact_runs update API we MUST send `contact_id` (not the contact document `_id`).
+  const getContactId = (contact: Contact): string => {
+    return (contact as any).contact_id || '';
+  };
   
   // Ref for scroll container
   const contactsScrollRef = useRef<HTMLDivElement>(null);
@@ -154,7 +164,8 @@ export const CompanyDetails = () => {
   };
 
   const getEffectiveContactShortlisted = (contact: Contact): boolean => {
-    const override = manualContactStatus[contact._id];
+    const contactId = getContactId(contact);
+    const override = contactId ? manualContactStatus[contactId] : undefined;
     if (override !== undefined) return override;
     if (typeof (contact as any).relevant === 'boolean') return (contact as any).relevant;
     return false;
@@ -267,8 +278,11 @@ export const CompanyDetails = () => {
                       <p>No contacts found for this company</p>
                     </div>
                   ) : (
-                    contacts.map((contact) => (
-                      <div key={contact._id} className="contact-card">
+                    contacts.map((contact) => {
+                      const contactId = getContactId(contact);
+                      const key = contactId || contact._id || `${contact.contact_data?.firstname || ''}-${contact.contact_data?.lastname || ''}`;
+                      return (
+                      <div key={key} className="contact-card">
                         <div className={`contact-card-grid ${showContactManualShortlisting ? 'has-shortlist' : ''}`}>
                           <div className="contact-col name-col">
                             <span className="col-label">Name</span>
@@ -316,33 +330,44 @@ export const CompanyDetails = () => {
                               <span className="col-label">Shortlist</span>
                               <SelectorDropdown
                                 label={getEffectiveContactShortlisted(contact) ? 'Shortlisted' : 'Not Shortlisted'}
-                                options={[
-                                  { label: 'Shortlisted', value: 'true' },
-                                  { label: 'Not Shortlisted', value: 'false' },
-                                ]}
-                                value={{
-                                  label: getEffectiveContactShortlisted(contact) ? 'Shortlisted' : 'Not Shortlisted',
-                                  value: String(getEffectiveContactShortlisted(contact)),
-                                }}
+                                options={shortlistOptions}
+                                value={
+                                  shortlistOptions.find(o => o.value === String(getEffectiveContactShortlisted(contact))) ||
+                                  shortlistOptions[0]
+                                }
                                 onChange={(opt: any) => {
                                   const next = opt?.value === 'true';
                                   setContactShortlistUpdateError(null);
                                   const prevValue = getEffectiveContactShortlisted(contact);
+                                  const effectiveContactId = getContactId(contact);
+                                  if (!navState?.campaignId) {
+                                    setContactShortlistUpdateError('Missing campaign_id. Please go back and open from Campaign again.');
+                                    return;
+                                  }
+                                  if (!effectiveContactId) {
+                                    setContactShortlistUpdateError('Missing contact_id from API response. Backend must return contact_id for each row.');
+                                    return;
+                                  }
                                   // Optimistic UI update
-                                  setManualContactStatus(prev => ({ ...prev, [contact._id]: next }));
+                                  setManualContactStatus(prev => ({ ...prev, [effectiveContactId]: next }));
 
                                   // Persist using backend API:
                                   // PATCH /api/v1/campaign_contact_runs?campaign_id=...&contact_id=...&relevant=true|false
                                   updateCampaignContactRun({
-                                    campaign_id: navState?.campaignId || '',
-                                    contact_id: contact._id,
+                                    campaign_id: navState.campaignId,
+                                    contact_id: effectiveContactId,
                                     relevant: next,
                                   })
                                     .unwrap()
-                                    .catch(() => {
+                                    .catch((err: any) => {
                                       // Revert optimistic update
-                                      setManualContactStatus(prev => ({ ...prev, [contact._id]: prevValue }));
-                                      setContactShortlistUpdateError('Please try again.');
+                                      setManualContactStatus(prev => ({ ...prev, [effectiveContactId]: prevValue }));
+                                      const msg =
+                                        err?.data?.message ||
+                                        err?.data?.detail ||
+                                        err?.error ||
+                                        'Please try again.';
+                                      setContactShortlistUpdateError(String(msg));
                                     });
                                 }}
                                 size="s"
@@ -352,7 +377,8 @@ export const CompanyDetails = () => {
                           )}
                         </div>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                 </div>
                 

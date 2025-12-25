@@ -30,7 +30,11 @@ export interface Company {
 }
 
 export interface Contact {
-  _id: string;
+  // Depending on which backend path produced the record, we may receive either:
+  // - `_id` (from contacts collection), OR
+  // - `contact_id` (from campaign_contact_runs projection where `_id` is excluded)
+  _id?: string;
+  contact_id?: string;
   company_id: string;
   /**
    * Backend-provided shortlisting/relevance signal.

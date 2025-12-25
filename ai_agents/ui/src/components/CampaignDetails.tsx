@@ -46,6 +46,18 @@ export const CampaignDetails = () => {
 
   const [updateCampaignCompanyRun] = useUpdateCampaignCompanyRunMutation();
 
+  const parseBoolOption = (opt: any): boolean | null => {
+    const v = opt?.value ?? opt;
+    if (v === true || v === 'true') return true;
+    if (v === false || v === 'false') return false;
+    return null;
+  };
+
+  const shortlistOptions = [
+    { label: 'Shortlisted', value: 'true' },
+    { label: 'Not Shortlisted', value: 'false' },
+  ];
+
   // Convert filter value to API param
   const getCompanyStatusParam = (): boolean | undefined => {
     if (statusFilter === 'true') return true;
@@ -74,9 +86,9 @@ export const CampaignDetails = () => {
   const campaign = data?.data?.campaign;
   const companies = data?.data?.companies || [];
   const pagination = data?.pagination;
+  const normalizedApproach = (campaign?.shortlisting_approach || '').trim().toLowerCase();
   const isManualCompanyShortlisting =
-    campaign?.shortlisting_approach === 'manual_company' ||
-    campaign?.shortlisting_approach === 'overall_manual';
+    normalizedApproach === 'manual_company' || normalizedApproach === 'overall_manual';
 
   const getEffectiveCompanyStatus = (company: CampaignCompany) => {
     const override = manualCompanyStatus[company._id];
@@ -372,35 +384,50 @@ export const CampaignDetails = () => {
                           </td>
                           <td>
                             {isManualCompanyShortlisting ? (
-                              <div onClick={(e) => e.stopPropagation()}>
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onKeyDownCapture={(e) => e.stopPropagation()}
+                              >
                                 <SelectorDropdown
                                   label={getEffectiveCompanyStatus(company) ? 'Shortlisted' : 'Not Shortlisted'}
-                                  options={[
-                                    { label: 'Shortlisted', value: 'true' },
-                                    { label: 'Not Shortlisted', value: 'false' },
-                                  ]}
-                                  value={{
-                                    label: getEffectiveCompanyStatus(company) ? 'Shortlisted' : 'Not Shortlisted',
-                                    value: String(getEffectiveCompanyStatus(company)),
-                                  }}
+                                  options={shortlistOptions}
+                                  value={
+                                    shortlistOptions.find(
+                                      (o) => o.value === String(getEffectiveCompanyStatus(company))
+                                    ) || shortlistOptions[0]
+                                  }
                                   onChange={(opt: any) => {
-                                    const next = opt?.value === 'true';
+                                    const parsed = parseBoolOption(opt);
+                                    if (parsed === null) return;
+                                    const next = parsed;
                                     setShortlistUpdateError(null);
                                     const prevValue = getEffectiveCompanyStatus(company);
                                     // Optimistic UI update
                                     setManualCompanyStatus(prev => ({ ...prev, [company._id]: next }));
 
                                     // Persist using backend API: PATCH /api/v1/campaign_company_run
+                                    const cid = campaignId || company.campaign_id;
+                                    if (!cid) {
+                                      setManualCompanyStatus(prev => ({ ...prev, [company._id]: prevValue }));
+                                      setShortlistUpdateError('Missing campaign_id. Please refresh and try again.');
+                                      return;
+                                    }
                                     updateCampaignCompanyRun({
-                                      campaign_id: campaignId || company.campaign_id,
+                                      campaign_id: cid,
                                       company_id: company.company_id,
                                       is_relevant: next,
                                     })
                                       .unwrap()
-                                      .catch(() => {
+                                      .catch((err: any) => {
                                         // Revert optimistic update
                                         setManualCompanyStatus(prev => ({ ...prev, [company._id]: prevValue }));
-                                        setShortlistUpdateError('Please try again.');
+                                        const msg =
+                                          err?.data?.message ||
+                                          err?.data?.detail ||
+                                          err?.error ||
+                                          'Please try again.';
+                                        setShortlistUpdateError(String(msg));
                                       });
                                   }}
                                   size="s"
