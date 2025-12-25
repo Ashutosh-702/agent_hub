@@ -77,7 +77,8 @@ export const CampaignDetails = () => {
 
   const getEffectiveCompanyStatus = (company: CampaignCompany) => {
     const override = manualCompanyStatus[company._id];
-    return override !== undefined ? override : company.company_status;
+    // Shortlisted status is based on is_relevant field
+    return override !== undefined ? override : company.is_relevant;
   };
 
   const displayedCompanies =
@@ -311,7 +312,6 @@ export const CampaignDetails = () => {
                       <th>Company ID</th>
                       <th>Status</th>
                       <th>LinkedIn Status</th>
-                      <th>Relevant</th>
                       <th>Confidence</th>
                       <th>Relevance Reason</th>
                       <th>Actions</th>
@@ -320,7 +320,7 @@ export const CampaignDetails = () => {
                   <tbody>
                     {displayedCompanies.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="empty-state">
+                          <td colSpan={6} className="empty-state">
                           <div className="empty-state-content">
                             <span className="empty-icon">🏢</span>
                             <p>No companies found</p>
@@ -351,7 +351,9 @@ export const CampaignDetails = () => {
                           }
                         >
                           <td className="company-id-cell" title={company.company_id}>
-                            {company.company_id.slice(0, 12)}...
+                            {company.company_id.length > 12 
+                              ? company.company_id.slice(0, 12) + '...'
+                              : company.company_id}
                           </td>
                           <td>
                             {isManualCompanyShortlisting ? (
@@ -377,11 +379,11 @@ export const CampaignDetails = () => {
                               <span
                                 className="status-badge"
                                 style={{
-                                  backgroundColor: statusColors[String(company.company_status)]?.bg,
-                                  color: statusColors[String(company.company_status)]?.text,
+                                  backgroundColor: statusColors[String(company.is_relevant)]?.bg,
+                                  color: statusColors[String(company.is_relevant)]?.text,
                                 }}
                               >
-                                {company.company_status ? 'Shortlisted' : 'Not Shortlisted'}
+                                {company.is_relevant ? 'Shortlisted' : 'Not Shortlisted'}
                               </span>
                             )}
                           </td>
@@ -394,11 +396,6 @@ export const CampaignDetails = () => {
                               }}
                             >
                               {company.linkedin_contact_status ? 'Done' : 'Pending'}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`relevance-badge ${company.is_relevant ? 'relevant' : 'not-relevant'}`}>
-                              {company.is_relevant ? '✓ Yes' : '✗ No'}
                             </span>
                           </td>
                           <td>
@@ -416,7 +413,9 @@ export const CampaignDetails = () => {
                           </td>
                           <td className="relevance-reason-cell" title={company.metadata?.relevance_reason}>
                             {company.metadata?.relevance_reason 
-                              ? company.metadata.relevance_reason.slice(0, 50) + '...'
+                              ? (company.metadata.relevance_reason.length > 50 
+                                  ? company.metadata.relevance_reason.slice(0, 50) + '...'
+                                  : company.metadata.relevance_reason)
                               : '-'}
                           </td>
                           <td>

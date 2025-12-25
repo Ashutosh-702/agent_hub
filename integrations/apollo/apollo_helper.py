@@ -14,14 +14,16 @@ from integrations.apollo.schema import ApolloResponseSchema
 from integrations.apollo.schema import SearchEnrichPeopleSchema
 from integrations.apollo.schema import SearchPeopleSchema
 from integrations.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 
 
 class ApolloHelper:
-    def __init__(self):
+    def __init__(self, campaign_contact_runs_dao: CampaignContactRunsDao):
         config = {}
         self.people_relevance_check = PeopleRelevanceCheck(config)
         self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        self.campaign_contact_runs_dao = campaign_contact_runs_dao
 
     async def get_company_contacts(self, query_params: ApolloResponseSchema) -> Dict[str, Any]:
  
@@ -245,6 +247,24 @@ class ApolloHelper:
                                     company_id=query_params.company_id
                                 )
                                 contact_id = await self.contacts_dao.create_contact(contact_doc)
+                                if query_params.campaign_id:
+                                    mapper_doc = {
+                                        "campaign_id": ObjectId(query_params.campaign_id),
+                                        "company_id": ObjectId(query_params.company_id),
+                                        "contact_id": contact_id,
+                                        "relevant": True,
+                                        "metadata": {
+                                            "created_at": datetime.now(timezone.utc),
+                                            "updated_at": datetime.now(timezone.utc)
+                                        }
+                                    }
+                                    if query_params.shortlisting_approach not in ["overall_manual", "manual_company"]:
+                                        mapper_doc["relevant"] = False
+
+                                    await self.campaign_contact_runs_dao.create_campaign_contact_run(mapper_doc)
+                                    logger.info(f"Campaign contact run created for contact {contact_id} for campaign {query_params.campaign_id}")
+
+                                    
                                 logger.info(f"Stored new contact {person.get('name', 'Unknown')} with ID: {contact_id}")
                                 stored_contact_ids.append(str(contact_id))
                                 contacts.append({

@@ -517,6 +517,24 @@ html, body {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.8rem;
   color: #6366f1;
+  position: relative;
+  cursor: pointer;
+}
+
+.company-id-cell:hover::after {
+  content: attr(title);
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 1000;
+  background: #1f2937;
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  margin-top: 4px;
 }
 
 .relevance-badge {
@@ -553,6 +571,27 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  position: relative;
+  cursor: pointer;
+}
+
+.relevance-reason-cell:hover::after {
+  content: attr(title);
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 1000;
+  background: #1f2937;
+  color: #fff;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  max-width: 400px;
+  white-space: normal;
+  word-wrap: break-word;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  margin-top: 4px;
+  line-height: 1.4;
 }
 
 .clear-filter-btn {

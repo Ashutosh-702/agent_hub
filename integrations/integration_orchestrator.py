@@ -17,6 +17,7 @@ from integrations.utils import extract_departments_from_config
 from integrations.apollo.apollo_helper import ApolloHelper
 from integrations.apollo.schema import ApolloResponseSchema
 from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 from config.logging import logger
 
 
@@ -29,11 +30,12 @@ class IntegrationOrchestrator:
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         self.campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.CompanyMappingsDao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        self.CampaignContactRunsDao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
         self.ContactsDao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.relevance_check = CompanyRelevanceCheck(self.config)
         self.campaign_id = self.config.get('_id')
         self.lusha_contact_handler = LushaContactHandler()
-        self.apollo_helper = ApolloHelper()
+        self.apollo_helper = ApolloHelper(self.CampaignContactRunsDao)
         self.webhook_sender = ContactHubspotWebhook(
             custom_webhook_url="https://asia-south1.api.boltic.io/service/webhook/temporal/v1.0/b156f5b3-c90d-449a-b104-2[…]c/workflows/execute/ee89e38a-e39a-42bf-8b26-4bdadb667e1d",
             campaign_id=self.campaign_id,
@@ -141,25 +143,29 @@ class IntegrationOrchestrator:
                     # "webhook_sent": False,
                     "contact_data.email": {"$ne": []} #only get contacts with email. it should not be empty here email is an array field.
                 })
-
+                shortlisting_approach = self.config.get("shortlisting_approach", "overall_ai")
                 # Create ApolloResponseSchema object
                 if len(contacts) == 0:
 
                     query_params = ApolloResponseSchema(
                         company_name=company_name,
                         company_domain=company_domain,
+                        campaign_id=str(self.campaign_id),
                         company_id=str(company_id),
                         person_seniorities=person_seniorities,
                         page=1,
                         per_page=number_of_contacts_per_company,
                         enrich_contacts=True,
                         contact_email_status=contact_email_status,
-                        organization_id=organization_id
+                        organization_id=organization_id,
+                        shortlisting_approach=self.config.get("shortlisting_approach", "overall_ai")
                     )
 
                     response = await self.apollo_helper.get_company_contacts(query_params)
-                #send  webhook to the users with the contacts
-                await self.webhook_sender.send_company_level_webhook(str(company_id), slack_metadata)
+
+                if shortlisting_approach not in ["overall_manual", "manual_company"]:
+                    #send  webhook to the users with the contacts
+                    await self.webhook_sender.send_company_level_webhook(str(company_id), slack_metadata)
                 logger.info(f"webhook sent to the users with the contacts")
 
         except Exception as e:
