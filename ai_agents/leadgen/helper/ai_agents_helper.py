@@ -11,6 +11,7 @@ from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo, Apollo
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.contacts import ContactsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 from global_utils.exceptions import ApiException
 from integrations.apollo.apollo_helper import ApolloHelper
 from kafkautils.constants import KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices, CONTACTS_ENRICHMENT
@@ -20,7 +21,7 @@ import asyncio
 from ai_agents.leadgen.schemas.ai_agents import Campaigns, Companies, CompanyContacts
 from ai_agents.leadgen.services.ai_agents_service import CampaignService
 from ai_agents.leadgen.utils import serialize_objectid
-from ai_agents.leadgen.schemas.ai_agents import CampaignDetailsWithCompanies
+from ai_agents.leadgen.schemas.ai_agents import CampaignDetailsWithCompanies, CampaignCompanyRun, CampaignContactRuns
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -388,6 +389,7 @@ class CompaniesHelper:
     def __init__(self):
         self.company_service = CompanyService()
         self.contact_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        self.contact_service = ContactService()
     async def get_companies_with_contact_counts(self, query_params: Companies):
         companies = await self.company_service.get_companies(query_params)
         for company in companies.get("companies"):
@@ -397,7 +399,28 @@ class CompaniesHelper:
 
     async def get_company_details_with_contacts(self, query_params: CompanyContacts):
         company = await self.company_service.get_company_details(query_params.company_id)
-        contacts, pagination_info = await self.contact_dao.get_paginated_contacts({"company_id": query_params.company_id}, query_params.page, query_params.limit)
+        contacts = await self.contact_service.get_campaign_contact_data(query_params)
+        # contacts, pagination_info = await self.contact_dao.get_paginated_contacts({"company_id": query_params.company_id}, query_params.page, query_params.limit)
         serialized_company = serialize_objectid(company)
-        serialized_contacts = serialize_objectid(contacts)
+        serialized_contacts = serialize_objectid(contacts.get("campaign_contact_data"))
+        pagination_info = contacts.get("pagination_info")
         return {"company": serialized_company, "contacts": serialized_contacts, "pagination_info": pagination_info}
+
+
+class CampaignCompanyRunHelper:
+
+    def __init__(self):
+        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+
+    async def update_campaign_company_run(self, query_params: CampaignCompanyRun):
+        await self.campaign_company_runs_dao.update_campaign_company_run({"campaign_id": query_params.campaign_id, "company_id": query_params.company_id}, {"$set": {"is_relevant": query_params.is_relevant, "metadata.updated_at": datetime.utcnow()}})
+        return {"message": "Campaign company run updated"}
+
+class CampaignContactRunsHelper:
+
+    def __init__(self):
+        self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
+
+    async def update_campaign_contact_runs(self, query_params: CampaignContactRuns):
+        await self.campaign_contact_runs_dao.update_campaign_contact_run({"campaign_id": query_params.campaign_id, "contact_id": query_params.contact_id}, {"$set": {"relevant": query_params.relevant, "metadata.updated_at": datetime.utcnow()}})
+        return {"message": "Campaign contact runs updated"}

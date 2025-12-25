@@ -17,7 +17,9 @@ from ai_agents.leadgen.schemas.ai_agents import (
     Campaigns,
     Companies,
     CompanyContacts,
-    CampaignDetailsWithCompanies
+    CampaignDetailsWithCompanies,
+    CampaignCompanyRun,
+    CampaignContactRuns
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -28,7 +30,7 @@ from ai_agents.leadgen.services.ai_agents_service import (
 from ai_agents.leadgen.helper.ai_agents_helper import LushaContactEnrichmentHelper, SaveProspectsDataToMongoHelper
 from ai_agents.leadgen.helper.ai_agents_helper import ApolloContactEnrichmentHelper
 from ai_agents.leadgen.helper.ai_agents_helper import CampaignsHelper
-from ai_agents.leadgen.helper.ai_agents_helper import CompaniesHelper
+from ai_agents.leadgen.helper.ai_agents_helper import CompaniesHelper, CampaignCompanyRunHelper, CampaignContactRunsHelper
 async def upload_leadgen_form(
     request_data: FormSubmission = Body(),
 ) -> Dict[str, Any]:
@@ -208,6 +210,12 @@ async def get_company_details_with_contacts(query_params: CompanyContacts = Depe
     response_data = ResponseData.model_construct(data={}, success=False)
     leadgen_companies_helper = CompaniesHelper()
 
+    if not query_params.campaign_id and not query_params.company_id:
+        response_data.data = {
+            "message": "Campaign ID or company ID is required",
+        }
+        return response_data.dict()
+
     response = await leadgen_companies_helper.get_company_details_with_contacts(query_params)
     response_data.success = True
     response_data.data = response.get("company")
@@ -225,4 +233,22 @@ async def get_campaign_details_with_companies(query_params: CampaignDetailsWithC
     response_data.data = response.get("campaign")
     response_data.data["companies"] = response.get("companies")
     response_data.pagination = response.get("pagination_info")
+    return response_data.dict()
+
+async def update_campaign_company_run(query_params: CampaignCompanyRun = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_campaign_company_run_helper = CampaignCompanyRunHelper()
+
+    response = await leadgen_campaign_company_run_helper.update_campaign_company_run(query_params)
+    response_data.success = True
+    response_data.data = response
+    return response_data.dict()
+
+async def update_campaign_contact_runs(query_params: CampaignContactRuns = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_campaign_contact_runs_helper = CampaignContactRunsHelper()
+
+    response = await leadgen_campaign_contact_runs_helper.update_campaign_contact_runs(query_params)
+    response_data.success = True
+    response_data.data = response
     return response_data.dict()

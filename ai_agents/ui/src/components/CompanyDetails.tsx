@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useLazyGetCompanyDetailsQuery } from '../store';
+import { useLazyGetCompanyDetailsQuery, useUpdateCampaignContactRunMutation } from '../store';
 import type { Company, Contact, Pagination } from '../store';
 import { Button, Link, NotificationBanner, SelectorDropdown, Spinner, Typography } from 'novus';
 
@@ -32,10 +32,13 @@ export const CompanyDetails = () => {
   const [hasMore, setHasMore] = useState(true);
   // Local-only (mock) overrides for manual contact shortlisting; keyed by contact `_id`
   const [manualContactStatus, setManualContactStatus] = useState<Record<string, boolean>>({});
+  const [contactShortlistUpdateError, setContactShortlistUpdateError] = useState<string | null>(null);
   
   // Pagination for contacts
   const [page, setPage] = useState(1);
   const limit = 5;
+
+  const [updateCampaignContactRun] = useUpdateCampaignContactRunMutation();
   
   // Ref for scroll container
   const contactsScrollRef = useRef<HTMLDivElement>(null);
@@ -150,6 +153,13 @@ export const CompanyDetails = () => {
     }
   };
 
+  const getEffectiveContactShortlisted = (contact: Contact): boolean => {
+    const override = manualContactStatus[contact._id];
+    if (override !== undefined) return override;
+    if (typeof (contact as any).relevant === 'boolean') return (contact as any).relevant;
+    return false;
+  };
+
   return (
     <div className="company-details-container">
       <div className="company-details-card">
@@ -178,6 +188,18 @@ export const CompanyDetails = () => {
             description="Please try again."
             primaryButtonText="Retry"
             onPrimaryClick={() => fetchCompanyDetails(1, false)}
+            showIcon
+          />
+        )}
+
+        {contactShortlistUpdateError && (
+          <NotificationBanner
+            appearance="negative"
+            type="inline"
+            title="Failed to update contact shortlist"
+            description={contactShortlistUpdateError}
+            primaryButtonText="Dismiss"
+            onPrimaryClick={() => setContactShortlistUpdateError(null)}
             showIcon
           />
         )}
@@ -293,18 +315,35 @@ export const CompanyDetails = () => {
                             <div className="contact-col">
                               <span className="col-label">Shortlist</span>
                               <SelectorDropdown
-                                label={(manualContactStatus[contact._id] ?? false) ? 'Shortlisted' : 'Not Shortlisted'}
+                                label={getEffectiveContactShortlisted(contact) ? 'Shortlisted' : 'Not Shortlisted'}
                                 options={[
                                   { label: 'Shortlisted', value: 'true' },
                                   { label: 'Not Shortlisted', value: 'false' },
                                 ]}
                                 value={{
-                                  label: (manualContactStatus[contact._id] ?? false) ? 'Shortlisted' : 'Not Shortlisted',
-                                  value: String(manualContactStatus[contact._id] ?? false),
+                                  label: getEffectiveContactShortlisted(contact) ? 'Shortlisted' : 'Not Shortlisted',
+                                  value: String(getEffectiveContactShortlisted(contact)),
                                 }}
                                 onChange={(opt: any) => {
                                   const next = opt?.value === 'true';
+                                  setContactShortlistUpdateError(null);
+                                  const prevValue = getEffectiveContactShortlisted(contact);
+                                  // Optimistic UI update
                                   setManualContactStatus(prev => ({ ...prev, [contact._id]: next }));
+
+                                  // Persist using backend API:
+                                  // PATCH /api/v1/campaign_contact_runs?campaign_id=...&contact_id=...&relevant=true|false
+                                  updateCampaignContactRun({
+                                    campaign_id: navState?.campaignId || '',
+                                    contact_id: contact._id,
+                                    relevant: next,
+                                  })
+                                    .unwrap()
+                                    .catch(() => {
+                                      // Revert optimistic update
+                                      setManualContactStatus(prev => ({ ...prev, [contact._id]: prevValue }));
+                                      setContactShortlistUpdateError('Please try again.');
+                                    });
                                 }}
                                 size="s"
                                 menuWidth={180}

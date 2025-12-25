@@ -297,15 +297,21 @@ class ContactService:
         self.lusha_api_client = LushaAPIClient()
 
     async def get_campaign_contact_data(self, query_params: CampaignContactData):
-        filter_query = {"campaign_id": query_params.campaign_id}
+        filter_query = {}
+        if query_params.campaign_id:
+            filter_query["campaign_id"] = query_params.campaign_id
 
         if query_params.company_id:
             filter_query["company_id"] = query_params.company_id
+
+        if not filter_query:
+            raise ApiException("Campaign ID or company ID is required")
 
         campaign_contact_runs_projection = {
             "campaign_id": 1,
             "company_id": 1,
             "contact_id": 1,
+            "relevant": 1,
             "_id": 0
         }
 
@@ -334,6 +340,7 @@ class ContactService:
 
             contact["contact_data"] = contact_doc.get("contact_data")
             contact["linkedin_data"] = contact_doc.get("linkedin_data")
+            contact["relevant"] = contact.get("relevant", False)
 
         serialized_response = serialize_objectid(response)
 

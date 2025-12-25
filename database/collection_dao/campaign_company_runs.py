@@ -26,6 +26,11 @@ class CampaignCompanyRunsDao(BaseMongoDao):
         return await self.find_one({"_id": campaign_company_run_id})
 
     async def update_campaign_company_run(self, query: Dict[str, Any], update_clause: Dict[str, Any]):
+        if not query:
+            raise ApiException("Query is required")
+        if not update_clause:
+            raise ApiException("Update clause is required")
+        query = self._process_query_objectids(query)
         return await self.update_one(query, update_clause)
 
     async def get_campaign_company_runs_paginated(self, query: dict = None, page: int = 1, limit: int = 100, projection: dict = None):

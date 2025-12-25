@@ -1,7 +1,7 @@
 from database.base_dao import BaseMongoDao
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Dict, Any
-
+from global_utils.exceptions import ApiException
 class CampaignContactRunsDao(BaseMongoDao):
     def __init__(self, mongo_client: AsyncIOMotorClient):
         super().__init__(mongo_client, "campaign_contact_runs")
@@ -21,6 +21,11 @@ class CampaignContactRunsDao(BaseMongoDao):
         return await self.find_one({"_id": campaign_contact_run_id})
     
     async def update_campaign_contact_run(self, query: Dict[str, Any], update_clause: Dict[str, Any]):
+        if not query:
+            raise ApiException("Query is required")
+        if not update_clause:
+            raise ApiException("Update clause is required")
+        query = self._process_query_objectids(query)
         return await self.update_one(query, update_clause)
     
     async def get_campaign_contact_runs_paginated(

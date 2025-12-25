@@ -5,6 +5,8 @@ export {
   useGetCampaignsQuery, 
   useCreateCampaignMutation,
   useGetCampaignDetailsQuery,
+  useUpdateCampaignCompanyRunMutation,
+  useUpdateCampaignContactRunMutation,
 } from './campaignApi';
 export type { 
   Campaign, 
@@ -15,6 +17,10 @@ export type {
   CampaignCompany,
   CampaignDetailsResponse,
   GetCampaignDetailsParams,
+  UpdateCampaignCompanyRunParams,
+  UpdateCampaignCompanyRunResponse,
+  UpdateCampaignContactRunParams,
+  UpdateCampaignContactRunResponse,
 } from './campaignApi';
 export { 
   companyApi, 

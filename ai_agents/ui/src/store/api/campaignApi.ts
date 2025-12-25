@@ -124,6 +124,28 @@ export interface GetCampaignDetailsParams {
   limit: number;
 }
 
+export interface UpdateCampaignCompanyRunResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface UpdateCampaignCompanyRunParams {
+  campaign_id: string;
+  company_id: string;
+  is_relevant: boolean;
+}
+
+export interface UpdateCampaignContactRunResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface UpdateCampaignContactRunParams {
+  campaign_id: string;
+  contact_id: string;
+  relevant: boolean;
+}
+
 export const campaignApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getCampaigns: builder.query<CampaignsResponse, GetCampaignsParams>({
@@ -170,6 +192,46 @@ export const campaignApi = baseApi.injectEndpoints({
         { type: 'Campaign', id: campaign_id },
       ],
     }),
+
+    updateCampaignCompanyRun: builder.mutation<
+      UpdateCampaignCompanyRunResponse,
+      UpdateCampaignCompanyRunParams
+    >({
+      query: ({ campaign_id, company_id, is_relevant }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          company_id,
+          is_relevant: String(is_relevant),
+        });
+        return {
+          url: `/api/v1/campaign_company_run?${params}`,
+          method: 'PATCH',
+        };
+      },
+      invalidatesTags: (_result, _error, { campaign_id }) => [
+        { type: 'Campaign', id: campaign_id },
+      ],
+    }),
+
+    updateCampaignContactRun: builder.mutation<
+      UpdateCampaignContactRunResponse,
+      UpdateCampaignContactRunParams
+    >({
+      query: ({ campaign_id, contact_id, relevant }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          contact_id,
+          relevant: String(relevant),
+        });
+        return {
+          url: `/api/v1/campaign_contact_runs?${params}`,
+          method: 'PATCH',
+        };
+      },
+      invalidatesTags: (_result, _error, { campaign_id }) => [
+        { type: 'Campaign', id: campaign_id },
+      ],
+    }),
   }),
 });
 
@@ -177,5 +239,7 @@ export const {
   useGetCampaignsQuery, 
   useCreateCampaignMutation,
   useGetCampaignDetailsQuery,
+  useUpdateCampaignCompanyRunMutation,
+  useUpdateCampaignContactRunMutation,
 } = campaignApi;
 

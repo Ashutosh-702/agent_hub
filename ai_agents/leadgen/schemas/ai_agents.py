@@ -74,7 +74,7 @@ class CompanyListWithDetails(BaseModel):
 
 
 class CampaignContactData(BaseModel):
-    campaign_id: str
+    campaign_id: Optional[str] = None
     company_id: Optional[str] = None
     page: int = 1
     limit: int = 10
@@ -121,7 +121,8 @@ class Companies(BaseModel):
     domain: Optional[str] = None
 
 class CompanyContacts(BaseModel):
-    company_id: str
+    campaign_id: Optional[str] = None
+    company_id: Optional[str] = None
     page: int = 1
     limit: int = 10
 
@@ -131,7 +132,15 @@ class CampaignDetailsWithCompanies(BaseModel):
     page: int = 1
     limit: int = 10
 
+class CampaignCompanyRun(BaseModel):
+    campaign_id: str
+    company_id: str
+    is_relevant: bool
 
+class CampaignContactRuns(BaseModel):
+    campaign_id: str
+    contact_id: str
+    relevant: bool
 class ApolloContactEnrichment(BaseModel):
     company_domain: List[str] = Field(description="List of company domains to enrich contacts for")
     interested_product: str = Field(description="Interested product to enrich contacts for")

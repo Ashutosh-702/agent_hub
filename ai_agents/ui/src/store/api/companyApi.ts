@@ -32,6 +32,11 @@ export interface Company {
 export interface Contact {
   _id: string;
   company_id: string;
+  /**
+   * Backend-provided shortlisting/relevance signal.
+   * When present, this should map to the UI "Shortlisted" column.
+   */
+  relevant?: boolean | null;
   contact_data: {
     firstname: string;
     lastname: string;

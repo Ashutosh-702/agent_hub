@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGetCampaignDetailsQuery } from '../store';
+import { useGetCampaignDetailsQuery, useUpdateCampaignCompanyRunMutation } from '../store';
 import type { CampaignCompany } from '../store';
 import { Badge, Button, NotificationBanner, SelectorDropdown, Spinner, Typography } from 'novus';
 
@@ -41,7 +41,10 @@ export const CampaignDetails = () => {
   const [statusFilter, setStatusFilter] = useState<CompanyStatusFilter>('all');
   // Local-only (mock) overrides for manual shortlisting mode; keyed by campaign_company mapping `_id`
   const [manualCompanyStatus, setManualCompanyStatus] = useState<Record<string, boolean>>({});
+  const [shortlistUpdateError, setShortlistUpdateError] = useState<string | null>(null);
   const limit = 10;
+
+  const [updateCampaignCompanyRun] = useUpdateCampaignCompanyRunMutation();
 
   // Convert filter value to API param
   const getCompanyStatusParam = (): boolean | undefined => {
@@ -187,6 +190,18 @@ export const CampaignDetails = () => {
             description="Please try again."
             primaryButtonText="Retry"
             onPrimaryClick={() => refetch()}
+            showIcon
+          />
+        )}
+
+        {shortlistUpdateError && (
+          <NotificationBanner
+            appearance="negative"
+            type="inline"
+            title="Failed to update shortlist"
+            description={shortlistUpdateError}
+            primaryButtonText="Dismiss"
+            onPrimaryClick={() => setShortlistUpdateError(null)}
             showIcon
           />
         )}
@@ -370,7 +385,23 @@ export const CampaignDetails = () => {
                                   }}
                                   onChange={(opt: any) => {
                                     const next = opt?.value === 'true';
+                                    setShortlistUpdateError(null);
+                                    const prevValue = getEffectiveCompanyStatus(company);
+                                    // Optimistic UI update
                                     setManualCompanyStatus(prev => ({ ...prev, [company._id]: next }));
+
+                                    // Persist using backend API: PATCH /api/v1/campaign_company_run
+                                    updateCampaignCompanyRun({
+                                      campaign_id: campaignId || company.campaign_id,
+                                      company_id: company.company_id,
+                                      is_relevant: next,
+                                    })
+                                      .unwrap()
+                                      .catch(() => {
+                                        // Revert optimistic update
+                                        setManualCompanyStatus(prev => ({ ...prev, [company._id]: prevValue }));
+                                        setShortlistUpdateError('Please try again.');
+                                      });
                                   }}
                                   size="s"
                                 />
