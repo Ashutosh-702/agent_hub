@@ -1,8 +1,28 @@
-FROM node:18-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /ui
 
+# --- Frontend build deps (needed for git+ssh dependencies like Novus) ---
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
+        git \
+        openssh-client \
+        curl \
+    && rm -rf /var/cache/apk/*
+
 COPY ai_agents/ui/ ./
+
+ARG AZURE_PRIVATE_TOKEN_BASE64
+
+# Configure SSH for Git operations (Novus install uses git+ssh)
+RUN mkdir -p /root/.ssh && \
+    touch /root/.ssh/id_rsa && \
+    curl -H "Authorization: Basic $AZURE_PRIVATE_TOKEN_BASE64" "https://dev.azure.com/Gofynd/Infrastructure/_apis/git/repositories/kube-infrastructure/items?scopePath=gitlab%2Fid_rsa&versionDescriptor.version=master" -o /root/.ssh/id_rsa && \
+    chmod 600 /root/.ssh/id_rsa && \
+    echo "Host dev.azure.com\n\tHostName dev.azure.com\n\tUser git\n\tStrictHostKeyChecking no\n" >> /root/.ssh/config && \
+    echo "Host ssh.dev.azure.com\n\tHostName ssh.dev.azure.com\n\tUser git\n\tStrictHostKeyChecking no\n" >> /root/.ssh/config && \
+    ssh-keyscan -t rsa ssh.dev.azure.com >> /root/.ssh/known_hosts
+
 RUN npm ci
 
 RUN npm run build
