@@ -8,6 +8,12 @@ export const getApiBaseUrl = () => {
 		return window.AGENTHUB_MAIN_DOMAIN;
 	}
 
+	// Frontend + backend are the same domain (SIT/Prod): default to current origin.
+	// This avoids Mixed Content when the page is HTTPS and /env-config is slow.
+	if (window.location && window.location.origin) {
+		return window.location.origin;
+	}
+
 	return process.env.AGENTHUB_MAIN_DOMAIN || 'http://0.0.0.0:80';
 };
 
