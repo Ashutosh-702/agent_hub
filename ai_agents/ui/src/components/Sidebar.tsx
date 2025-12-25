@@ -27,7 +27,7 @@ const menuItems: MenuItem[] = [
     children: [
       { path: '/prospecting/company', label: 'Company Prospecting', icon: '🔍' },
       { path: '/prospecting/contact', label: 'Contact Prospecting', icon: '👤' },
-      { path: '/prospecting/wide', label: 'Wide Prospecting', icon: '🌐' },
+      { path: '/prospecting/wide/define-filters', label: 'Wide Prospecting', icon: '🌐' },
     ]
   },
 ];

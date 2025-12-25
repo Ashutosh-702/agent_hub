@@ -8,6 +8,9 @@ import { CompanyDetails } from './components/CompanyDetails';
 import { CampaignList } from './components/CampaignList';
 import { CampaignDetails } from './components/CampaignDetails';
 import { ComingSoon } from './components/ComingSoon';
+import { ProspectingDefineFilters } from './components/ProspectingDefineFilters';
+import { ProspectingImportJob } from './components/ProspectingImportJob';
+import { ProspectingReviewProspects } from './components/ProspectingReviewProspects';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 
 function AppContent() {
@@ -28,7 +31,14 @@ function AppContent() {
             <Route path="/prospecting" element={<Navigate to="/prospecting/wide" replace />} />
             <Route path="/prospecting/company" element={<ComingSoon />} />
             <Route path="/prospecting/contact" element={<ComingSoon />} />
-            <Route path="/prospecting/wide" element={<Form />} />
+            {/* Wide Prospecting Wizard (Figma-aligned UI) */}
+            <Route path="/prospecting/wide" element={<Navigate to="/prospecting/wide/define-filters" replace />} />
+            <Route path="/prospecting/wide/define-filters" element={<ProspectingDefineFilters />} />
+            <Route path="/prospecting/wide/import-job" element={<ProspectingImportJob />} />
+            <Route path="/prospecting/wide/review-prospects" element={<ProspectingReviewProspects />} />
+
+            {/* Legacy campaign creation form (intentionally not Novus-migrated) */}
+            <Route path="/prospecting/wide/create" element={<Form />} />
           </Routes>
       </main>
     </div>
