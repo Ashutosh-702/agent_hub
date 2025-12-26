@@ -153,11 +153,15 @@ export const Step1LeadGeneration = () => {
     setShowResults(true);
   };
 
+  const handleRefineSearch = () => {
+    setShowResults(false);
+  };
+
   return (
     <div className="step-container step-lead-generation">
       <div className="step-header">
         <h2>Lead Generation</h2>
-        <p>Define your target criteria to find potential prospects</p>
+        <p>{showResults ? 'Review the prospects found based on your criteria' : 'Define your target criteria to find potential prospects'}</p>
       </div>
 
       {/* Loading Animation */}
@@ -191,99 +195,102 @@ export const Step1LeadGeneration = () => {
         </div>
       )}
 
-      {/* Filters Form */}
-      <div className="filters-grid">
-        {/* Industry */}
-        <div className="filter-group">
-          <label>Industry</label>
-          <div className="chip-select">
-            {INDUSTRIES.map(industry => (
-              <button
-                key={industry}
-                type="button"
-                className={`chip ${localFilters.industry.includes(industry) ? 'selected' : ''}`}
-                onClick={() => handleMultiSelect('industry', industry)}
-              >
-                {industry}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Show Filters OR Results - not both */}
+      {!showResults ? (
+        <>
+          {/* Filters Form */}
+          <div className="filters-grid">
+            {/* Industry */}
+            <div className="filter-group">
+              <label>Industry</label>
+              <div className="chip-select">
+                {INDUSTRIES.map(industry => (
+                  <button
+                    key={industry}
+                    type="button"
+                    className={`chip ${localFilters.industry.includes(industry) ? 'selected' : ''}`}
+                    onClick={() => handleMultiSelect('industry', industry)}
+                  >
+                    {industry}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Region */}
-        <div className="filter-group">
-          <label>Region / Country</label>
-          <div className="chip-select">
-            {REGIONS.map(region => (
-              <button
-                key={region}
-                type="button"
-                className={`chip ${localFilters.region.includes(region) ? 'selected' : ''}`}
-                onClick={() => handleMultiSelect('region', region)}
-              >
-                {region}
-              </button>
-            ))}
-          </div>
-        </div>
+            {/* Region */}
+            <div className="filter-group">
+              <label>Region / Country</label>
+              <div className="chip-select">
+                {REGIONS.map(region => (
+                  <button
+                    key={region}
+                    type="button"
+                    className={`chip ${localFilters.region.includes(region) ? 'selected' : ''}`}
+                    onClick={() => handleMultiSelect('region', region)}
+                  >
+                    {region}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Employee Count */}
-        <div className="filter-group">
-          <label>Employee Count</label>
-          <div className="chip-select">
-            {EMPLOYEE_COUNTS.map(count => (
-              <button
-                key={count}
-                type="button"
-                className={`chip ${localFilters.employeeCount.includes(count) ? 'selected' : ''}`}
-                onClick={() => handleMultiSelect('employeeCount', count)}
-              >
-                {count}
-              </button>
-            ))}
-          </div>
-        </div>
+            {/* Employee Count */}
+            <div className="filter-group">
+              <label>Employee Count</label>
+              <div className="chip-select">
+                {EMPLOYEE_COUNTS.map(count => (
+                  <button
+                    key={count}
+                    type="button"
+                    className={`chip ${localFilters.employeeCount.includes(count) ? 'selected' : ''}`}
+                    onClick={() => handleMultiSelect('employeeCount', count)}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Revenue Range */}
-        <div className="filter-group filter-row">
-          <div className="input-group">
-            <label>Min Revenue ($)</label>
-            <input
-              type="text"
-              placeholder="e.g., 1000000"
-              value={localFilters.revenueMin}
-              onChange={(e) => setLocalFilters(prev => ({ ...prev, revenueMin: e.target.value }))}
-            />
+            {/* Revenue Range */}
+            <div className="filter-group filter-row">
+              <div className="input-group">
+                <label>Min Revenue ($)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., 1000000"
+                  value={localFilters.revenueMin}
+                  onChange={(e) => setLocalFilters(prev => ({ ...prev, revenueMin: e.target.value }))}
+                />
+              </div>
+              <div className="input-group">
+                <label>Max Revenue ($)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., 50000000"
+                  value={localFilters.revenueMax}
+                  onChange={(e) => setLocalFilters(prev => ({ ...prev, revenueMax: e.target.value }))}
+                />
+              </div>
+            </div>
           </div>
-          <div className="input-group">
-            <label>Max Revenue ($)</label>
-            <input
-              type="text"
-              placeholder="e.g., 50000000"
-              value={localFilters.revenueMax}
-              onChange={(e) => setLocalFilters(prev => ({ ...prev, revenueMax: e.target.value }))}
-            />
+
+          {/* Fetch Button */}
+          <div className="step-actions">
+            <button 
+              className="btn-primary btn-large"
+              onClick={handleFetchProspects}
+              disabled={state.isLoading}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              Find Prospects
+            </button>
           </div>
-        </div>
-      </div>
-
-      {/* Fetch Button */}
-      <div className="step-actions">
-        <button 
-          className="btn-primary btn-large"
-          onClick={handleFetchProspects}
-          disabled={state.isLoading}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          Find Prospects
-        </button>
-      </div>
-
-      {/* Results Preview */}
-      {showResults && state.qualifiedCompanies.length > 0 && (
+        </>
+      ) : (
+        /* Results View - replaces the filters */
         <div className="results-preview">
           <div className="results-header">
             <h3>
@@ -325,7 +332,11 @@ export const Step1LeadGeneration = () => {
 
           {/* Continue Button */}
           <div className="step-actions">
-            <button className="btn-secondary" onClick={handleFetchProspects}>
+            <button className="btn-secondary" onClick={handleRefineSearch}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
               Refine Search
             </button>
             <button className="btn-primary btn-large" onClick={nextStep}>
