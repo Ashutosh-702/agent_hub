@@ -20,6 +20,7 @@ function AppContent() {
             <Route path="/" element={<Navigate to="/campaign" replace />} />
             {/* Campaign - Top level section */}
             <Route path="/campaign" element={<CampaignList />} />
+            <Route path="/campaign/new" element={<Form />} />
             <Route path="/campaign/:campaignId" element={<CampaignDetails />} />
             {/* Master Data - Companies & Contacts */}
             <Route path="/master-data" element={<Navigate to="/master-data/companies" replace />} />

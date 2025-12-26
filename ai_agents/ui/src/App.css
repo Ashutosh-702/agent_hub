@@ -402,6 +402,50 @@ button:focus:not(:focus-visible) {
   font-size: var(--text-base);
 }
 
+/* New Campaign Button */
+.new-campaign-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 100%);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+}
+
+.new-campaign-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.new-campaign-btn:active {
+  transform: translateY(0);
+}
+
+.new-campaign-btn svg {
+  flex-shrink: 0;
+}
+
+/* Campaign Metrics */
+.metric-value {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-qualified {
+  color: var(--color-success);
+}
+
+.metric-outreached {
+  color: var(--color-primary);
+}
+
 /* Create Campaign Button */
 .create-campaign-btn {
   display: inline-flex;

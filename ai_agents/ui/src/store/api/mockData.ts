@@ -40,6 +40,12 @@ export const mockCampaigns: Campaign[] = [
       created_at: '2024-12-20T10:30:00Z',
       updated_at: '2024-12-25T14:20:00Z',
     },
+    metrics: {
+      companies_prospected: 120,
+      companies_qualified: 45,
+      contacts_found: 89,
+      contacts_outreached: 34,
+    },
     company_mappings_count: 45,
   },
   {
@@ -77,6 +83,12 @@ export const mockCampaigns: Campaign[] = [
       created_at: '2024-11-15T08:00:00Z',
       updated_at: '2024-12-10T16:45:00Z',
     },
+    metrics: {
+      companies_prospected: 350,
+      companies_qualified: 128,
+      contacts_found: 256,
+      contacts_outreached: 180,
+    },
     company_mappings_count: 128,
   },
   {
@@ -113,6 +125,12 @@ export const mockCampaigns: Campaign[] = [
     metadata: {
       created_at: '2024-12-22T09:15:00Z',
       updated_at: '2024-12-22T09:15:00Z',
+    },
+    metrics: {
+      companies_prospected: 0,
+      companies_qualified: 0,
+      contacts_found: 0,
+      contacts_outreached: 0,
     },
     company_mappings_count: 0,
   },

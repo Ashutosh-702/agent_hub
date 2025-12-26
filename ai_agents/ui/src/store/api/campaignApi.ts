@@ -36,6 +36,13 @@ export interface Campaign {
     created_at: string;
     updated_at: string;
   };
+  // Campaign metrics
+  metrics: {
+    companies_prospected: number;
+    companies_qualified: number;
+    contacts_found: number;
+    contacts_outreached: number;
+  };
   company_mappings_count: number;
 }
 
