@@ -98,6 +98,7 @@ export const Step1LeadGeneration = () => {
   
   const [localFilters, setLocalFilters] = useState(state.filters);
   const [showResults, setShowResults] = useState(false);
+  const [isRefining, setIsRefining] = useState(false); // Show filters while keeping results below
   const [animationProgress, setAnimationProgress] = useState(0);
 
   const handleMultiSelect = (field: 'industry' | 'region' | 'employeeCount', value: string) => {
@@ -113,6 +114,7 @@ export const Step1LeadGeneration = () => {
     setFilters(localFilters);
     setLoading(true, 'Searching for prospects...', 0);
     setShowResults(false);
+    setIsRefining(false);
     setAnimationProgress(0);
 
     // Simulate progressive loading animation
@@ -154,14 +156,20 @@ export const Step1LeadGeneration = () => {
   };
 
   const handleRefineSearch = () => {
-    setShowResults(false);
+    setIsRefining(true); // Show filters but keep results visible below
   };
 
   return (
     <div className="step-container step-lead-generation">
       <div className="step-header">
         <h2>Lead Generation</h2>
-        <p>{showResults ? 'Review the prospects found based on your criteria' : 'Define your target criteria to find potential prospects'}</p>
+        <p>
+          {!showResults 
+            ? 'Define your target criteria to find potential prospects'
+            : isRefining 
+              ? 'Adjust your filters and search again' 
+              : 'Review the prospects found based on your criteria'}
+        </p>
       </div>
 
       {/* Loading Animation */}
@@ -195,8 +203,8 @@ export const Step1LeadGeneration = () => {
         </div>
       )}
 
-      {/* Show Filters OR Results - not both */}
-      {!showResults ? (
+      {/* Show Filters when: no results yet OR refining search */}
+      {(!showResults || isRefining) && (
         <>
           {/* Filters Form */}
           <div className="filters-grid">
@@ -285,12 +293,14 @@ export const Step1LeadGeneration = () => {
                 <circle cx="11" cy="11" r="8"/>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
-              Find Prospects
+              {isRefining ? 'Update Search' : 'Find Prospects'}
             </button>
           </div>
         </>
-      ) : (
-        /* Results View - replaces the filters */
+      )}
+
+      {/* Results View - shown when we have results */}
+      {showResults && state.qualifiedCompanies.length > 0 && (
         <div className="results-preview">
           <div className="results-header">
             <h3>
@@ -330,15 +340,17 @@ export const Step1LeadGeneration = () => {
             )}
           </div>
 
-          {/* Continue Button */}
+          {/* Continue Button - only show Refine Search when not already refining */}
           <div className="step-actions">
-            <button className="btn-secondary" onClick={handleRefineSearch}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-              Refine Search
-            </button>
+            {!isRefining && (
+              <button className="btn-secondary" onClick={handleRefineSearch}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Refine Search
+              </button>
+            )}
             <button className="btn-primary btn-large" onClick={nextStep}>
               Continue to Qualification
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
