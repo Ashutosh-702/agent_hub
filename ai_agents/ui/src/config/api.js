@@ -8,7 +8,7 @@ export const getApiBaseUrl = () => {
 		return window.AGENTHUB_MAIN_DOMAIN;
 	}
 
-	return process.env.AGENTHUB_MAIN_DOMAIN || 'http://0.0.0.0:80';
+	return import.meta.env.VITE_AGENTHUB_MAIN_DOMAIN || 'http://0.0.0.0:80';
 };
 
 export const initializeConfig = async () => {

@@ -168,7 +168,7 @@ export const CampaignDetails = () => {
         {/* Back Button */}
         <button
           className="back-to-campaigns-btn"
-          onClick={() => navigate('/master-data/campaign')}
+          onClick={() => navigate('/campaign')}
         >
           ← Back to Campaigns
         </button>

@@ -176,7 +176,7 @@ export const CompanyDetails = () => {
           className="back-to-companies-btn"
           onClick={() => {
             if (isFromCampaign && navState?.campaignId) {
-              navigate(`/master-data/campaign/${navState.campaignId}`);
+              navigate(`/campaign/${navState.campaignId}`);
               return;
             }
             navigate('/master-data/companies');

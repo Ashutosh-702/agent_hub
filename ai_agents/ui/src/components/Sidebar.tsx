@@ -86,12 +86,17 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { 
+    path: '/campaign', 
+    label: 'Campaign', 
+    icon: Icons.campaign,
+  },
+  { 
     path: '/master-data', 
     label: 'Master Data', 
     icon: Icons.masterData,
     children: [
-      { path: '/master-data/campaign', label: 'Campaign', icon: Icons.campaign },
       { path: '/master-data/companies', label: 'Companies', icon: Icons.companies },
+      { path: '/master-data/contacts', label: 'Contacts', icon: Icons.contactProspecting },
     ]
   },
   { 
@@ -108,7 +113,7 @@ const menuItems: MenuItem[] = [
 
 export const Sidebar = () => {
   const { isCollapsed, toggleSidebar } = useSidebar();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['/master-data']);
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const location = useLocation();
 
   const toggleExpand = (path: string) => {

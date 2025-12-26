@@ -17,13 +17,16 @@ function AppContent() {
       <Sidebar />
       <main className={`main-content ${isCollapsed ? 'sidebar-collapsed' : ''}`}>
           <Routes>
-            <Route path="/" element={<Navigate to="/master-data/campaign" replace />} />
-            <Route path="/campaign" element={<Navigate to="/master-data/campaign" replace />} />
-            <Route path="/master-data" element={<Navigate to="/master-data/campaign" replace />} />
-            <Route path="/master-data/campaign" element={<CampaignList />} />
-            <Route path="/master-data/campaign/:campaignId" element={<CampaignDetails />} />
+            <Route path="/" element={<Navigate to="/campaign" replace />} />
+            {/* Campaign - Top level section */}
+            <Route path="/campaign" element={<CampaignList />} />
+            <Route path="/campaign/:campaignId" element={<CampaignDetails />} />
+            {/* Master Data - Companies & Contacts */}
+            <Route path="/master-data" element={<Navigate to="/master-data/companies" replace />} />
             <Route path="/master-data/companies" element={<Companies />} />
             <Route path="/master-data/companies/:companyId" element={<CompanyDetails />} />
+            <Route path="/master-data/contacts" element={<ComingSoon />} />
+            {/* Prospecting */}
             <Route path="/prospecting" element={<Navigate to="/prospecting/wide" replace />} />
             <Route path="/prospecting/company" element={<ComingSoon />} />
             <Route path="/prospecting/contact" element={<ComingSoon />} />
