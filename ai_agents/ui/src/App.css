@@ -560,6 +560,16 @@ button:focus:not(:focus-visible) {
   text-transform: capitalize;
 }
 
+.campaign-name-cell {
+  font-weight: 600;
+  color: var(--color-gray-900);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
 .product-badge {
   display: inline-block;
   padding: var(--space-1) var(--space-3);

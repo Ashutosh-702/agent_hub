@@ -2,6 +2,7 @@ import { baseApi } from './baseApi';
 
 export interface Campaign {
   _id: string;
+  name: string;
   // Selected during campaign creation (optional for backwards compatibility)
   shortlisting_approach?: string;
   prompts: {

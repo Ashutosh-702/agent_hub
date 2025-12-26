@@ -7,6 +7,7 @@ import type { Company, Contact } from './companyApi';
 export const mockCampaigns: Campaign[] = [
   {
     _id: '507f1f77bcf86cd799439011',
+    name: 'Q1 2025 SaaS Outreach',
     shortlisting_approach: 'ai_driven',
     prompts: {
       web: 'Find companies in the SaaS space that are growing rapidly',
@@ -50,6 +51,7 @@ export const mockCampaigns: Campaign[] = [
   },
   {
     _id: '507f1f77bcf86cd799439012',
+    name: 'Healthcare Decision Makers',
     shortlisting_approach: 'manual',
     prompts: {
       web: 'Healthcare technology companies focused on patient care',
@@ -93,6 +95,7 @@ export const mockCampaigns: Campaign[] = [
   },
   {
     _id: '507f1f77bcf86cd799439013',
+    name: 'EMEA Fintech Expansion',
     shortlisting_approach: 'ai_driven',
     prompts: {
       web: 'Fintech startups disrupting traditional banking',

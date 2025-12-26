@@ -46,11 +46,11 @@ export const CampaignList = () => {
 
   const columns: Array<DataTableColumn<Campaign>> = [
     {
-      id: 'campaignId',
-      header: 'Campaign ID',
+      id: 'campaignName',
+      header: 'Campaign Name',
       cell: (campaign) => (
-        <span className="campaign-name" title={campaign._id}>
-          {campaign._id.slice(0, 8)}...
+        <span className="campaign-name-cell" title={campaign.name}>
+          {campaign.name || 'Untitled Campaign'}
         </span>
       ),
     },
