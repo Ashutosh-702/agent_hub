@@ -27,6 +27,7 @@ export const Step2LeadQualification = () => {
 
   const companies = state.qualifiedCompanies;
   const qualifiedCount = companies.filter(c => c.qualificationStatus === 'qualified').length;
+  const rejectedCount = companies.filter(c => c.qualificationStatus === 'rejected').length;
 
   // Toggle single company qualification via checkbox
   const toggleCompanyQualification = (companyId: string) => {
