@@ -24,6 +24,8 @@ export const Step2LeadQualification = () => {
   const [aiQuestionsAnswers, setAiQuestionsAnswers] = useState<Record<string, boolean>>({});
   const [isQualifying, setIsQualifying] = useState(false);
   const [qualificationComplete, setQualificationComplete] = useState(false);
+  const [activeTab, setActiveTab] = useState<'qualified' | 'rejected'>('qualified');
+  const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
 
   const companies = state.qualifiedCompanies;
   const qualifiedCount = companies.filter(c => c.qualificationStatus === 'qualified').length;
@@ -65,11 +67,30 @@ export const Step2LeadQualification = () => {
     await new Promise(resolve => setTimeout(resolve, 3000));
     clearInterval(interval);
 
+    // Mock rejection reasons
+    const REJECTION_REASONS = [
+      'Employee count below target threshold',
+      'Industry not aligned with ICP criteria',
+      'Revenue below minimum requirement',
+      'Geographic region outside target market',
+      'No recent funding or growth signals detected',
+      'Company appears to be in decline phase',
+      'Limited online presence and engagement',
+      'Tech stack mismatch with product offering',
+    ];
+
     // Simulate AI qualification results
+    const reasons: Record<string, string> = {};
     const updatedCompanies = companies.map(company => {
       // Random qualification based on "AI analysis"
       const score = Math.random();
       const qualified = score > 0.4; // 60% qualification rate
+      
+      if (!qualified) {
+        // Assign a random rejection reason
+        reasons[company.id] = REJECTION_REASONS[Math.floor(Math.random() * REJECTION_REASONS.length)];
+      }
+      
       return {
         ...company,
         isQualified: qualified,
@@ -77,6 +98,7 @@ export const Step2LeadQualification = () => {
       } as typeof company;
     });
 
+    setRejectionReasons(reasons);
     setQualifiedCompanies(updatedCompanies);
     setLoading(false);
     setIsQualifying(false);
@@ -294,6 +316,7 @@ export const Step2LeadQualification = () => {
       {/* AI Qualification Results */}
       {state.qualificationMode === 'ai' && qualificationComplete && (
         <div className="ai-results">
+          {/* Summary Cards */}
           <div className="results-summary">
             <div className="result-card success">
               <h3>{qualifiedCount}</h3>
@@ -305,21 +328,96 @@ export const Step2LeadQualification = () => {
             </div>
           </div>
 
-          <div className="qualified-companies-list">
-            <h3>Qualified Companies</h3>
-            {companies.filter(c => c.qualificationStatus === 'qualified').map((company) => (
-              <div key={company.id} className="company-result-card qualified">
-                <div className="company-info">
-                  <h4>{company.name}</h4>
-                  <div className="company-meta">
-                    <span className="tag">{company.industry}</span>
-                    <span className="tag">{company.location}</span>
-                  </div>
-                </div>
-                <span className="status-badge qualified">✓ Qualified</span>
-              </div>
-            ))}
+          {/* Tabs */}
+          <div className="results-tabs">
+            <button 
+              className={`tab-btn ${activeTab === 'qualified' ? 'active' : ''}`}
+              onClick={() => setActiveTab('qualified')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Qualified ({qualifiedCount})
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'rejected' ? 'active' : ''}`}
+              onClick={() => setActiveTab('rejected')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+              Rejected ({rejectedCount})
+            </button>
           </div>
+
+          {/* Qualified Companies Tab */}
+          {activeTab === 'qualified' && (
+            <div className="companies-tab-content">
+              {companies.filter(c => c.qualificationStatus === 'qualified').length === 0 ? (
+                <div className="empty-state">
+                  <p>No qualified companies yet</p>
+                </div>
+              ) : (
+                companies.filter(c => c.qualificationStatus === 'qualified').map((company) => (
+                  <div key={company.id} className="company-result-card qualified">
+                    <div className="company-info">
+                      <h4>{company.name}</h4>
+                      <div className="company-meta">
+                        <span className="tag">{company.industry}</span>
+                        <span className="tag">{company.location}</span>
+                        <span className="tag">{company.employeeCount} employees</span>
+                      </div>
+                    </div>
+                    <span className="status-badge qualified">✓ Qualified</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Rejected Companies Tab */}
+          {activeTab === 'rejected' && (
+            <div className="companies-tab-content">
+              {companies.filter(c => c.qualificationStatus === 'rejected').length === 0 ? (
+                <div className="empty-state">
+                  <p>No rejected companies</p>
+                </div>
+              ) : (
+                companies.filter(c => c.qualificationStatus === 'rejected').map((company) => (
+                  <div key={company.id} className="company-result-card rejected">
+                    <div className="company-info">
+                      <h4>{company.name}</h4>
+                      <div className="company-meta">
+                        <span className="tag">{company.industry}</span>
+                        <span className="tag">{company.location}</span>
+                        <span className="tag">{company.employeeCount} employees</span>
+                      </div>
+                      <div className="rejection-reason">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="12" y1="8" x2="12" y2="12"/>
+                          <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <span>{rejectionReasons[company.id] || 'Does not meet qualification criteria'}</span>
+                      </div>
+                    </div>
+                    <button 
+                      className="btn-override"
+                      onClick={() => qualifyCompany(company.id, true)}
+                      title="Override AI decision and qualify this company"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      Qualify
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       )}
 
