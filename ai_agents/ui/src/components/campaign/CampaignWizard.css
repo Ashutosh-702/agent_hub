@@ -934,7 +934,6 @@
 }
 
 .company-qualification-card,
-.sync-company-card,
 .personalization-company-card {
   display: flex;
   align-items: center;
@@ -948,23 +947,18 @@
 }
 
 .company-qualification-card:hover,
-.sync-company-card:hover,
 .personalization-company-card:hover {
   border-color: var(--color-gray-300);
   box-shadow: var(--shadow-sm);
 }
 
 .company-qualification-card.qualified,
-.sync-company-card.synced,
-.sync-company-card.selected,
 .personalization-company-card.selected {
   border-color: var(--color-success);
   background: rgba(16, 185, 129, 0.08);
 }
 
 .company-qualification-card.qualified:hover,
-.sync-company-card.synced:hover,
-.sync-company-card.selected:hover,
 .personalization-company-card.selected:hover {
   background: rgba(16, 185, 129, 0.12);
 }
@@ -982,8 +976,7 @@
   flex-shrink: 0;
 }
 
-.company-qualification-card.rejected,
-.sync-company-card.failed {
+.company-qualification-card.rejected {
   border-color: var(--color-error);
   background: var(--color-error-light);
 }
@@ -1402,14 +1395,6 @@
 }
 
 /* Sync Styles */
-.sync-company-card .company-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  width: 100%;
-  cursor: pointer;
-}
-
 .sync-status {
   display: flex;
   align-items: center;
@@ -2806,30 +2791,45 @@
 }
 
 /* Step 4: Sync Hubspot - Company with contacts structure */
+.step-sync-hubspot .sync-companies-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 .sync-company-card {
   background: var(--color-white);
-  border: 1px solid var(--color-gray-200);
-  border-radius: var(--radius-lg);
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.sync-company-card:hover {
+  border-color: var(--color-gray-300);
+  box-shadow: var(--shadow-md);
 }
 
 .sync-company-card.selected {
   border-color: var(--color-success);
-  background: rgba(16, 185, 129, 0.02);
+  background: rgba(16, 185, 129, 0.03);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 .sync-company-card.synced {
   border-color: var(--color-primary);
-  background: rgba(99, 102, 241, 0.02);
+  background: rgba(99, 102, 241, 0.03);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 .sync-company-card .company-row {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-4);
+  padding: var(--space-5);
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .sync-company-card .company-row:hover {
@@ -2846,33 +2846,193 @@
 }
 
 .sync-company-card .company-info h4 {
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--color-gray-900);
-  margin: 0 0 var(--space-1) 0;
+  margin: 0 0 var(--space-2) 0;
+}
+
+.sync-company-card .company-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.sync-company-card .company-meta .tag {
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.sync-company-card .company-meta .contacts-count {
+  padding: var(--space-1) var(--space-2);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, rgba(124, 58, 237, 0.1) 100%);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.sync-company-card .expand-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--color-gray-100);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-gray-500);
+  transition: all 0.2s ease;
+}
+
+.sync-company-card .expand-btn:hover {
+  background: var(--color-gray-200);
+  color: var(--color-gray-700);
 }
 
 .sync-company-card .company-contacts {
   border-top: 1px solid var(--color-gray-200);
-  padding: var(--space-4);
-  background: var(--color-gray-50);
+  padding: var(--space-4) var(--space-5);
+  background: linear-gradient(180deg, var(--color-gray-50) 0%, var(--color-white) 100%);
+}
+
+.sync-company-card .contacts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
 }
 
 .sync-company-card .contacts-header h5 {
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-gray-700);
-  margin: 0 0 var(--space-3) 0;
+  margin: 0;
+}
+
+.sync-company-card .contacts-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+.sync-company-card .contact-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.sync-company-card .contact-card:hover {
+  border-color: var(--color-gray-300);
+  box-shadow: var(--shadow-sm);
 }
 
 .sync-company-card .contact-card.synced {
   background: rgba(99, 102, 241, 0.05);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.sync-company-card .contact-card .contact-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 100%);
+  color: var(--color-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.sync-company-card .contact-card .contact-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sync-company-card .contact-card .contact-name {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--color-gray-900);
+}
+
+.sync-company-card .contact-card .contact-title {
+  font-size: var(--text-xs);
+  color: var(--color-gray-500);
+}
+
+.sync-company-card .contact-card .contact-email {
+  font-size: var(--text-xs);
+  color: var(--color-primary);
 }
 
 .contact-synced-badge {
+  width: 24px;
+  height: 24px;
+  background: var(--color-success);
+  color: var(--color-white);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Sync stats enhancement */
+.sync-stats {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.sync-stats .stat {
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  min-width: 120px;
+}
+
+.sync-stats .stat .stat-value {
+  display: block;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-gray-900);
+}
+
+.sync-stats .stat .stat-label {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: var(--space-1);
+}
+
+.sync-stats .stat.synced .stat-value {
+  color: var(--color-primary);
+}
+
+.sync-stats .stat.success .stat-value {
   color: var(--color-success);
-  font-weight: 600;
-  font-size: var(--text-sm);
 }
 
