@@ -213,7 +213,13 @@ export const Step4Personalization = () => {
                     </svg>
                   </div>
                 )}
-                <button className="btn-icon expand-btn">
+                <button 
+                  className="btn-icon expand-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedCompany(expandedCompany === company.id ? null : company.id);
+                  }}
+                >
                   <svg
                     width="20"
                     height="20"
@@ -227,12 +233,9 @@ export const Step4Personalization = () => {
                   </svg>
                 </button>
               </div>
-            </div>
-          );
-        })}
 
-            {/* Expanded Content */}
-            {expandedCompany === company.id && (
+              {/* Expanded Content */}
+              {expandedCompany === company.id && (
               <div className="personalization-content">
                 {/* Message Section */}
                 <div className="personalization-section">
