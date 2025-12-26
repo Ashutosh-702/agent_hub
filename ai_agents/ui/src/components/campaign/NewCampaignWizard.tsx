@@ -98,10 +98,10 @@ export const useCampaignWizard = () => {
 };
 
 const STEPS = [
-  { id: 1, title: 'Lead Generation', description: 'Define target criteria' },
-  { id: 2, title: 'Lead Qualification', description: 'Qualify prospects' },
-  { id: 3, title: 'Sync to CRM', description: 'Sync to HubSpot' },
-  { id: 4, title: 'Personalization', description: 'Generate & review' },
+  { id: 1, title: 'Lead Generation' },
+  { id: 2, title: 'Qualification' },
+  { id: 3, title: 'Sync to CRM' },
+  { id: 4, title: 'Personalization' },
 ];
 
 export const NewCampaignWizard = () => {
@@ -395,17 +395,14 @@ export const NewCampaignWizard = () => {
             >
               <div className="stepper-circle">
                 {state.currentStep > step.id ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                 ) : (
                   step.id
                 )}
               </div>
-              <div className="stepper-content">
-                <span className="stepper-title">{step.title}</span>
-                <span className="stepper-description">{step.description}</span>
-              </div>
+              <span className="stepper-title">{step.title}</span>
               {index < STEPS.length - 1 && <div className="stepper-line" />}
             </div>
           ))}

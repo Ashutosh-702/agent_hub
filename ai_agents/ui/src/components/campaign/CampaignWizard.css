@@ -44,21 +44,28 @@
 
 /* Progress Stepper */
 .wizard-stepper {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   display: flex;
   justify-content: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-8);
-  padding: var(--space-6);
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-6);
+  padding: var(--space-3) var(--space-4);
   background: var(--color-white);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .stepper-item {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-2);
   cursor: default;
   position: relative;
 }
@@ -72,23 +79,24 @@
 }
 
 .stepper-circle {
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   background: var(--color-gray-200);
   color: var(--color-gray-500);
   transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .stepper-item.active .stepper-circle {
   background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 100%);
   color: var(--color-white);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
 .stepper-item.completed .stepper-circle {
@@ -96,36 +104,30 @@
   color: var(--color-white);
 }
 
-.stepper-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .stepper-title {
-  font-weight: 600;
-  font-size: var(--text-sm);
-  color: var(--color-gray-400);
-}
-
-.stepper-item.active .stepper-title,
-.stepper-item.completed .stepper-title {
-  color: var(--color-gray-900);
-}
-
-.stepper-description {
+  font-weight: 500;
   font-size: var(--text-xs);
   color: var(--color-gray-400);
+  white-space: nowrap;
+}
+
+.stepper-item.active .stepper-title {
+  color: var(--color-gray-900);
+  font-weight: 600;
+}
+
+.stepper-item.completed .stepper-title {
+  color: var(--color-gray-700);
 }
 
 .stepper-line {
-  width: 60px;
+  width: 24px;
   height: 2px;
   background: var(--color-gray-200);
-  margin-left: var(--space-4);
+  margin-left: var(--space-2);
+  flex-shrink: 0;
 }
 
-.stepper-item.completed + .stepper-item .stepper-line,
 .stepper-item.completed .stepper-line {
   background: var(--color-success);
 }
