@@ -100,6 +100,7 @@ export const Step1LeadGeneration = () => {
   const [showResults, setShowResults] = useState(false);
   const [isRefining, setIsRefining] = useState(false); // Show filters while keeping results below
   const [animationProgress, setAnimationProgress] = useState(0);
+  const [showAllProspects, setShowAllProspects] = useState(false);
 
   const handleMultiSelect = (field: 'industry' | 'region' | 'employeeCount', value: string) => {
     setLocalFilters(prev => ({
@@ -314,11 +315,11 @@ export const Step1LeadGeneration = () => {
           </div>
 
           <div className="prospects-preview-list">
-            {state.qualifiedCompanies.slice(0, 5).map((company, index) => (
+            {(showAllProspects ? state.qualifiedCompanies : state.qualifiedCompanies.slice(0, 5)).map((company, index) => (
               <div 
                 key={company.id} 
                 className="prospect-preview-card"
-                style={{ animationDelay: `${index * 0.1}s` }}
+                style={{ animationDelay: `${Math.min(index, 5) * 0.1}s` }}
               >
                 <div className="prospect-info">
                   <h4>{company.name}</h4>
@@ -334,9 +335,26 @@ export const Step1LeadGeneration = () => {
               </div>
             ))}
             {state.qualifiedCompanies.length > 5 && (
-              <div className="more-prospects">
-                +{state.qualifiedCompanies.length - 5} more prospects
-              </div>
+              <button 
+                className="more-prospects-btn"
+                onClick={() => setShowAllProspects(!showAllProspects)}
+              >
+                {showAllProspects ? (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="18 15 12 9 6 15"/>
+                    </svg>
+                    Show less
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                    +{state.qualifiedCompanies.length - 5} more prospects
+                  </>
+                )}
+              </button>
             )}
           </div>
 
