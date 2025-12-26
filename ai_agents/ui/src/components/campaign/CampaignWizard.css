@@ -1069,6 +1069,11 @@
   margin: 0 0 var(--space-6) 0;
 }
 
+.ai-questions-card > .btn-primary {
+  display: flex;
+  margin: 0 auto;
+}
+
 .ai-questions-list {
   display: flex;
   flex-direction: column;
