@@ -2762,3 +2762,46 @@
   border-width: 2px;
 }
 
+/* Contact/Company meta separator */
+.contact-meta .separator,
+.company-meta .separator {
+  color: var(--color-gray-400);
+  margin: 0 var(--space-1);
+}
+
+/* LinkedIn link styling */
+.contact-linkedin,
+.company-linkedin {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: #0A66C2;
+  text-decoration: none;
+  margin-top: var(--space-1);
+  transition: opacity 0.2s ease;
+}
+
+.contact-linkedin:hover,
+.company-linkedin:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.contact-linkedin svg,
+.company-linkedin svg {
+  color: #0A66C2;
+}
+
+/* Reject button styling (for qualified items) */
+.btn-override.btn-reject {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.btn-override.btn-reject:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--color-danger);
+}
+
