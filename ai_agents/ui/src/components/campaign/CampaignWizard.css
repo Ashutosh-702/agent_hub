@@ -1193,17 +1193,49 @@
 }
 
 .result-card {
-  padding: var(--space-6);
+  padding: var(--space-5);
   border-radius: var(--radius-xl);
-  min-width: 150px;
+  min-width: 160px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 3px solid transparent;
+  position: relative;
+}
+
+.result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .result-card.success {
   background: var(--color-success-light);
 }
 
+.result-card.success.active {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+}
+
 .result-card.danger {
   background: var(--color-error-light);
+}
+
+.result-card.danger.active {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+}
+
+.result-card .card-icon {
+  margin-bottom: var(--space-2);
+  opacity: 0.7;
+}
+
+.result-card.success .card-icon {
+  color: var(--color-success);
+}
+
+.result-card.danger .card-icon {
+  color: var(--color-error);
 }
 
 .result-card h3 {
@@ -1224,6 +1256,10 @@
   margin: var(--space-1) 0 0 0;
   font-size: var(--text-sm);
   color: var(--color-gray-600);
+}
+
+.result-card.active p {
+  font-weight: 500;
 }
 
 .qualified-companies-list {

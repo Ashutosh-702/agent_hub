@@ -316,40 +316,38 @@ export const Step2LeadQualification = () => {
       {/* AI Qualification Results */}
       {state.qualificationMode === 'ai' && qualificationComplete && (
         <div className="ai-results">
-          {/* Summary Cards */}
+          {/* Summary Cards - Also act as tab switchers */}
           <div className="results-summary">
-            <div className="result-card success">
+            <div 
+              className={`result-card success ${activeTab === 'qualified' ? 'active' : ''}`}
+              onClick={() => setActiveTab('qualified')}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="card-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
               <h3>{qualifiedCount}</h3>
               <p>Qualified Leads</p>
             </div>
-            <div className="result-card danger">
+            <div 
+              className={`result-card danger ${activeTab === 'rejected' ? 'active' : ''}`}
+              onClick={() => setActiveTab('rejected')}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="card-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+              </div>
               <h3>{rejectedCount}</h3>
               <p>Rejected</p>
             </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="results-tabs">
-            <button 
-              className={`tab-btn ${activeTab === 'qualified' ? 'active' : ''}`}
-              onClick={() => setActiveTab('qualified')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              Qualified ({qualifiedCount})
-            </button>
-            <button 
-              className={`tab-btn ${activeTab === 'rejected' ? 'active' : ''}`}
-              onClick={() => setActiveTab('rejected')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="15" y1="9" x2="9" y2="15"/>
-                <line x1="9" y1="9" x2="15" y2="15"/>
-              </svg>
-              Rejected ({rejectedCount})
-            </button>
           </div>
 
           {/* Qualified Companies Tab */}
