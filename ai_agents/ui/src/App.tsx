@@ -7,6 +7,7 @@ import { CompanyDetails } from './components/CompanyDetails';
 import { CampaignList } from './components/CampaignList';
 import { CampaignDetails } from './components/CampaignDetails';
 import { ComingSoon } from './components/ComingSoon';
+import { NewCampaignWizard } from './components/campaign';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 
 function AppContent() {
@@ -20,7 +21,7 @@ function AppContent() {
             <Route path="/" element={<Navigate to="/campaign" replace />} />
             {/* Campaign - Top level section */}
             <Route path="/campaign" element={<CampaignList />} />
-            <Route path="/campaign/new" element={<Form />} />
+            <Route path="/campaign/new" element={<NewCampaignWizard />} />
             <Route path="/campaign/:campaignId" element={<CampaignDetails />} />
             {/* Master Data - Companies & Contacts */}
             <Route path="/master-data" element={<Navigate to="/master-data/companies" replace />} />
