@@ -35,12 +35,13 @@ export interface Contact {
 
 export interface Company extends Prospect {
   contacts: Contact[];
-  syncStatus: 'not_synced' | 'syncing' | 'synced' | 'failed';
+  syncStatus: 'not_synced' | 'selected' | 'syncing' | 'synced' | 'failed';
   personalization?: {
     messageStatus: 'pending' | 'generating' | 'generated' | 'approved' | 'rejected';
     deckStatus: 'pending' | 'generating' | 'generated' | 'approved' | 'rejected';
     message?: string;
     deckUrl?: string;
+    isSelected?: boolean;
   };
 }
 

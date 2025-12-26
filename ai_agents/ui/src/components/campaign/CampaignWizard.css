@@ -838,6 +838,101 @@
   overflow-y: auto;
 }
 
+/* Select All Header */
+.select-all-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-gray-50);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-2);
+}
+
+.select-all-text {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-gray-700);
+}
+
+.selected-count {
+  color: var(--color-gray-500);
+  font-weight: 400;
+  margin-left: var(--space-1);
+}
+
+/* Custom Checkbox */
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: relative;
+  height: 20px;
+  width: 20px;
+  background-color: var(--color-white);
+  border: 2px solid var(--color-gray-300);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.checkbox-container:hover .checkmark {
+  border-color: var(--color-primary);
+}
+
+.checkbox-container input:checked ~ .checkmark {
+  background-color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+/* Indeterminate state */
+.checkbox-container input:indeterminate ~ .checkmark {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.checkbox-container input:indeterminate ~ .checkmark:after {
+  display: block;
+  left: 4px;
+  top: 7px;
+  width: 10px;
+  height: 2px;
+  border: none;
+  background: white;
+  transform: none;
+}
+
 .company-qualification-card,
 .sync-company-card,
 .personalization-company-card {
@@ -849,12 +944,42 @@
   border: 1px solid var(--color-gray-200);
   border-radius: var(--radius-lg);
   transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.company-qualification-card:hover,
+.sync-company-card:hover,
+.personalization-company-card:hover {
+  border-color: var(--color-gray-300);
+  box-shadow: var(--shadow-sm);
 }
 
 .company-qualification-card.qualified,
-.sync-company-card.synced {
+.sync-company-card.synced,
+.sync-company-card.selected,
+.personalization-company-card.selected {
   border-color: var(--color-success);
-  background: var(--color-success-light);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.company-qualification-card.qualified:hover,
+.sync-company-card.synced:hover,
+.sync-company-card.selected:hover,
+.personalization-company-card.selected:hover {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+/* Qualified Badge */
+.qualified-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--color-success);
+  border-radius: 50%;
+  color: white;
+  flex-shrink: 0;
 }
 
 .company-qualification-card.rejected,

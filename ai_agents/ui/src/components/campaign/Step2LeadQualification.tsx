@@ -21,38 +21,30 @@ export const Step2LeadQualification = () => {
     setQualifiedCompanies,
   } = useCampaignWizard();
 
-  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [aiQuestionsAnswers, setAiQuestionsAnswers] = useState<Record<string, boolean>>({});
   const [isQualifying, setIsQualifying] = useState(false);
   const [qualificationComplete, setQualificationComplete] = useState(false);
 
   const companies = state.qualifiedCompanies;
   const qualifiedCount = companies.filter(c => c.qualificationStatus === 'qualified').length;
-  const rejectedCount = companies.filter(c => c.qualificationStatus === 'rejected').length;
-  const pendingCount = companies.filter(c => c.qualificationStatus === 'pending').length;
 
-  const toggleSelectCompany = (companyId: string) => {
-    setSelectedCompanies(prev => 
-      prev.includes(companyId) 
-        ? prev.filter(id => id !== companyId)
-        : [...prev, companyId]
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedCompanies.length === companies.length) {
-      setSelectedCompanies([]);
-    } else {
-      setSelectedCompanies(companies.map(c => c.id));
+  // Toggle single company qualification via checkbox
+  const toggleCompanyQualification = (companyId: string) => {
+    const company = companies.find(c => c.id === companyId);
+    if (company) {
+      const isCurrentlyQualified = company.qualificationStatus === 'qualified';
+      qualifyCompany(companyId, !isCurrentlyQualified);
     }
   };
 
-  const handleBulkQualify = (qualified: boolean) => {
-    if (selectedCompanies.length > 0) {
-      bulkQualify(selectedCompanies, qualified);
-      setSelectedCompanies([]);
-    }
+  // Select/Deselect all companies
+  const handleSelectAll = () => {
+    const allQualified = companies.every(c => c.qualificationStatus === 'qualified');
+    bulkQualify(companies.map(c => c.id), !allQualified);
   };
+
+  const allSelected = companies.length > 0 && companies.every(c => c.qualificationStatus === 'qualified');
+  const someSelected = companies.some(c => c.qualificationStatus === 'qualified') && !allSelected;
 
   const handleAIQualification = async () => {
     setIsQualifying(true);
@@ -186,107 +178,70 @@ export const Step2LeadQualification = () => {
             </div>
             <div className="stat qualified">
               <span className="stat-value">{qualifiedCount}</span>
-              <span className="stat-label">Qualified</span>
-            </div>
-            <div className="stat rejected">
-              <span className="stat-value">{rejectedCount}</span>
-              <span className="stat-label">Rejected</span>
-            </div>
-            <div className="stat pending">
-              <span className="stat-value">{pendingCount}</span>
-              <span className="stat-label">Pending</span>
+              <span className="stat-label">Selected</span>
             </div>
           </div>
 
-          {/* Bulk Actions */}
-          <div className="bulk-actions">
-            <label className="checkbox-label">
-              <input 
-                type="checkbox" 
-                checked={selectedCompanies.length === companies.length && companies.length > 0}
-                onChange={toggleSelectAll}
-              />
-              Select All ({selectedCompanies.length} selected)
-            </label>
-            <div className="bulk-buttons">
-              <button 
-                className="btn-success btn-small"
-                disabled={selectedCompanies.length === 0}
-                onClick={() => handleBulkQualify(true)}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                Qualify Selected
-              </button>
-              <button 
-                className="btn-danger btn-small"
-                disabled={selectedCompanies.length === 0}
-                onClick={() => handleBulkQualify(false)}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"/>
-                  <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-                Reject Selected
-              </button>
-            </div>
-          </div>
-
-          {/* Companies List */}
+          {/* Companies List with Select All Header */}
           <div className="companies-qualification-list">
-            {companies.map((company) => (
-              <div 
-                key={company.id} 
-                className={`company-qualification-card ${company.qualificationStatus}`}
-              >
-                <div className="company-select">
-                  <input 
-                    type="checkbox"
-                    checked={selectedCompanies.includes(company.id)}
-                    onChange={() => toggleSelectCompany(company.id)}
-                  />
-                </div>
-                <div className="company-info">
-                  <h4>{company.name}</h4>
-                  <div className="company-meta">
-                    <span className="tag">{company.industry}</span>
-                    <span className="tag">{company.location}</span>
-                    <span className="tag">{company.revenue}</span>
-                    <span className="tag">{company.contacts.length} contacts</span>
+            {/* Select All Header */}
+            <div className="select-all-header">
+              <label className="checkbox-container">
+                <input 
+                  type="checkbox" 
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected;
+                  }}
+                  onChange={handleSelectAll}
+                />
+                <span className="checkmark"></span>
+              </label>
+              <span className="select-all-text">
+                {allSelected ? 'Deselect All' : 'Select All'} 
+                <span className="selected-count">({qualifiedCount} of {companies.length} selected)</span>
+              </span>
+            </div>
+
+            {/* Companies */}
+            {companies.map((company) => {
+              const isQualified = company.qualificationStatus === 'qualified';
+              return (
+                <div 
+                  key={company.id} 
+                  className={`company-qualification-card ${isQualified ? 'qualified' : ''}`}
+                  onClick={() => toggleCompanyQualification(company.id)}
+                >
+                  <div className="company-select">
+                    <label className="checkbox-container">
+                      <input 
+                        type="checkbox"
+                        checked={isQualified}
+                        onChange={() => toggleCompanyQualification(company.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span className="checkmark"></span>
+                    </label>
                   </div>
-                </div>
-                <div className="company-actions">
-                  {company.qualificationStatus === 'pending' ? (
-                    <>
-                      <button 
-                        className="btn-icon btn-success"
-                        onClick={() => qualifyCompany(company.id, true)}
-                        title="Qualify"
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                      </button>
-                      <button 
-                        className="btn-icon btn-danger"
-                        onClick={() => qualifyCompany(company.id, false)}
-                        title="Reject"
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <line x1="18" y1="6" x2="6" y2="18"/>
-                          <line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                      </button>
-                    </>
-                  ) : (
-                    <span className={`status-badge ${company.qualificationStatus}`}>
-                      {company.qualificationStatus === 'qualified' ? '✓ Qualified' : '✗ Rejected'}
-                    </span>
+                  <div className="company-info">
+                    <h4>{company.name}</h4>
+                    <div className="company-meta">
+                      <span className="tag">{company.industry}</span>
+                      <span className="tag">{company.location}</span>
+                      <span className="tag">{company.revenue}</span>
+                      <span className="tag">{company.contacts.length} contacts</span>
+                    </div>
+                  </div>
+                  {isQualified && (
+                    <div className="qualified-badge">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -390,9 +345,9 @@ export const Step2LeadQualification = () => {
           </button>
         )}
 
-        {(qualifiedCount > 0 || (state.qualificationMode === 'manual' && pendingCount === 0)) && (
+        {qualifiedCount > 0 && (
           <button className="btn-primary btn-large" onClick={handleContinue}>
-            Continue with {qualifiedCount} Qualified Leads
+            Continue with {qualifiedCount} Selected
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="5" y1="12" x2="19" y2="12"/>
               <polyline points="12 5 19 12 12 19"/>

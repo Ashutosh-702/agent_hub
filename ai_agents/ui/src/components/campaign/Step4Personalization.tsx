@@ -19,9 +19,9 @@ export const Step4Personalization = () => {
     setSelectedSequence,
     enrollToSequence,
     prevStep,
+    setQualifiedCompanies,
   } = useCampaignWizard();
 
-  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [expandedCompany, setExpandedCompany] = useState<string | null>(null);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [manualMessage, setManualMessage] = useState<Record<string, string>>({});
@@ -29,51 +29,45 @@ export const Step4Personalization = () => {
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [editingDeck, setEditingDeck] = useState<string | null>(null);
 
-  const companies = state.qualifiedCompanies.filter(c => c.syncStatus === 'synced');
+  const companies = state.qualifiedCompanies;
   
-  const generatedCount = companies.filter(c => 
-    c.personalization?.messageStatus === 'generated' || c.personalization?.messageStatus === 'approved'
-  ).length;
-  
-  const approvedCount = companies.filter(c => 
-    c.personalization?.messageStatus === 'approved' && c.personalization?.deckStatus === 'approved'
-  ).length;
+  // Count selected (for enrollment)
+  const selectedCount = companies.filter(c => c.personalization?.isSelected).length;
 
   const generatingCount = companies.filter(c => 
     c.personalization?.messageStatus === 'generating'
   ).length;
 
-  const toggleSelectCompany = (companyId: string) => {
-    setSelectedCompanies(prev =>
-      prev.includes(companyId)
-        ? prev.filter(id => id !== companyId)
-        : [...prev, companyId]
-    );
+  // Toggle company selection for enrollment
+  const toggleCompanySelection = (companyId: string) => {
+    setQualifiedCompanies(companies.map(c => 
+      c.id === companyId 
+        ? { ...c, personalization: { ...c.personalization!, isSelected: !c.personalization?.isSelected } }
+        : c
+    ));
   };
 
-  const toggleSelectAll = () => {
-    const pendingCompanies = companies.filter(c => c.personalization?.messageStatus === 'pending');
-    if (selectedCompanies.length === pendingCompanies.length) {
-      setSelectedCompanies([]);
-    } else {
-      setSelectedCompanies(pendingCompanies.map(c => c.id));
-    }
+  // Select/Deselect all companies
+  const handleSelectAll = () => {
+    const allSelected = companies.every(c => c.personalization?.isSelected);
+    setQualifiedCompanies(companies.map(c => ({
+      ...c,
+      personalization: { ...c.personalization!, isSelected: !allSelected },
+    })));
   };
+
+  const allSelected = companies.length > 0 && companies.every(c => c.personalization?.isSelected);
+  const someSelected = companies.some(c => c.personalization?.isSelected) && !allSelected;
 
   const handleGenerate = (companyId: string) => {
     generatePersonalization(companyId);
   };
 
   const handleBulkGenerate = () => {
-    if (selectedCompanies.length > 0) {
-      bulkGeneratePersonalization(selectedCompanies);
-      setSelectedCompanies([]);
+    const selectedIds = companies.filter(c => c.personalization?.isSelected).map(c => c.id);
+    if (selectedIds.length > 0) {
+      bulkGeneratePersonalization(selectedIds);
     }
-  };
-
-  const handleGenerateAll = () => {
-    const pendingIds = companies.filter(c => c.personalization?.messageStatus === 'pending').map(c => c.id);
-    bulkGeneratePersonalization(pendingIds);
   };
 
   const handleApprove = (companyId: string, type: 'message' | 'deck') => {
@@ -90,10 +84,10 @@ export const Step4Personalization = () => {
 
   const handleEnroll = () => {
     if (state.selectedSequence) {
-      const approvedIds = companies
-        .filter(c => c.personalization?.messageStatus === 'approved' && c.personalization?.deckStatus === 'approved')
+      const selectedIds = companies
+        .filter(c => c.personalization?.isSelected)
         .map(c => c.id);
-      enrollToSequence(approvedIds);
+      enrollToSequence(selectedIds);
     }
   };
 
@@ -112,7 +106,7 @@ export const Step4Personalization = () => {
     }
   };
 
-  const readyForEnrollment = approvedCount > 0;
+  const readyForEnrollment = selectedCount > 0;
 
   return (
     <div className="step-container step-personalization">
@@ -127,69 +121,66 @@ export const Step4Personalization = () => {
           <span className="stat-value">{companies.length}</span>
           <span className="stat-label">Total</span>
         </div>
-        <div className="stat generating">
-          <span className="stat-value">{generatingCount}</span>
-          <span className="stat-label">Generating</span>
-        </div>
-        <div className="stat generated">
-          <span className="stat-value">{generatedCount}</span>
-          <span className="stat-label">Generated</span>
-        </div>
-        <div className="stat approved">
-          <span className="stat-value">{approvedCount}</span>
-          <span className="stat-label">Approved</span>
+        <div className="stat synced">
+          <span className="stat-value">{selectedCount}</span>
+          <span className="stat-label">Selected</span>
         </div>
       </div>
 
-      {/* Bulk Actions */}
+      {/* Action Buttons */}
       <div className="bulk-actions">
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={selectedCompanies.length === companies.filter(c => c.personalization?.messageStatus === 'pending').length && companies.filter(c => c.personalization?.messageStatus === 'pending').length > 0}
-            onChange={toggleSelectAll}
-          />
-          Select All Pending ({selectedCompanies.length} selected)
-        </label>
-        <div className="bulk-buttons">
-          <button
-            className="btn-primary btn-small"
-            disabled={selectedCompanies.length === 0 || generatingCount > 0}
-            onClick={handleBulkGenerate}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            </svg>
-            Generate Selected
-          </button>
-          <button
-            className="btn-secondary btn-small"
-            disabled={generatingCount > 0 || generatedCount === companies.length}
-            onClick={handleGenerateAll}
-          >
-            Generate All
-          </button>
-        </div>
+        <button
+          className="btn-primary btn-small"
+          disabled={selectedCount === 0 || generatingCount > 0}
+          onClick={handleBulkGenerate}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          Generate for Selected ({selectedCount})
+        </button>
       </div>
 
-      {/* Companies List */}
+      {/* Companies List with Select All Header */}
       <div className="personalization-companies-list">
-        {companies.map((company) => (
-          <div key={company.id} className={`personalization-company-card ${company.personalization?.messageStatus || 'pending'}`}>
-            <div className="company-header" onClick={() => setExpandedCompany(expandedCompany === company.id ? null : company.id)}>
-              {company.personalization?.messageStatus === 'pending' && (
-                <div className="company-select">
-                  <input
+        {/* Select All Header */}
+        <div className="select-all-header">
+          <label className="checkbox-container">
+            <input 
+              type="checkbox" 
+              checked={allSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = someSelected;
+              }}
+              onChange={handleSelectAll}
+            />
+            <span className="checkmark"></span>
+          </label>
+          <span className="select-all-text">
+            {allSelected ? 'Deselect All' : 'Select All'} 
+            <span className="selected-count">({selectedCount} of {companies.length} selected)</span>
+          </span>
+        </div>
+
+        {/* Companies */}
+        {companies.map((company) => {
+          const isSelected = company.personalization?.isSelected;
+          return (
+            <div 
+              key={company.id} 
+              className={`personalization-company-card ${isSelected ? 'selected' : ''}`}
+              onClick={() => toggleCompanySelection(company.id)}
+            >
+              <div className="company-select" onClick={(e) => e.stopPropagation()}>
+                <label className="checkbox-container">
+                  <input 
                     type="checkbox"
-                    checked={selectedCompanies.includes(company.id)}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      toggleSelectCompany(company.id);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
+                    checked={isSelected || false}
+                    onChange={() => toggleCompanySelection(company.id)}
                   />
-                </div>
-              )}
+                  <span className="checkmark"></span>
+                </label>
+              </div>
               <div className="company-info">
                 <h4>{company.name}</h4>
                 <div className="company-meta">
@@ -197,14 +188,11 @@ export const Step4Personalization = () => {
                   {getStatusBadge(company.personalization?.messageStatus)}
                 </div>
               </div>
-              <div className="company-actions">
+              <div className="company-actions" onClick={(e) => e.stopPropagation()}>
                 {company.personalization?.messageStatus === 'pending' && (
                   <button
                     className="btn-primary btn-small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleGenerate(company.id);
-                    }}
+                    onClick={() => handleGenerate(company.id)}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -218,6 +206,13 @@ export const Step4Personalization = () => {
                     <span>Generating...</span>
                   </div>
                 )}
+                {isSelected && (
+                  <div className="qualified-badge">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                )}
                 <button className="btn-icon expand-btn">
                   <svg
                     width="20"
@@ -226,13 +221,15 @@ export const Step4Personalization = () => {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
-                    style={{ transform: expandedCompany === company.id ? 'rotate(180deg)' : 'none' }}
+                    style={{ transform: expandedCompany === company.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
                   >
                     <polyline points="6 9 12 15 18 9"/>
                   </svg>
                 </button>
               </div>
             </div>
+          );
+        })}
 
             {/* Expanded Content */}
             {expandedCompany === company.id && (
@@ -414,7 +411,7 @@ export const Step4Personalization = () => {
               </button>
             </div>
             <div className="modal-body">
-              <p>Select a Lemlist sequence to enroll {approvedCount} approved leads:</p>
+              <p>Select a Lemlist sequence to enroll {selectedCount} leads:</p>
               <div className="sequence-list">
                 {MOCK_SEQUENCES.map((seq) => (
                   <div
@@ -447,7 +444,7 @@ export const Step4Personalization = () => {
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                   <polyline points="22 4 12 14.01 9 11.01"/>
                 </svg>
-                Enroll {approvedCount} Leads
+                Enroll {selectedCount} Leads
               </button>
             </div>
           </div>
@@ -473,7 +470,7 @@ export const Step4Personalization = () => {
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
             <polyline points="22 4 12 14.01 9 11.01"/>
           </svg>
-          Review Passed - Enroll {approvedCount} Leads to Sequence
+          Enroll {selectedCount} Leads to Sequence
         </button>
       </div>
     </div>
