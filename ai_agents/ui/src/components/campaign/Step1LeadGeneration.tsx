@@ -36,9 +36,9 @@ const EMPLOYEE_COUNTS = [
   '5000+',
 ];
 
-// Mock prospects data
+// Mock prospects data - expanded for pagination testing
 const generateMockProspects = (filters: { industry: string[]; region: string[] }): Prospect[] => {
-  const companies = [
+  const baseCompanies = [
     { name: 'TechFlow Solutions', industry: 'Software & Technology', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
     { name: 'MedCore Systems', industry: 'Healthcare & Medical', location: 'United Kingdom', revenue: '$10M - $25M', employeeCount: '201-500' },
     { name: 'FinanceHub Inc', industry: 'Financial Services', location: 'Germany', revenue: '$25M - $50M', employeeCount: '501-1000' },
@@ -51,7 +51,43 @@ const generateMockProspects = (filters: { industry: string[]; region: string[] }
     { name: 'MediaStream Co', industry: 'Media & Entertainment', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
     { name: 'ConsultPro Services', industry: 'Professional Services', location: 'North America', revenue: '$1M - $2M', employeeCount: '11-50' },
     { name: 'InnovateTech Labs', industry: 'Software & Technology', location: 'Europe', revenue: '$10M - $25M', employeeCount: '201-500' },
+    { name: 'NextGen AI', industry: 'Software & Technology', location: 'United States', revenue: '$10M - $25M', employeeCount: '51-200' },
+    { name: 'BioHealth Labs', industry: 'Healthcare & Medical', location: 'United States', revenue: '$25M - $50M', employeeCount: '201-500' },
+    { name: 'CapitalFlow', industry: 'Financial Services', location: 'United Kingdom', revenue: '$50M - $100M', employeeCount: '501-1000' },
+    { name: 'ShopSmart', industry: 'E-commerce & Retail', location: 'Germany', revenue: '$5M - $10M', employeeCount: '51-200' },
+    { name: 'BuildRight Corp', industry: 'Manufacturing', location: 'United States', revenue: '$25M - $50M', employeeCount: '501-1000' },
+    { name: 'LearnHub', industry: 'Education', location: 'India', revenue: '$1M - $2M', employeeCount: '11-50' },
+    { name: 'ContentPro', industry: 'Media & Entertainment', location: 'United Kingdom', revenue: '$2M - $5M', employeeCount: '51-200' },
+    { name: 'LegalEase', industry: 'Professional Services', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
+    { name: 'CyberShield', industry: 'Software & Technology', location: 'Germany', revenue: '$10M - $25M', employeeCount: '201-500' },
+    { name: 'MedTech Plus', industry: 'Healthcare & Medical', location: 'Australia', revenue: '$5M - $10M', employeeCount: '51-200' },
+    { name: 'WealthWise', industry: 'Financial Services', location: 'United States', revenue: '$100M+', employeeCount: '1001-5000' },
+    { name: 'QuickCommerce', industry: 'E-commerce & Retail', location: 'India', revenue: '$2M - $5M', employeeCount: '51-200' },
+    { name: 'SteelForge', industry: 'Manufacturing', location: 'Germany', revenue: '$50M - $100M', employeeCount: '1001-5000' },
+    { name: 'SkillUp Academy', industry: 'Education', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
+    { name: 'StreamNow', industry: 'Media & Entertainment', location: 'United States', revenue: '$25M - $50M', employeeCount: '201-500' },
+    { name: 'AdvisoryPro', industry: 'Professional Services', location: 'United Kingdom', revenue: '$2M - $5M', employeeCount: '11-50' },
+    { name: 'CloudNine Tech', industry: 'Software & Technology', location: 'United States', revenue: '$25M - $50M', employeeCount: '201-500' },
+    { name: 'PharmaCare', industry: 'Healthcare & Medical', location: 'Germany', revenue: '$100M+', employeeCount: '5000+' },
+    { name: 'InsureMax', industry: 'Financial Services', location: 'Australia', revenue: '$50M - $100M', employeeCount: '501-1000' },
+    { name: 'FashionFirst', industry: 'E-commerce & Retail', location: 'United Kingdom', revenue: '$10M - $25M', employeeCount: '201-500' },
+    { name: 'AutoParts Global', industry: 'Manufacturing', location: 'United States', revenue: '$100M+', employeeCount: '5000+' },
+    { name: 'CodeCamp', industry: 'Education', location: 'India', revenue: '$1M - $2M', employeeCount: '11-50' },
+    { name: 'GameStudio X', industry: 'Media & Entertainment', location: 'United States', revenue: '$10M - $25M', employeeCount: '51-200' },
+    { name: 'TaxPro Services', industry: 'Professional Services', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
   ];
+
+  // Duplicate companies with variations to simulate more data
+  const companies = [...baseCompanies];
+  const prefixes = ['Global', 'Premier', 'Elite', 'Prime'];
+  prefixes.forEach(prefix => {
+    baseCompanies.slice(0, 10).forEach(c => {
+      companies.push({
+        ...c,
+        name: `${prefix} ${c.name}`,
+      });
+    });
+  });
 
   return companies
     .filter(c => {
@@ -93,6 +129,8 @@ const generateMockContacts = (companyId: string, companyName: string): Contact[]
   }));
 };
 
+const ITEMS_PER_PAGE = 10;
+
 export const Step1LeadGeneration = () => {
   const { state, setFilters, setProspects, setQualifiedCompanies, nextStep, setLoading } = useCampaignWizard();
   
@@ -100,7 +138,14 @@ export const Step1LeadGeneration = () => {
   const [showResults, setShowResults] = useState(false);
   const [isRefining, setIsRefining] = useState(false); // Show filters while keeping results below
   const [animationProgress, setAnimationProgress] = useState(0);
-  const [showAllProspects, setShowAllProspects] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Pagination calculations
+  const totalItems = state.qualifiedCompanies.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedCompanies = state.qualifiedCompanies.slice(startIndex, endIndex);
 
   const handleMultiSelect = (field: 'industry' | 'region' | 'employeeCount', value: string) => {
     setLocalFilters(prev => ({
@@ -117,6 +162,7 @@ export const Step1LeadGeneration = () => {
     setShowResults(false);
     setIsRefining(false);
     setAnimationProgress(0);
+    setCurrentPage(1); // Reset to first page on new search
 
     // Simulate progressive loading animation
     const estimatedTotal = Math.floor(Math.random() * 50) + 30;
@@ -314,12 +360,17 @@ export const Step1LeadGeneration = () => {
             <p>Review the prospects and continue to qualification</p>
           </div>
 
+          {/* Pagination info */}
+          <div className="pagination-info">
+            Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems} prospects
+          </div>
+
           <div className="prospects-preview-list">
-            {(showAllProspects ? state.qualifiedCompanies : state.qualifiedCompanies.slice(0, 5)).map((company, index) => (
+            {paginatedCompanies.map((company, index) => (
               <div 
                 key={company.id} 
                 className="prospect-preview-card"
-                style={{ animationDelay: `${Math.min(index, 5) * 0.1}s` }}
+                style={{ animationDelay: `${index * 0.05}s` }}
               >
                 <div className="prospect-info">
                   <h4>{company.name}</h4>
@@ -334,29 +385,79 @@ export const Step1LeadGeneration = () => {
                 </div>
               </div>
             ))}
-            {state.qualifiedCompanies.length > 5 && (
-              <button 
-                className="more-prospects-btn"
-                onClick={() => setShowAllProspects(!showAllProspects)}
-              >
-                {showAllProspects ? (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="18 15 12 9 6 15"/>
-                    </svg>
-                    Show less
-                  </>
-                ) : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                    +{state.qualifiedCompanies.length - 5} more prospects
-                  </>
-                )}
-              </button>
-            )}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="pagination-controls">
+              <button 
+                className="pagination-btn"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                title="First page"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="11 17 6 12 11 7"/>
+                  <polyline points="18 17 13 12 18 7"/>
+                </svg>
+              </button>
+              <button 
+                className="pagination-btn"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                title="Previous page"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+              </button>
+
+              <div className="pagination-pages">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    // Show first, last, current, and adjacent pages
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - currentPage) <= 1) return true;
+                    return false;
+                  })
+                  .map((page, idx, arr) => (
+                    <span key={page}>
+                      {idx > 0 && arr[idx - 1] !== page - 1 && (
+                        <span className="pagination-ellipsis">...</span>
+                      )}
+                      <button
+                        className={`pagination-page ${currentPage === page ? 'active' : ''}`}
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </button>
+                    </span>
+                  ))}
+              </div>
+
+              <button 
+                className="pagination-btn"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                title="Next page"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+              <button 
+                className="pagination-btn"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                title="Last page"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="13 17 18 12 13 7"/>
+                  <polyline points="6 17 11 12 6 7"/>
+                </svg>
+              </button>
+            </div>
+          )}
 
           {/* Continue Button - only show Refine Search when not already refining */}
           <div className="step-actions">
