@@ -1,7 +1,8 @@
 export { NewCampaignWizard } from './NewCampaignWizard';
-export { Step1LeadGeneration } from './Step1LeadGeneration';
-export { Step2LeadQualification } from './Step2LeadQualification';
-export { Step3SyncHubspot } from './Step3SyncHubspot';
-export { Step4Personalization } from './Step4Personalization';
+export { Step1Prospecting } from './Step1Prospecting';
+export { Step2CompanyQualification } from './Step2CompanyQualification';
+export { Step3ContactQualification } from './Step3ContactQualification';
+export { Step4SyncHubspot } from './Step4SyncHubspot';
+export { Step5Personalization } from './Step5Personalization';
+export { Step6EnrollOutreach } from './Step6EnrollOutreach';
 export { CampaignComplete } from './CampaignComplete';
-

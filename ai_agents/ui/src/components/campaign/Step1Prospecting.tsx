@@ -131,7 +131,7 @@ const generateMockContacts = (companyId: string, companyName: string): Contact[]
 
 const ITEMS_PER_PAGE = 10;
 
-export const Step1LeadGeneration = () => {
+export const Step1Prospecting = () => {
   const { state, setFilters, setProspects, setQualifiedCompanies, nextStep, setLoading } = useCampaignWizard();
   
   const [localFilters, setLocalFilters] = useState(state.filters);

@@ -9,16 +9,17 @@ const AI_QUESTIONS = [
   'Is the company in a growth phase (expanding operations)?',
 ];
 
-export const Step2LeadQualification = () => {
+export const Step2CompanyQualification = () => {
   const { 
     state, 
-    setQualificationMode, 
+    setCompanyQualificationMode, 
     qualifyCompany, 
     bulkQualify, 
     nextStep, 
     prevStep,
     setLoading,
     setQualifiedCompanies,
+    setQualifiedContacts,
   } = useCampaignWizard();
 
   const [aiQuestionsAnswers, setAiQuestionsAnswers] = useState<Record<string, boolean>>({});
@@ -109,14 +110,24 @@ export const Step2LeadQualification = () => {
     // Filter only qualified companies for next step
     const qualified = companies.filter(c => c.qualificationStatus === 'qualified');
     setQualifiedCompanies(qualified);
+    
+    // Extract contacts from qualified companies for contact qualification
+    const contacts = qualified.flatMap(company => 
+      company.contacts.map(contact => ({
+        ...contact,
+        qualificationStatus: 'pending' as const,
+        syncStatus: 'not_synced' as const,
+      }))
+    );
+    setQualifiedContacts(contacts);
     nextStep();
   };
 
   return (
-    <div className="step-container step-lead-qualification">
+    <div className="step-container step-company-qualification">
       <div className="step-header">
-        <h2>Lead Qualification</h2>
-        <p>Review and qualify your prospects before syncing to CRM</p>
+        <h2>Company Qualification</h2>
+        <p>Review and qualify companies before proceeding to contact qualification</p>
       </div>
 
       {/* Loading Animation */}
@@ -150,13 +161,13 @@ export const Step2LeadQualification = () => {
       )}
 
       {/* Mode Selection */}
-      {!state.qualificationMode && (
+      {!state.companyQualificationMode && (
         <div className="qualification-mode-selection">
           <h3>Choose Qualification Method</h3>
           <div className="mode-cards">
             <div 
               className="mode-card"
-              onClick={() => setQualificationMode('manual')}
+              onClick={() => setCompanyQualificationMode('manual')}
             >
               <div className="mode-icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -170,7 +181,7 @@ export const Step2LeadQualification = () => {
             </div>
             <div 
               className="mode-card"
-              onClick={() => setQualificationMode('ai')}
+              onClick={() => setCompanyQualificationMode('ai')}
             >
               <div className="mode-icon ai">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -191,7 +202,7 @@ export const Step2LeadQualification = () => {
       )}
 
       {/* Manual Qualification */}
-      {state.qualificationMode === 'manual' && (
+      {state.companyQualificationMode === 'manual' && (
         <div className="manual-qualification">
           {/* Stats Bar */}
           <div className="qualification-stats">
@@ -270,7 +281,7 @@ export const Step2LeadQualification = () => {
       )}
 
       {/* AI Qualification */}
-      {state.qualificationMode === 'ai' && !qualificationComplete && (
+      {state.companyQualificationMode === 'ai' && !qualificationComplete && (
         <div className="ai-qualification">
           <div className="ai-questions-card">
             <h3>Define Qualification Criteria</h3>
@@ -314,7 +325,7 @@ export const Step2LeadQualification = () => {
       )}
 
       {/* AI Qualification Results */}
-      {state.qualificationMode === 'ai' && qualificationComplete && (
+      {state.companyQualificationMode === 'ai' && qualificationComplete && (
         <div className="ai-results">
           {/* Summary Cards - Also act as tab switchers */}
           <div className="results-summary">
@@ -422,7 +433,7 @@ export const Step2LeadQualification = () => {
       {/* Navigation */}
       <div className="step-navigation">
         <button className="btn-secondary" onClick={() => {
-          setQualificationMode(null);
+          setCompanyQualificationMode(null);
           setQualificationComplete(false);
           prevStep();
         }}>
@@ -433,9 +444,9 @@ export const Step2LeadQualification = () => {
           Back
         </button>
         
-        {state.qualificationMode && (
+        {state.companyQualificationMode && (
           <button className="btn-secondary" onClick={() => {
-            setQualificationMode(null);
+            setCompanyQualificationMode(null);
             setQualificationComplete(false);
           }}>
             Change Method

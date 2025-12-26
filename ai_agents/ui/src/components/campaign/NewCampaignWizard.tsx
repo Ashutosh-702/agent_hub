@@ -1,10 +1,12 @@
 import { useState, createContext, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './CampaignWizard.css';
-import { Step1LeadGeneration } from './Step1LeadGeneration';
-import { Step2LeadQualification } from './Step2LeadQualification';
-import { Step3SyncHubspot } from './Step3SyncHubspot';
-import { Step4Personalization } from './Step4Personalization';
+import { Step1Prospecting } from './Step1Prospecting';
+import { Step2CompanyQualification } from './Step2CompanyQualification';
+import { Step3ContactQualification } from './Step3ContactQualification';
+import { Step4SyncHubspot } from './Step4SyncHubspot';
+import { Step5Personalization } from './Step5Personalization';
+import { Step6EnrollOutreach } from './Step6EnrollOutreach';
 import { CampaignComplete } from './CampaignComplete';
 
 // Types for the campaign wizard
@@ -31,6 +33,14 @@ export interface Contact {
   jobTitle: string;
   linkedinUrl?: string;
   isSynced?: boolean;
+  qualificationStatus?: 'pending' | 'qualified' | 'rejected';
+  aiRejectionReason?: string;
+  syncStatus?: 'not_synced' | 'selected' | 'syncing' | 'synced' | 'failed';
+  personalization?: {
+    messageStatus: 'pending' | 'generating' | 'generated' | 'approved' | 'rejected';
+    message?: string;
+    isSelected?: boolean;
+  };
 }
 
 export interface Company extends Prospect {
@@ -58,8 +68,11 @@ export interface CampaignState {
   filters: CampaignFilters;
   prospects: Prospect[];
   qualifiedCompanies: Company[];
-  qualificationMode: 'manual' | 'ai' | null;
+  qualifiedContacts: Contact[];
+  companyQualificationMode: 'manual' | 'ai' | null;
+  contactQualificationMode: 'manual' | 'ai' | null;
   aiQuestions: string[];
+  contactAiQuestions: string[];
   selectedSequence: string | null;
   isLoading: boolean;
   loadingMessage: string;
@@ -71,17 +84,21 @@ interface CampaignContextType {
   setFilters: (filters: CampaignFilters) => void;
   setProspects: (prospects: Prospect[]) => void;
   setQualifiedCompanies: (companies: Company[]) => void;
-  setQualificationMode: (mode: 'manual' | 'ai' | null) => void;
+  setQualifiedContacts: (contacts: Contact[]) => void;
+  setCompanyQualificationMode: (mode: 'manual' | 'ai' | null) => void;
+  setContactQualificationMode: (mode: 'manual' | 'ai' | null) => void;
   qualifyCompany: (companyId: string, qualified: boolean) => void;
   bulkQualify: (companyIds: string[], qualified: boolean) => void;
-  syncCompany: (companyId: string) => void;
-  bulkSync: (companyIds: string[]) => void;
-  generatePersonalization: (companyId: string) => void;
-  bulkGeneratePersonalization: (companyIds: string[]) => void;
-  approvePersonalization: (companyId: string, type: 'message' | 'deck') => void;
-  rejectPersonalization: (companyId: string, type: 'message' | 'deck') => void;
+  qualifyContact: (contactId: string, qualified: boolean) => void;
+  bulkQualifyContacts: (contactIds: string[], qualified: boolean) => void;
+  syncContact: (contactId: string) => void;
+  bulkSyncContacts: (contactIds: string[]) => void;
+  generateContactPersonalization: (contactId: string) => void;
+  bulkGenerateContactPersonalization: (contactIds: string[]) => void;
+  approveContactPersonalization: (contactId: string) => void;
+  rejectContactPersonalization: (contactId: string) => void;
   setSelectedSequence: (sequenceId: string) => void;
-  enrollToSequence: (companyIds: string[]) => void;
+  enrollToSequence: (contactIds: string[]) => void;
   nextStep: () => void;
   prevStep: () => void;
   goToStep: (step: number) => void;
@@ -99,10 +116,12 @@ export const useCampaignWizard = () => {
 };
 
 const STEPS = [
-  { id: 1, title: 'Lead Generation' },
-  { id: 2, title: 'Lead Qualification' },
-  { id: 3, title: 'Sync to CRM' },
-  { id: 4, title: 'Personalization' },
+  { id: 1, title: 'Prospecting' },
+  { id: 2, title: 'Company Qualification' },
+  { id: 3, title: 'Contact Qualification' },
+  { id: 4, title: 'Sync to Hubspot' },
+  { id: 5, title: 'Personalization' },
+  { id: 6, title: 'Enroll for Outreach' },
 ];
 
 export const NewCampaignWizard = () => {
@@ -118,8 +137,11 @@ export const NewCampaignWizard = () => {
     },
     prospects: [],
     qualifiedCompanies: [],
-    qualificationMode: null,
+    qualifiedContacts: [],
+    companyQualificationMode: null,
+    contactQualificationMode: null,
     aiQuestions: [],
+    contactAiQuestions: [],
     selectedSequence: null,
     isLoading: false,
     loadingMessage: '',
@@ -140,8 +162,16 @@ export const NewCampaignWizard = () => {
     setState(prev => ({ ...prev, qualifiedCompanies: companies }));
   }, []);
 
-  const setQualificationMode = useCallback((mode: 'manual' | 'ai' | null) => {
-    setState(prev => ({ ...prev, qualificationMode: mode }));
+  const setQualifiedContacts = useCallback((contacts: Contact[]) => {
+    setState(prev => ({ ...prev, qualifiedContacts: contacts }));
+  }, []);
+
+  const setCompanyQualificationMode = useCallback((mode: 'manual' | 'ai' | null) => {
+    setState(prev => ({ ...prev, companyQualificationMode: mode }));
+  }, []);
+
+  const setContactQualificationMode = useCallback((mode: 'manual' | 'ai' | null) => {
+    setState(prev => ({ ...prev, contactQualificationMode: mode }));
   }, []);
 
   const qualifyCompany = useCallback((companyId: string, qualified: boolean) => {
@@ -164,6 +194,62 @@ export const NewCampaignWizard = () => {
           : c
       ),
     }));
+  }, []);
+
+  const qualifyContact = useCallback((contactId: string, qualified: boolean) => {
+    setState(prev => ({
+      ...prev,
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        c.id === contactId
+          ? { ...c, qualificationStatus: qualified ? 'qualified' : 'rejected' }
+          : c
+      ),
+    }));
+  }, []);
+
+  const bulkQualifyContacts = useCallback((contactIds: string[], qualified: boolean) => {
+    setState(prev => ({
+      ...prev,
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        contactIds.includes(c.id)
+          ? { ...c, qualificationStatus: qualified ? 'qualified' : 'rejected' }
+          : c
+      ),
+    }));
+  }, []);
+
+  const syncContact = useCallback((contactId: string) => {
+    setState(prev => ({
+      ...prev,
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        c.id === contactId ? { ...c, syncStatus: 'syncing' } : c
+      ),
+    }));
+    setTimeout(() => {
+      setState(prev => ({
+        ...prev,
+        qualifiedContacts: prev.qualifiedContacts.map(c =>
+          c.id === contactId ? { ...c, syncStatus: 'synced' } : c
+        ),
+      }));
+    }, 1500);
+  }, []);
+
+  const bulkSyncContacts = useCallback((contactIds: string[]) => {
+    setState(prev => ({
+      ...prev,
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        contactIds.includes(c.id) ? { ...c, syncStatus: 'syncing' } : c
+      ),
+    }));
+    setTimeout(() => {
+      setState(prev => ({
+        ...prev,
+        qualifiedContacts: prev.qualifiedContacts.map(c =>
+          contactIds.includes(c.id) ? { ...c, syncStatus: 'synced' } : c
+        ),
+      }));
+    }, 2000);
   }, []);
 
   const syncCompany = useCallback((companyId: string) => {
@@ -202,92 +288,98 @@ export const NewCampaignWizard = () => {
     }, 2000);
   }, []);
 
-  const generatePersonalization = useCallback((companyId: string) => {
-    setState(prev => ({
-      ...prev,
-      qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-        c.id === companyId
-          ? {
-              ...c,
-              personalization: {
-                ...c.personalization,
-                messageStatus: 'generating',
-                deckStatus: 'generating',
-              } as Company['personalization'],
-            }
-          : c
-      ),
-    }));
-    // Simulate generation
-    setTimeout(() => {
-      setState(prev => ({
+  const generateContactPersonalization = useCallback((contactId: string) => {
+    setState(prev => {
+      const contact = prev.qualifiedContacts.find(c => c.id === contactId);
+      const company = prev.qualifiedCompanies.find(comp => comp.id === contact?.companyId);
+      return {
         ...prev,
-        qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-          c.id === companyId
+        qualifiedContacts: prev.qualifiedContacts.map(c =>
+          c.id === contactId
             ? {
                 ...c,
                 personalization: {
-                  messageStatus: 'generated',
-                  deckStatus: 'generated',
-                  message: `Hi Team at ${c.name},\n\nI noticed your company is doing great work in ${c.industry}. We help companies like yours achieve 3x better results with our platform.\n\nWould love to schedule a quick call to discuss how we can help ${c.name} grow even faster.\n\nBest regards`,
-                  deckUrl: 'https://example.com/deck.pdf',
-                },
+                  ...c.personalization,
+                  messageStatus: 'generating',
+                } as Contact['personalization'],
               }
             : c
         ),
-      }));
+      };
+    });
+    // Simulate generation
+    setTimeout(() => {
+      setState(prev => {
+        const contact = prev.qualifiedContacts.find(c => c.id === contactId);
+        const company = prev.qualifiedCompanies.find(comp => comp.id === contact?.companyId);
+        return {
+          ...prev,
+          qualifiedContacts: prev.qualifiedContacts.map(c =>
+            c.id === contactId
+              ? {
+                  ...c,
+                  personalization: {
+                    messageStatus: 'generated',
+                    message: `Hi ${c.firstName},\n\nI noticed ${company?.name || 'your company'} is doing great work in ${company?.industry || 'your industry'}. As ${c.jobTitle}, I thought you might be interested in how we help companies like yours achieve 3x better results.\n\nWould love to schedule a quick call to discuss how we can help.\n\nBest regards`,
+                  },
+                }
+              : c
+          ),
+        };
+      });
     }, 3000);
   }, []);
 
-  const bulkGeneratePersonalization = useCallback((companyIds: string[]) => {
+  const bulkGenerateContactPersonalization = useCallback((contactIds: string[]) => {
     setState(prev => ({
       ...prev,
-      qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-        companyIds.includes(c.id)
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        contactIds.includes(c.id)
           ? {
               ...c,
               personalization: {
                 ...c.personalization,
                 messageStatus: 'generating',
-                deckStatus: 'generating',
-              } as Company['personalization'],
+              } as Contact['personalization'],
             }
           : c
       ),
     }));
     // Simulate bulk generation with staggered completion
-    companyIds.forEach((id, index) => {
+    contactIds.forEach((id, index) => {
       setTimeout(() => {
-        setState(prev => ({
-          ...prev,
-          qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-            c.id === id
-              ? {
-                  ...c,
-                  personalization: {
-                    messageStatus: 'generated',
-                    deckStatus: 'generated',
-                    message: `Hi Team at ${c.name},\n\nI noticed your company is doing great work in ${c.industry}. We help companies like yours achieve 3x better results with our platform.\n\nWould love to schedule a quick call to discuss how we can help ${c.name} grow even faster.\n\nBest regards`,
-                    deckUrl: 'https://example.com/deck.pdf',
-                  },
-                }
-              : c
-          ),
-        }));
-      }, 2000 + index * 1000);
+        setState(prev => {
+          const contact = prev.qualifiedContacts.find(c => c.id === id);
+          const company = prev.qualifiedCompanies.find(comp => comp.id === contact?.companyId);
+          return {
+            ...prev,
+            qualifiedContacts: prev.qualifiedContacts.map(c =>
+              c.id === id
+                ? {
+                    ...c,
+                    personalization: {
+                      messageStatus: 'generated',
+                      message: `Hi ${c.firstName},\n\nI noticed ${company?.name || 'your company'} is doing great work in ${company?.industry || 'your industry'}. As ${c.jobTitle}, I thought you might be interested in how we help companies like yours achieve 3x better results.\n\nWould love to schedule a quick call to discuss how we can help.\n\nBest regards`,
+                    },
+                  }
+                : c
+            ),
+          };
+        });
+      }, 2000 + index * 500);
     });
   }, []);
 
-  const approvePersonalization = useCallback((companyId: string, type: 'message' | 'deck') => {
+  const approveContactPersonalization = useCallback((contactId: string) => {
     setState(prev => ({
       ...prev,
-      qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-        c.id === companyId
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        c.id === contactId
           ? {
               ...c,
               personalization: {
                 ...c.personalization!,
-                [type === 'message' ? 'messageStatus' : 'deckStatus']: 'approved',
+                messageStatus: 'approved',
               },
             }
           : c
@@ -295,16 +387,16 @@ export const NewCampaignWizard = () => {
     }));
   }, []);
 
-  const rejectPersonalization = useCallback((companyId: string, type: 'message' | 'deck') => {
+  const rejectContactPersonalization = useCallback((contactId: string) => {
     setState(prev => ({
       ...prev,
-      qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-        c.id === companyId
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        c.id === contactId
           ? {
               ...c,
               personalization: {
                 ...c.personalization!,
-                [type === 'message' ? 'messageStatus' : 'deckStatus']: 'rejected',
+                messageStatus: 'rejected',
               },
             }
           : c
@@ -316,9 +408,9 @@ export const NewCampaignWizard = () => {
     setState(prev => ({ ...prev, selectedSequence: sequenceId }));
   }, []);
 
-  const enrollToSequence = useCallback((_companyIds: string[]) => {
+  const enrollToSequence = useCallback((_contactIds: string[]) => {
     // Simulate enrollment
-    setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Enrolling leads to sequence...' }));
+    setState(prev => ({ ...prev, isLoading: true, loadingMessage: 'Enrolling contacts to sequence...' }));
     setTimeout(() => {
       setState(prev => ({ ...prev, isLoading: false }));
       setIsComplete(true);
@@ -326,7 +418,7 @@ export const NewCampaignWizard = () => {
   }, []);
 
   const nextStep = useCallback(() => {
-    setState(prev => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, 4) }));
+    setState(prev => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, 6) }));
   }, []);
 
   const prevStep = useCallback(() => {
@@ -334,7 +426,7 @@ export const NewCampaignWizard = () => {
   }, []);
 
   const goToStep = useCallback((step: number) => {
-    if (step >= 1 && step <= 4) {
+    if (step >= 1 && step <= 6) {
       setState(prev => ({ ...prev, currentStep: step }));
     }
   }, []);
@@ -348,15 +440,19 @@ export const NewCampaignWizard = () => {
     setFilters,
     setProspects,
     setQualifiedCompanies,
-    setQualificationMode,
+    setQualifiedContacts,
+    setCompanyQualificationMode,
+    setContactQualificationMode,
     qualifyCompany,
     bulkQualify,
-    syncCompany,
-    bulkSync,
-    generatePersonalization,
-    bulkGeneratePersonalization,
-    approvePersonalization,
-    rejectPersonalization,
+    qualifyContact,
+    bulkQualifyContacts,
+    syncContact,
+    bulkSyncContacts,
+    generateContactPersonalization,
+    bulkGenerateContactPersonalization,
+    approveContactPersonalization,
+    rejectContactPersonalization,
     setSelectedSequence,
     enrollToSequence,
     nextStep,
@@ -411,10 +507,12 @@ export const NewCampaignWizard = () => {
 
         {/* Step Content */}
         <div className="wizard-content">
-          {state.currentStep === 1 && <Step1LeadGeneration />}
-          {state.currentStep === 2 && <Step2LeadQualification />}
-          {state.currentStep === 3 && <Step3SyncHubspot />}
-          {state.currentStep === 4 && <Step4Personalization />}
+          {state.currentStep === 1 && <Step1Prospecting />}
+          {state.currentStep === 2 && <Step2CompanyQualification />}
+          {state.currentStep === 3 && <Step3ContactQualification />}
+          {state.currentStep === 4 && <Step4SyncHubspot />}
+          {state.currentStep === 5 && <Step5Personalization />}
+          {state.currentStep === 6 && <Step6EnrollOutreach />}
         </div>
       </div>
     </CampaignContext.Provider>
