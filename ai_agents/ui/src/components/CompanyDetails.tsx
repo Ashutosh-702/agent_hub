@@ -188,7 +188,7 @@ export const CompanyDetails = () => {
         {/* Error State */}
         {error && (
           <div className="error-banner">
-            ❌ Failed to load company details
+            <span>Failed to load company details</span>
             <button className="retry-btn" onClick={() => fetchCompanyDetails(1, false)}>Retry</button>
           </div>
         )}
@@ -219,7 +219,12 @@ export const CompanyDetails = () => {
                 <div className="contacts-list">
                   {contacts.length === 0 && !isLoadingMore ? (
                     <div className="empty-state-box">
-                      <span className="empty-icon">👤</span>
+                      <span className="empty-icon" aria-hidden="true">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                          <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                      </span>
                       <p>No contacts found for this company</p>
                     </div>
                   ) : (

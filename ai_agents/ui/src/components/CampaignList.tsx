@@ -93,12 +93,16 @@ export const CampaignList = () => {
         <button
           className="action-btn"
           title="View Details"
+          aria-label="View campaign details"
           onClick={(e) => {
             e.stopPropagation();
             navigate(`/master-data/campaign/${campaign._id}`);
           }}
         >
-          👁️
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
         </button>
       ),
     },
@@ -139,7 +143,6 @@ export const CampaignList = () => {
                   <div className="empty-state">
                     <div className="empty-state-content">
                       <EmptyState
-                        icon="📋"
                         title="No campaigns yet"
                         description="Go to Prospecting → Wide Prospecting to create a campaign"
                       />

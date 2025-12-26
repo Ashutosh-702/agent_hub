@@ -103,12 +103,16 @@ export const Companies = () => {
         <button
           className="action-btn"
           title="View Details"
+          aria-label="View company details"
           onClick={(e) => {
             e.stopPropagation();
             navigate(`/master-data/companies/${company._id}`);
           }}
         >
-          👁️
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
         </button>
       ),
     },
@@ -167,7 +171,19 @@ export const Companies = () => {
                 emptyState={
                   <div className="empty-state">
                     <div className="empty-state-content">
-                      <EmptyState icon="🏢" title="No companies found" />
+                      <EmptyState 
+                        title="No companies found"
+                        icon={
+                          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                            <path d="M3 21h18"/>
+                            <path d="M5 21V7l8-4v18"/>
+                            <path d="M19 21V11l-6-4"/>
+                            <path d="M9 9h.01"/>
+                            <path d="M9 12h.01"/>
+                            <path d="M9 15h.01"/>
+                          </svg>
+                        }
+                      />
                     </div>
                   </div>
                 }
