@@ -396,8 +396,9 @@ export const Step4Personalization = () => {
                 </div>
               </div>
             )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       {/* Enroll Modal */}
