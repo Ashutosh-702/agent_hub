@@ -110,6 +110,15 @@ export const CampaignList = () => {
       cell: (campaign) => formatDate(campaign.metadata?.created_at),
     },
     {
+      id: 'createdBy',
+      header: 'Created By',
+      cell: (campaign) => (
+        <span className="created-by-cell" title={campaign.ownership?.user_email}>
+          {campaign.ownership?.user_email?.split('@')[0] || 'Unknown'}
+        </span>
+      ),
+    },
+    {
       id: 'actions',
       header: 'Actions',
       cell: (campaign) => (

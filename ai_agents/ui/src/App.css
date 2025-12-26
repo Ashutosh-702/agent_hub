@@ -570,6 +570,16 @@ button:focus:not(:focus-visible) {
   display: block;
 }
 
+.created-by-cell {
+  color: var(--color-gray-600);
+  font-size: var(--text-sm);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
 .product-badge {
   display: inline-block;
   padding: var(--space-1) var(--space-3);
