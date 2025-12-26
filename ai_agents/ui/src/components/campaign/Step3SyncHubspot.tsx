@@ -5,6 +5,7 @@ export const Step3SyncHubspot = () => {
   const { state, syncCompany, bulkSync, nextStep, prevStep, setQualifiedCompanies } = useCampaignWizard();
 
   const [expandedCompany, setExpandedCompany] = useState<string | null>(null);
+  const [showAllContacts, setShowAllContacts] = useState<Set<string>>(new Set());
 
   const companies = state.qualifiedCompanies;
   const selectedCount = companies.filter(c => c.syncStatus === 'selected' || c.syncStatus === 'synced').length;
@@ -32,6 +33,18 @@ export const Step3SyncHubspot = () => {
 
   const toggleExpandCompany = (companyId: string) => {
     setExpandedCompany(prev => prev === companyId ? null : companyId);
+  };
+
+  const toggleShowAllContacts = (companyId: string) => {
+    setShowAllContacts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(companyId)) {
+        newSet.delete(companyId);
+      } else {
+        newSet.add(companyId);
+      }
+      return newSet;
+    });
   };
 
   const handleSyncSelected = async () => {
@@ -143,7 +156,7 @@ export const Step3SyncHubspot = () => {
                     <h5>Contacts to sync</h5>
                   </div>
                   <div className="contacts-list">
-                    {company.contacts.slice(0, 3).map((contact) => (
+                    {(showAllContacts.has(company.id) ? company.contacts : company.contacts.slice(0, 3)).map((contact) => (
                       <div key={contact.id} className="contact-card">
                         <div className="contact-avatar">
                           {contact.firstName[0]}{contact.lastName[0]}
@@ -156,9 +169,18 @@ export const Step3SyncHubspot = () => {
                       </div>
                     ))}
                     {company.contacts.length > 3 && (
-                      <div className="more-contacts">
-                        +{company.contacts.length - 3} more contacts
-                      </div>
+                      <button 
+                        className="more-contacts clickable"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleShowAllContacts(company.id);
+                        }}
+                      >
+                        {showAllContacts.has(company.id) 
+                          ? 'Show less' 
+                          : `+${company.contacts.length - 3} more contacts`
+                        }
+                      </button>
                     )}
                   </div>
                 </div>
