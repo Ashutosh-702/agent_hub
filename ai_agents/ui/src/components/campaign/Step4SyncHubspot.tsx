@@ -169,31 +169,6 @@ export const Step4SyncHubspot = () => {
         )}
       </div>
 
-      {/* Sync Button */}
-      {selectedContactsCount > 0 && !syncComplete && (
-        <div className="sync-action-bar">
-          <button 
-            className="btn-primary btn-large"
-            onClick={handleSyncSelected}
-            disabled={isSyncing}
-          >
-            {isSyncing ? (
-              <>
-                <div className="spinner" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
-                </svg>
-                Sync {selectedCompaniesCount} Companies ({selectedContactsCount} Contacts) to HubSpot
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* Sync Success Message */}
       {syncComplete && syncedContactsCount > 0 && (
         <div className="sync-success-banner">
@@ -341,17 +316,38 @@ export const Step4SyncHubspot = () => {
           Back
         </button>
 
-        <button
-          className="btn-primary btn-large"
-          onClick={handleContinue}
-          disabled={syncedContactsCount === 0}
-        >
-          Continue with {syncedCompaniesCount} Companies ({syncedContactsCount} Contacts)
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <polyline points="12 5 19 12 12 19"/>
-          </svg>
-        </button>
+        {!syncComplete ? (
+          <button
+            className="btn-primary btn-large"
+            onClick={handleSyncSelected}
+            disabled={selectedContactsCount === 0 || isSyncing}
+          >
+            {isSyncing ? (
+              <>
+                <div className="spinner" />
+                Syncing to HubSpot...
+              </>
+            ) : (
+              <>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+                </svg>
+                Sync {selectedCompaniesCount} Companies ({selectedContactsCount} Contacts) to HubSpot
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            className="btn-primary btn-large"
+            onClick={handleContinue}
+          >
+            Continue with {syncedCompaniesCount} Companies ({syncedContactsCount} Contacts)
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+              <polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );
