@@ -6,7 +6,9 @@
 .new-campaign-wizard {
   min-height: 100vh;
   padding: var(--space-6);
+  padding-top: var(--space-4);
   background: var(--color-gray-50);
+  overflow-x: visible;
 }
 
 /* Wizard Header */
@@ -45,20 +47,21 @@
 /* Progress Stepper */
 .wizard-stepper {
   position: sticky;
-  top: 0;
+  top: var(--space-4);
   z-index: 100;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: var(--space-1);
   margin-bottom: var(--space-6);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   background: var(--color-white);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
-  max-width: 600px;
+  max-width: 650px;
   margin-left: auto;
   margin-right: auto;
+  overflow: visible;
 }
 
 .stepper-item {

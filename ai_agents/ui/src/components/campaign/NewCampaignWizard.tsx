@@ -99,7 +99,7 @@ export const useCampaignWizard = () => {
 
 const STEPS = [
   { id: 1, title: 'Lead Generation' },
-  { id: 2, title: 'Qualification' },
+  { id: 2, title: 'Lead Qualification' },
   { id: 3, title: 'Sync to CRM' },
   { id: 4, title: 'Personalization' },
 ];
