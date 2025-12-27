@@ -29,7 +29,13 @@ export const Step5Personalization = () => {
   // Count selected (for bulk actions)
   const selectedCount = contacts.filter(c => c.personalization?.isSelected).length;
   const generatingCount = contacts.filter(c => c.personalization?.messageStatus === 'generating').length;
-  const approvedCount = contacts.filter(c => c.personalization?.messageStatus === 'approved').length;
+  // Fully approved = both message AND deck are approved
+  const fullyApprovedCount = contacts.filter(c => 
+    c.personalization?.messageStatus === 'approved' && 
+    c.personalization?.deckStatus === 'approved'
+  ).length;
+  const messageApprovedCount = contacts.filter(c => c.personalization?.messageStatus === 'approved').length;
+  const deckApprovedCount = contacts.filter(c => c.personalization?.deckStatus === 'approved').length;
 
   // Get company name for a contact
   const getCompanyName = (companyId: string) => {
@@ -131,9 +137,12 @@ export const Step5Personalization = () => {
   };
 
   const handleContinue = () => {
-    // Keep only contacts with approved personalization
-    const approved = contacts.filter(c => c.personalization?.messageStatus === 'approved');
-    setQualifiedContacts(approved);
+    // Keep only contacts with both message AND deck approved
+    const fullyApproved = contacts.filter(c => 
+      c.personalization?.messageStatus === 'approved' && 
+      c.personalization?.deckStatus === 'approved'
+    );
+    setQualifiedContacts(fullyApproved);
     nextStep();
   };
 
@@ -154,9 +163,17 @@ export const Step5Personalization = () => {
           <span className="stat-value">{selectedCount}</span>
           <span className="stat-label">Selected</span>
         </div>
+        <div className="stat">
+          <span className="stat-value">{messageApprovedCount}</span>
+          <span className="stat-label">Messages Approved</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">{deckApprovedCount}</span>
+          <span className="stat-label">Decks Approved</span>
+        </div>
         <div className="stat success">
-          <span className="stat-value">{approvedCount}</span>
-          <span className="stat-label">Approved</span>
+          <span className="stat-value">{fullyApprovedCount}</span>
+          <span className="stat-label">Fully Approved</span>
         </div>
       </div>
 
@@ -232,7 +249,8 @@ export const Step5Personalization = () => {
                     <span>Generating...</span>
                   </div>
                 )}
-                {(contact.personalization?.messageStatus === 'generated' || contact.personalization?.messageStatus === 'approved') && (
+                {/* Show checkmark only when both message AND deck are approved */}
+                {(contact.personalization?.messageStatus === 'approved' && contact.personalization?.deckStatus === 'approved') && (
                   <div className="qualified-badge">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="20 6 9 17 4 12"/>
@@ -495,10 +513,10 @@ export const Step5Personalization = () => {
 
         <button
           className="btn-primary btn-large"
-          disabled={approvedCount === 0}
+          disabled={fullyApprovedCount === 0}
           onClick={handleContinue}
         >
-          Continue with {approvedCount} Approved
+          Continue with {fullyApprovedCount} Fully Approved
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="5" y1="12" x2="19" y2="12"/>
             <polyline points="12 5 19 12 12 19"/>
