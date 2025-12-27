@@ -39,6 +39,8 @@ export interface Contact {
   personalization?: {
     messageStatus: 'pending' | 'generating' | 'generated' | 'approved' | 'rejected';
     message?: string;
+    deckStatus: 'pending' | 'generating' | 'generated' | 'approved' | 'rejected';
+    deckUrl?: string;
     isSelected?: boolean;
   };
 }
@@ -97,6 +99,10 @@ interface CampaignContextType {
   bulkGenerateContactPersonalization: (contactIds: string[]) => void;
   approveContactPersonalization: (contactId: string) => void;
   rejectContactPersonalization: (contactId: string) => void;
+  approveDeck: (contactId: string) => void;
+  rejectDeck: (contactId: string) => void;
+  updateDeckUrl: (contactId: string, url: string) => void;
+  replaceWithDefaultDeck: (contactId: string) => void;
   setSelectedSequence: (sequenceId: string) => void;
   enrollToSequence: (contactIds: string[]) => void;
   nextStep: () => void;
@@ -121,6 +127,9 @@ const STEPS = [
   { id: 3, title: 'Contact Qualification' },
   { id: 4, title: 'Sync to Hubspot' },
   { id: 5, title: 'Personalization' },
+
+// Default deck URL - used when user wants to replace AI-generated deck with default
+const DEFAULT_DECK_URL = 'https://decks.example.com/default/standard-company-deck.pdf';
   { id: 6, title: 'Enroll for Outreach' },
 ];
 
@@ -295,8 +304,6 @@ export const NewCampaignWizard = () => {
 
   const generateContactPersonalization = useCallback((contactId: string) => {
     setState(prev => {
-      const contact = prev.qualifiedContacts.find(c => c.id === contactId);
-      const company = prev.qualifiedCompanies.find(comp => comp.id === contact?.companyId);
       return {
         ...prev,
         qualifiedContacts: prev.qualifiedContacts.map(c =>
@@ -306,6 +313,7 @@ export const NewCampaignWizard = () => {
                 personalization: {
                   ...c.personalization,
                   messageStatus: 'generating',
+                  deckStatus: 'generating',
                 } as Contact['personalization'],
               }
             : c
@@ -324,8 +332,11 @@ export const NewCampaignWizard = () => {
               ? {
                   ...c,
                   personalization: {
+                    ...c.personalization,
                     messageStatus: 'generated',
                     message: `Hi ${c.firstName},\n\nI noticed ${company?.name || 'your company'} is doing great work in ${company?.industry || 'your industry'}. As ${c.jobTitle}, I thought you might be interested in how we help companies like yours achieve 3x better results.\n\nWould love to schedule a quick call to discuss how we can help.\n\nBest regards`,
+                    deckStatus: 'generated',
+                    deckUrl: `https://decks.example.com/personalized/${c.id}/${company?.name?.toLowerCase().replace(/\s+/g, '-') || 'company'}-deck.pdf`,
                   },
                 }
               : c
@@ -345,6 +356,7 @@ export const NewCampaignWizard = () => {
               personalization: {
                 ...c.personalization,
                 messageStatus: 'generating',
+                deckStatus: 'generating',
               } as Contact['personalization'],
             }
           : c
@@ -363,8 +375,11 @@ export const NewCampaignWizard = () => {
                 ? {
                     ...c,
                     personalization: {
+                      ...c.personalization,
                       messageStatus: 'generated',
                       message: `Hi ${c.firstName},\n\nI noticed ${company?.name || 'your company'} is doing great work in ${company?.industry || 'your industry'}. As ${c.jobTitle}, I thought you might be interested in how we help companies like yours achieve 3x better results.\n\nWould love to schedule a quick call to discuss how we can help.\n\nBest regards`,
+                      deckStatus: 'generated',
+                      deckUrl: `https://decks.example.com/personalized/${c.id}/${company?.name?.toLowerCase().replace(/\s+/g, '-') || 'company'}-deck.pdf`,
                     },
                   }
                 : c
@@ -402,6 +417,76 @@ export const NewCampaignWizard = () => {
               personalization: {
                 ...c.personalization!,
                 messageStatus: 'rejected',
+              },
+            }
+          : c
+      ),
+    }));
+  }, []);
+
+  const approveDeck = useCallback((contactId: string) => {
+    setState(prev => ({
+      ...prev,
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        c.id === contactId
+          ? {
+              ...c,
+              personalization: {
+                ...c.personalization!,
+                deckStatus: 'approved',
+              },
+            }
+          : c
+      ),
+    }));
+  }, []);
+
+  const rejectDeck = useCallback((contactId: string) => {
+    setState(prev => ({
+      ...prev,
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        c.id === contactId
+          ? {
+              ...c,
+              personalization: {
+                ...c.personalization!,
+                deckStatus: 'rejected',
+              },
+            }
+          : c
+      ),
+    }));
+  }, []);
+
+  const updateDeckUrl = useCallback((contactId: string, url: string) => {
+    setState(prev => ({
+      ...prev,
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        c.id === contactId
+          ? {
+              ...c,
+              personalization: {
+                ...c.personalization!,
+                deckUrl: url,
+                deckStatus: 'generated', // Reset to generated when URL is manually updated
+              },
+            }
+          : c
+      ),
+    }));
+  }, []);
+
+  const replaceWithDefaultDeck = useCallback((contactId: string) => {
+    setState(prev => ({
+      ...prev,
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        c.id === contactId
+          ? {
+              ...c,
+              personalization: {
+                ...c.personalization!,
+                deckUrl: DEFAULT_DECK_URL,
+                deckStatus: 'generated', // Reset to generated when replaced with default
               },
             }
           : c
@@ -458,6 +543,10 @@ export const NewCampaignWizard = () => {
     bulkGenerateContactPersonalization,
     approveContactPersonalization,
     rejectContactPersonalization,
+    approveDeck,
+    rejectDeck,
+    updateDeckUrl,
+    replaceWithDefaultDeck,
     setSelectedSequence,
     enrollToSequence,
     nextStep,

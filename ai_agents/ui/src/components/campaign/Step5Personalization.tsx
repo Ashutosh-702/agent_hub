@@ -8,6 +8,10 @@ export const Step5Personalization = () => {
     bulkGenerateContactPersonalization,
     approveContactPersonalization,
     rejectContactPersonalization,
+    approveDeck,
+    rejectDeck,
+    updateDeckUrl,
+    replaceWithDefaultDeck,
     prevStep,
     nextStep,
     setQualifiedContacts,
@@ -16,6 +20,9 @@ export const Step5Personalization = () => {
   const [expandedContact, setExpandedContact] = useState<string | null>(null);
   const [manualMessage, setManualMessage] = useState<Record<string, string>>({});
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
+  const [manualDeckUrl, setManualDeckUrl] = useState<Record<string, string>>({});
+  const [deckFeedback, setDeckFeedback] = useState<Record<string, string>>({});
+  const [editingDeckUrl, setEditingDeckUrl] = useState<string | null>(null);
 
   const contacts = state.qualifiedContacts;
   
@@ -87,6 +94,40 @@ export const Step5Personalization = () => {
       default:
         return <span className="status-badge pending">Pending</span>;
     }
+  };
+
+  const getDeckStatusBadge = (status: string | undefined) => {
+    switch (status) {
+      case 'generating':
+        return <span className="status-badge generating">Generating...</span>;
+      case 'generated':
+        return <span className="status-badge generated">Ready for Review</span>;
+      case 'approved':
+        return <span className="status-badge approved">Approved</span>;
+      case 'rejected':
+        return <span className="status-badge rejected">Rejected</span>;
+      default:
+        return <span className="status-badge pending">Pending</span>;
+    }
+  };
+
+  const handleApproveDeck = (contactId: string) => {
+    approveDeck(contactId);
+  };
+
+  const handleRejectDeck = (contactId: string) => {
+    rejectDeck(contactId);
+  };
+
+  const handleUpdateDeckUrl = (contactId: string) => {
+    if (manualDeckUrl[contactId]) {
+      updateDeckUrl(contactId, manualDeckUrl[contactId]);
+      setEditingDeckUrl(null);
+    }
+  };
+
+  const handleReplaceWithDefault = (contactId: string) => {
+    replaceWithDefaultDeck(contactId);
   };
 
   const handleContinue = () => {
@@ -294,6 +335,144 @@ export const Step5Personalization = () => {
                             rows={6}
                           />
                         )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Deck Section */}
+                  <div className="personalization-section deck-section">
+                    <div className="section-header">
+                      <h5>Personalized Deck for {contact.firstName}</h5>
+                      {getDeckStatusBadge(contact.personalization?.deckStatus)}
+                    </div>
+
+                    {contact.personalization?.deckStatus === 'generating' && (
+                      <div className="generating-placeholder">
+                        <div className="typing-indicator">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                        <p>AI is generating a personalized deck...</p>
+                      </div>
+                    )}
+
+                    {(contact.personalization?.deckStatus === 'generated' || contact.personalization?.deckStatus === 'approved') && (
+                      <div className="deck-preview">
+                        <div className="deck-url-field">
+                          <label>Deck URL</label>
+                          <div className="url-input-group">
+                            <input 
+                              type="text" 
+                              value={contact.personalization?.deckUrl || ''} 
+                              readOnly 
+                              className="deck-url-input"
+                            />
+                            <a 
+                              href={contact.personalization?.deckUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="btn-icon open-deck-btn"
+                              title="Open Deck in New Window"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/>
+                                <line x1="10" y1="14" x2="21" y2="3"/>
+                              </svg>
+                            </a>
+                          </div>
+                        </div>
+
+                        {contact.personalization?.deckStatus !== 'approved' && (
+                          <div className="review-actions">
+                            <button className="btn-success btn-small" onClick={() => handleApproveDeck(contact.id)}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                              Approve Deck
+                            </button>
+                            <button className="btn-danger btn-small" onClick={() => handleRejectDeck(contact.id)}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                              </svg>
+                              Reject Deck
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {contact.personalization?.deckStatus === 'rejected' && (
+                      <div className="rejected-content deck-rejected">
+                        <p>Deck was rejected. You can:</p>
+                        
+                        {/* Feedback and Regenerate - Coming Soon */}
+                        <div className="deck-feedback-section">
+                          <label>Provide feedback for regeneration</label>
+                          <textarea
+                            placeholder="Describe what you'd like changed in the deck..."
+                            value={deckFeedback[contact.id] || ''}
+                            onChange={(e) => setDeckFeedback(prev => ({ ...prev, [contact.id]: e.target.value }))}
+                            rows={3}
+                          />
+                          <button 
+                            className="btn-primary btn-small" 
+                            disabled
+                            title="Coming Soon"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            </svg>
+                            Regenerate with Feedback
+                            <span className="coming-soon-tag">Coming Soon</span>
+                          </button>
+                        </div>
+
+                        {/* Manual URL Input */}
+                        <div className="manual-deck-url-section">
+                          <label>Or enter your own deck URL</label>
+                          <div className="url-input-group">
+                            <input
+                              type="text"
+                              placeholder="https://your-deck-url.com/deck.pdf"
+                              value={manualDeckUrl[contact.id] || ''}
+                              onChange={(e) => setManualDeckUrl(prev => ({ ...prev, [contact.id]: e.target.value }))}
+                              className="deck-url-input"
+                            />
+                            <button 
+                              className="btn-primary btn-small"
+                              onClick={() => handleUpdateDeckUrl(contact.id)}
+                              disabled={!manualDeckUrl[contact.id]}
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Replace with Default Deck */}
+                        <div className="default-deck-section">
+                          <button 
+                            className="btn-secondary btn-small"
+                            onClick={() => handleReplaceWithDefault(contact.id)}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                              <polyline points="14 2 14 8 20 8"/>
+                              <line x1="16" y1="13" x2="8" y2="13"/>
+                              <line x1="16" y1="17" x2="8" y2="17"/>
+                              <polyline points="10 9 9 9 8 9"/>
+                            </svg>
+                            Replace with Default Deck
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!contact.personalization?.deckStatus || contact.personalization?.deckStatus === 'pending' && (
+                      <div className="deck-pending">
+                        <p className="pending-text">Deck will be generated along with the message</p>
                       </div>
                     )}
                   </div>

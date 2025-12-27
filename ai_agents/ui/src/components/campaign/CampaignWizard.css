@@ -3088,3 +3088,186 @@
   font-weight: 600 !important;
 }
 
+/* ============================================
+   DECK SECTION STYLES - Personalization Step
+   ============================================ */
+
+.deck-section {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.deck-section .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.deck-section .section-header h5 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-gray-800);
+}
+
+.deck-preview {
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.deck-url-field {
+  margin-bottom: var(--space-4);
+}
+
+.deck-url-field label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-gray-600);
+  margin-bottom: var(--space-2);
+}
+
+.url-input-group {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.deck-url-input {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-gray-800);
+  background: var(--color-white);
+}
+
+.deck-url-input:read-only {
+  background: var(--color-gray-100);
+  cursor: default;
+}
+
+.open-deck-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--color-primary);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.open-deck-btn:hover {
+  background: var(--color-primary-dark);
+  transform: translateY(-1px);
+}
+
+/* Deck Rejected State */
+.deck-rejected {
+  padding: var(--space-4);
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-md);
+}
+
+.deck-rejected > p {
+  margin: 0 0 var(--space-4) 0;
+  font-weight: 500;
+  color: var(--color-gray-700);
+}
+
+.deck-feedback-section {
+  margin-bottom: var(--space-4);
+}
+
+.deck-feedback-section label,
+.manual-deck-url-section label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-gray-600);
+  margin-bottom: var(--space-2);
+}
+
+.deck-feedback-section textarea {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  resize: vertical;
+  margin-bottom: var(--space-2);
+  background: var(--color-white);
+  color: var(--color-gray-800);
+}
+
+.deck-feedback-section button {
+  position: relative;
+}
+
+.coming-soon-tag {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  padding: 2px 6px;
+  background: var(--color-warning);
+  color: var(--color-white);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.5px;
+}
+
+button:disabled .coming-soon-tag {
+  background: var(--color-gray-400);
+}
+
+.manual-deck-url-section {
+  margin-bottom: var(--space-4);
+}
+
+.manual-deck-url-section .url-input-group {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.manual-deck-url-section .deck-url-input {
+  flex: 1;
+}
+
+.default-deck-section {
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-gray-300);
+  margin-top: var(--space-3);
+}
+
+.default-deck-section button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Deck Pending State */
+.deck-pending {
+  padding: var(--space-4);
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.deck-pending .pending-text {
+  margin: 0;
+  color: var(--color-gray-500);
+  font-size: var(--text-sm);
+}
+
