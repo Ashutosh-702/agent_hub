@@ -122,14 +122,14 @@ export const Step5Personalization = () => {
       {/* Action Buttons */}
       <div className="bulk-actions">
         <button
-          className="btn-primary btn-small"
+          className="btn-primary"
           disabled={selectedCount === 0 || generatingCount > 0}
           onClick={handleBulkGenerate}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
-          Generate for Selected ({selectedCount})
+          Generate Personalized Messages for {selectedCount} Contacts
         </button>
       </div>
 
@@ -185,17 +185,6 @@ export const Step5Personalization = () => {
                 {getStatusBadge(contact.personalization?.messageStatus)}
               </div>
               <div className="contact-actions" onClick={(e) => e.stopPropagation()}>
-                {(!contact.personalization?.messageStatus || contact.personalization?.messageStatus === 'pending') && (
-                  <button
-                    className="btn-primary btn-small"
-                    onClick={() => handleGenerate(contact.id)}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                    </svg>
-                    Generate
-                  </button>
-                )}
                 {contact.personalization?.messageStatus === 'generating' && (
                   <div className="generating-indicator">
                     <div className="spinner" />
