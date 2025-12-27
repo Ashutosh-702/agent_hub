@@ -127,11 +127,11 @@ const STEPS = [
   { id: 3, title: 'Contact Qualification' },
   { id: 4, title: 'Sync to Hubspot' },
   { id: 5, title: 'Personalization' },
+  { id: 6, title: 'Enroll for Outreach' },
+];
 
 // Default deck URL - used when user wants to replace AI-generated deck with default
 const DEFAULT_DECK_URL = 'https://decks.example.com/default/standard-company-deck.pdf';
-  { id: 6, title: 'Enroll for Outreach' },
-];
 
 export const NewCampaignWizard = () => {
   const navigate = useNavigate();
