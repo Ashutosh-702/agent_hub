@@ -21,7 +21,6 @@ export const Step5Personalization = () => {
   const [manualMessage, setManualMessage] = useState<Record<string, string>>({});
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [manualDeckUrl, setManualDeckUrl] = useState<Record<string, string>>({});
-  const [deckFeedback, setDeckFeedback] = useState<Record<string, string>>({});
   const [editingDeckUrl, setEditingDeckUrl] = useState<string | null>(null);
 
   const contacts = state.qualifiedContacts;
@@ -428,13 +427,6 @@ export const Step5Personalization = () => {
                         
                         {/* Feedback and Regenerate - Coming Soon */}
                         <div className="deck-feedback-section">
-                          <label>Provide feedback for regeneration</label>
-                          <textarea
-                            placeholder="Describe what you'd like changed in the deck..."
-                            value={deckFeedback[contact.id] || ''}
-                            onChange={(e) => setDeckFeedback(prev => ({ ...prev, [contact.id]: e.target.value }))}
-                            rows={3}
-                          />
                           <button 
                             className="btn-primary btn-small" 
                             disabled
@@ -450,7 +442,7 @@ export const Step5Personalization = () => {
 
                         {/* Manual URL Input */}
                         <div className="manual-deck-url-section">
-                          <label>Or enter your own deck URL</label>
+                          <label>Make manual edits in the AI generated deck and paste the public URL here</label>
                           <div className="url-input-group">
                             <input
                               type="text"
@@ -471,19 +463,34 @@ export const Step5Personalization = () => {
 
                         {/* Replace with Default Deck */}
                         <div className="default-deck-section">
-                          <button 
-                            className="btn-secondary btn-small"
-                            onClick={() => handleReplaceWithDefault(contact.id)}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                              <polyline points="14 2 14 8 20 8"/>
-                              <line x1="16" y1="13" x2="8" y2="13"/>
-                              <line x1="16" y1="17" x2="8" y2="17"/>
-                              <polyline points="10 9 9 9 8 9"/>
-                            </svg>
-                            Replace with Default Deck
-                          </button>
+                          <div className="default-deck-actions">
+                            <button 
+                              className="btn-secondary btn-small"
+                              onClick={() => handleReplaceWithDefault(contact.id)}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                                <polyline points="10 9 9 9 8 9"/>
+                              </svg>
+                              Replace with Default Deck
+                            </button>
+                            <a
+                              href="https://decks.example.com/default/standard-company-deck.pdf"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-icon view-default-btn"
+                              title="View Default Deck"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/>
+                                <line x1="10" y1="14" x2="21" y2="3"/>
+                              </svg>
+                            </a>
+                          </div>
                         </div>
                       </div>
                     )}

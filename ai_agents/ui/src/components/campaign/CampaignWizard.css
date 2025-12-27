@@ -850,6 +850,15 @@
   margin-bottom: var(--space-2);
 }
 
+/* Sticky select-all header for Sync to HubSpot step */
+.step-sync-hubspot .select-all-header {
+  position: sticky;
+  top: 160px; /* Below the wizard stepper */
+  z-index: 10;
+  background: var(--color-white);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
 .select-all-text {
   font-size: var(--text-sm);
   font-weight: 500;
@@ -3251,10 +3260,36 @@ button:disabled .coming-soon-tag {
   margin-top: var(--space-3);
 }
 
+.default-deck-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .default-deck-section button {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.view-default-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.view-default-btn:hover {
+  background: var(--color-gray-200);
+  color: var(--color-gray-800);
 }
 
 /* Deck Pending State */
