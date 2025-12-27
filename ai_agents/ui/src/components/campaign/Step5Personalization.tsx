@@ -6,6 +6,7 @@ export const Step5Personalization = () => {
     state,
     generateContactPersonalization,
     bulkGenerateContactPersonalization,
+    regenerateMessageOnly,
     approveContactPersonalization,
     rejectContactPersonalization,
     approveDeck,
@@ -83,7 +84,7 @@ export const Step5Personalization = () => {
   };
 
   const handleRegenerate = (contactId: string) => {
-    generateContactPersonalization(contactId);
+    regenerateMessageOnly(contactId);
   };
 
   const getStatusBadge = (status: string | undefined) => {
@@ -257,11 +258,12 @@ export const Step5Personalization = () => {
                   </div>
                 )}
                 <button 
-                  className="btn-icon expand-btn"
+                  className={`btn-icon expand-btn ${contact.personalization?.messageStatus === 'generated' || contact.personalization?.deckStatus === 'generated' ? 'pulse-attention' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     setExpandedContact(expandedContact === contact.id ? null : contact.id);
                   }}
+                  title={contact.personalization?.messageStatus === 'generated' ? 'Click to review personalization' : ''}
                 >
                   <svg
                     width="20"
@@ -363,6 +365,32 @@ export const Step5Personalization = () => {
                       {getDeckStatusBadge(contact.personalization?.deckStatus)}
                     </div>
 
+                    {/* AI Generated Deck URL - always visible when available */}
+                    {contact.personalization?.deckUrl && (
+                      <div className="ai-deck-url-section">
+                        <label>AI Generated Deck</label>
+                        <div className="url-input-group">
+                          <input 
+                            type="text" 
+                            value={contact.personalization.deckUrl} 
+                            readOnly 
+                            className="deck-url-input"
+                          />
+                          <button
+                            className="btn-icon open-deck-btn"
+                            title="Open AI Generated Deck"
+                            onClick={() => window.open(contact.personalization?.deckUrl, '_blank', 'noopener,noreferrer,width=1200,height=800')}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                              <polyline points="15 3 21 3 21 9"/>
+                              <line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {contact.personalization?.deckStatus === 'generating' && (
                       <div className="generating-placeholder">
                         <div className="typing-indicator">
@@ -376,29 +404,6 @@ export const Step5Personalization = () => {
 
                     {(contact.personalization?.deckStatus === 'generated' || contact.personalization?.deckStatus === 'approved') && (
                       <div className="deck-preview">
-                        <div className="deck-url-field">
-                          <label>Deck URL</label>
-                          <div className="url-input-group">
-                            <input 
-                              type="text" 
-                              value={contact.personalization?.deckUrl || ''} 
-                              readOnly 
-                              className="deck-url-input"
-                            />
-                            <button
-                              className="btn-icon open-deck-btn"
-                              title="Open Deck in New Window"
-                              onClick={() => window.open(contact.personalization?.deckUrl, '_blank', 'noopener,noreferrer,width=1200,height=800')}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                                <polyline points="15 3 21 3 21 9"/>
-                                <line x1="10" y1="14" x2="21" y2="3"/>
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-
                         {contact.personalization?.deckStatus !== 'approved' && (
                           <div className="review-actions">
                             <button className="btn-success btn-small" onClick={() => handleApproveDeck(contact.id)}>
@@ -422,47 +427,6 @@ export const Step5Personalization = () => {
                     {contact.personalization?.deckStatus === 'rejected' && (
                       <div className="rejected-content deck-rejected">
                         <p>Deck was rejected. You can:</p>
-
-                        {/* AI Generated Deck URL - for reference */}
-                        {contact.personalization?.deckUrl && (
-                          <div className="ai-deck-url-section">
-                            <label>AI Generated Deck</label>
-                            <div className="url-input-group">
-                              <input 
-                                type="text" 
-                                value={contact.personalization.deckUrl} 
-                                readOnly 
-                                className="deck-url-input"
-                              />
-                              <button
-                                className="btn-icon open-deck-btn"
-                                title="Open AI Generated Deck"
-                                onClick={() => window.open(contact.personalization?.deckUrl, '_blank', 'noopener,noreferrer,width=1200,height=800')}
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                                  <polyline points="15 3 21 3 21 9"/>
-                                  <line x1="10" y1="14" x2="21" y2="3"/>
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Feedback and Regenerate - Coming Soon */}
-                        <div className="deck-feedback-section">
-                          <button 
-                            className="btn-primary btn-small" 
-                            disabled
-                            title="Coming Soon"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-                            </svg>
-                            Regenerate with Feedback
-                            <span className="coming-soon-tag">Coming Soon</span>
-                          </button>
-                        </div>
 
                         {/* Manual URL Input */}
                         <div className="manual-deck-url-section">
@@ -515,6 +479,21 @@ export const Step5Personalization = () => {
                               </svg>
                             </a>
                           </div>
+                        </div>
+
+                        {/* Feedback and Regenerate - Coming Soon (at bottom) */}
+                        <div className="deck-feedback-section">
+                          <button 
+                            className="btn-secondary btn-small" 
+                            disabled
+                            title="Coming Soon"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            </svg>
+                            Regenerate with Feedback
+                            <span className="coming-soon-tag">Coming Soon</span>
+                          </button>
                         </div>
                       </div>
                     )}

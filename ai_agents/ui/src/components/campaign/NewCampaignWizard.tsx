@@ -97,6 +97,7 @@ interface CampaignContextType {
   bulkSyncContacts: (contactIds: string[]) => void;
   generateContactPersonalization: (contactId: string) => void;
   bulkGenerateContactPersonalization: (contactIds: string[]) => void;
+  regenerateMessageOnly: (contactId: string) => void;
   approveContactPersonalization: (contactId: string) => void;
   rejectContactPersonalization: (contactId: string) => void;
   approveDeck: (contactId: string) => void;
@@ -390,6 +391,48 @@ export const NewCampaignWizard = () => {
     });
   }, []);
 
+  // Regenerate only the message (not the deck)
+  const regenerateMessageOnly = useCallback((contactId: string) => {
+    setState(prev => ({
+      ...prev,
+      qualifiedContacts: prev.qualifiedContacts.map(c =>
+        c.id === contactId
+          ? {
+              ...c,
+              personalization: {
+                ...c.personalization!,
+                messageStatus: 'generating',
+                // Keep deck status and URL unchanged
+              },
+            }
+          : c
+      ),
+    }));
+    // Simulate message regeneration
+    setTimeout(() => {
+      setState(prev => {
+        const contact = prev.qualifiedContacts.find(c => c.id === contactId);
+        const company = prev.qualifiedCompanies.find(comp => comp.id === contact?.companyId);
+        return {
+          ...prev,
+          qualifiedContacts: prev.qualifiedContacts.map(c =>
+            c.id === contactId
+              ? {
+                  ...c,
+                  personalization: {
+                    ...c.personalization!,
+                    messageStatus: 'generated',
+                    message: `Hi ${c.firstName},\n\nI came across ${company?.name || 'your company'} and was impressed by your work in ${company?.industry || 'your industry'}. As ${c.jobTitle}, you might find our solution particularly valuable for achieving better outcomes.\n\nI'd love to connect and share how we've helped similar companies succeed.\n\nLooking forward to hearing from you!`,
+                    // Deck remains unchanged
+                  },
+                }
+              : c
+          ),
+        };
+      });
+    }, 2500);
+  }, []);
+
   const approveContactPersonalization = useCallback((contactId: string) => {
     setState(prev => ({
       ...prev,
@@ -541,6 +584,7 @@ export const NewCampaignWizard = () => {
     bulkSyncContacts,
     generateContactPersonalization,
     bulkGenerateContactPersonalization,
+    regenerateMessageOnly,
     approveContactPersonalization,
     rejectContactPersonalization,
     approveDeck,
