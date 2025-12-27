@@ -44,32 +44,36 @@
   margin: 0;
 }
 
-/* Progress Stepper */
+/* Progress Stepper - Compact Vertical Layout */
 .wizard-stepper {
   position: sticky;
   top: var(--space-4);
   z-index: 100;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   gap: 0;
   margin-bottom: var(--space-6);
-  padding: var(--space-4) var(--space-8);
+  padding: var(--space-4) var(--space-6);
   background: var(--color-white);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
-  width: fit-content;
   max-width: 100%;
   margin-left: auto;
   margin-right: auto;
+  overflow: hidden;
 }
 
 .stepper-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-5);
+  gap: var(--space-2);
+  padding: var(--space-2);
   cursor: default;
+  min-width: 80px;
+  max-width: 120px;
+  flex: 1;
 }
 
 .stepper-item.completed {
@@ -93,6 +97,8 @@
   color: var(--color-gray-500);
   transition: all var(--transition-fast);
   flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .stepper-item.active .stepper-circle {
@@ -108,9 +114,12 @@
 
 .stepper-title {
   font-weight: 500;
-  font-size: var(--text-sm);
+  font-size: 11px;
   color: var(--color-gray-400);
-  white-space: nowrap;
+  text-align: center;
+  line-height: 1.3;
+  max-width: 100%;
+  word-wrap: break-word;
 }
 
 .stepper-item.active .stepper-title {
@@ -122,15 +131,24 @@
   color: var(--color-gray-700);
 }
 
-.stepper-line {
-  width: 32px;
+/* Connector line between steps */
+.stepper-connector {
+  width: 40px;
   height: 2px;
   background: var(--color-gray-300);
   flex-shrink: 0;
+  margin-top: 16px; /* Align with center of circle */
+  position: relative;
+  z-index: 1;
 }
 
-.stepper-item.completed .stepper-line {
+.stepper-item.completed + .stepper-connector {
   background: var(--color-success);
+}
+
+/* Legacy stepper-line support */
+.stepper-line {
+  display: none;
 }
 
 /* Wizard Content */
@@ -850,13 +868,10 @@
   margin-bottom: var(--space-2);
 }
 
-/* Sticky select-all header for Sync to HubSpot step */
+/* Select-all header styling for Sync to HubSpot step */
 .step-sync-hubspot .select-all-header {
-  position: sticky;
-  top: 160px; /* Below the wizard stepper */
-  z-index: 10;
   background: var(--color-white);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--color-gray-200);
 }
 
 .select-all-text {

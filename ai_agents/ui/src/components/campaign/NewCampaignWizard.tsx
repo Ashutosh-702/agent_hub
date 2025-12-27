@@ -1,4 +1,4 @@
-import { useState, createContext, useContext, useCallback, useEffect } from 'react';
+import React, { useState, createContext, useContext, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './CampaignWizard.css';
 import { Step1Prospecting } from './Step1Prospecting';
@@ -621,25 +621,26 @@ export const NewCampaignWizard = () => {
         {/* Progress Stepper */}
         <div className="wizard-stepper">
           {STEPS.map((step, index) => (
-            <div
-              key={step.id}
-              className={`stepper-item ${state.currentStep === step.id ? 'active' : ''} ${state.currentStep > step.id ? 'completed' : ''}`}
-              onClick={() => state.currentStep > step.id && goToStep(step.id)}
-              role="button"
-              tabIndex={state.currentStep > step.id ? 0 : -1}
-            >
-              <div className="stepper-circle">
-                {state.currentStep > step.id ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                ) : (
-                  step.id
-                )}
+            <React.Fragment key={step.id}>
+              <div
+                className={`stepper-item ${state.currentStep === step.id ? 'active' : ''} ${state.currentStep > step.id ? 'completed' : ''}`}
+                onClick={() => state.currentStep > step.id && goToStep(step.id)}
+                role="button"
+                tabIndex={state.currentStep > step.id ? 0 : -1}
+              >
+                <div className="stepper-circle">
+                  {state.currentStep > step.id ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  ) : (
+                    step.id
+                  )}
+                </div>
+                <span className="stepper-title">{step.title}</span>
               </div>
-              <span className="stepper-title">{step.title}</span>
-              {index < STEPS.length - 1 && <div className="stepper-line" />}
-            </div>
+              {index < STEPS.length - 1 && <div className="stepper-connector" />}
+            </React.Fragment>
           ))}
         </div>
 
