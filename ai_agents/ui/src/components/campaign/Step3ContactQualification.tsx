@@ -107,6 +107,9 @@ export const Step3ContactQualification = () => {
     setLoading(false);
     setIsQualifying(false);
     setQualificationComplete(true);
+    
+    // Scroll to top to show results
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const handleContinue = () => {
