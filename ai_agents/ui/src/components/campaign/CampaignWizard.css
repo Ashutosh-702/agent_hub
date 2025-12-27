@@ -3194,12 +3194,30 @@
   color: var(--color-gray-700);
 }
 
+/* AI Generated Deck URL in rejection section */
+.ai-deck-url-section {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-gray-200);
+}
+
+.ai-deck-url-section label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-gray-600);
+  margin-bottom: var(--space-2);
+}
+
 .deck-feedback-section {
   margin-bottom: var(--space-4);
 }
 
 .deck-feedback-section label,
-.manual-deck-url-section label {
+.manual-deck-url-section label,
+.ai-deck-url-section label {
   display: block;
   font-size: var(--text-sm);
   font-weight: 500;
