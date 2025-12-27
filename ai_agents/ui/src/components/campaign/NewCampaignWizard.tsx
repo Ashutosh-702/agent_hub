@@ -1,4 +1,4 @@
-import { useState, createContext, useContext, useCallback } from 'react';
+import { useState, createContext, useContext, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './CampaignWizard.css';
 import { Step1Prospecting } from './Step1Prospecting';
@@ -149,6 +149,11 @@ export const NewCampaignWizard = () => {
   });
 
   const [isComplete, setIsComplete] = useState(false);
+
+  // Scroll to top on mount and when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [state.currentStep]);
 
   const setFilters = useCallback((filters: CampaignFilters) => {
     setState(prev => ({ ...prev, filters }));
