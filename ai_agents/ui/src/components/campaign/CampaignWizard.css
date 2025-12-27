@@ -3227,7 +3227,9 @@
 }
 
 .deck-feedback-section {
-  margin-bottom: var(--space-4);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px dashed var(--color-gray-300);
 }
 
 .deck-feedback-section label,
