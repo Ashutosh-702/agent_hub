@@ -84,11 +84,11 @@ export const Step4SyncHubspot = () => {
     if (!company || company.isSynced) return;
 
     const contactIds = company.contacts.map(c => c.id);
-    const newStatus = company.isSelected ? 'not_synced' : 'selected';
+    const newStatus: Contact['syncStatus'] = company.isSelected ? 'not_synced' : 'selected';
 
     setQualifiedContacts(contacts.map(c => 
       contactIds.includes(c.id) 
-        ? { ...c, syncStatus: newStatus as const }
+        ? { ...c, syncStatus: newStatus }
         : c
     ));
   };
@@ -96,11 +96,11 @@ export const Step4SyncHubspot = () => {
   // Select/Deselect all companies
   const handleSelectAll = () => {
     const allSelected = companiesWithContacts.every(c => c.isSelected || c.isSynced);
-    const newStatus = allSelected ? 'not_synced' : 'selected';
+    const newStatus: Contact['syncStatus'] = allSelected ? 'not_synced' : 'selected';
     
     setQualifiedContacts(contacts.map(c => ({
       ...c,
-      syncStatus: c.syncStatus === 'synced' ? 'synced' : newStatus as const,
+      syncStatus: c.syncStatus === 'synced' ? 'synced' : newStatus,
     })));
   };
 

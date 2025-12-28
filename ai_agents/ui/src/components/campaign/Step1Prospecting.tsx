@@ -1,133 +1,13 @@
 import { useState } from 'react';
-import { useCampaignWizard, type Prospect, type Company, type Contact } from './NewCampaignWizard';
+import { useCampaignWizard, type Company } from './NewCampaignWizard';
 
-// Mock data for dropdowns
-const INDUSTRIES = [
-  'Software & Technology',
-  'Healthcare & Medical',
-  'Financial Services',
-  'E-commerce & Retail',
-  'Manufacturing',
-  'Professional Services',
-  'Education',
-  'Media & Entertainment',
-];
-
-const REGIONS = [
-  'North America',
-  'Europe',
-  'Asia Pacific',
-  'Latin America',
-  'Middle East & Africa',
-  'United States',
-  'United Kingdom',
-  'Germany',
-  'India',
-  'Australia',
-];
-
-const EMPLOYEE_COUNTS = [
-  '1-10',
-  '11-50',
-  '51-200',
-  '201-500',
-  '501-1000',
-  '1001-5000',
-  '5000+',
-];
-
-// Mock prospects data - expanded for pagination testing
-const generateMockProspects = (filters: { industry: string[]; region: string[] }): Prospect[] => {
-  const baseCompanies = [
-    { name: 'TechFlow Solutions', industry: 'Software & Technology', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
-    { name: 'MedCore Systems', industry: 'Healthcare & Medical', location: 'United Kingdom', revenue: '$10M - $25M', employeeCount: '201-500' },
-    { name: 'FinanceHub Inc', industry: 'Financial Services', location: 'Germany', revenue: '$25M - $50M', employeeCount: '501-1000' },
-    { name: 'CloudScale Pro', industry: 'Software & Technology', location: 'United States', revenue: '$2M - $5M', employeeCount: '11-50' },
-    { name: 'DataDriven Analytics', industry: 'Software & Technology', location: 'India', revenue: '$1M - $2M', employeeCount: '51-200' },
-    { name: 'HealthBridge Tech', industry: 'Healthcare & Medical', location: 'Australia', revenue: '$5M - $10M', employeeCount: '201-500' },
-    { name: 'RetailGenius', industry: 'E-commerce & Retail', location: 'United States', revenue: '$10M - $25M', employeeCount: '201-500' },
-    { name: 'ManufactPro', industry: 'Manufacturing', location: 'Germany', revenue: '$50M - $100M', employeeCount: '1001-5000' },
-    { name: 'EduLearn Platform', industry: 'Education', location: 'United Kingdom', revenue: '$2M - $5M', employeeCount: '51-200' },
-    { name: 'MediaStream Co', industry: 'Media & Entertainment', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
-    { name: 'ConsultPro Services', industry: 'Professional Services', location: 'North America', revenue: '$1M - $2M', employeeCount: '11-50' },
-    { name: 'InnovateTech Labs', industry: 'Software & Technology', location: 'Europe', revenue: '$10M - $25M', employeeCount: '201-500' },
-    { name: 'NextGen AI', industry: 'Software & Technology', location: 'United States', revenue: '$10M - $25M', employeeCount: '51-200' },
-    { name: 'BioHealth Labs', industry: 'Healthcare & Medical', location: 'United States', revenue: '$25M - $50M', employeeCount: '201-500' },
-    { name: 'CapitalFlow', industry: 'Financial Services', location: 'United Kingdom', revenue: '$50M - $100M', employeeCount: '501-1000' },
-    { name: 'ShopSmart', industry: 'E-commerce & Retail', location: 'Germany', revenue: '$5M - $10M', employeeCount: '51-200' },
-    { name: 'BuildRight Corp', industry: 'Manufacturing', location: 'United States', revenue: '$25M - $50M', employeeCount: '501-1000' },
-    { name: 'LearnHub', industry: 'Education', location: 'India', revenue: '$1M - $2M', employeeCount: '11-50' },
-    { name: 'ContentPro', industry: 'Media & Entertainment', location: 'United Kingdom', revenue: '$2M - $5M', employeeCount: '51-200' },
-    { name: 'LegalEase', industry: 'Professional Services', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
-    { name: 'CyberShield', industry: 'Software & Technology', location: 'Germany', revenue: '$10M - $25M', employeeCount: '201-500' },
-    { name: 'MedTech Plus', industry: 'Healthcare & Medical', location: 'Australia', revenue: '$5M - $10M', employeeCount: '51-200' },
-    { name: 'WealthWise', industry: 'Financial Services', location: 'United States', revenue: '$100M+', employeeCount: '1001-5000' },
-    { name: 'QuickCommerce', industry: 'E-commerce & Retail', location: 'India', revenue: '$2M - $5M', employeeCount: '51-200' },
-    { name: 'SteelForge', industry: 'Manufacturing', location: 'Germany', revenue: '$50M - $100M', employeeCount: '1001-5000' },
-    { name: 'SkillUp Academy', industry: 'Education', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
-    { name: 'StreamNow', industry: 'Media & Entertainment', location: 'United States', revenue: '$25M - $50M', employeeCount: '201-500' },
-    { name: 'AdvisoryPro', industry: 'Professional Services', location: 'United Kingdom', revenue: '$2M - $5M', employeeCount: '11-50' },
-    { name: 'CloudNine Tech', industry: 'Software & Technology', location: 'United States', revenue: '$25M - $50M', employeeCount: '201-500' },
-    { name: 'PharmaCare', industry: 'Healthcare & Medical', location: 'Germany', revenue: '$100M+', employeeCount: '5000+' },
-    { name: 'InsureMax', industry: 'Financial Services', location: 'Australia', revenue: '$50M - $100M', employeeCount: '501-1000' },
-    { name: 'FashionFirst', industry: 'E-commerce & Retail', location: 'United Kingdom', revenue: '$10M - $25M', employeeCount: '201-500' },
-    { name: 'AutoParts Global', industry: 'Manufacturing', location: 'United States', revenue: '$100M+', employeeCount: '5000+' },
-    { name: 'CodeCamp', industry: 'Education', location: 'India', revenue: '$1M - $2M', employeeCount: '11-50' },
-    { name: 'GameStudio X', industry: 'Media & Entertainment', location: 'United States', revenue: '$10M - $25M', employeeCount: '51-200' },
-    { name: 'TaxPro Services', industry: 'Professional Services', location: 'United States', revenue: '$5M - $10M', employeeCount: '51-200' },
-  ];
-
-  // Duplicate companies with variations to simulate more data
-  const companies = [...baseCompanies];
-  const prefixes = ['Global', 'Premier', 'Elite', 'Prime'];
-  prefixes.forEach(prefix => {
-    baseCompanies.slice(0, 10).forEach(c => {
-      companies.push({
-        ...c,
-        name: `${prefix} ${c.name}`,
-      });
-    });
-  });
-
-  return companies
-    .filter(c => {
-      const industryMatch = filters.industry.length === 0 || filters.industry.some(i => c.industry.includes(i));
-      const regionMatch = filters.region.length === 0 || filters.region.some(r => c.location.includes(r) || r.includes(c.location));
-      return industryMatch && regionMatch;
-    })
-    .map((c, index) => ({
-      id: `prospect-${index + 1}`,
-      name: c.name,
-      industry: c.industry,
-      employeeCount: c.employeeCount,
-      revenue: c.revenue,
-      location: c.location,
-      website: `https://${c.name.toLowerCase().replace(/\s+/g, '')}.com`,
-      linkedinUrl: `https://linkedin.com/company/${c.name.toLowerCase().replace(/\s+/g, '-')}`,
-      isQualified: undefined,
-      qualificationStatus: 'pending' as const,
-    }));
-};
-
-// Generate mock contacts for each company
-const generateMockContacts = (companyId: string, companyName: string): Contact[] => {
-  const titles = ['CEO', 'CTO', 'VP of Sales', 'Head of Marketing', 'Director of Operations'];
-  const firstNames = ['John', 'Sarah', 'Michael', 'Emily', 'David'];
-  const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Davis'];
-  
-  const numContacts = Math.floor(Math.random() * 4) + 2; // 2-5 contacts
-  return Array.from({ length: numContacts }, (_, i) => ({
-    id: `${companyId}-contact-${i + 1}`,
-    companyId,
-    firstName: firstNames[i % firstNames.length],
-    lastName: lastNames[i % lastNames.length],
-    email: `${firstNames[i % firstNames.length].toLowerCase()}.${lastNames[i % lastNames.length].toLowerCase()}@${companyName.toLowerCase().replace(/\s+/g, '')}.com`,
-    phone: `+1-555-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-    jobTitle: titles[i % titles.length],
-    linkedinUrl: `https://linkedin.com/in/${firstNames[i % firstNames.length].toLowerCase()}${lastNames[i % lastNames.length].toLowerCase()}`,
-    isSynced: false,
-  }));
-};
+import {
+  getMockContacts,
+  getMockProspects,
+  WIZARD_EMPLOYEE_COUNTS as EMPLOYEE_COUNTS,
+  WIZARD_INDUSTRIES as INDUSTRIES,
+  WIZARD_REGIONS as REGIONS,
+} from '../../store/api/wizardMockData';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -183,13 +63,13 @@ export const Step1Prospecting = () => {
     
     clearInterval(interval);
     
-    const prospects = generateMockProspects(localFilters);
+    const prospects = getMockProspects(localFilters);
     setProspects(prospects);
     
     // Convert prospects to companies with contacts
     const companies: Company[] = prospects.map(p => ({
       ...p,
-      contacts: generateMockContacts(p.id, p.name),
+      contacts: getMockContacts(p.id, p.name),
       syncStatus: 'not_synced' as const,
       personalization: {
         messageStatus: 'pending' as const,

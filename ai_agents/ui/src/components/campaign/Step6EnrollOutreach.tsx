@@ -1,48 +1,7 @@
 import { useState } from 'react';
 import { useCampaignWizard } from './NewCampaignWizard';
 
-const MOCK_SEQUENCES = [
-  { 
-    id: 'seq-1', 
-    name: 'Enterprise Outreach - Q1 2025',
-    description: 'Multi-touch sequence for enterprise prospects with personalized follow-ups',
-    steps: 5,
-    avgOpenRate: 42,
-    avgReplyRate: 8,
-  },
-  { 
-    id: 'seq-2', 
-    name: 'SMB Cold Outreach',
-    description: 'Quick and direct sequence for small and medium businesses',
-    steps: 3,
-    avgOpenRate: 38,
-    avgReplyRate: 12,
-  },
-  { 
-    id: 'seq-3', 
-    name: 'Healthcare Decision Makers',
-    description: 'Tailored sequence for healthcare industry executives',
-    steps: 4,
-    avgOpenRate: 35,
-    avgReplyRate: 6,
-  },
-  { 
-    id: 'seq-4', 
-    name: 'Tech Founders Sequence',
-    description: 'Casual, founder-to-founder outreach for tech startups',
-    steps: 4,
-    avgOpenRate: 45,
-    avgReplyRate: 15,
-  },
-  { 
-    id: 'seq-5', 
-    name: 'Re-engagement Campaign',
-    description: 'Win-back sequence for previously contacted prospects',
-    steps: 3,
-    avgOpenRate: 28,
-    avgReplyRate: 5,
-  },
-];
+import { MOCK_LEMLIST_SEQUENCES as MOCK_SEQUENCES } from '../../store/api/wizardMockData';
 
 export const Step6EnrollOutreach = () => {
   const {
@@ -68,6 +27,7 @@ export const Step6EnrollOutreach = () => {
     if (!state.selectedSequence) return;
     
     setIsEnrolling(true);
+    enrollToSequence(contacts.map(c => c.id));
     
     // Simulate enrollment
     await new Promise(resolve => setTimeout(resolve, 2500));

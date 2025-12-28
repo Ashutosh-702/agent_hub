@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { useCampaignWizard, type Contact } from './NewCampaignWizard';
+import { useCampaignWizard } from './NewCampaignWizard';
 
 export const Step5Personalization = () => {
   const {
     state,
-    generateContactPersonalization,
     bulkGenerateContactPersonalization,
     regenerateMessageOnly,
     approveContactPersonalization,
@@ -22,7 +21,6 @@ export const Step5Personalization = () => {
   const [manualMessage, setManualMessage] = useState<Record<string, string>>({});
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [manualDeckUrl, setManualDeckUrl] = useState<Record<string, string>>({});
-  const [editingDeckUrl, setEditingDeckUrl] = useState<string | null>(null);
 
   const contacts = state.qualifiedContacts;
   
@@ -63,10 +61,6 @@ export const Step5Personalization = () => {
 
   const allSelected = contacts.length > 0 && contacts.every(c => c.personalization?.isSelected);
   const someSelected = contacts.some(c => c.personalization?.isSelected) && !allSelected;
-
-  const handleGenerate = (contactId: string) => {
-    generateContactPersonalization(contactId);
-  };
 
   const handleBulkGenerate = () => {
     const selectedIds = contacts.filter(c => c.personalization?.isSelected).map(c => c.id);
@@ -128,7 +122,6 @@ export const Step5Personalization = () => {
   const handleUpdateDeckUrl = (contactId: string) => {
     if (manualDeckUrl[contactId]) {
       updateDeckUrl(contactId, manualDeckUrl[contactId]);
-      setEditingDeckUrl(null);
     }
   };
 

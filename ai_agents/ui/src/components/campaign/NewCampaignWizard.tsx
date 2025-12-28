@@ -267,42 +267,6 @@ export const NewCampaignWizard = () => {
     }, 2000);
   }, []);
 
-  const syncCompany = useCallback((companyId: string) => {
-    setState(prev => ({
-      ...prev,
-      qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-        c.id === companyId ? { ...c, syncStatus: 'syncing' } : c
-      ),
-    }));
-    // Simulate sync
-    setTimeout(() => {
-      setState(prev => ({
-        ...prev,
-        qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-          c.id === companyId ? { ...c, syncStatus: 'synced' } : c
-        ),
-      }));
-    }, 1500);
-  }, []);
-
-  const bulkSync = useCallback((companyIds: string[]) => {
-    setState(prev => ({
-      ...prev,
-      qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-        companyIds.includes(c.id) ? { ...c, syncStatus: 'syncing' } : c
-      ),
-    }));
-    // Simulate bulk sync
-    setTimeout(() => {
-      setState(prev => ({
-        ...prev,
-        qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-          companyIds.includes(c.id) ? { ...c, syncStatus: 'synced' } : c
-        ),
-      }));
-    }, 2000);
-  }, []);
-
   const generateContactPersonalization = useCallback((contactId: string) => {
     setState(prev => {
       return {
