@@ -286,9 +286,16 @@ async def enrich_apollo_contact_list(query_params: ApolloContactList = Depends()
 
     return response_data.dict()
 
-async def update_apollo_contact_enrichment_status(query_params: UpdateApolloContactEnrichmentStatus = Depends()) -> Dict[str, Any]:
+async def update_apollo_contact_enrichment_status(
+    contact_ids: list[str] = Body(default_factory=list),
+    query_params: UpdateApolloContactEnrichmentStatus = Depends(),
+) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)
     campaign_helper = CampaignsHelper()
+
+    # Support passing contact_ids via JSON body (as per curl) in addition to query params.
+    if contact_ids:
+        query_params.contact_ids = contact_ids
 
     response = await campaign_helper.update_contact_relevance(query_params)
     response_data.success = True
