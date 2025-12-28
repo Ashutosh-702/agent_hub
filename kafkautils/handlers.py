@@ -256,6 +256,11 @@ async def process_company_qualification_ai(request_id: str, campaign_id: str):
         orchestrator = IntegrationOrchestrator(campaign_data)
         # Uses the campaign config (including updated prompts.web) to re-run relevance check.
         await orchestrator.relevance_check.company_relevance_check(campaign_id)
+        update_campaign_status = await campaigns_dao.update_campaign(campaign_id, {"$set": {"prospecting_cycle.status": "company_qualification"}})
+        if update_campaign_status:
+            logger.info(f"✅ Updated campaign status to contact_qualification: {campaign_id}")
+        else:
+            logger.error(f"❌ Failed to update campaign status to contact_qualification: {campaign_id}")
 
         logger.info(f"✅ Completed AI company qualification: {request_id}")
 
