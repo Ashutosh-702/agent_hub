@@ -13,7 +13,12 @@ from database.collection_dao.contacts import ContactsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from global_utils.exceptions import ApiException
 from integrations.apollo.apollo_helper import ApolloHelper
-from kafkautils.constants import KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices, CONTACTS_ENRICHMENT
+from kafkautils.constants import (
+    KAFKA_SERVICE_CONFIG_MAPPING,
+    LeadgenServices,
+    CONTACTS_ENRICHMENT,
+    LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING,
+)
 from kafkautils.producer.event_helpers import emit_event_helper
 import uuid
 import asyncio
@@ -21,6 +26,8 @@ from ai_agents.leadgen.schemas.ai_agents import Campaigns, Companies, CompanyCon
 from ai_agents.leadgen.services.ai_agents_service import CampaignService
 from ai_agents.leadgen.utils import serialize_objectid
 from ai_agents.leadgen.schemas.ai_agents import CampaignDetailsWithCompanies
+from database.collection_dao.campaigns import CampaignsDao
+from ai_agents.leadgen.schemas.ai_agents import AiCompanyQualification
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -362,7 +369,10 @@ class CampaignsHelper:
 
     def __init__(self):
         self.campaign_service = CampaignService()
+        self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        self.event_emitter = loaded_config.connection_manager.event_emitter
+        self.company_qualification_ai_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING]
 
     async def get_campaigns(self, query_params: Campaigns):
         campaigns = await self.campaign_service.get_campaigns(query_params)
@@ -400,6 +410,41 @@ class CampaignsHelper:
                     {"$set": {"is_relevant": is_relevant}}
                 )
         return {"message": "Company qualification completed"}
+
+    async def ai_company_qualification(self, query_params: AiCompanyQualification):
+        campaign_id = query_params.campaign_id
+        web_prompt = query_params.web_prompt
+
+        if not web_prompt:
+            raise ApiException("Web prompt is required")
+
+        update_campaign = await self.campaign_dao.update_campaign(
+            campaign_id,
+            {"prompts.web": web_prompt, "metadata.updated_at": datetime.utcnow()},
+        )
+        request_id = str(uuid.uuid4())
+
+        if not self.event_emitter:
+            raise ApiException("EventBridge Producer not initialized")
+
+        event = {
+            "request_id": request_id,
+            "action": "process_company_qualification_ai",
+            "campaign_id": campaign_id,
+            "web_prompt": web_prompt,
+            "timestamp": asyncio.get_event_loop().time()
+        }
+
+        await emit_event_helper(
+            event_emitter=self.event_emitter,
+            topics=self.company_qualification_ai_kafka_config["topics"],
+            partition_value=request_id,
+            event=event,
+            event_meta={"service": "leadgen", "campaign_id": campaign_id, "web_prompt": web_prompt},
+        )
+        if not update_campaign:
+            raise ApiException("Campaign not found")
+        return {"message": "Campaign updated", "campaign_id": campaign_id}
 
 class CompaniesHelper:
 

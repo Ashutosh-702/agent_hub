@@ -19,7 +19,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CompanyContacts,
     CampaignDetailsWithCompanies,
     CreateCampaignFromProspectingJob,
-    ManualCompanyQualification
+    ManualCompanyQualification,
+    AiCompanyQualification
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -247,6 +248,16 @@ async def manual_company_qualification(query_params: ManualCompanyQualification 
     campaign_helper = CampaignsHelper()
 
     response = await campaign_helper.manual_company_qualification(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+async def ai_company_qualification(query_params: AiCompanyQualification = Body()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.ai_company_qualification(query_params)
     response_data.success = True
     response_data.data = response
 

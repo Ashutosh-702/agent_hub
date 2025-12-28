@@ -129,6 +129,71 @@ async def leadgen_prospecting_job_processing_handler(message: Any):
         traceback.print_exc()
         raise
 
+
+async def leadgen_company_qualification_ai_processing_handler(message: Any):
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+        else:
+            logger.error("🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")
+
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+
+        if action != "process_company_qualification_ai":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+
+        logger.info(f"🔄 Processing AI company qualification: {request_id}")
+        await process_company_qualification_ai(request_id, campaign_id)
+
+    except Exception as e:
+        logger.error(f"❌ Error handling leadgen message: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+async def process_company_qualification_ai(request_id: str, campaign_id: str):
+    """Re-run AI company qualification (relevance check) using updated campaign prompts."""
+    try:
+        logger.info(f"🔍 Processing request: {request_id}")
+        logger.info(f"📋 Campaign ID: {campaign_id}")
+
+        await initialize_consumer_connections()
+
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaign_data = await campaigns_dao.get_campaign(campaign_id)
+
+        if not campaign_data:
+            logger.error(f"❌ Campaign not found: {campaign_id}")
+            return
+
+        orchestrator = IntegrationOrchestrator(campaign_data)
+        # Uses the campaign config (including updated prompts.web) to re-run relevance check.
+        await orchestrator.relevance_check.company_relevance_check(campaign_id)
+
+        logger.info(f"✅ Completed AI company qualification: {request_id}")
+
+    except Exception as e:
+        logger.error(f"❌ Error processing AI company qualification {request_id}: {e}")
+        raise
+
 async def process_prospecting_job(request_id: str, campaign_id: str):
     """Process a single prospecting job request using campaign_id."""
     try:

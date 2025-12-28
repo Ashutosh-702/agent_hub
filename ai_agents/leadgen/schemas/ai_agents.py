@@ -69,6 +69,7 @@ class ManualCompanyQualification(BaseModel):
     selection_type: str = "all"
     is_relevant: bool = True
     
+    
 
     #here company_ids llist is dependent on the selection_type
     #if selection_type is "all", then company_ids should be None
@@ -113,6 +114,10 @@ class ManualCompanyQualification(BaseModel):
 
         return self
 
+class AiCompanyQualification(BaseModel):
+    campaign_id: str
+    web_prompt: Optional[str] = None
+    
 class ManualCompanyQualificationResponse(BaseModel):
     campaign_id: str
     company_ids: List[str]
