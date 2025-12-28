@@ -21,7 +21,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CreateCampaignFromProspectingJob,
     ManualCompanyQualification,
     AiCompanyQualification,
-    ApolloContactList
+    ApolloContactList,
+    UpdateApolloContactEnrichmentStatus
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -269,6 +270,26 @@ async def get_apollo_contact_list(query_params: ApolloContactList = Depends()) -
     campaign_helper = CampaignsHelper()
 
     response = await campaign_helper.get_apollo_contact_list(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+async def enrich_apollo_contact_list(query_params: ApolloContactList = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.get_apollo_contact_list(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+async def update_apollo_contact_enrichment_status(query_params: UpdateApolloContactEnrichmentStatus = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.update_contact_relevance(query_params)
     response_data.success = True
     response_data.data = response
 

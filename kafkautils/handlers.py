@@ -201,12 +201,12 @@ async def leadgen_apollo_contact_list_processing_handler(message: Any):
             logger.error("❌ Missing request_id or campaign_id in message")
             return
 
-        if action != "get_apollo_contact_list":
+        if action != "get_apollo_contact_list" and action != "enrich_apollo_contact_list":
             logger.error(f"❌ Unknown action: {action}")
             return
 
         logger.info(f"🔄 Processing Apollo contact list for campaign: {campaign_id}")
-        await process_apollo_contact_list(request_id, campaign_id, slack_metadata)
+        await process_apollo_contact_list(request_id, campaign_id, slack_metadata, action)
 
     except Exception as e:
         logger.error(f"❌ Error handling apollo contact list message: {e}")
@@ -215,7 +215,7 @@ async def leadgen_apollo_contact_list_processing_handler(message: Any):
         raise
 
 
-async def process_apollo_contact_list(request_id: str, campaign_id: str, slack_metadata: dict):
+async def process_apollo_contact_list(request_id: str, campaign_id: str, slack_metadata: dict, action: str):
     """
     Fetch Apollo contacts for all relevant companies in a campaign.
     This reuses `process_contacts_enrichment` (which calls ApolloHelper.get_company_contacts).
@@ -229,7 +229,10 @@ async def process_apollo_contact_list(request_id: str, campaign_id: str, slack_m
             logger.error(f"❌ Campaign not found: {campaign_id}")
             return
         orchestrator = IntegrationOrchestrator(campaign_data)
-        await orchestrator.fetch_apollo_contact_list()
+        if action == "get_apollo_contact_list":
+            await orchestrator.fetch_apollo_contact_list()
+        elif action == "enrich_apollo_contact_list":
+            await orchestrator.enrich_apollo_contact_list()
 
     except Exception as e:
         logger.error(f"❌ Error processing apollo contact list {request_id}: {e}")

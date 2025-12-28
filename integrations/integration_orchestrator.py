@@ -8,6 +8,7 @@ from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaigns import CampaignsDao
 from database.collection_dao.contacts import ContactsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 from config.loaded_config import loaded_config
 from ai_agents.core_sdr.src.api.company_relevance_check import CompanyRelevanceCheck
 from integrations.lusha.lusha_helper import LushaHelper
@@ -29,6 +30,7 @@ class IntegrationOrchestrator:
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         self.campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.CompanyMappingsDao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        self.CampaignContactRunsDao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
         self.ContactsDao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.relevance_check = CompanyRelevanceCheck(self.config)
         self.campaign_id = self.config.get('_id')
@@ -52,13 +54,60 @@ class IntegrationOrchestrator:
                 return
             logger.info("Fetching contacts from apollo...")
             await self.process_apollo_contact_list(self.campaign_id)
+            await self.campaigns_dao.update_campaign(self.campaign_id, {"$set": {"prospecting_cycle.status": "contact_qualification"}})
             return {
                 "contacts_fetched": True
             }
         except Exception as e:
             logger.error(f"Error while processing apollo contact list for campaign {self.campaign_id}: {str(e)}")
             raise
+
+    async def enrich_apollo_contact_list(self) -> Dict[str, Any]:
+        """Core function to process enrich apollo contact list"""
+        try:
+            campaign = await self.campaigns_dao.get_campaign(self.campaign_id)
+            if not campaign:
+                logger.error(f"Campaign not found for campaign_id: {self.campaign_id}")
+                return
+            if campaign.get("prospecting_cycle", {}).get("status") != "contact_qualification":
+                logger.error(f"Campaign is not in contact qualification status for campaign_id: {self.campaign_id}")
+                return
+            logger.info("Enriching contacts from apollo...")
+            await self.enrich_apollo_contacts(self.campaign_id)
+            await self.campaigns_dao.update_campaign(self.campaign_id, {"$set": {"prospecting_cycle.status": "contact_qualification"}})
+            return {
+                "contacts_enriched": True
+            }
+        except Exception as e:
+            logger.error(f"Error while processing enrich apollo contact list for campaign {self.campaign_id}: {str(e)}")
     
+    async def enrich_apollo_contacts(self, campaign_id: str) -> Dict[str, Any]:
+        try:
+            logger.info(f"📋 Campaign ID: {campaign_id}")
+            get_campaign_contact_runs_count = await self.CampaignContactRunsDao.get_campaign_contact_runs_count({"campaign_id": campaign_id, "is_relevant": True})
+            if get_campaign_contact_runs_count == 0:
+                logger.info(f"No campaign contacts found for campaign_id: {campaign_id}")
+                return
+            total_pages = (get_campaign_contact_runs_count + 5 - 1) // 5 if get_campaign_contact_runs_count > 0 else 1
+            total_pages = min(total_pages, 1)
+            for page in range(1, total_pages + 1):
+                campaign_contact_runs, pagination_info = await self.CampaignContactRunsDao.get_campaign_contact_runs_paginated({"campaign_id": campaign_id, "is_relevant": True}, page, 5)
+                if not campaign_contact_runs:
+                    logger.info(f"No campaign contacts found for page {page}")
+                    continue
+                for campaign_contact_run in campaign_contact_runs:
+                    company_id = campaign_contact_run.get("company_id")
+                    contact_id = campaign_contact_run.get("contact_id")
+                    await self.apollo_helper.enrich_apollo_contact(contact_id)
+                    await self.CampaignContactRunsDao.update_campaign_contact_run({"campaign_id": campaign_id, "contact_id": contact_id}, {"$set": {"enrichment_status": True}})
+
+            await self.campaigns_dao.update_campaign(campaign_id, {"$set": {"prospecting_cycle.status": "contact_enriched"}})
+
+            return {
+                "contacts_enriched": True
+            }
+        except Exception as e:
+            logger.error(f"Error while processing enrich apollo contacts for campaign {campaign_id}: {str(e)}")
 
     async def process_apollo_contact_list(self, campaign_id: str, prospecting_approach: str="manual"):
         try:
@@ -204,11 +253,16 @@ class IntegrationOrchestrator:
                 logger.info(f"📍 Company ID: {company_id}")
 
                 # if company as  multple unsent contacts, then don't do apollo search
-                contacts = await self.ContactsDao.get_contacts({
-                    "company_id": company_id,
-                    # "webhook_sent": False,
-                    "contact_data.email": {"$ne": []} #only get contacts with email. it should not be empty here email is an array field.
-                })
+                if prospecting_approach == "manual":
+                    contacts = await self.ContactsDao.get_contacts({
+                        "company_id": company_id,
+                    })
+                else:
+                    contacts = await self.ContactsDao.get_contacts({
+                        "company_id": company_id,
+                        # "webhook_sent": False,
+                        "contact_data.email": {"$ne": []} #only get contacts with email. it should not be empty here email is an array field.
+                    })
 
                 # Create ApolloResponseSchema object
                 if len(contacts) == 0:

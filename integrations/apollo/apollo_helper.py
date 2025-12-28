@@ -286,9 +286,11 @@ class ApolloHelper:
                                 "company_id": ObjectId(query_params.company_id),
                                 "contact_id": contact_id,
                                 "is_relevant": False,
+                                "enrichment_status": False,
                                 "metadata": {
                                     "created_at": datetime.now(timezone.utc),
                                     "updated_at": datetime.now(timezone.utc),
+                                    "raw_data": None,
                                 }
                             }
                             await self.campaign_contact_runs_dao.create_campaign_contact_run(campaign_contact_run_doc)
@@ -943,3 +945,87 @@ class ApolloHelper:
             
         return value
 
+    async def enrich_apollo_contact(self, contact_id: str) -> Dict[str, Any]:
+        
+        try:
+            contact_doc = await self.contacts_dao.get_contact(contact_id)
+            if not contact_doc:
+                return {"status": "error", "message": "Contact not found", "contact_id": contact_id}
+
+            person_id = (contact_doc.get("contact_data") or {}).get("source_id")
+            if not person_id:
+                return {
+                    "status": "error",
+                    "message": "Apollo person_id missing on contact_data.source_id",
+                    "contact_id": contact_id,
+                }
+
+            apollo_client = ApolloAPIClient()
+            enrichment_response = await apollo_client.apollo_people_enrichment_api(
+                person_id=str(person_id),
+                reveal_personal_emails=True,
+                reveal_phone_number=False,
+            )
+
+            if enrichment_response.get("status_code") != 200:
+                return {
+                    "status": "error",
+                    "message": "Apollo enrichment failed",
+                    "contact_id": contact_id,
+                    "apollo_error": enrichment_response.get("error"),
+                }
+
+            enriched_data = enrichment_response.get("results", {}) or {}
+            enriched_person = enriched_data.get("person", {}) or {}
+
+            # Merge enriched fields into the existing contact
+            
+            enriched_emails = enriched_person.get("email", [])
+            emails = []
+            if isinstance(enriched_emails, list):
+                emails = [e.get("address", "") if isinstance(e, dict) else str(e) for e in enriched_emails if e]
+            elif enriched_emails:
+                emails = [str(enriched_emails)]
+            emails = list({e for e in emails if e})
+
+            enriched_phones = enriched_person.get("phone_numbers", [])
+            phones = []
+            if isinstance(enriched_phones, list):
+                phones = [
+                    (p.get("raw_number") or p.get("sanitized_number") or "")
+                    if isinstance(p, dict) else str(p)
+                    for p in enriched_phones if p
+                ]
+            elif enriched_phones:
+                phones = [str(enriched_phones)]
+            phones = list({p for p in phones if p})
+
+            update_set = {
+                "metadata.updated_at": datetime.now(timezone.utc),
+                "metadata.raw_data": enriched_data or {},  # keep raw for debugging
+            }
+
+            # Only overwrite if we got something useful
+            if emails:
+                update_set["contact_data.email"] = emails
+            if phones:
+                update_set["contact_data.phone"] = phones
+            if enriched_person.get("title"):
+                update_set["contact_data.jobtitle"] = enriched_person.get("title")
+            if enriched_person.get("last_name"):
+                update_set["contact_data.lastname"] = enriched_person.get("last_name")
+
+            await self.contacts_dao.update_contact(contact_id, {"$set": update_set})
+
+            return {
+                "status": "success",
+                "message": "Contact enriched",
+                "contact_id": contact_id,
+                "apollo_person_id": str(person_id),
+                "emails": emails,
+                "phones": phones,
+            }
+
+        except Exception as e:
+            logger.error(f"Error enriching contact {contact_id}: {e}")
+            return {"status": "error", "message": str(e), "contact_id": contact_id}

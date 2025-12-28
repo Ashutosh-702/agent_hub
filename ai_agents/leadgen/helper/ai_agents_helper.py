@@ -8,9 +8,9 @@ from integrations.lusha.lusha_api import LushaAPIClient
 from ai_agents.leadgen.services.ai_agents_service import CompanyService, ContactService
 from ai_agents.leadgen.schemas.contact_models import ContactDocument
 from ai_agents.leadgen.schemas.ai_agents import SaveProspectsDataToMongo, ApolloContactEnrichment
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.contacts import ContactsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 from global_utils.exceptions import ApiException
 from integrations.apollo.apollo_helper import ApolloHelper
 from kafkautils.constants import (
@@ -28,7 +28,7 @@ from ai_agents.leadgen.services.ai_agents_service import CampaignService
 from ai_agents.leadgen.utils import serialize_objectid
 from ai_agents.leadgen.schemas.ai_agents import CampaignDetailsWithCompanies
 from database.collection_dao.campaigns import CampaignsDao
-from ai_agents.leadgen.schemas.ai_agents import AiCompanyQualification, ApolloContactList
+from ai_agents.leadgen.schemas.ai_agents import AiCompanyQualification, ApolloContactList, UpdateApolloContactEnrichmentStatus
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -372,6 +372,7 @@ class CampaignsHelper:
         self.campaign_service = CampaignService()
         self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.company_qualification_ai_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING]
         self.apollo_contact_list_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_APOLLO_CONTACT_LIST_PROCESSING]
@@ -449,7 +450,7 @@ class CampaignsHelper:
         return {"message": "Campaign updated", "campaign_id": campaign_id}
 
     async def get_apollo_contact_list(self, query_params: ApolloContactList):
-        
+        enrichment_status = query_params.enrichment_status
         campaign_id = query_params.campaign_id
         # We just need to send the campaign_id to the kafka topic (consumer will expand to company_ids and call Apollo)
         request_id = str(uuid.uuid4())
@@ -457,12 +458,17 @@ class CampaignsHelper:
         if not self.event_emitter:
             raise ApiException("EventBridge Producer not initialized")
 
+        
+
         event = {
             "request_id": request_id,
-            "action": "get_apollo_contact_list",
             "campaign_id": campaign_id,
             "timestamp": asyncio.get_event_loop().time()
         }
+        if enrichment_status:
+            event["action"] = "enrich_apollo_contact_list"
+        else:
+            event["action"] = "get_apollo_contact_list"
         await emit_event_helper(
             event_emitter=self.event_emitter,
             topics=self.apollo_contact_list_kafka_config["topics"],
@@ -473,6 +479,23 @@ class CampaignsHelper:
 
         return {"message": "Apollo contact fetch queued", "request_id": request_id, "campaign_id": campaign_id}
 
+    async def update_contact_relevance(self, query_params: UpdateApolloContactEnrichmentStatus):
+        campaign_id = query_params.campaign_id
+        contact_ids = query_params.contact_ids  if query_params.contact_ids else []
+        is_relevant = query_params.is_relevant
+        selection_type = query_params.selection_type
+
+        if selection_type == "all":
+            await self.campaign_contact_runs_dao.update_campaign_contact_runs({"campaign_id": campaign_id}, {"$set": {"is_relevant": is_relevant}})
+        else:
+            chunk_size = 500
+            for i in range(0, len(contact_ids), chunk_size):
+                chunk = contact_ids[i:i + chunk_size]
+                await self.campaign_contact_runs_dao.update_campaign_contact_runs(
+                    {"campaign_id": campaign_id, "contact_id": {"$in": chunk}},
+                    {"$set": {"is_relevant": is_relevant}}
+                )
+        return {"message": "Contact relevance updated"}
 class CompaniesHelper:
 
     def __init__(self):

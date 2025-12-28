@@ -120,6 +120,53 @@ class AiCompanyQualification(BaseModel):
 
 class ApolloContactList(BaseModel):
     campaign_id: str
+    enrichment_status: Optional[bool] = False
+
+class UpdateApolloContactEnrichmentStatus(BaseModel):
+    campaign_id: str
+    contact_ids: Optional[List[str]] = None
+    selection_type: str = "all"
+    is_relevant: bool = True
+
+
+    @field_validator('contact_ids')
+    @classmethod
+    def normalize_contact_ids(cls, contact_ids: Optional[List[str]]):
+        if contact_ids is None:
+            return None
+
+        # normalize + de-dupe while preserving order
+        seen = set()
+        normalized: List[str] = []
+        for idx, cid in enumerate(contact_ids):
+            if not isinstance(cid, str) or not cid.strip():
+                raise ValueError(f"contact_ids[{idx}] must be a non-empty string")
+            cid = cid.strip()
+            if cid not in seen:
+                seen.add(cid)
+                normalized.append(cid)
+        return normalized
+
+    @model_validator(mode='after')
+    def validate_selection_type_and_limits(self):
+        allowed = {"all", "selected"}
+        if self.selection_type not in allowed:
+            raise ValueError(f"selection_type must be one of {sorted(allowed)}")
+
+        if self.selection_type == "all":
+            # for all, ignore any accidentally provided list
+            self.contact_ids = None
+            return self
+
+        # selection_type == "selected"
+        if not self.contact_ids:
+            raise ValueError("contact_ids cannot be empty when selection_type is 'selected'")
+
+        MAX_COMPANY_IDS = 500
+        if len(self.contact_ids) > MAX_COMPANY_IDS:
+            raise ValueError(f"contact_ids too large: {len(self.contact_ids)} (max {MAX_COMPANY_IDS})")
+
+        return self
 
     
 class ManualCompanyQualificationResponse(BaseModel):
