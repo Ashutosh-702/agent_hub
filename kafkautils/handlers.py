@@ -89,6 +89,78 @@ async def leadgen_batch_processing_handler(message: Any):
         traceback.print_exc()
         raise
 
+async def leadgen_prospecting_job_processing_handler(message: Any):
+    try:
+        # Try different ways to extract the payload
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+
+        else:
+            logger.error(f"🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+        
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")  # Now we get campaign_id instead of form_data
+        
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+        
+        if action != "process_prospecting_job":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+        
+        logger.info(f"🔄 Processing prospecting job: {request_id}")
+        await process_prospecting_job(request_id, campaign_id)
+        
+    except Exception as e:
+        logger.error(f"❌ Error handling leadgen message: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+async def process_prospecting_job(request_id: str, campaign_id: str):
+    """Process a single prospecting job request using campaign_id."""
+    try:
+        logger.info(f"🔍 Processing request: {request_id}")
+        logger.info(f"📋 Campaign ID: {campaign_id}")
+        
+        # Initialize database connection if needed
+        await initialize_consumer_connections()
+        
+        # Fetch campaign data from database using campaign_id
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaign_data = await campaigns_dao.get_campaign(campaign_id)
+        
+        if not campaign_data:
+            logger.error(f"❌ Campaign not found: {campaign_id}")
+            return
+        
+        logger.info(f"🔍 DEBUG: Campaign data structure: {campaign_data}")
+        logger.info(f"📊 Industry: {campaign_data.get('segmentation', {}).get('industry', 'Unknown')}")
+        logger.info(f"📍 Location: {campaign_data.get('target', {}).get('location', {}).get('names', 'Unknown')}")
+        
+        # Run the prospecting job pipeline for this campaign
+        orchestrator = IntegrationOrchestrator(campaign_data)
+        await orchestrator.process_prospecting_job()
+        
+        logger.info(f"✅ Completed processing: {request_id}")
+        # print(f"📝 Result: {result}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error processing request {request_id}: {e}")
+        raise 
+
 
 async def process_leadgen_message(request_id: str, campaign_id: str):
     """Process a single leadgen company search request using campaign_id."""

@@ -17,7 +17,9 @@ from ai_agents.leadgen.schemas.ai_agents import (
     Campaigns,
     Companies,
     CompanyContacts,
-    CampaignDetailsWithCompanies
+    CampaignDetailsWithCompanies,
+    CreateCampaignFromProspectingJob,
+    ManualCompanyQualification
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -225,4 +227,27 @@ async def get_campaign_details_with_companies(query_params: CampaignDetailsWithC
     response_data.data = response.get("campaign")
     response_data.data["companies"] = response.get("companies")
     response_data.pagination = response.get("pagination_info")
+    return response_data.dict()
+
+async def create_campaign_from_prospecting_job(query_params: CreateCampaignFromProspectingJob = Body()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_form_upload_service = CampaignService()
+
+    response = await leadgen_form_upload_service.create_campaign_from_prospecting_job(query_params)
+    response_data.success = True
+    response_data.data = {
+        "message": "Data uploaded and queued for processing via EventBridge",
+        "campaign_id": response.get("campaign_id")
+    }
+
+    return response_data.dict()
+
+async def manual_company_qualification(query_params: ManualCompanyQualification = Body()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.manual_company_qualification(query_params)
+    response_data.success = True
+    response_data.data = response
+
     return response_data.dict()

@@ -25,8 +25,30 @@ class CampaignCompanyRunsDao(BaseMongoDao):
     async def get_campaign_company_run(self, campaign_company_run_id: str):
         return await self.find_one({"_id": campaign_company_run_id})
 
-    async def update_campaign_company_run(self, query: Dict[str, Any], update_clause: Dict[str, Any]):
+    async def update_campaign_company_run(self, query: Dict[str, Any]=None, update_clause: Dict[str, Any]=None):
+        if query is None:
+            query = {}
+        if update_clause is None:
+            update_clause = {}
+        query = self._process_query_objectids(query)
+        update_clause = self._process_query_objectids(update_clause)
         return await self.update_one(query, update_clause)
+
+    async def update_campaign_company_runs(self, query: Dict[str, Any]=None, update_clause: Dict[str, Any]=None):
+        if query is None:
+            query = {}
+        if update_clause is None:
+            update_clause = {}
+        query = self._process_query_objectids(query)
+        return await self.update_many(query, update_clause)
+
+    async def update_campaign_company_run_by_campaign_id(self, campaign_id: str, update_clause: Dict[str, Any]):
+        """
+        Bulk update by campaign_id (used for selection_type='all' operations).
+        """
+        query = {"campaign_id": campaign_id}
+        query = self._process_query_objectids(query)
+        return await self.update_many(query, update_clause)
 
     async def get_campaign_company_runs_paginated(self, query: dict = None, page: int = 1, limit: int = 100, projection: dict = None):
         if query is None:

@@ -18,7 +18,9 @@ from ai_agents.leadgen.views.ai_agents import (
     get_campaigns,
     get_companies,
     get_company_details_with_contacts,
-    get_campaign_details_with_companies
+    get_campaign_details_with_companies,
+    create_campaign_from_prospecting_job,
+    manual_company_qualification
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -132,5 +134,19 @@ router.add_api_route(
     "/campaign_details_with_companies",
     methods=["GET"],
     endpoint=get_campaign_details_with_companies,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/create_campaign_from_prospecting_job",
+    methods=["POST"],
+    endpoint=create_campaign_from_prospecting_job,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/manual_company_qualification",
+    methods=["POST"],
+    endpoint=manual_company_qualification,
     response_model=ResponseData,
 )

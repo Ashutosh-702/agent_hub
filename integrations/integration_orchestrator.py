@@ -40,6 +40,20 @@ class IntegrationOrchestrator:
             source="ai_sdr"
         )
 
+    async def process_prospecting_job(self) -> Dict[str, Any]:
+        """Core function to process prospecting job"""
+        try:
+            await self.campaigns_dao.update_campaign_status(self.campaign_id,"started")
+            logger.info("Fetching companies from apollo...")
+            inserted_count = await self.apollo_helper.get_companies_from_apollo(self.config)
+            logger.info(f"Found {inserted_count} companies from apollo.")
+            await self.campaigns_dao.update_campaign_status(self.campaign_id,"company_qualification")
+            return {
+                "companies_fetched": inserted_count
+            }
+        except Exception as e:
+            logger.error(f"Error while processing prospecting job for campaign {self.campaign_id}: {str(e)}")
+
     async def process_company_search(self) -> Dict[str, Any]:
         """Core function to process company search"""
         total_company_data = []

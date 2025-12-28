@@ -17,7 +17,7 @@ from kafkautils.constants import KAFKA_SERVICE_CONFIG_MAPPING, LeadgenServices, 
 from kafkautils.producer.event_helpers import emit_event_helper
 import uuid
 import asyncio
-from ai_agents.leadgen.schemas.ai_agents import Campaigns, Companies, CompanyContacts
+from ai_agents.leadgen.schemas.ai_agents import Campaigns, Companies, CompanyContacts, ManualCompanyQualification
 from ai_agents.leadgen.services.ai_agents_service import CampaignService
 from ai_agents.leadgen.utils import serialize_objectid
 from ai_agents.leadgen.schemas.ai_agents import CampaignDetailsWithCompanies
@@ -382,6 +382,24 @@ class CampaignsHelper:
         serialized_campaign = serialize_objectid(campaign)
         serialized_companies = serialize_objectid(companies)
         return {"campaign": serialized_campaign, "companies": serialized_companies, "pagination_info": pagination_info}
+
+    async def manual_company_qualification(self, query_params: ManualCompanyQualification):
+        campaign_id = query_params.campaign_id
+        company_ids = query_params.company_ids
+        is_relevant = query_params.is_relevant
+        selection_type = query_params.selection_type
+
+        if selection_type == "all":
+            await self.campaign_company_runs_dao.update_campaign_company_run_by_campaign_id(campaign_id, {"$set": {"is_relevant": is_relevant}})
+        else:
+            chunk_size = 500
+            for i in range(0, len(company_ids), chunk_size):
+                chunk = company_ids[i:i + chunk_size]
+                await self.campaign_company_runs_dao.update_campaign_company_runs(
+                    {"campaign_id": campaign_id, "company_id": {"$in": chunk}},
+                    {"$set": {"is_relevant": is_relevant}}
+                )
+        return {"message": "Company qualification completed"}
 
 class CompaniesHelper:
 
