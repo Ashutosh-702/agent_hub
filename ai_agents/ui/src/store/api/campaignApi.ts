@@ -2,17 +2,18 @@ import { baseApi } from './baseApi';
 
 export interface Campaign {
   _id: string;
-  name: string;
+  // Older UI / mock compatibility (backend may not send these)
+  name?: string | null;
   // Selected during campaign creation (optional for backwards compatibility)
-  shortlisting_approach?: string;
+  shortlisting_approach?: string | null;
   prompts: {
     web: string;
-    persona: string;
+    persona: string | null;
   };
   segmentation: {
     industry: string[];
-    keywords: string;
-    categories: string;
+    keywords: string | null;
+    categories: string | null;
   };
   target: {
     employee_count: string[];
@@ -25,26 +26,35 @@ export interface Campaign {
     };
   };
   ownership: {
-    hubspot_email: string;
-    product_name: string;
-    business_team: string;
-    user_email: string;
+    hubspot_email: string | null;
+    product_name: string | null;
+    business_team: string | null;
+    user_email: string | null;
   };
   lifecycle: {
+    status: string;
+  };
+  prospecting_cycle?: {
     status: string;
   };
   metadata: {
     created_at: string;
     updated_at: string;
   };
-  // Campaign metrics
-  metrics: {
-    companies_prospected: number;
-    companies_qualified: number;
-    contacts_found: number;
-    contacts_outreached: number;
+
+  // Aggregates returned by /api/v1/campaigns
+  relevant_company_mappings_count?: number;
+  total_company_mappings_count?: number;
+  contact_runs_count?: number;
+
+  // Older UI / mock compatibility (backend may not send these)
+  metrics?: {
+    companies_prospected?: number;
+    companies_qualified?: number;
+    contacts_found?: number;
+    contacts_outreached?: number;
   };
-  company_mappings_count: number;
+  company_mappings_count?: number;
 }
 
 export interface Pagination {
@@ -98,6 +108,26 @@ export interface CreateCampaignResponse {
   message?: string;
 }
 
+export interface CreateCampaignFromProspectingJobPayload {
+  industry: string;
+  employee_count: string; // comma-separated
+  revenue_min: string;
+  revenue_max: string;
+  location_type: string;
+  location: string;
+  currency: string;
+  prospecting_cycle_status: string;
+}
+
+export interface CreateCampaignFromProspectingJobResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+    campaign_id?: string;
+  };
+  errors?: string[];
+}
+
 // Campaign Details with Companies
 export interface CampaignCompany {
   _id: string;
@@ -106,6 +136,25 @@ export interface CampaignCompany {
   company_status: boolean;
   linkedin_contact_status: boolean;
   is_relevant: boolean;
+  company?: {
+    _id?: string;
+    identifiers?: {
+      name?: string;
+      domain?: string;
+      source_id?: string;
+    };
+    profile?: {
+      industry?: string | string[];
+      employee_count?: string | string[];
+      revenue_min?: string;
+      revenue_max?: string;
+    };
+    location?: {
+      type?: string;
+      name?: string | string[];
+    };
+    source?: string;
+  };
   metadata: {
     created_at: string;
     updated_at: string;
@@ -130,6 +179,21 @@ export interface GetCampaignDetailsParams {
   company_status?: boolean;
   page: number;
   limit: number;
+}
+
+export interface ManualCompanyQualificationPayload {
+  campaign_id: string;
+  selection_type: 'all' | 'selected' | 'selective';
+  is_relevant: boolean;
+  company_ids?: string[];
+}
+
+export interface ManualCompanyQualificationResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+  };
+  errors?: string[];
 }
 
 export const campaignApi = baseApi.injectEndpoints({
@@ -158,6 +222,18 @@ export const campaignApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ['Campaign'],
     }),
+
+    createCampaignFromProspectingJob: builder.mutation<
+      CreateCampaignFromProspectingJobResponse,
+      CreateCampaignFromProspectingJobPayload
+    >({
+      query: (payload) => ({
+        url: '/api/v1/create_campaign_from_prospecting_job',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Campaign'],
+    }),
     
     getCampaignDetails: builder.query<CampaignDetailsResponse, GetCampaignDetailsParams>({
       query: ({ campaign_id, company_status, page, limit }) => {
@@ -178,12 +254,27 @@ export const campaignApi = baseApi.injectEndpoints({
         { type: 'Campaign', id: campaign_id },
       ],
     }),
+
+    manualCompanyQualification: builder.mutation<
+      ManualCompanyQualificationResponse,
+      ManualCompanyQualificationPayload
+    >({
+      query: (payload) => ({
+        url: '/api/v1/manual_company_qualification',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
   }),
 });
 
 export const { 
   useGetCampaignsQuery, 
   useCreateCampaignMutation,
+  useCreateCampaignFromProspectingJobMutation,
   useGetCampaignDetailsQuery,
+  useLazyGetCampaignDetailsQuery,
+  useManualCompanyQualificationMutation,
 } = campaignApi;
 

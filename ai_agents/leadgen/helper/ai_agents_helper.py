@@ -371,6 +371,7 @@ class CampaignsHelper:
     def __init__(self):
         self.campaign_service = CampaignService()
         self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
         self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
         self.event_emitter = loaded_config.connection_manager.event_emitter
@@ -398,6 +399,29 @@ class CampaignsHelper:
         if query_params.company_status != None:
             query["is_relevant"] = query_params.company_status
         companies, pagination_info = await self.campaign_company_runs_dao.get_campaign_company_runs_paginated(query, query_params.page, query_params.limit)
+
+        # Attach basic company details for better UI rendering (avoid N+1 by bulk fetching).
+        company_ids = [c.get("company_id") for c in companies if c.get("company_id")]
+        company_map = {}
+        if company_ids:
+            company_docs = await self.companies_dao.find_many(
+                {"_id": {"$in": company_ids}},
+                projection={
+                    "_id": 1,
+                    "identifiers": 1,
+                    "profile": 1,
+                    "location": 1,
+                    "source": 1,
+                },
+            )
+            company_map = {doc.get("_id"): doc for doc in company_docs}
+
+        for run in companies:
+            cid = run.get("company_id")
+            doc = company_map.get(cid)
+            if doc:
+                run["company"] = doc
+
         serialized_campaign = serialize_objectid(campaign)
         serialized_companies = serialize_objectid(companies)
         return {"campaign": serialized_campaign, "companies": serialized_companies, "pagination_info": pagination_info}
@@ -418,9 +442,7 @@ class CampaignsHelper:
                     {"campaign_id": campaign_id, "company_id": {"$in": chunk}},
                     {"$set": {"is_relevant": is_relevant}}
                 )
-        update_campaign = await self.campaign_dao.update_campaign(campaign_id, {"$set": {"prospecting_cycle.status": "company_qualification"}})
-        if not update_campaign:
-            raise ApiException("Campaign not found")
+        update_campaign = await self.campaign_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "company_qualification"})
         return {"message": "Company qualification completed"}
 
     async def ai_company_qualification(self, query_params: AiCompanyQualification):

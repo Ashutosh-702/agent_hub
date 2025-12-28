@@ -1,165 +1,177 @@
-import { useState } from 'react';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { useEffect, useMemo, useState } from 'react';
+import { useGetCampaignDetailsQuery, useManualCompanyQualificationMutation } from '../../store';
 import { useCampaignWizard } from './NewCampaignWizard';
 
-const AI_QUESTIONS = [
-  'Does the company have a dedicated IT/Engineering team?',
-  'Is the company actively hiring for technical roles?',
-  'Does the company use cloud-based solutions?',
-  'Has the company raised funding in the last 2 years?',
-  'Is the company in a growth phase (expanding operations)?',
-];
+const PAGE_SIZE = 100;
+
+const toLabel = (value: unknown): string => {
+  if (Array.isArray(value)) return value.filter(Boolean).join(', ');
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  return String(value);
+};
 
 export const Step2CompanyQualification = () => {
-  const { 
-    state, 
-    setCompanyQualificationMode, 
-    qualifyCompany, 
-    bulkQualify, 
-    nextStep, 
-    prevStep,
-    setLoading,
-    setQualifiedCompanies,
-    setQualifiedContacts,
-  } = useCampaignWizard();
+  const { state, setCompanyQualificationMode, nextStep, prevStep, setLoading } = useCampaignWizard();
+  const campaignId = state.campaignId;
 
-  const [aiQuestionsAnswers, setAiQuestionsAnswers] = useState<Record<string, boolean>>({});
-  const [isQualifying, setIsQualifying] = useState(false);
-  const [qualificationComplete, setQualificationComplete] = useState(false);
-  const [activeTab, setActiveTab] = useState<'qualified' | 'rejected'>('qualified');
-  const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<Set<string>>(new Set());
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const companies = state.qualifiedCompanies;
-  const qualifiedCount = companies.filter(c => c.qualificationStatus === 'qualified').length;
-  const rejectedCount = companies.filter(c => c.qualificationStatus === 'rejected').length;
+  const [manualCompanyQualification] = useManualCompanyQualificationMutation();
 
-  // Toggle single company qualification via checkbox
-  const toggleCompanyQualification = (companyId: string) => {
-    const company = companies.find(c => c.id === companyId);
-    if (company) {
-      const isCurrentlyQualified = company.qualificationStatus === 'qualified';
-      qualifyCompany(companyId, !isCurrentlyQualified);
+  const queryArgs = campaignId ? { campaign_id: campaignId, page, limit: PAGE_SIZE } : skipToken;
+  const { data, isFetching, isError } = useGetCampaignDetailsQuery(queryArgs);
+
+  const companies = data?.data?.companies ?? [];
+  const pagination = data?.pagination;
+
+  const companyIdsOnPage = useMemo(() => companies.map((c) => c.company_id), [companies]);
+
+  // Initialize selections from backend (is_relevant) whenever page changes.
+  useEffect(() => {
+    const next = new Set<string>();
+    for (const c of companies) {
+      if (c.is_relevant) next.add(c.company_id);
+    }
+    setSelectedCompanyIds(next);
+  }, [companies]);
+
+  const allSelectedOnPage = companyIdsOnPage.length > 0 && companyIdsOnPage.every((id) => selectedCompanyIds.has(id));
+  const someSelectedOnPage = companyIdsOnPage.some((id) => selectedCompanyIds.has(id)) && !allSelectedOnPage;
+
+  const toggleCompany = (companyId: string) => {
+    setSelectedCompanyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(companyId)) next.delete(companyId);
+      else next.add(companyId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedCompanyIds((prev) => {
+      const next = new Set(prev);
+      const shouldSelectAll = !companyIdsOnPage.every((id) => next.has(id));
+      if (shouldSelectAll) {
+        companyIdsOnPage.forEach((id) => next.add(id));
+      } else {
+        companyIdsOnPage.forEach((id) => next.delete(id));
+      }
+      return next;
+    });
+  };
+
+  const persistCurrentPage = async () => {
+    if (!campaignId) return;
+    setSaveError(null);
+
+    // Requirement: if user didn't select any company on current page, don't call the API.
+    if (selectedCompanyIds.size === 0) return;
+
+    const selected = Array.from(selectedCompanyIds);
+    const unselected = companyIdsOnPage.filter((id) => !selectedCompanyIds.has(id));
+
+    try {
+      setLoading(true, 'Saving company qualification…');
+
+      // Persist TRUE for selected companies on this page
+      if (selected.length > 0) {
+        await manualCompanyQualification({
+          campaign_id: campaignId,
+          selection_type: 'selective',
+          company_ids: selected,
+          is_relevant: true,
+        }).unwrap();
+      }
+
+      // Persist FALSE for unselected companies on this page
+      if (unselected.length > 0) {
+        await manualCompanyQualification({
+          campaign_id: campaignId,
+          selection_type: 'selective',
+          company_ids: unselected,
+          is_relevant: false,
+        }).unwrap();
+      }
+    } catch (e: unknown) {
+      const msg =
+        typeof e === 'object' && e && 'data' in e
+          ? JSON.stringify((e as any).data)
+          : 'Failed to save qualification';
+      setSaveError(msg);
+      throw e;
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Select/Deselect all companies
-  const handleSelectAll = () => {
-    const allQualified = companies.every(c => c.qualificationStatus === 'qualified');
-    bulkQualify(companies.map(c => c.id), !allQualified);
+  const handleNextPage = async () => {
+    if (!pagination?.has_next) return;
+    await persistCurrentPage();
+    setPage((p) => p + 1);
   };
 
-  const allSelected = companies.length > 0 && companies.every(c => c.qualificationStatus === 'qualified');
-  const someSelected = companies.some(c => c.qualificationStatus === 'qualified') && !allSelected;
-
-  const handleAIQualification = async () => {
-    setIsQualifying(true);
-    setLoading(true, 'AI is qualifying leads based on your criteria...', 0);
-
-    // Simulate AI qualification process with animation
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 10) + 5;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-      }
-      setLoading(true, `Analyzing companies... ${Math.min(progress, 100)}%`, progress);
-    }, 200);
-
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    clearInterval(interval);
-
-    // Mock rejection reasons
-    const REJECTION_REASONS = [
-      'Employee count below target threshold',
-      'Industry not aligned with ICP criteria',
-      'Revenue below minimum requirement',
-      'Geographic region outside target market',
-      'No recent funding or growth signals detected',
-      'Company appears to be in decline phase',
-      'Limited online presence and engagement',
-      'Tech stack mismatch with product offering',
-    ];
-
-    // Simulate AI qualification results
-    const reasons: Record<string, string> = {};
-    const updatedCompanies = companies.map(company => {
-      // Random qualification based on "AI analysis"
-      const score = Math.random();
-      const qualified = score > 0.4; // 60% qualification rate
-      
-      if (!qualified) {
-        // Assign a random rejection reason
-        reasons[company.id] = REJECTION_REASONS[Math.floor(Math.random() * REJECTION_REASONS.length)];
-      }
-      
-      return {
-        ...company,
-        isQualified: qualified,
-        qualificationStatus: qualified ? 'qualified' : 'rejected',
-      } as typeof company;
-    });
-
-    setRejectionReasons(reasons);
-    setQualifiedCompanies(updatedCompanies);
-    setLoading(false);
-    setIsQualifying(false);
-    setQualificationComplete(true);
-    
-    // Scroll to top to show results
-    window.scrollTo({ top: 0, behavior: 'instant' });
+  const handlePrevPage = async () => {
+    if (page <= 1) return;
+    await persistCurrentPage();
+    setPage((p) => Math.max(1, p - 1));
   };
 
-  const handleContinue = () => {
-    // Filter only qualified companies for next step
-    const qualified = companies.filter(c => c.qualificationStatus === 'qualified');
-    setQualifiedCompanies(qualified);
-    
-    // Extract contacts from qualified companies for contact qualification
-    const contacts = qualified.flatMap(company => 
-      company.contacts.map(contact => ({
-        ...contact,
-        qualificationStatus: 'pending' as const,
-        syncStatus: 'not_synced' as const,
-      }))
-    );
-    setQualifiedContacts(contacts);
+  const handleSelectAllCampaign = async () => {
+    if (!campaignId) return;
+    setSaveError(null);
+    try {
+      setLoading(true, 'Selecting all companies…');
+      await manualCompanyQualification({
+        campaign_id: campaignId,
+        selection_type: 'all',
+        is_relevant: true,
+      }).unwrap();
+    } catch (e: unknown) {
+      const msg =
+        typeof e === 'object' && e && 'data' in e
+          ? JSON.stringify((e as any).data)
+          : 'Failed to select all companies';
+      setSaveError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    await persistCurrentPage();
     nextStep();
   };
+
+  if (!campaignId) {
+    return (
+      <div className="step-container step-company-qualification">
+        <div className="step-header">
+          <h2>Company Qualification</h2>
+          <p>Missing campaign id. Please go back and start prospecting again.</p>
+        </div>
+        <div className="wizard-navigation">
+          <button className="btn secondary" onClick={prevStep}>
+            Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="step-container step-company-qualification">
       <div className="step-header">
         <h2>Company Qualification</h2>
-        <p>Review and qualify companies before proceeding to contact qualification</p>
+        <p>Review companies page-wise (100 per page). Changes are saved before paging.</p>
       </div>
 
-      {/* Loading Animation */}
-      {state.isLoading && (
-        <div className="loading-overlay">
-          <div className="loading-card">
-            <div className="loading-animation ai-animation">
-              <div className="ai-brain">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 2a4 4 0 0 1 4 4c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2a4 4 0 0 1 4-4z"/>
-                  <path d="M12 8v8"/>
-                  <path d="M5 12h14"/>
-                  <circle cx="5" cy="12" r="2"/>
-                  <circle cx="19" cy="12" r="2"/>
-                  <circle cx="12" cy="19" r="2"/>
-                </svg>
-              </div>
-              <div className="ai-pulse" />
-            </div>
-            <h3>{state.loadingMessage}</h3>
-            <div className="loading-progress">
-              <div className="progress-bar">
-                <div 
-                  className="progress-fill ai-progress" 
-                  style={{ width: `${state.estimatedCount}%` }}
-                />
-              </div>
-            </div>
-          </div>
+      {saveError && (
+        <div className="error-banner" style={{ marginBottom: 12 }}>
+          {saveError}
         </div>
       )}
 
@@ -168,38 +180,42 @@ export const Step2CompanyQualification = () => {
         <div className="qualification-mode-selection">
           <h3>Choose Qualification Method</h3>
           <div className="mode-cards">
-            <div 
-              className="mode-card"
-              onClick={() => setCompanyQualificationMode('manual')}
-            >
+            <div className="mode-card" onClick={() => setCompanyQualificationMode('manual')}>
               <div className="mode-icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
                 </svg>
               </div>
               <h4>Manual Qualification</h4>
-              <p>Review each company individually and decide if they qualify as a lead</p>
-              <span className="mode-tag">Full Control</span>
+              <p>Select relevant companies page by page.</p>
+              <span className="mode-tag">Recommended</span>
             </div>
-            <div 
-              className="mode-card"
-              onClick={() => setCompanyQualificationMode('ai')}
-            >
+
+            <div className="mode-card" onClick={() => setCompanyQualificationMode('ai')}>
               <div className="mode-icon ai">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 2a4 4 0 0 1 4 4c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2a4 4 0 0 1 4-4z"/>
-                  <path d="M12 8v8"/>
-                  <path d="M5 12h14"/>
-                  <circle cx="5" cy="12" r="2"/>
-                  <circle cx="19" cy="12" r="2"/>
-                  <circle cx="12" cy="19" r="2"/>
+                  <path d="M12 2a4 4 0 0 1 4 4c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2a4 4 0 0 1 4-4z" />
+                  <path d="M12 8v8" />
+                  <path d="M5 12h14" />
+                  <circle cx="5" cy="12" r="2" />
+                  <circle cx="19" cy="12" r="2" />
+                  <circle cx="12" cy="19" r="2" />
                 </svg>
               </div>
               <h4>AI Qualification</h4>
-              <p>Let AI qualify leads based on your custom criteria questions</p>
-              <span className="mode-tag ai">Recommended</span>
+              <p>Coming soon.</p>
+              <span className="mode-tag ai">Soon</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {state.companyQualificationMode === 'ai' && (
+        <div className="manual-qualification">
+          <div className="empty-state">
+            <h3>AI Qualification</h3>
+            <p>Coming soon. Please use Manual Qualification for now.</p>
           </div>
         </div>
       )}
@@ -207,292 +223,157 @@ export const Step2CompanyQualification = () => {
       {/* Manual Qualification */}
       {state.companyQualificationMode === 'manual' && (
         <div className="manual-qualification">
-          {/* Stats Bar */}
           <div className="qualification-stats">
             <div className="stat">
-              <span className="stat-value">{companies.length}</span>
+              <span className="stat-value">{pagination?.total_records ?? '—'}</span>
               <span className="stat-label">Total</span>
             </div>
             <div className="stat qualified">
-              <span className="stat-value">{qualifiedCount}</span>
-              <span className="stat-label">Selected</span>
+              <span className="stat-value">{selectedCompanyIds.size}</span>
+              <span className="stat-label">Selected (this page)</span>
+            </div>
+            <div className="stat">
+              <span className="stat-value">{page}</span>
+              <span className="stat-label">Page</span>
             </div>
           </div>
 
-          {/* Companies List with Select All Header */}
-          <div className="companies-qualification-list">
-            {/* Select All Header */}
-            <div className="select-all-header">
-              <label className="checkbox-container">
-                <input 
-                  type="checkbox" 
-                  checked={allSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected;
-                  }}
-                  onChange={handleSelectAll}
-                />
-                <span className="checkmark"></span>
-              </label>
-              <span className="select-all-text">
-                {allSelected ? 'Deselect All' : 'Select All'} 
-                <span className="selected-count">({qualifiedCount} of {companies.length} selected)</span>
-              </span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+            <button className="btn secondary" onClick={handleSelectAllCampaign}>
+              Select All (Campaign)
+            </button>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>
+              Sends only: campaign_id, selection_type=all, is_relevant=true
             </div>
-
-            {/* Companies */}
-            {companies.map((company) => {
-              const isQualified = company.qualificationStatus === 'qualified';
-              return (
-                <div 
-                  key={company.id} 
-                  className={`company-qualification-card ${isQualified ? 'qualified' : ''}`}
-                  onClick={() => toggleCompanyQualification(company.id)}
-                >
-                  <div className="company-select">
-                    <label className="checkbox-container">
-                      <input 
-                        type="checkbox"
-                        checked={isQualified}
-                        onChange={() => toggleCompanyQualification(company.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <span className="checkmark"></span>
-                    </label>
-                  </div>
-                  <div className="company-info">
-                    <h4>{company.name}</h4>
-                    <div className="company-meta">
-                      <span className="tag">{company.industry}</span>
-                      <span className="tag">{company.location}</span>
-                      <span className="tag">{company.revenue}</span>
-                      <span className="tag">{company.contacts.length} contacts</span>
-                    </div>
-                  </div>
-                  {isQualified && (
-                    <div className="qualified-badge">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
-        </div>
-      )}
 
-      {/* AI Qualification */}
-      {state.companyQualificationMode === 'ai' && !qualificationComplete && (
-        <div className="ai-qualification">
-          <div className="ai-questions-card">
-            <h3>Define Qualification Criteria</h3>
-            <p>Answer these questions to help AI understand your ideal customer profile</p>
-            
-            <div className="ai-questions-list">
-              {AI_QUESTIONS.map((question, index) => (
-                <div key={index} className="ai-question">
-                  <span className="question-text">{question}</span>
-                  <div className="question-options">
-                    <button
-                      className={`option-btn ${aiQuestionsAnswers[question] === true ? 'selected yes' : ''}`}
-                      onClick={() => setAiQuestionsAnswers(prev => ({ ...prev, [question]: true }))}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      className={`option-btn ${aiQuestionsAnswers[question] === false ? 'selected no' : ''}`}
-                      onClick={() => setAiQuestionsAnswers(prev => ({ ...prev, [question]: false }))}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-              ))}
+          {isFetching && (
+            <div style={{ padding: 12, color: '#94a3b8' }}>
+              Loading companies…
             </div>
+          )}
 
-            <button 
-              className="btn-primary btn-large"
-              onClick={handleAIQualification}
-              disabled={isQualifying || Object.keys(aiQuestionsAnswers).length < 3}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2a4 4 0 0 1 4 4c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2a4 4 0 0 1 4-4z"/>
-                <path d="M12 8v8"/>
-              </svg>
-              Run AI Qualification
+          {isError && (
+            <div className="error-banner" style={{ marginBottom: 12 }}>
+              Failed to load companies for qualification.
+            </div>
+          )}
+
+          {!isFetching && companies.length > 0 && (
+            <div className="companies-qualification-list">
+              <div className="select-all-header">
+                <span className="select-all-text">
+                  Select companies (click cards)
+                  <span className="selected-count">
+                    ({selectedCompanyIds.size} of {companies.length} selected)
+                  </span>
+                </span>
+                <div style={{ flex: 1 }} />
+                <button className="btn secondary" onClick={toggleSelectAllOnPage}>
+                  {allSelectedOnPage ? 'Deselect All (Page)' : 'Select All (Page)'}
+                </button>
+                {someSelectedOnPage && !allSelectedOnPage ? (
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>Partial</span>
+                ) : null}
+              </div>
+
+              <div className="companies-cards-grid">
+                {companies.map((c) => {
+                  const companyName = c.company?.identifiers?.name || c.company?.identifiers?.domain || c.company_id;
+                  const companyDomain = c.company?.identifiers?.domain;
+                  const industry = toLabel(c.company?.profile?.industry);
+                  const employeeCount = toLabel(c.company?.profile?.employee_count);
+                  const location = toLabel(c.company?.location?.name);
+                  const revenueMin = toLabel(c.company?.profile?.revenue_min);
+                  const revenueMax = toLabel(c.company?.profile?.revenue_max);
+                  const isSelected = selectedCompanyIds.has(c.company_id);
+                  return (
+                  <div
+                    key={c.company_id}
+                    className={`company-card ${isSelected ? 'selected' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => toggleCompany(c.company_id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleCompany(c.company_id);
+                      }
+                    }}
+                  >
+                    <div className="company-card-header">
+                      <div className="company-card-title">
+                        <div className="company-name">{companyName}</div>
+                        {companyDomain && companyName !== companyDomain ? (
+                          <div className="company-domain">{companyDomain}</div>
+                        ) : null}
+                      </div>
+                      <div className="company-card-selected-indicator" aria-hidden="true">
+                        {isSelected ? 'Selected' : 'Select'}
+                      </div>
+                    </div>
+                    <div className="company-card-body">
+                      <div className="company-kv-grid">
+                        {industry ? (
+                          <div className="company-kv">
+                            <div className="company-k">Industry</div>
+                            <div className="company-v">{industry}</div>
+                          </div>
+                        ) : null}
+                        {employeeCount ? (
+                          <div className="company-kv">
+                            <div className="company-k">Employees</div>
+                            <div className="company-v">{employeeCount}</div>
+                          </div>
+                        ) : null}
+                        {location ? (
+                          <div className="company-kv">
+                            <div className="company-k">Location</div>
+                            <div className="company-v">{location}</div>
+                          </div>
+                        ) : null}
+                        {revenueMin || revenueMax ? (
+                          <div className="company-kv">
+                            <div className="company-k">Revenue</div>
+                            <div className="company-v">
+                              {revenueMin && revenueMax ? `${revenueMin} - ${revenueMax}` : revenueMin || revenueMax}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                      {c.metadata?.relevance_reason ? (
+                        <div className="company-reason">{c.metadata.relevance_reason}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="wizard-navigation">
+            <button className="btn secondary" onClick={prevStep}>
+              Back
+            </button>
+
+            <div style={{ flex: 1 }} />
+
+            <button className="btn secondary" onClick={handlePrevPage} disabled={page <= 1 || isFetching}>
+              Save & Prev Page
+            </button>
+            <button className="btn secondary" onClick={handleNextPage} disabled={!pagination?.has_next || isFetching}>
+              Save & Next Page
+            </button>
+
+            <button className="btn primary" onClick={handleContinue} disabled={isFetching}>
+              Continue
             </button>
           </div>
         </div>
       )}
-
-      {/* AI Qualification Results */}
-      {state.companyQualificationMode === 'ai' && qualificationComplete && (
-        <div className="ai-results">
-          {/* Summary Cards - Also act as tab switchers */}
-          <div className="results-summary">
-            <div 
-              className={`result-card success ${activeTab === 'qualified' ? 'active' : ''}`}
-              onClick={() => setActiveTab('qualified')}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="card-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
-              <h3>{qualifiedCount}</h3>
-              <p>Qualified Leads</p>
-            </div>
-            <div 
-              className={`result-card danger ${activeTab === 'rejected' ? 'active' : ''}`}
-              onClick={() => setActiveTab('rejected')}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="card-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="15" y1="9" x2="9" y2="15"/>
-                  <line x1="9" y1="9" x2="15" y2="15"/>
-                </svg>
-              </div>
-              <h3>{rejectedCount}</h3>
-              <p>Rejected</p>
-            </div>
-          </div>
-
-          {/* Qualified Companies Tab */}
-          {activeTab === 'qualified' && (
-            <div className="companies-tab-content">
-              {companies.filter(c => c.qualificationStatus === 'qualified').length === 0 ? (
-                <div className="empty-state">
-                  <p>No qualified companies yet</p>
-                </div>
-              ) : (
-                companies.filter(c => c.qualificationStatus === 'qualified').map((company) => (
-                  <div key={company.id} className="company-result-card qualified">
-                    <div className="company-info">
-                      <h4>{company.name}</h4>
-                      <div className="company-meta">
-                        <span className="tag">{company.industry}</span>
-                        <span className="tag">{company.location}</span>
-                        <span className="tag">{company.employeeCount} employees</span>
-                      </div>
-                      {company.linkedinUrl && (
-                        <a href={company.linkedinUrl} target="_blank" rel="noopener noreferrer" className="company-linkedin">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                          </svg>
-                          LinkedIn
-                        </a>
-                      )}
-                    </div>
-                    <button 
-                      className="btn-override btn-reject"
-                      onClick={() => qualifyCompany(company.id, false)}
-                      title="Reject this company"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                      </svg>
-                      Reject
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* Rejected Companies Tab */}
-          {activeTab === 'rejected' && (
-            <div className="companies-tab-content">
-              {companies.filter(c => c.qualificationStatus === 'rejected').length === 0 ? (
-                <div className="empty-state">
-                  <p>No rejected companies</p>
-                </div>
-              ) : (
-                companies.filter(c => c.qualificationStatus === 'rejected').map((company) => (
-                  <div key={company.id} className="company-result-card rejected">
-                    <div className="company-info">
-                      <h4>{company.name}</h4>
-                      <div className="company-meta">
-                        <span className="tag">{company.industry}</span>
-                        <span className="tag">{company.location}</span>
-                        <span className="tag">{company.employeeCount} employees</span>
-                      </div>
-                      {company.linkedinUrl && (
-                        <a href={company.linkedinUrl} target="_blank" rel="noopener noreferrer" className="company-linkedin">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                          </svg>
-                          LinkedIn
-                        </a>
-                      )}
-                      <div className="rejection-reason">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10"/>
-                          <line x1="12" y1="8" x2="12" y2="12"/>
-                          <line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                        <span>{rejectionReasons[company.id] || 'Does not meet qualification criteria'}</span>
-                      </div>
-                    </div>
-                    <button 
-                      className="btn-override"
-                      onClick={() => qualifyCompany(company.id, true)}
-                      title="Override AI decision and qualify this company"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                      Qualify
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Navigation */}
-      <div className="step-navigation">
-        <button className="btn-secondary" onClick={() => {
-          setCompanyQualificationMode(null);
-          setQualificationComplete(false);
-          prevStep();
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="19" y1="12" x2="5" y2="12"/>
-            <polyline points="12 19 5 12 12 5"/>
-          </svg>
-          Back
-        </button>
-        
-        {state.companyQualificationMode && (
-          <button className="btn-secondary" onClick={() => {
-            setCompanyQualificationMode(null);
-            setQualificationComplete(false);
-          }}>
-            Change Method
-          </button>
-        )}
-
-        {qualifiedCount > 0 && (
-          <button className="btn-primary btn-large" onClick={handleContinue}>
-            Continue with {qualifiedCount} Selected
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="5" y1="12" x2="19" y2="12"/>
-              <polyline points="12 5 19 12 12 19"/>
-            </svg>
-          </button>
-        )}
-      </div>
     </div>
   );
 };
+
 

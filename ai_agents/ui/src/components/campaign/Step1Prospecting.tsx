@@ -1,24 +1,38 @@
-import { useState } from 'react';
-import { useCampaignWizard, type Company } from './NewCampaignWizard';
+import { useEffect, useState } from 'react';
+import { useCampaignWizard } from './NewCampaignWizard';
 
 import {
-  getMockContacts,
-  getMockProspects,
   WIZARD_EMPLOYEE_COUNTS as EMPLOYEE_COUNTS,
   WIZARD_INDUSTRIES as INDUSTRIES,
   WIZARD_REGIONS as REGIONS,
 } from '../../store/api/wizardMockData';
+import { useCreateCampaignFromProspectingJobMutation, useGetCampaignDetailsQuery } from '../../store';
 
 const ITEMS_PER_PAGE = 10;
+const CURRENCIES = ['USD', 'INR'] as const;
+const LOCATION_TYPES = ['country', 'region'] as const;
 
 export const Step1Prospecting = () => {
-  const { state, setFilters, setProspects, setQualifiedCompanies, nextStep, setLoading } = useCampaignWizard();
+  const { state, setFilters, setCampaignId, nextStep, setLoading } = useCampaignWizard();
+  const [createCampaignFromProspectingJob, { isLoading: isCreating }] = useCreateCampaignFromProspectingJobMutation();
   
   const [localFilters, setLocalFilters] = useState(state.filters);
   const [showResults, setShowResults] = useState(false);
   const [isRefining, setIsRefining] = useState(false); // Show filters while keeping results below
-  const [animationProgress, setAnimationProgress] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+
+  const { data: campaignDetailsData } = useGetCampaignDetailsQuery(
+    createdCampaignId
+      ? { campaign_id: createdCampaignId, page: 1, limit: 10 }
+      : // dummy (skip below)
+        ({ campaign_id: '' as string, page: 1, limit: 10 } as any),
+    {
+      skip: !createdCampaignId || !isPolling,
+      pollingInterval: createdCampaignId && isPolling ? 2000 : 0,
+    }
+  );
 
   // Pagination calculations
   const totalItems = state.qualifiedCompanies.length;
@@ -36,51 +50,59 @@ export const Step1Prospecting = () => {
     }));
   };
 
+  const handleSingleSelect = (field: 'currency' | 'locationType', value: string) => {
+    setLocalFilters(prev => ({ ...prev, [field]: value }));
+  };
+
   const handleFetchProspects = async () => {
     setFilters(localFilters);
-    setLoading(true, 'Searching for prospects...', 0);
+    setLoading(true, 'Creating campaign & finding prospects...');
     setShowResults(false);
     setIsRefining(false);
-    setAnimationProgress(0);
-    setCurrentPage(1); // Reset to first page on new search
+    setCurrentPage(1);
 
-    // Simulate progressive loading animation
-    const estimatedTotal = Math.floor(Math.random() * 50) + 30;
-    let progress = 0;
-    
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 15) + 5;
-      if (progress >= estimatedTotal) {
-        progress = estimatedTotal;
-        clearInterval(interval);
+    try {
+      const payload = {
+        industry: localFilters.industry[0] || '',
+        employee_count: localFilters.employeeCount.join(','),
+        revenue_min: localFilters.revenueMin || '0',
+        revenue_max: localFilters.revenueMax || '0',
+        location_type: localFilters.locationType || 'country',
+        location: localFilters.region[0] || '',
+        currency: localFilters.currency || 'USD',
+        prospecting_cycle_status: 'prospecting',
+      };
+
+      const res = await createCampaignFromProspectingJob(payload).unwrap();
+      const newCampaignId = res?.data?.campaign_id;
+      if (!newCampaignId) {
+        throw new Error('campaign_id missing in response');
       }
-      setAnimationProgress(progress);
-      setLoading(true, 'Fetching prospects from Apollo...', progress);
-    }, 300);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    clearInterval(interval);
-    
-    const prospects = getMockProspects(localFilters);
-    setProspects(prospects);
-    
-    // Convert prospects to companies with contacts
-    const companies: Company[] = prospects.map(p => ({
-      ...p,
-      contacts: getMockContacts(p.id, p.name),
-      syncStatus: 'not_synced' as const,
-      personalization: {
-        messageStatus: 'pending' as const,
-        deckStatus: 'pending' as const,
-      },
-    }));
-    setQualifiedCompanies(companies);
-    
-    setLoading(false);
-    setShowResults(true);
+      setCreatedCampaignId(newCampaignId);
+      setCampaignId(newCampaignId);
+      setIsPolling(true);
+      setLoading(true, 'Prospecting in progress… waiting for company qualification…');
+    } catch (e) {
+      console.error(e);
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    const lifecycleStatus = campaignDetailsData?.data?.campaign?.lifecycle?.status;
+    const prospectingCycleStatus = campaignDetailsData?.data?.campaign?.prospecting_cycle?.status;
+
+    if (!createdCampaignId || !isPolling) return;
+
+    // Stop polling once the backend moved the campaign forward.
+    if (lifecycleStatus === 'company_qualification' || (prospectingCycleStatus && prospectingCycleStatus !== 'prospecting')) {
+      setIsPolling(false);
+      setLoading(false);
+      // Move to Step 2; Step 2 will load companies page-wise (100/page) from backend.
+      nextStep();
+    }
+  }, [campaignDetailsData, createdCampaignId, isPolling, nextStep, setLoading]);
 
   const handleRefineSearch = () => {
     setIsRefining(true); // Show filters but keep results visible below
@@ -99,33 +121,17 @@ export const Step1Prospecting = () => {
         </p>
       </div>
 
-      {/* Loading Animation */}
-      {state.isLoading && (
+      {/* Loading Overlay (no progress bar) */}
+      {(state.isLoading || isCreating || isPolling) && (
         <div className="loading-overlay">
           <div className="loading-card">
             <div className="loading-animation">
-              <div className="pulse-ring" />
-              <div className="pulse-ring delay-1" />
-              <div className="pulse-ring delay-2" />
-              <div className="loading-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-              </div>
+              <div className="spinner large" />
             </div>
-            <h3>{state.loadingMessage}</h3>
-            <div className="loading-progress">
-              <div className="progress-bar">
-                <div 
-                  className="progress-fill" 
-                  style={{ width: `${Math.min((animationProgress / 80) * 100, 100)}%` }}
-                />
-              </div>
-              <span className="progress-count">
-                {animationProgress} prospects found...
-              </span>
-            </div>
+            <h3>{state.loadingMessage || 'Working…'}</h3>
+            {createdCampaignId && (
+              <p style={{ marginTop: 8, opacity: 0.85 }}>Campaign ID: {createdCampaignId}</p>
+            )}
           </div>
         </div>
       )}
@@ -169,6 +175,23 @@ export const Step1Prospecting = () => {
               </div>
             </div>
 
+            {/* Location Type */}
+            <div className="filter-group">
+              <label>Location Type</label>
+              <div className="chip-select">
+                {LOCATION_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`chip ${localFilters.locationType === t ? 'selected' : ''}`}
+                    onClick={() => handleSingleSelect('locationType', t)}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Employee Count */}
             <div className="filter-group">
               <label>Employee Count</label>
@@ -181,6 +204,23 @@ export const Step1Prospecting = () => {
                     onClick={() => handleMultiSelect('employeeCount', count)}
                   >
                     {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Currency */}
+            <div className="filter-group">
+              <label>Currency</label>
+              <div className="chip-select">
+                {CURRENCIES.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`chip ${localFilters.currency === c ? 'selected' : ''}`}
+                    onClick={() => handleSingleSelect('currency', c)}
+                  >
+                    {c}
                   </button>
                 ))}
               </div>

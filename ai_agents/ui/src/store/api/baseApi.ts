@@ -3,7 +3,7 @@ import { API_BASE_URL } from '../../config/api.js';
 import { mockCampaigns, mockCampaignCompanies, mockCompanies, mockContacts } from './mockData';
 
 // Enable mock mode when backend is not available
-export const USE_MOCK_DATA = true;
+export const USE_MOCK_DATA = false;
 
 // Mock query function that returns mock data based on the endpoint
 const mockBaseQuery = async (args: string | { url: string }) => {

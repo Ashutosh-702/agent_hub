@@ -63,11 +63,14 @@ export interface CampaignFilters {
   employeeCount: string[];
   revenueMin: string;
   revenueMax: string;
+  currency: string;
+  locationType: string;
 }
 
 export interface CampaignState {
   currentStep: number;
   filters: CampaignFilters;
+  campaignId: string | null;
   prospects: Prospect[];
   qualifiedCompanies: Company[];
   qualifiedContacts: Contact[];
@@ -84,6 +87,7 @@ export interface CampaignState {
 interface CampaignContextType {
   state: CampaignState;
   setFilters: (filters: CampaignFilters) => void;
+  setCampaignId: (campaignId: string | null) => void;
   setProspects: (prospects: Prospect[]) => void;
   setQualifiedCompanies: (companies: Company[]) => void;
   setQualifiedContacts: (contacts: Contact[]) => void;
@@ -144,7 +148,10 @@ export const NewCampaignWizard = () => {
       employeeCount: [],
       revenueMin: '',
       revenueMax: '',
+      currency: 'USD',
+      locationType: 'country',
     },
+    campaignId: null,
     prospects: [],
     qualifiedCompanies: [],
     qualifiedContacts: [],
@@ -167,6 +174,10 @@ export const NewCampaignWizard = () => {
 
   const setFilters = useCallback((filters: CampaignFilters) => {
     setState(prev => ({ ...prev, filters }));
+  }, []);
+
+  const setCampaignId = useCallback((campaignId: string | null) => {
+    setState(prev => ({ ...prev, campaignId }));
   }, []);
 
   const setProspects = useCallback((prospects: Prospect[]) => {
@@ -535,6 +546,7 @@ export const NewCampaignWizard = () => {
   const contextValue: CampaignContextType = {
     state,
     setFilters,
+    setCampaignId,
     setProspects,
     setQualifiedCompanies,
     setQualifiedContacts,

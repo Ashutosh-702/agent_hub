@@ -10,6 +10,9 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   completed: { bg: 'rgba(99, 102, 241, 0.15)', text: '#6366f1' },
   draft: { bg: 'rgba(156, 163, 175, 0.15)', text: '#9ca3af' },
   paused: { bg: 'rgba(245, 158, 11, 0.15)', text: '#f59e0b' },
+  company_qualification: { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' },
+  contact_qualification: { bg: 'rgba(168, 85, 247, 0.15)', text: '#a855f7' },
+  contact_enriched: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981' },
 };
 
 export const CampaignList = () => {
@@ -46,19 +49,21 @@ export const CampaignList = () => {
 
   const columns: Array<DataTableColumn<Campaign>> = [
     {
-      id: 'campaignName',
-      header: 'Campaign Name',
+      id: 'campaignId',
+      header: 'Campaign ID',
       cell: (campaign) => (
-        <span className="campaign-name-cell" title={campaign.name}>
-          {campaign.name || 'Untitled Campaign'}
+        <span className="campaign-name-cell" title={campaign._id}>
+          {campaign._id}
         </span>
       ),
     },
     {
-      id: 'product',
-      header: 'Product',
+      id: 'industry',
+      header: 'Industry',
       cell: (campaign) => (
-        <span className="product-badge">{campaign.ownership?.product_name || 'N/A'}</span>
+        <span className="product-badge">
+          {(campaign.segmentation?.industry || []).join(', ') || 'N/A'}
+        </span>
       ),
     },
     {
@@ -77,31 +82,31 @@ export const CampaignList = () => {
       ),
     },
     {
-      id: 'companiesProspected',
-      header: 'Companies Prospected',
+      id: 'prospectingCycleStatus',
+      header: 'Prospecting Cycle',
       cell: (campaign) => (
-        <span className="metric-value">{campaign.metrics?.companies_prospected ?? 0}</span>
+        <span className="metric-value">{campaign.prospecting_cycle?.status || 'N/A'}</span>
       ),
     },
     {
-      id: 'companiesQualified',
-      header: 'Companies Qualified',
+      id: 'relevantCompanyMappingsCount',
+      header: 'Relevant Companies',
       cell: (campaign) => (
-        <span className="metric-value metric-qualified">{campaign.metrics?.companies_qualified ?? 0}</span>
+        <span className="metric-value metric-qualified">{campaign.relevant_company_mappings_count ?? 0}</span>
       ),
     },
     {
-      id: 'contactsFound',
-      header: 'Contacts Found',
+      id: 'totalCompanyMappingsCount',
+      header: 'Total Companies',
       cell: (campaign) => (
-        <span className="metric-value">{campaign.metrics?.contacts_found ?? 0}</span>
+        <span className="metric-value">{campaign.total_company_mappings_count ?? 0}</span>
       ),
     },
     {
-      id: 'contactsOutreached',
-      header: 'Contacts Outreached',
+      id: 'contactRunsCount',
+      header: 'Contacts',
       cell: (campaign) => (
-        <span className="metric-value metric-outreached">{campaign.metrics?.contacts_outreached ?? 0}</span>
+        <span className="metric-value">{campaign.contact_runs_count ?? 0}</span>
       ),
     },
     {
@@ -113,7 +118,7 @@ export const CampaignList = () => {
       id: 'createdBy',
       header: 'Created By',
       cell: (campaign) => (
-        <span className="created-by-cell" title={campaign.ownership?.user_email}>
+        <span className="created-by-cell" title={campaign.ownership?.user_email ?? undefined}>
           {campaign.ownership?.user_email?.split('@')[0] || 'Unknown'}
         </span>
       ),

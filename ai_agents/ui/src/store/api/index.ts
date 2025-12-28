@@ -4,7 +4,10 @@ export {
   campaignApi, 
   useGetCampaignsQuery, 
   useCreateCampaignMutation,
+  useCreateCampaignFromProspectingJobMutation,
   useGetCampaignDetailsQuery,
+  useLazyGetCampaignDetailsQuery,
+  useManualCompanyQualificationMutation,
 } from './campaignApi';
 export type { 
   Campaign, 
@@ -12,6 +15,10 @@ export type {
   GetCampaignsParams,
   CreateCampaignPayload,
   CreateCampaignResponse,
+  CreateCampaignFromProspectingJobPayload,
+  CreateCampaignFromProspectingJobResponse,
+  ManualCompanyQualificationPayload,
+  ManualCompanyQualificationResponse,
   CampaignCompany,
   CampaignDetailsResponse,
   GetCampaignDetailsParams,

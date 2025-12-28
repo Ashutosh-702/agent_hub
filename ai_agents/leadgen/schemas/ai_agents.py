@@ -95,6 +95,10 @@ class ManualCompanyQualification(BaseModel):
 
     @model_validator(mode='after')
     def validate_selection_type_and_limits(self):
+        # Backwards/UX compatibility: allow "selective" as alias of "selected"
+        if self.selection_type == "selective":
+            self.selection_type = "selected"
+
         allowed = {"all", "selected"}
         if self.selection_type not in allowed:
             raise ValueError(f"selection_type must be one of {sorted(allowed)}")

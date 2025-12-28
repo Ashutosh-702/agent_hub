@@ -147,7 +147,7 @@ export const CampaignDetails = () => {
         { label: 'Business Team', value: campaign.ownership?.business_team || '-' },
         { label: 'Owner Email', value: campaign.ownership?.user_email || '-' },
         { label: 'HubSpot Email', value: campaign.ownership?.hubspot_email || '-' },
-        { label: 'Shortlisting Approach', value: shortlistingApproachLabel(campaign.shortlisting_approach) },
+        { label: 'Shortlisting Approach', value: shortlistingApproachLabel(campaign.shortlisting_approach ?? undefined) },
         { label: 'Target Industries', value: campaign.segmentation?.industry?.join(', ') || '-' },
         { label: 'Employee Range', value: campaign.target?.employee_count?.join(', ') || '-' },
         {
@@ -191,7 +191,7 @@ export const CampaignDetails = () => {
               <div className="campaign-details-header">
                 <div>
                   <h1 className="campaign-details-title">
-                    {campaign.ownership?.product_name || 'Campaign'}
+                    {campaignId}
                   </h1>
                   <p className="campaign-id">ID: {campaignId}</p>
                 </div>
