@@ -19,6 +19,8 @@ from integrations.apollo.apollo_helper import ApolloHelper
 from integrations.apollo.schema import ApolloResponseSchema
 from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
 from config.logging import logger
+from datetime import datetime, timezone
+from bson import ObjectId
 
 
 class IntegrationOrchestrator:
@@ -54,7 +56,7 @@ class IntegrationOrchestrator:
                 return
             logger.info("Fetching contacts from apollo...")
             await self.process_apollo_contact_list(self.campaign_id)
-            await self.campaigns_dao.update_campaign(self.campaign_id, {"$set": {"prospecting_cycle.status": "contact_qualification"}})
+            await self.campaigns_dao.update_campaign(self.campaign_id, {"prospecting_cycle.status": "contact_qualification"})
             return {
                 "contacts_fetched": True
             }
@@ -74,7 +76,7 @@ class IntegrationOrchestrator:
                 return
             logger.info("Enriching contacts from apollo...")
             await self.enrich_apollo_contacts(self.campaign_id)
-            await self.campaigns_dao.update_campaign(self.campaign_id, {"$set": {"prospecting_cycle.status": "contact_qualification"}})
+            await self.campaigns_dao.update_campaign(self.campaign_id, {"prospecting_cycle.status": "contact_enriched"})
             return {
                 "contacts_enriched": True
             }
@@ -84,14 +86,14 @@ class IntegrationOrchestrator:
     async def enrich_apollo_contacts(self, campaign_id: str) -> Dict[str, Any]:
         try:
             logger.info(f"📋 Campaign ID: {campaign_id}")
-            get_campaign_contact_runs_count = await self.CampaignContactRunsDao.get_campaign_contact_runs_count({"campaign_id": campaign_id, "is_relevant": True})
+            get_campaign_contact_runs_count = await self.CampaignContactRunsDao.get_campaign_contact_runs_count({"campaign_id": campaign_id, "is_relevant": True, "$or": [{"enrichment_status": False}, {"enrichment_status": {"$exists": False}}]})
             if get_campaign_contact_runs_count == 0:
                 logger.info(f"No campaign contacts found for campaign_id: {campaign_id}")
                 return
             total_pages = (get_campaign_contact_runs_count + 5 - 1) // 5 if get_campaign_contact_runs_count > 0 else 1
             total_pages = min(total_pages, 1)
             for page in range(1, total_pages + 1):
-                campaign_contact_runs, pagination_info = await self.CampaignContactRunsDao.get_campaign_contact_runs_paginated({"campaign_id": campaign_id, "is_relevant": True}, page, 5)
+                campaign_contact_runs, pagination_info = await self.CampaignContactRunsDao.get_campaign_contact_runs_paginated({"campaign_id": campaign_id, "is_relevant": True, "$or": [{"enrichment_status": False}, {"enrichment_status": {"$exists": False}}]}, page, 5)
                 if not campaign_contact_runs:
                     logger.info(f"No campaign contacts found for page {page}")
                     continue
@@ -100,8 +102,9 @@ class IntegrationOrchestrator:
                     contact_id = campaign_contact_run.get("contact_id")
                     await self.apollo_helper.enrich_apollo_contact(contact_id)
                     await self.CampaignContactRunsDao.update_campaign_contact_run({"campaign_id": campaign_id, "contact_id": contact_id}, {"$set": {"enrichment_status": True}})
+                    await self.ContactsDao.update_contact(contact_id, {"$set": {"enrichment_status": True}})
 
-            await self.campaigns_dao.update_campaign(campaign_id, {"$set": {"prospecting_cycle.status": "contact_enriched"}})
+            await self.campaigns_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "contact_enriched"})
 
             return {
                 "contacts_enriched": True
@@ -282,6 +285,28 @@ class IntegrationOrchestrator:
                     )
 
                     response = await self.apollo_helper.get_company_contacts(query_params)
+
+                else:
+                    for contact in contacts:
+                        contact_id = contact.get("contact_id")
+                        campaign_contact_runs = await self.CampaignContactRunsDao.get_campaign_contact_runs({"campaign_id": self.campaign_id, "company_id": company_id, "contact_id": contact.get("contact_id")})
+                        if campaign_contact_runs:
+                            logger.error(f"Campaign contact run already exists for contact_id: {contact.get('contact_id')}")
+                            continue
+                        await self.apollo_helper.enrich_apollo_contact(contact.get("contact_id"))
+                        campaign_contact_run_doc = {
+                                "campaign_id": ObjectId(self.campaign_id),
+                                "company_id": ObjectId(company_id),
+                                "contact_id": ObjectId(contact_id),
+                                "is_relevant": False,
+                                "enrichment_status": False,
+                                "metadata": {
+                                    "created_at": datetime.now(timezone.utc),
+                                    "updated_at": datetime.now(timezone.utc),
+                                    "raw_data": None,
+                                }
+                            }
+                        await self.CampaignContactRunsDao.create_campaign_contact_run(campaign_contact_run_doc)
                 #send  webhook to the users with the contacts
                 if prospecting_approach != "manual":
                     await self.webhook_sender.send_company_level_webhook(str(company_id), slack_metadata)

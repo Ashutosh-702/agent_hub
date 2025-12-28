@@ -273,6 +273,12 @@ class ApolloHelper:
                                 "enriched_data": None
                             })
                     else:
+                        existing_contact_id = await self.contacts_dao.get_contacts({
+                            "company_id": ObjectId(query_params.company_id),
+                            "contact_data.source_id": person.get('id')
+                        })
+                        if existing_contact_id:
+                            continue
                         enrichment_response = None
                         contact_doc = self.transform_apollo_contact_to_db_format(
                                         person_data=person,
@@ -584,12 +590,15 @@ class ApolloHelper:
                 "source": "APOLLO-ENRICHER"
             },
             "webhook_sent": False,
+            "enrichment_status": False,
             "metadata": {
                 "created_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
                 "raw_data": enriched_data
             }
         }
+        if enriched_data:
+            contact_doc["enrichment_status"] = True
         
         return contact_doc
 
@@ -1014,6 +1023,7 @@ class ApolloHelper:
                 update_set["contact_data.jobtitle"] = enriched_person.get("title")
             if enriched_person.get("last_name"):
                 update_set["contact_data.lastname"] = enriched_person.get("last_name")
+            update_set["enrichment_status"] = True
 
             await self.contacts_dao.update_contact(contact_id, {"$set": update_set})
 

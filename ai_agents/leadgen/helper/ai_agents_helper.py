@@ -382,7 +382,13 @@ class CampaignsHelper:
         #get company mappings counts for each campaign
         for campaign in campaigns.get("campaigns"):
             company_mappings_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign["_id"], "is_relevant": True})
-            campaign["company_mappings_count"] = company_mappings_count
+            total_company_mappings_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign["_id"]})
+            contact_runs_count = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count({"campaign_id": campaign["_id"]})
+
+            campaign["relevant_company_mappings_count"] = company_mappings_count
+            campaign["total_company_mappings_count"] = total_company_mappings_count
+            campaign["contact_runs_count"] = contact_runs_count
+
         return campaigns
 
     async def get_campaign_details_with_companies(self, query_params: CampaignDetailsWithCompanies):
@@ -412,6 +418,9 @@ class CampaignsHelper:
                     {"campaign_id": campaign_id, "company_id": {"$in": chunk}},
                     {"$set": {"is_relevant": is_relevant}}
                 )
+        update_campaign = await self.campaign_dao.update_campaign(campaign_id, {"$set": {"prospecting_cycle.status": "company_qualification"}})
+        if not update_campaign:
+            raise ApiException("Campaign not found")
         return {"message": "Company qualification completed"}
 
     async def ai_company_qualification(self, query_params: AiCompanyQualification):
