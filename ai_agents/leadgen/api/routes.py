@@ -22,6 +22,7 @@ from ai_agents.leadgen.views.ai_agents import (
     create_campaign_from_prospecting_job,
     manual_company_qualification,
     ai_company_qualification,
+    get_apollo_contact_list,
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -156,5 +157,12 @@ router.add_api_route(
     "/ai_company_qualification",
     methods=["POST"],
     endpoint=ai_company_qualification,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/get_apollo_contact_list",
+    methods=["POST"],
+    endpoint=get_apollo_contact_list,
     response_model=ResponseData,
 )

@@ -161,6 +161,8 @@ async def leadgen_company_qualification_ai_processing_handler(message: Any):
 
         logger.info(f"🔄 Processing AI company qualification: {request_id}")
         await process_company_qualification_ai(request_id, campaign_id)
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        await campaigns_dao.update_campaign( campaign_id, {"$set":{"prospecting_cycle.status":"contact_qualification"}})
 
     except Exception as e:
         logger.error(f"❌ Error handling leadgen message: {e}")
@@ -168,6 +170,70 @@ async def leadgen_company_qualification_ai_processing_handler(message: Any):
         traceback.print_exc()
         raise
 
+
+async def leadgen_apollo_contact_list_processing_handler(message: Any):
+    """
+    Handler for get_apollo_contact_list events.
+    Expands campaign_id -> relevant company_ids and then reuses contacts enrichment logic (Apollo fetch).
+    """
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+        else:
+            logger.error("🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")
+        slack_metadata = payload.get("slack_metadata", {})
+
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+
+        if action != "get_apollo_contact_list":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+
+        logger.info(f"🔄 Processing Apollo contact list for campaign: {campaign_id}")
+        await process_apollo_contact_list(request_id, campaign_id, slack_metadata)
+
+    except Exception as e:
+        logger.error(f"❌ Error handling apollo contact list message: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+async def process_apollo_contact_list(request_id: str, campaign_id: str, slack_metadata: dict):
+    """
+    Fetch Apollo contacts for all relevant companies in a campaign.
+    This reuses `process_contacts_enrichment` (which calls ApolloHelper.get_company_contacts).
+    """
+    try:
+        await initialize_consumer_connections()
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaign_data = await campaigns_dao.get_campaign(campaign_id)
+        
+        if not campaign_data:
+            logger.error(f"❌ Campaign not found: {campaign_id}")
+            return
+        orchestrator = IntegrationOrchestrator(campaign_data)
+        await orchestrator.fetch_apollo_contact_list()
+
+    except Exception as e:
+        logger.error(f"❌ Error processing apollo contact list {request_id}: {e}")
+        raise
 
 async def process_company_qualification_ai(request_id: str, campaign_id: str):
     """Re-run AI company qualification (relevance check) using updated campaign prompts."""

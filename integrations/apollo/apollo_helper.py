@@ -14,7 +14,7 @@ from integrations.apollo.schema import ApolloResponseSchema
 from integrations.apollo.schema import SearchEnrichPeopleSchema
 from integrations.apollo.schema import SearchPeopleSchema
 from integrations.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
-
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 
 class ApolloHelper:
     def __init__(self):
@@ -22,7 +22,7 @@ class ApolloHelper:
         self.people_relevance_check = PeopleRelevanceCheck(config)
         self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-
+        self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
     async def get_company_contacts(self, query_params: ApolloResponseSchema) -> Dict[str, Any]:
  
         bind_contextvars(
@@ -136,8 +136,12 @@ class ApolloHelper:
         for page in range(2, total_pages + 1):
             try:
                 logger.info(f"Processing page {page} of {total_pages}...")
-
-                contacts_count = await self.contacts_dao.get_contacts_count({
+                if query_params.prospecting_approach != "manual":
+                    contacts_count = await self.contacts_dao.get_contacts_count({
+                        "company_id": ObjectId(query_params.company_id),
+                    })
+                else:
+                    contacts_count = await self.contacts_dao.get_contacts_count({
                     "company_id": ObjectId(query_params.company_id),
                     "contact_data.email": {"$ne": []}
                 })
@@ -212,62 +216,84 @@ class ApolloHelper:
                     continue
 
                 try:
-                    enrichment_response = await apollo_client.apollo_people_enrichment_api(
-                        person_id=str(person_id),
-                        reveal_personal_emails=query_params.reveal_personal_emails,
-                        reveal_phone_number=query_params.reveal_phone_number
-                    )
+                    if query_params.prospecting_approach != "manual":
+                        enrichment_response = await apollo_client.apollo_people_enrichment_api(
+                            person_id=str(person_id),
+                            reveal_personal_emails=query_params.reveal_personal_emails,
+                            reveal_phone_number=query_params.reveal_phone_number
+                        )
+                        if enrichment_response.get('status_code') == 200:
+                            enriched_data = enrichment_response.get('results', {})
 
-                    if enrichment_response.get('status_code') == 200:
-                        enriched_data = enrichment_response.get('results', {})
-
-                        try:
-                            # Check if contact already exists
-                            existing_contact_id = await self._check_existing_contact(
-                                enriched_data=enriched_data,
-                                company_id=query_params.company_id
-                            )
-                            
-                            if existing_contact_id:
-                                # Contact already exists, use existing ID
-                                logger.info(f"Contact {person.get('name', 'Unknown')} already exists with ID: {existing_contact_id}")
-                                stored_contact_ids.append(existing_contact_id)
-                                contacts.append({
-                                    "contact_data": person,
-                                    "enriched_data": enriched_data,
-                                    "contact_id": existing_contact_id
-                                })
-                            else:
-                                # Contact doesn't exist, create new one
-                                contact_doc = self.transform_apollo_contact_to_db_format(
-                                    person_data=person,
+                            try:
+                                # Check if contact already exists
+                                existing_contact_id = await self._check_existing_contact(
                                     enriched_data=enriched_data,
                                     company_id=query_params.company_id
                                 )
-                                contact_id = await self.contacts_dao.create_contact(contact_doc)
-                                logger.info(f"Stored new contact {person.get('name', 'Unknown')} with ID: {contact_id}")
-                                stored_contact_ids.append(str(contact_id))
+
+                                if existing_contact_id:
+                                    # Contact already exists, use existing ID
+                                    logger.info(f"Contact {person.get('name', 'Unknown')} already exists with ID: {existing_contact_id}")
+                                    stored_contact_ids.append(existing_contact_id)
+                                    contacts.append({
+                                        "contact_data": person,
+                                        "enriched_data": enriched_data,
+                                        "contact_id": existing_contact_id
+                                    })
+                                else:
+                                    # Contact doesn't exist, create new one
+                                    contact_doc = self.transform_apollo_contact_to_db_format(
+                                        person_data=person,
+                                        enriched_data=enriched_data,
+                                        company_id=query_params.company_id
+                                    )
+                                    contact_id = await self.contacts_dao.create_contact(contact_doc)
+                                    logger.info(f"Stored new contact {person.get('name', 'Unknown')} with ID: {contact_id}")
+                                    stored_contact_ids.append(str(contact_id))
+                                    contacts.append({
+                                        "contact_data": person,
+                                        "enriched_data": enriched_data,
+                                        "contact_id": str(contact_id)
+                                    })
+
+                            except Exception as e:
+                                logger.error(f"Error storing contact {person_id} in database: {str(e)}")
+                                # Still add to contacts even if storage failed
                                 contacts.append({
                                     "contact_data": person,
-                                    "enriched_data": enriched_data,
-                                    "contact_id": str(contact_id)
+                                    "enriched_data": enriched_data
                                 })
-                            
-                        except Exception as e:
-                            logger.error(f"Error storing contact {person_id} in database: {str(e)}")
-                            # Still add to contacts even if storage failed
+                                continue
+                        else:
+                            # Include contact even if enrichment failed
+                            logger.error(f"Failed to enrich contact {person_id}: {enrichment_response.get('error', 'Unknown error')}")
                             contacts.append({
                                 "contact_data": person,
-                                "enriched_data": enriched_data
+                                "enriched_data": None
                             })
-                            continue
                     else:
-                        # Include contact even if enrichment failed
-                        logger.error(f"Failed to enrich contact {person_id}: {enrichment_response.get('error', 'Unknown error')}")
-                        contacts.append({
-                            "contact_data": person,
-                            "enriched_data": None
-                        })
+                        enrichment_response = None
+                        contact_doc = self.transform_apollo_contact_to_db_format(
+                                        person_data=person,
+                                        enriched_data=None,
+                                        company_id=query_params.company_id
+                                    )
+                        contact_id = await self.contacts_dao.create_contact(contact_doc)
+                        if query_params.campaign_id and query_params.company_id:
+                            campaign_contact_run_doc = {
+                                "campaign_id": ObjectId(query_params.campaign_id),
+                                "company_id": ObjectId(query_params.company_id),
+                                "contact_id": contact_id,
+                                "is_relevant": False,
+                                "metadata": {
+                                    "created_at": datetime.now(timezone.utc),
+                                    "updated_at": datetime.now(timezone.utc),
+                                }
+                            }
+                            await self.campaign_contact_runs_dao.create_campaign_contact_run(campaign_contact_run_doc)
+
+                    
 
                 except Exception as e:
                     logger.error(f"Error enriching contact {person_id}: {str(e)}")
@@ -737,7 +763,10 @@ class ApolloHelper:
         logger.info(f"Found {len(people)} contacts in this page")
 
         # Filter people based on relevance check
-        people = await self.filter_relevant_people(people)
+        if query_params.prospecting_approach != "manual":
+            people = await self.filter_relevant_people(people)
+        else:
+            people = people
 
         # Enrich and store contacts
         enrichment_result = await self.enrich_and_store_contacts(people, query_params)

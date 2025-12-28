@@ -18,6 +18,7 @@ from kafkautils.constants import (
     LeadgenServices,
     CONTACTS_ENRICHMENT,
     LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING,
+    LEADGEN_APOLLO_CONTACT_LIST_PROCESSING,
 )
 from kafkautils.producer.event_helpers import emit_event_helper
 import uuid
@@ -27,7 +28,7 @@ from ai_agents.leadgen.services.ai_agents_service import CampaignService
 from ai_agents.leadgen.utils import serialize_objectid
 from ai_agents.leadgen.schemas.ai_agents import CampaignDetailsWithCompanies
 from database.collection_dao.campaigns import CampaignsDao
-from ai_agents.leadgen.schemas.ai_agents import AiCompanyQualification
+from ai_agents.leadgen.schemas.ai_agents import AiCompanyQualification, ApolloContactList
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -373,6 +374,7 @@ class CampaignsHelper:
         self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.company_qualification_ai_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING]
+        self.apollo_contact_list_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_APOLLO_CONTACT_LIST_PROCESSING]
 
     async def get_campaigns(self, query_params: Campaigns):
         campaigns = await self.campaign_service.get_campaigns(query_params)
@@ -445,6 +447,31 @@ class CampaignsHelper:
         if not update_campaign:
             raise ApiException("Campaign not found")
         return {"message": "Campaign updated", "campaign_id": campaign_id}
+
+    async def get_apollo_contact_list(self, query_params: ApolloContactList):
+        
+        campaign_id = query_params.campaign_id
+        # We just need to send the campaign_id to the kafka topic (consumer will expand to company_ids and call Apollo)
+        request_id = str(uuid.uuid4())
+
+        if not self.event_emitter:
+            raise ApiException("EventBridge Producer not initialized")
+
+        event = {
+            "request_id": request_id,
+            "action": "get_apollo_contact_list",
+            "campaign_id": campaign_id,
+            "timestamp": asyncio.get_event_loop().time()
+        }
+        await emit_event_helper(
+            event_emitter=self.event_emitter,
+            topics=self.apollo_contact_list_kafka_config["topics"],
+            partition_value=request_id,
+            event=event,
+            event_meta={"service": "leadgen", "campaign_id": campaign_id},
+        )
+
+        return {"message": "Apollo contact fetch queued", "request_id": request_id, "campaign_id": campaign_id}
 
 class CompaniesHelper:
 

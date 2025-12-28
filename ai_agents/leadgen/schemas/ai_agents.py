@@ -117,6 +117,10 @@ class ManualCompanyQualification(BaseModel):
 class AiCompanyQualification(BaseModel):
     campaign_id: str
     web_prompt: Optional[str] = None
+
+class ApolloContactList(BaseModel):
+    campaign_id: str
+
     
 class ManualCompanyQualificationResponse(BaseModel):
     campaign_id: str

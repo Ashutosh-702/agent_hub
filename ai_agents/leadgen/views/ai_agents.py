@@ -20,7 +20,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CampaignDetailsWithCompanies,
     CreateCampaignFromProspectingJob,
     ManualCompanyQualification,
-    AiCompanyQualification
+    AiCompanyQualification,
+    ApolloContactList
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -258,6 +259,16 @@ async def ai_company_qualification(query_params: AiCompanyQualification = Body()
     campaign_helper = CampaignsHelper()
 
     response = await campaign_helper.ai_company_qualification(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+async def get_apollo_contact_list(query_params: ApolloContactList = Depends()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.get_apollo_contact_list(query_params)
     response_data.success = True
     response_data.data = response
 
