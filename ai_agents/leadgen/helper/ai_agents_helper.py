@@ -28,7 +28,7 @@ from ai_agents.leadgen.services.ai_agents_service import CampaignService
 from ai_agents.leadgen.utils import serialize_objectid
 from ai_agents.leadgen.schemas.ai_agents import CampaignDetailsWithCompanies
 from database.collection_dao.campaigns import CampaignsDao
-from ai_agents.leadgen.schemas.ai_agents import AiCompanyQualification, ApolloContactList, UpdateApolloContactEnrichmentStatus
+from ai_agents.leadgen.schemas.ai_agents import AiCompanyQualification, ApolloContactList, UpdateApolloContactEnrichmentStatus, GetCampaignContactList, CampaignContactList
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -374,6 +374,7 @@ class CampaignsHelper:
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
         self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
+        self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.company_qualification_ai_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING]
         self.apollo_contact_list_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_APOLLO_CONTACT_LIST_PROCESSING]
@@ -527,6 +528,30 @@ class CampaignsHelper:
                     {"$set": {"is_relevant": is_relevant}}
                 )
         return {"message": "Contact relevance updated"}
+
+    async def get_campaign_contact_list(self, query_params: GetCampaignContactList):
+        campaign_id = query_params.campaign_id
+        page = query_params.page
+        limit = query_params.limit
+        campaign = await self.campaign_service.get_campaign_details(query_params.campaign_id)
+        contacts, pagination_info = await self.campaign_contact_runs_dao.get_campaign_contact_runs_paginated({"campaign_id": campaign_id}, page, limit)
+        serialized_contacts = []
+        serialized_campaign = serialize_objectid(campaign)
+        for contact in contacts:
+            contact_id = contact.get("contact_id")
+            contact_doc = await self.contacts_dao.get_contact(contact_id)
+            if contact_doc:
+                contact["contact_data"] = contact_doc.get("contact_data")
+                contact["linkedin_data"] = contact_doc.get("linkedin_data")
+                enrichment_status = contact_doc.get("enrichment_status")
+                contact["enrichment_status"] = enrichment_status
+                serialized_contacts.append(serialize_objectid(contact))
+        serialized_data = {
+            "campaign": serialized_campaign,
+            "contacts": serialized_contacts,
+            "pagination_info": pagination_info
+        }
+        return serialized_data
 class CompaniesHelper:
 
     def __init__(self):

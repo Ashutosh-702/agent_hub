@@ -1,6 +1,12 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useEffect, useMemo, useState } from 'react';
-import { useGetCampaignDetailsQuery, useManualCompanyQualificationMutation } from '../../store';
+import {
+  useGetApolloContactListMutation,
+  useLazyGetCampaignContactListQuery,
+  useGetCampaignDetailsQuery,
+  useManualCompanyQualificationMutation,
+  type CampaignContactListItem,
+} from '../../store';
 import { useCampaignWizard } from './NewCampaignWizard';
 
 const PAGE_SIZE = 100;
@@ -13,14 +19,17 @@ const toLabel = (value: unknown): string => {
 };
 
 export const Step2CompanyQualification = () => {
-  const { state, setCompanyQualificationMode, nextStep, prevStep, setLoading } = useCampaignWizard();
+  const { state, setCompanyQualificationMode, nextStep, prevStep, setLoading, setQualifiedContacts } = useCampaignWizard();
   const campaignId = state.campaignId;
 
   const [page, setPage] = useState(1);
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<Set<string>>(new Set());
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isContactPolling, setIsContactPolling] = useState(false);
 
   const [manualCompanyQualification] = useManualCompanyQualificationMutation();
+  const [queueApolloContactList] = useGetApolloContactListMutation();
+  const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
 
   const queryArgs = campaignId ? { campaign_id: campaignId, page, limit: PAGE_SIZE } : skipToken;
   const { data, isFetching, isError } = useGetCampaignDetailsQuery(queryArgs);
@@ -142,9 +151,101 @@ export const Step2CompanyQualification = () => {
   };
 
   const handleContinue = async () => {
+    if (!campaignId) return;
     await persistCurrentPage();
-    nextStep();
+
+    // Queue Apollo contact list fetch
+    setSaveError(null);
+    try {
+      setLoading(true, 'Queueing Apollo contacts…');
+      await queueApolloContactList({ campaign_id: campaignId, enrichment_status: false }).unwrap();
+      setIsContactPolling(true);
+    } catch (e: unknown) {
+      const msg =
+        typeof e === 'object' && e && 'data' in e
+          ? JSON.stringify((e as any).data)
+          : 'Failed to queue Apollo contact fetch';
+      setSaveError(msg);
+      setLoading(false);
+    }
   };
+
+  // Poll until campaign moves to contact_qualification, then load contacts and go to Step 3.
+  useEffect(() => {
+    if (!campaignId || !isContactPolling) return;
+
+    let cancelled = false;
+    setLoading(true, 'Fetching contacts from Apollo…');
+
+    const poll = async () => {
+      try {
+        // Use a consistent page size for both polling and fetching to avoid pagination mismatches.
+        const limit = 100;
+        const first = await fetchCampaignContactList({ campaign_id: campaignId, page: 1, limit }).unwrap();
+        const status = first?.data?.campaign?.prospecting_cycle?.status;
+
+        // Keep polling until backend sets contact_qualification
+        if (status !== 'contact_qualification') return;
+
+        // Once ready, load contacts (all pages, with a safety cap)
+        let page = 1;
+        let hasNext = first.pagination?.has_next ?? false;
+        const all: CampaignContactListItem[] = [];
+        let pagesFetched = 0;
+        const MAX_PAGES = 50; // safety cap
+
+        // include first page contacts (if any) then continue paging
+        all.push(...(first.data?.contacts || []));
+        while (hasNext && pagesFetched < MAX_PAGES) {
+          pagesFetched += 1;
+          page += 1;
+          const res = await fetchCampaignContactList({ campaign_id: campaignId, page, limit }).unwrap();
+          all.push(...(res.data?.contacts || []));
+          hasNext = res.pagination?.has_next ?? false;
+        }
+
+        if (cancelled) return;
+
+        // Map API contacts into wizard contacts
+        const mapped = all.map((c) => ({
+          id: c.contact_id,
+          companyId: c.company_id,
+          companyName: c.contact_data?.company || undefined,
+          firstName: c.contact_data?.firstname || '',
+          lastName: c.contact_data?.lastname || '',
+          email: (c.contact_data?.email && c.contact_data.email[0]) || '',
+          phone: (c.contact_data?.phone && c.contact_data.phone[0]) || undefined,
+          jobTitle: c.contact_data?.jobtitle || '',
+          linkedinUrl: c.linkedin_data?.linkedin_url || undefined,
+          qualificationStatus: 'pending' as const,
+          syncStatus: 'not_synced' as const,
+          personalization: {
+            messageStatus: 'pending' as const,
+            deckStatus: 'pending' as const,
+          },
+        }));
+
+        setQualifiedContacts(mapped);
+        setIsContactPolling(false);
+        setLoading(false);
+        nextStep();
+      } catch (e) {
+        // ignore transient errors during polling; keep waiting
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void poll();
+    }, 3000);
+
+    // run immediately too
+    void poll();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [campaignId, fetchCampaignContactList, isContactPolling, nextStep, setLoading, setQualifiedContacts]);
 
   if (!campaignId) {
     return (
@@ -168,6 +269,32 @@ export const Step2CompanyQualification = () => {
         <h2>Company Qualification</h2>
         <p>Review companies page-wise (100 per page). Changes are saved before paging.</p>
       </div>
+
+      {/* Loading Overlay (queue + polling) */}
+      {state.isLoading && (
+        <div className="loading-overlay">
+          <div className="loading-card">
+            <div className="loading-animation ai-animation">
+              <div className="ai-brain">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <div className="ai-pulse" />
+            </div>
+            <h3>{state.loadingMessage}</h3>
+            <div className="loading-progress">
+              <div className="progress-bar">
+                <div
+                  className="progress-fill ai-progress"
+                  style={{ width: `${state.estimatedCount}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {saveError && (
         <div className="error-banner" style={{ marginBottom: 12 }}>

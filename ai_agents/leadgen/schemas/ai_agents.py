@@ -132,6 +132,17 @@ class UpdateApolloContactEnrichmentStatus(BaseModel):
     selection_type: str = "all"
     is_relevant: bool = True
 
+class GetCampaignContactList(BaseModel):
+    campaign_id: str
+    page: int = 1
+    limit: int = 10
+
+class CampaignContactList(BaseModel):
+    campaign_id: str
+    page: int = 1
+    limit: int = 10
+    contact_ids: Optional[List[str]] = None
+    selection_type: str = "all"
 
     @field_validator('contact_ids')
     @classmethod

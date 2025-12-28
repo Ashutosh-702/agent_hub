@@ -1,5 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCampaignWizard, type Contact } from './NewCampaignWizard';
+import {
+  useEnrichApolloContactListMutation,
+  useLazyGetCampaignContactListQuery,
+  useUpdateApolloContactEnrichmentStatusMutation,
+  type CampaignContactListItem,
+} from '../../store';
 
 const CONTACT_AI_QUESTIONS = [
   'Should the contact be in a decision-making role (Director/VP/C-level)?',
@@ -21,6 +27,12 @@ export const Step3ContactQualification = () => {
     setQualifiedContacts,
   } = useCampaignWizard();
 
+  const campaignId = state.campaignId;
+  const [isEnrichPolling, setIsEnrichPolling] = useState(false);
+  const [enrichApolloContactList] = useEnrichApolloContactListMutation();
+  const [updateApolloContactEnrichmentStatus] = useUpdateApolloContactEnrichmentStatusMutation();
+  const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
+
   const [aiQuestionsAnswers, setAiQuestionsAnswers] = useState<Record<string, boolean>>({});
   const [isQualifying, setIsQualifying] = useState(false);
   const [qualificationComplete, setQualificationComplete] = useState(false);
@@ -31,9 +43,10 @@ export const Step3ContactQualification = () => {
   const qualifiedCount = contacts.filter(c => c.qualificationStatus === 'qualified').length;
   const rejectedCount = contacts.filter(c => c.qualificationStatus === 'rejected').length;
 
-  // Get company name for a contact
-  const getCompanyName = (companyId: string) => {
-    const company = state.qualifiedCompanies.find(c => c.id === companyId);
+  // Get company name for a contact (prefer API-provided name)
+  const getCompanyName = (contact: Contact) => {
+    if (contact.companyName) return contact.companyName;
+    const company = state.qualifiedCompanies.find(c => c.id === contact.companyId);
     return company?.name || 'Unknown Company';
   };
 
@@ -113,11 +126,114 @@ export const Step3ContactQualification = () => {
   };
 
   const handleContinue = () => {
-    // Filter only qualified contacts for next step
-    const qualified = contacts.filter(c => c.qualificationStatus === 'qualified');
-    setQualifiedContacts(qualified);
-    nextStep();
+    // Before going to Step 4, queue contact enrichment and poll until campaign status becomes contact_enriched.
+    if (!campaignId) {
+      nextStep();
+      return;
+    }
+
+    const selectedContactIds = contacts
+      .filter((c) => c.qualificationStatus === 'qualified')
+      .map((c) => c.id);
+
+    if (selectedContactIds.length === 0) {
+      // nothing selected; don't start enrichment chain
+      return;
+    }
+
+    setLoading(true, 'Saving selected contacts…');
+    void (async () => {
+      try {
+        // 1) Persist selected contact ids (is_relevant=true)
+        await updateApolloContactEnrichmentStatus({
+          campaign_id: campaignId,
+          selection_type: 'selected',
+          is_relevant: true,
+          contact_ids: selectedContactIds,
+        }).unwrap();
+
+        // 2) Queue enrichment job
+        await enrichApolloContactList({ campaign_id: campaignId, enrichment_status: true }).unwrap();
+        setLoading(true, 'Enriching contacts from Apollo…');
+        // 3) Start polling for contact_enriched
+        setIsEnrichPolling(true);
+      } catch (e) {
+        setLoading(false);
+        setIsEnrichPolling(false);
+      }
+    })();
   };
+
+  // Poll get_campaign_contact_list until prospecting_cycle.status is contact_enriched,
+  // then refresh contacts and advance to Step 4.
+  useEffect(() => {
+    if (!campaignId || !isEnrichPolling) return;
+
+    let cancelled = false;
+    const limit = 100;
+
+    const poll = async () => {
+      try {
+        const first = await fetchCampaignContactList({ campaign_id: campaignId, page: 1, limit }).unwrap();
+        const status = first?.data?.campaign?.prospecting_cycle?.status;
+        if (status !== 'contact_enriched') return;
+
+        // Fetch all contacts pages once enriched
+        let page = 1;
+        let hasNext = first.pagination?.has_next ?? false;
+        const all: CampaignContactListItem[] = [];
+        all.push(...(first.data?.contacts || []));
+
+        let pagesFetched = 0;
+        const MAX_PAGES = 50; // safety cap
+
+        while (hasNext && pagesFetched < MAX_PAGES) {
+          pagesFetched += 1;
+          page += 1;
+          const res = await fetchCampaignContactList({ campaign_id: campaignId, page, limit }).unwrap();
+          all.push(...(res.data?.contacts || []));
+          hasNext = res.pagination?.has_next ?? false;
+        }
+
+        if (cancelled) return;
+
+        const mapped = all.map((c) => ({
+          id: c.contact_id,
+          companyId: c.company_id,
+          companyName: c.contact_data?.company || undefined,
+          firstName: c.contact_data?.firstname || '',
+          lastName: c.contact_data?.lastname || '',
+          email: (c.contact_data?.email && c.contact_data.email[0]) || '',
+          phone: (c.contact_data?.phone && c.contact_data.phone[0]) || undefined,
+          jobTitle: c.contact_data?.jobtitle || '',
+          linkedinUrl: c.linkedin_data?.linkedin_url || undefined,
+          qualificationStatus: 'pending' as const,
+          syncStatus: 'not_synced' as const,
+          personalization: {
+            messageStatus: 'pending' as const,
+            deckStatus: 'pending' as const,
+          },
+        })) as Contact[];
+
+        setQualifiedContacts(mapped);
+        setLoading(false);
+        setIsEnrichPolling(false);
+        nextStep();
+      } catch (e) {
+        // ignore transient errors during polling
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void poll();
+    }, 3000);
+    void poll();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [campaignId, fetchCampaignContactList, isEnrichPolling, nextStep, setLoading, setQualifiedContacts]);
 
   return (
     <div className="step-container step-contact-qualification">
@@ -256,9 +372,9 @@ export const Step3ContactQualification = () => {
                     <h4>{contact.firstName} {contact.lastName}</h4>
                     <div className="contact-meta">
                       <span className="job-title">{contact.jobTitle}</span>
-                      <span className="company-name">{getCompanyName(contact.companyId)}</span>
+                      <span className="company-name">{getCompanyName(contact)}</span>
                     </div>
-                    <span className="contact-email">{contact.email}</span>
+                    <span className="contact-email">{contact.email || 'No email found'}</span>
                   </div>
                   {isQualified && (
                     <div className="qualified-badge">
@@ -373,9 +489,9 @@ export const Step3ContactQualification = () => {
                       <div className="contact-meta">
                         <span className="job-title">{contact.jobTitle}</span>
                         <span className="separator">-</span>
-                        <span className="company-name">{getCompanyName(contact.companyId)}</span>
+                        <span className="company-name">{getCompanyName(contact)}</span>
                       </div>
-                      <span className="contact-email">{contact.email}</span>
+                      <span className="contact-email">{contact.email || 'No email found'}</span>
                       {contact.linkedinUrl && (
                         <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="contact-linkedin">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -420,7 +536,7 @@ export const Step3ContactQualification = () => {
                       <div className="contact-meta">
                         <span className="job-title">{contact.jobTitle}</span>
                         <span className="separator">-</span>
-                        <span className="company-name">{getCompanyName(contact.companyId)}</span>
+                        <span className="company-name">{getCompanyName(contact)}</span>
                       </div>
                       {contact.linkedinUrl && (
                         <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="contact-linkedin">

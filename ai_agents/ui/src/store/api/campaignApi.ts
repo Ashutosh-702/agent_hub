@@ -196,6 +196,79 @@ export interface ManualCompanyQualificationResponse {
   errors?: string[];
 }
 
+export interface GetApolloContactListParams {
+  campaign_id: string;
+  enrichment_status: boolean;
+}
+
+export interface GetApolloContactListResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+    request_id?: string;
+    campaign_id?: string;
+  };
+  errors?: string[];
+}
+
+export interface UpdateApolloContactEnrichmentStatusParams {
+  campaign_id: string;
+  selection_type: 'all' | 'selected';
+  is_relevant: boolean;
+  contact_ids: string[];
+}
+
+export interface UpdateApolloContactEnrichmentStatusResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+  };
+  errors?: string[];
+}
+
+export interface CampaignContactListItem {
+  _id: string;
+  campaign_id: string;
+  company_id: string;
+  contact_id: string;
+  is_relevant: boolean;
+  enrichment_status?: boolean;
+  metadata?: {
+    created_at?: string;
+    updated_at?: string;
+    raw_data?: unknown;
+  };
+  contact_data?: {
+    firstname?: string;
+    lastname?: string;
+    email?: string[];
+    phone?: string[];
+    jobtitle?: string;
+    company?: string;
+    source_id?: string;
+  };
+  linkedin_data?: {
+    linkedin_url?: string | null;
+    source?: string;
+  };
+}
+
+export interface GetCampaignContactListParams {
+  campaign_id: string;
+  page: number;
+  limit: number;
+}
+
+export interface GetCampaignContactListResponse {
+  success: boolean;
+  data: {
+    campaign: Campaign;
+    contacts: CampaignContactListItem[];
+  };
+  pagination: Pagination | null;
+  errors: string[];
+}
+
 export const campaignApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getCampaigns: builder.query<CampaignsResponse, GetCampaignsParams>({
@@ -266,6 +339,68 @@ export const campaignApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
     }),
+
+    getApolloContactList: builder.mutation<GetApolloContactListResponse, GetApolloContactListParams>({
+      query: ({ campaign_id, enrichment_status }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          enrichment_status: String(enrichment_status),
+        });
+        return {
+          url: `/api/v1/get_apollo_contact_list?${params}`,
+          method: 'POST',
+        };
+      },
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    enrichApolloContactList: builder.mutation<GetApolloContactListResponse, GetApolloContactListParams>({
+      query: ({ campaign_id, enrichment_status }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          enrichment_status: String(enrichment_status),
+        });
+        return {
+          url: `/api/v1/enrich_apollo_contact_list?${params}`,
+          method: 'POST',
+        };
+      },
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    updateApolloContactEnrichmentStatus: builder.mutation<
+      UpdateApolloContactEnrichmentStatusResponse,
+      UpdateApolloContactEnrichmentStatusParams
+    >({
+      query: ({ campaign_id, selection_type, is_relevant, contact_ids }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          selection_type,
+          is_relevant: String(is_relevant),
+        });
+        return {
+          url: `/api/v1/update_apollo_contact_enrichment_status?${params}`,
+          method: 'POST',
+          body: contact_ids, // API accepts JSON array body (see curl)
+        };
+      },
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    getCampaignContactList: builder.query<GetCampaignContactListResponse, GetCampaignContactListParams>({
+      query: ({ campaign_id, page, limit }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          page: String(page),
+          limit: String(limit),
+        });
+        return {
+          url: `/api/v1/get_campaign_contact_list?${params}`,
+          method: 'GET',
+        };
+      },
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
   }),
 });
 
@@ -276,5 +411,10 @@ export const {
   useGetCampaignDetailsQuery,
   useLazyGetCampaignDetailsQuery,
   useManualCompanyQualificationMutation,
+  useGetApolloContactListMutation,
+  useEnrichApolloContactListMutation,
+  useUpdateApolloContactEnrichmentStatusMutation,
+  useGetCampaignContactListQuery,
+  useLazyGetCampaignContactListQuery,
 } = campaignApi;
 

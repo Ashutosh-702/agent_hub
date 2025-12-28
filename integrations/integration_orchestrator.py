@@ -51,7 +51,7 @@ class IntegrationOrchestrator:
             if not campaign:
                 logger.error(f"Campaign not found for campaign_id: {self.campaign_id}")
                 return
-            if campaign.get("prospecting_cycle", {}).get("status") != "contact_qualification":
+            if campaign.get("prospecting_cycle", {}).get("status") != "company_qualification":
                 logger.error(f"Campaign is not in contact qualification status for campaign_id: {self.campaign_id}")
                 return
             logger.info("Fetching contacts from apollo...")
@@ -288,7 +288,7 @@ class IntegrationOrchestrator:
 
                 else:
                     for contact in contacts:
-                        contact_id = contact.get("contact_id")
+                        contact_id = contact.get("_id")
                         campaign_contact_runs = await self.CampaignContactRunsDao.get_campaign_contact_runs({"campaign_id": self.campaign_id, "company_id": company_id, "contact_id": contact.get("contact_id")})
                         if campaign_contact_runs:
                             logger.error(f"Campaign contact run already exists for contact_id: {contact.get('contact_id')}")

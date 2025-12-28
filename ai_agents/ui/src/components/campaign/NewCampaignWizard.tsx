@@ -26,6 +26,7 @@ export interface Prospect {
 export interface Contact {
   id: string;
   companyId: string;
+  companyName?: string;
   firstName: string;
   lastName: string;
   email: string;

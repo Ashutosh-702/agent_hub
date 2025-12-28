@@ -25,6 +25,7 @@ from ai_agents.leadgen.views.ai_agents import (
     get_apollo_contact_list,
     enrich_apollo_contact_list,
     update_apollo_contact_enrichment_status,
+    get_campaign_contact_list,
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -180,5 +181,12 @@ router.add_api_route(
     "/update_apollo_contact_enrichment_status",
     methods=["POST"],
     endpoint=update_apollo_contact_enrichment_status,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/get_campaign_contact_list",
+    methods=["GET"],
+    endpoint=get_campaign_contact_list,
     response_model=ResponseData,
 )
