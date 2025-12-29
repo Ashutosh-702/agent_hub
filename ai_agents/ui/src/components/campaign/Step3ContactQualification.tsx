@@ -7,14 +7,6 @@ import {
   type CampaignContactListItem,
 } from '../../store';
 
-const CONTACT_AI_QUESTIONS = [
-  'Should the contact be in a decision-making role (Director/VP/C-level)?',
-  'Should the contact have technical background?',
-  'Should the contact be actively posting on LinkedIn?',
-  'Should the contact have been in the role for at least 6 months?',
-  'Should the contact be based in the same region as the company HQ?',
-];
-
 export const Step3ContactQualification = () => {
   const { 
     state, 
@@ -33,15 +25,8 @@ export const Step3ContactQualification = () => {
   const [updateApolloContactEnrichmentStatus] = useUpdateApolloContactEnrichmentStatusMutation();
   const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
 
-  const [aiQuestionsAnswers, setAiQuestionsAnswers] = useState<Record<string, boolean>>({});
-  const [isQualifying, setIsQualifying] = useState(false);
-  const [qualificationComplete, setQualificationComplete] = useState(false);
-  const [activeTab, setActiveTab] = useState<'qualified' | 'rejected'>('qualified');
-  const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
-
   const contacts = state.qualifiedContacts;
   const qualifiedCount = contacts.filter(c => c.qualificationStatus === 'qualified').length;
-  const rejectedCount = contacts.filter(c => c.qualificationStatus === 'rejected').length;
 
   // Get company name for a contact (prefer API-provided name)
   const getCompanyName = (contact: Contact) => {
@@ -67,63 +52,6 @@ export const Step3ContactQualification = () => {
 
   const allSelected = contacts.length > 0 && contacts.every(c => c.qualificationStatus === 'qualified');
   const someSelected = contacts.some(c => c.qualificationStatus === 'qualified') && !allSelected;
-
-  const handleAIQualification = async () => {
-    setIsQualifying(true);
-    setLoading(true, 'AI is qualifying contacts based on your criteria...', 0);
-
-    // Simulate AI qualification process with animation
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 10) + 5;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-      }
-      setLoading(true, `Analyzing contacts... ${Math.min(progress, 100)}%`, progress);
-    }, 200);
-
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    clearInterval(interval);
-
-    // Mock rejection reasons for contacts
-    const REJECTION_REASONS = [
-      'Role level does not match decision-maker criteria',
-      'Limited LinkedIn activity and engagement',
-      'Recently joined the company (less than 6 months)',
-      'Job title does not align with target persona',
-      'No technical background detected',
-      'Contact appears to be in a transitional role',
-      'Email domain suggests personal account',
-      'Profile indicates non-purchasing role',
-    ];
-
-    // Simulate AI qualification results
-    const reasons: Record<string, string> = {};
-    const updatedContacts = contacts.map(contact => {
-      // Random qualification based on "AI analysis"
-      const score = Math.random();
-      const qualified = score > 0.35; // 65% qualification rate
-      
-      if (!qualified) {
-        reasons[contact.id] = REJECTION_REASONS[Math.floor(Math.random() * REJECTION_REASONS.length)];
-      }
-      
-      return {
-        ...contact,
-        qualificationStatus: qualified ? 'qualified' : 'rejected',
-      } as Contact;
-    });
-
-    setRejectionReasons(reasons);
-    setQualifiedContacts(updatedContacts);
-    setLoading(false);
-    setIsQualifying(false);
-    setQualificationComplete(true);
-    
-    // Scroll to top to show results
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  };
 
   const handleContinue = () => {
     // Before going to Step 4, queue contact enrichment and poll until campaign status becomes contact_enriched.
@@ -288,8 +216,7 @@ export const Step3ContactQualification = () => {
               <span className="mode-tag">Full Control</span>
             </div>
             <div 
-              className="mode-card"
-              onClick={() => setContactQualificationMode('ai')}
+              className="mode-card disabled"
             >
               <div className="mode-icon ai">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -302,8 +229,8 @@ export const Step3ContactQualification = () => {
                 </svg>
               </div>
               <h4>AI Qualification</h4>
-              <p>Let AI qualify contacts based on your custom criteria</p>
-              <span className="mode-tag ai">Recommended</span>
+              <p>Coming soon.</p>
+              <span className="mode-tag ai">Soon</span>
             </div>
           </div>
         </div>
@@ -390,186 +317,18 @@ export const Step3ContactQualification = () => {
         </div>
       )}
 
-      {/* AI Qualification */}
-      {state.contactQualificationMode === 'ai' && !qualificationComplete && (
-        <div className="ai-qualification">
-          <div className="ai-questions-card">
-            <h3>Define Contact Qualification Criteria</h3>
-            <p>Answer these questions to help AI understand your ideal contact profile</p>
-            
-            <div className="ai-questions-list">
-              {CONTACT_AI_QUESTIONS.map((question, index) => (
-                <div key={index} className="ai-question">
-                  <span className="question-text">{question}</span>
-                  <div className="question-options">
-                    <button
-                      className={`option-btn ${aiQuestionsAnswers[question] === true ? 'selected yes' : ''}`}
-                      onClick={() => setAiQuestionsAnswers(prev => ({ ...prev, [question]: true }))}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      className={`option-btn ${aiQuestionsAnswers[question] === false ? 'selected no' : ''}`}
-                      onClick={() => setAiQuestionsAnswers(prev => ({ ...prev, [question]: false }))}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button 
-              className="btn-primary btn-large"
-              onClick={handleAIQualification}
-              disabled={isQualifying || Object.keys(aiQuestionsAnswers).length < 3}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2a4 4 0 0 1 4 4c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2a4 4 0 0 1 4-4z"/>
-                <path d="M12 8v8"/>
-              </svg>
-              Run AI Qualification
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* AI Qualification Results */}
-      {state.contactQualificationMode === 'ai' && qualificationComplete && (
-        <div className="ai-results">
-          {/* Summary Cards - Also act as tab switchers */}
-          <div className="results-summary">
-            <div 
-              className={`result-card success ${activeTab === 'qualified' ? 'active' : ''}`}
-              onClick={() => setActiveTab('qualified')}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="card-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
-              <h3>{qualifiedCount}</h3>
-              <p>Qualified Contacts</p>
-            </div>
-            <div 
-              className={`result-card danger ${activeTab === 'rejected' ? 'active' : ''}`}
-              onClick={() => setActiveTab('rejected')}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="card-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="15" y1="9" x2="9" y2="15"/>
-                  <line x1="9" y1="9" x2="15" y2="15"/>
-                </svg>
-              </div>
-              <h3>{rejectedCount}</h3>
-              <p>Rejected</p>
+      {/* AI Qualification (Coming soon) */}
+      {state.contactQualificationMode === 'ai' && (
+        <div className="manual-qualification">
+          <div className="empty-state">
+            <h3>AI Contact Qualification</h3>
+            <p>Coming soon. Please use Manual Qualification for now.</p>
+            <div className="wizard-navigation">
+              <button className="btn secondary" onClick={() => setContactQualificationMode('manual')}>
+                Switch to Manual
+              </button>
             </div>
           </div>
-
-          {/* Qualified Contacts Tab */}
-          {activeTab === 'qualified' && (
-            <div className="contacts-tab-content">
-              {contacts.filter(c => c.qualificationStatus === 'qualified').length === 0 ? (
-                <div className="empty-state">
-                  <p>No qualified contacts yet</p>
-                </div>
-              ) : (
-                contacts.filter(c => c.qualificationStatus === 'qualified').map((contact) => (
-                  <div key={contact.id} className="contact-result-card qualified">
-                    <div className="contact-avatar">
-                      {contact.firstName[0]}{contact.lastName[0]}
-                    </div>
-                    <div className="contact-info">
-                      <h4>{contact.firstName} {contact.lastName}</h4>
-                      <div className="contact-meta">
-                        <span className="job-title">{contact.jobTitle}</span>
-                        <span className="separator">-</span>
-                        <span className="company-name">{getCompanyName(contact)}</span>
-                      </div>
-                      <span className="contact-email">{contact.email || 'No email found'}</span>
-                      {contact.linkedinUrl && (
-                        <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="contact-linkedin">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                          </svg>
-                          LinkedIn
-                        </a>
-                      )}
-                    </div>
-                    <button 
-                      className="btn-override btn-reject"
-                      onClick={() => qualifyContact(contact.id, false)}
-                      title="Reject this contact"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                      </svg>
-                      Reject
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* Rejected Contacts Tab */}
-          {activeTab === 'rejected' && (
-            <div className="contacts-tab-content">
-              {contacts.filter(c => c.qualificationStatus === 'rejected').length === 0 ? (
-                <div className="empty-state">
-                  <p>No rejected contacts</p>
-                </div>
-              ) : (
-                contacts.filter(c => c.qualificationStatus === 'rejected').map((contact) => (
-                  <div key={contact.id} className="contact-result-card rejected">
-                    <div className="contact-avatar">
-                      {contact.firstName[0]}{contact.lastName[0]}
-                    </div>
-                    <div className="contact-info">
-                      <h4>{contact.firstName} {contact.lastName}</h4>
-                      <div className="contact-meta">
-                        <span className="job-title">{contact.jobTitle}</span>
-                        <span className="separator">-</span>
-                        <span className="company-name">{getCompanyName(contact)}</span>
-                      </div>
-                      {contact.linkedinUrl && (
-                        <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="contact-linkedin">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                          </svg>
-                          LinkedIn
-                        </a>
-                      )}
-                      <div className="rejection-reason">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10"/>
-                          <line x1="12" y1="8" x2="12" y2="12"/>
-                          <line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                        <span>{rejectionReasons[contact.id] || 'Does not meet qualification criteria'}</span>
-                      </div>
-                    </div>
-                    <button 
-                      className="btn-override"
-                      onClick={() => qualifyContact(contact.id, true)}
-                      title="Override AI decision and qualify this contact"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                      Qualify
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
         </div>
       )}
 
@@ -577,7 +336,6 @@ export const Step3ContactQualification = () => {
       <div className="step-navigation">
         <button className="btn-secondary" onClick={() => {
           setContactQualificationMode(null);
-          setQualificationComplete(false);
           prevStep();
         }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -590,13 +348,12 @@ export const Step3ContactQualification = () => {
         {state.contactQualificationMode && (
           <button className="btn-secondary" onClick={() => {
             setContactQualificationMode(null);
-            setQualificationComplete(false);
           }}>
             Change Method
           </button>
         )}
 
-        {qualifiedCount > 0 && (
+        {qualifiedCount > 0 && state.contactQualificationMode !== 'ai' && (
           <button className="btn-primary btn-large" onClick={handleContinue}>
             Continue with {qualifiedCount} Contacts
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
