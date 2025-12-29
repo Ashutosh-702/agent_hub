@@ -1,0 +1,150 @@
+{
+  "products": {
+    "GlamAR": {
+      "description": "Predefined ICP criteria options for GlamAR - AR/VR virtual try-on solution for Beauty & Skincare brands",
+      "questions": {
+        "comprehensiveCriteria": {
+          "label": "Comprehensive Outline of Ideal Customer",
+          "options": [
+            {
+              "id": "glamar_cc_1",
+              "label": "Skincare & Cosmetics Brands with E-commerce",
+              "value": "A relevant company must be a skincare, cosmetics, or beauty brand that sells products online through their own e-commerce platform or major marketplaces. They should be focused on providing customers with a digital-first shopping experience and be open to implementing AR/VR technology for virtual product try-on."
+            },
+            {
+              "id": "glamar_cc_2",
+              "label": "Beauty Retailers with Omnichannel Presence",
+              "value": "A relevant company must be a beauty retailer with both online and offline presence, selling skincare, makeup, or personal care products. They should have a significant e-commerce operation and be looking to enhance customer experience through innovative technology solutions like virtual try-on."
+            },
+            {
+              "id": "glamar_cc_3",
+              "label": "D2C Skincare Startups & Scale-ups",
+              "value": "A relevant company must be a direct-to-consumer skincare or beauty brand, typically venture-backed or rapidly growing, that prioritizes digital customer experience. They should be tech-forward and interested in using AR/VR solutions to reduce return rates and increase conversion."
+            }
+          ]
+        },
+        "mandatoryCriteria": {
+          "label": "Mandatory Criteria",
+          "options": [
+            {
+              "id": "glamar_mc_1",
+              "label": "Beauty/Skincare Focus + Digital Sales",
+              "value": "Primary business must involve skincare, cosmetics, or beauty products. Must have active e-commerce operations (own website or marketplace presence). Must be B2C or D2C model. Must have product catalog suitable for virtual try-on (makeup, skincare with visible effects, hair color, etc.)."
+            },
+            {
+              "id": "glamar_mc_2",
+              "label": "Established Brand with Tech Budget",
+              "value": "Must be an established beauty/skincare brand with annual revenue above $5M. Must have dedicated digital/e-commerce team. Must have budget allocated for technology innovation. Must have products that can benefit from AR visualization (lipstick, foundation, skincare, etc.)."
+            },
+            {
+              "id": "glamar_mc_3",
+              "label": "Growth-Stage with Innovation Mandate",
+              "value": "Must be a growth-stage beauty company with 50+ employees. Must have raised Series A or beyond funding. Must have explicit focus on digital transformation in their strategy. Must sell products where color matching or skin compatibility is important."
+            }
+          ]
+        },
+        "businessModels": {
+          "label": "Relevant Business Models or Operating Styles",
+          "options": [
+            {
+              "id": "glamar_bm_1",
+              "label": "D2C E-commerce with Subscription",
+              "value": "Direct-to-consumer e-commerce brands, subscription-based skincare services, personalized beauty product companies, brands with strong mobile app presence, companies offering skin analysis or shade matching services."
+            },
+            {
+              "id": "glamar_bm_2",
+              "label": "Omnichannel Retail & Marketplaces",
+              "value": "Omnichannel beauty retailers with online stores, beauty brands selling through Amazon/Nykaa/Sephora, multi-brand beauty e-tailers, department stores with strong beauty sections, specialty beauty retail chains."
+            },
+            {
+              "id": "glamar_bm_3",
+              "label": "Professional & Premium Beauty",
+              "value": "Premium/luxury skincare brands, dermatologist-recommended product companies, professional beauty product manufacturers, Korean/Japanese beauty brands expanding globally, clean beauty and sustainable cosmetics companies."
+            }
+          ]
+        },
+        "positiveIndicators": {
+          "label": "Positive Indicators of a Strong Fit",
+          "options": [
+            {
+              "id": "glamar_pi_1",
+              "label": "High Digital Engagement & Returns Focus",
+              "value": "Strong social media presence and engagement, existing mobile app with high ratings, high product return rates (opportunity to reduce via virtual try-on), active influencer marketing programs, investment in UX/UI improvements, previous implementation of tech solutions."
+            },
+            {
+              "id": "glamar_pi_2",
+              "label": "Innovation & Customer Experience Focus",
+              "value": "Dedicated innovation or R&D team, customer experience as a stated priority, participation in beauty tech conferences, existing partnerships with tech companies, strong Net Promoter Score focus, personalization initiatives in place."
+            },
+            {
+              "id": "glamar_pi_3",
+              "label": "Scale & Growth Trajectory",
+              "value": "Rapid revenue growth (50%+ YoY), expanding to new markets or channels, recently raised funding, launching new product lines frequently, investing in digital marketing, building out e-commerce capabilities."
+            }
+          ]
+        },
+        "exclusionCriteria": {
+          "label": "Exclusion Criteria",
+          "options": [
+            {
+              "id": "glamar_ec_1",
+              "label": "Non-Visual & B2B Products",
+              "value": "Pure B2B suppliers or manufacturers without consumer presence. Fragrance-only brands (no visual try-on benefit). Haircare brands without color products. Wellness/supplement companies. Spa or salon service providers without product sales. White-label manufacturers."
+            },
+            {
+              "id": "glamar_ec_2",
+              "label": "Limited Digital Presence",
+              "value": "Brands with no e-commerce presence. Companies with outdated websites or no mobile optimization. Brands selling only through physical retail without digital strategy. Companies with less than 1000 monthly website visitors. Businesses without product photography or digital assets."
+            },
+            {
+              "id": "glamar_ec_3",
+              "label": "Operational Constraints",
+              "value": "Companies in financial distress or undergoing restructuring. Brands being acquired or in M&A process. Companies with technology freeze or budget cuts. Brands with existing AR vendor contracts. Companies in regions with limited AR device penetration."
+            }
+          ]
+        },
+        "referenceCompanies": {
+          "label": "Reference Companies (Best-Fit Examples)",
+          "options": [
+            {
+              "id": "glamar_rc_1",
+              "label": "Indian D2C Beauty Leaders",
+              "value": "Sugar Cosmetics (D2C makeup brand with strong digital presence). Mamaearth (natural skincare with massive e-commerce). Plum Goodness (vegan beauty, tech-forward). Minimalist (skincare with ingredient focus). MyGlamm (beauty + tech integration)."
+            },
+            {
+              "id": "glamar_rc_2",
+              "label": "Global Beauty Brands",
+              "value": "L'Oreal (already using AR for virtual try-on). Sephora (omnichannel with virtual artist). NYX Cosmetics (digital-first approach). e.l.f. Cosmetics (D2C focus). Charlotte Tilbury (luxury with AR mirror)."
+            },
+            {
+              "id": "glamar_rc_3",
+              "label": "Beauty Retailers & Platforms",
+              "value": "Nykaa (India's largest beauty e-tailer). Purplle (growing beauty marketplace). Tata CLiQ Beauty (premium beauty platform). Amazon Beauty (marketplace with AR features). Flipkart Beauty (mass market e-commerce)."
+            }
+          ]
+        },
+        "additionalValidations": {
+          "label": "Other Validations by User",
+          "options": [
+            {
+              "id": "glamar_av_1",
+              "label": "Strict Qualification",
+              "value": "Must meet ALL mandatory criteria. Must have at least 3 positive indicators. Must avoid ALL exclusion criteria. Priority given to companies with existing AR/VR interest or initiatives."
+            },
+            {
+              "id": "glamar_av_2",
+              "label": "Balanced Qualification",
+              "value": "Must meet at least 3 of 4 mandatory criteria. Must have at least 2 positive indicators. Must not match more than 1 exclusion criterion. Consider companies showing openness to technology adoption."
+            },
+            {
+              "id": "glamar_av_3",
+              "label": "Growth-Focused Qualification",
+              "value": "Prioritize companies with high growth trajectory. Focus on D2C and e-commerce native brands. Prefer companies with recent funding or expansion news. Consider smaller brands with strong digital-first DNA."
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+

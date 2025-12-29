@@ -67,6 +67,7 @@ export interface CampaignFilters {
   revenueMax: string;
   currency: string;
   locationType: string;
+  productName: string;
 }
 
 export interface CampaignState {
@@ -173,6 +174,7 @@ export const NewCampaignWizard = () => {
       revenueMax: '',
       currency: 'USD',
       locationType: 'country',
+      productName: '',
     },
     campaignId: null,
     prospects: [],

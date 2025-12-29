@@ -10,6 +10,28 @@ import {
   type CampaignContactListItem,
 } from '../../store';
 import { useCampaignWizard } from './NewCampaignWizard';
+import productIcpOptions from '../../assets/product_icp_options.json';
+
+// Type for Product ICP options
+interface IcpOption {
+  id: string;
+  label: string;
+  value: string;
+}
+
+interface IcpQuestion {
+  label: string;
+  options: IcpOption[];
+}
+
+interface ProductIcpConfig {
+  description: string;
+  questions: Record<string, IcpQuestion>;
+}
+
+interface ProductIcpOptionsJson {
+  products: Record<string, ProductIcpConfig>;
+}
 
 const PAGE_SIZE = 100;
 
@@ -23,6 +45,13 @@ const toLabel = (value: unknown): string => {
 export const Step2CompanyQualification = () => {
   const { state, setCompanyQualificationMode, nextStep, prevStep, setLoading, setQualifiedContacts } = useCampaignWizard();
   const campaignId = state.campaignId;
+  
+  // Check if selected product has predefined ICP options
+  const selectedProductName = state.filters.productName;
+  const icpOptionsData = productIcpOptions as ProductIcpOptionsJson;
+  const productConfig = selectedProductName ? icpOptionsData.products[selectedProductName] : undefined;
+  const hasProductIcp = !!productConfig;
+  const productQuestions = productConfig?.questions ?? {};
 
   const [page, setPage] = useState(1);
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<Set<string>>(new Set());
@@ -474,21 +503,43 @@ export const Step2CompanyQualification = () => {
 
             {aiView === 'setup' ? (
               <>
+              {hasProductIcp && (
+                <div className="product-icp-banner">
+                  <span className="product-icp-badge">{selectedProductName} ICP</span>
+                  <span>Select predefined criteria from the dropdowns below for quick AI qualification setup.</span>
+                </div>
+              )}
               <div className="ai-setup-grid">
               <div className="ai-setup-field">
                 <label>
                   Comprehensive relevance criteria <span className="ai-required">*</span>
                 </label>
-                <textarea
-                  value={aiSetup.comprehensiveCriteria}
-                  onChange={(e) => {
-                    setAiSetupSaved(false);
-                    setAiSetup((p) => ({ ...p, comprehensiveCriteria: e.target.value }));
-                  }}
-                  required
-                  className={aiSetupTouched && !aiSetup.comprehensiveCriteria.trim() ? 'invalid' : undefined}
-                  placeholder="Example: A relevant company must be a retailer that specializes in or has significant operations in selling or renting furniture, mattresses, or other heavy/bulky home goods items."
-                />
+                {hasProductIcp ? (
+                  <select
+                    value={aiSetup.comprehensiveCriteria}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, comprehensiveCriteria: e.target.value }));
+                    }}
+                    className={`product-icp-select ${aiSetupTouched && !aiSetup.comprehensiveCriteria.trim() ? 'invalid' : ''}`}
+                  >
+                    <option value="">-- Select criteria --</option>
+                    {productQuestions.comprehensiveCriteria?.options.map((opt) => (
+                      <option key={opt.id} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <textarea
+                    value={aiSetup.comprehensiveCriteria}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, comprehensiveCriteria: e.target.value }));
+                    }}
+                    required
+                    className={aiSetupTouched && !aiSetup.comprehensiveCriteria.trim() ? 'invalid' : undefined}
+                    placeholder="Example: A relevant company must be a retailer that specializes in or has significant operations in selling or renting furniture, mattresses, or other heavy/bulky home goods items."
+                  />
+                )}
                 {aiSetupTouched && !aiSetup.comprehensiveCriteria.trim() ? (
                   <div className="ai-field-error">This field is required.</div>
                 ) : null}
@@ -498,16 +549,32 @@ export const Step2CompanyQualification = () => {
                 <label>
                   Mandatory criteria (must-have) <span className="ai-required">*</span>
                 </label>
-                <textarea
-                  value={aiSetup.mandatoryCriteria}
-                  onChange={(e) => {
-                    setAiSetupSaved(false);
-                    setAiSetup((p) => ({ ...p, mandatoryCriteria: e.target.value }));
-                  }}
-                  required
-                  className={aiSetupTouched && !aiSetup.mandatoryCriteria.trim() ? 'invalid' : undefined}
-                  placeholder="Example: Primary business must involve furniture/mattresses/heavy home goods. Must have e-commerce OR physical stores. Must be B2C."
-                />
+                {hasProductIcp ? (
+                  <select
+                    value={aiSetup.mandatoryCriteria}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, mandatoryCriteria: e.target.value }));
+                    }}
+                    className={`product-icp-select ${aiSetupTouched && !aiSetup.mandatoryCriteria.trim() ? 'invalid' : ''}`}
+                  >
+                    <option value="">-- Select criteria --</option>
+                    {productQuestions.mandatoryCriteria?.options.map((opt) => (
+                      <option key={opt.id} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <textarea
+                    value={aiSetup.mandatoryCriteria}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, mandatoryCriteria: e.target.value }));
+                    }}
+                    required
+                    className={aiSetupTouched && !aiSetup.mandatoryCriteria.trim() ? 'invalid' : undefined}
+                    placeholder="Example: Primary business must involve furniture/mattresses/heavy home goods. Must have e-commerce OR physical stores. Must be B2C."
+                  />
+                )}
                 {aiSetupTouched && !aiSetup.mandatoryCriteria.trim() ? (
                   <div className="ai-field-error">This field is required.</div>
                 ) : null}
@@ -517,16 +584,32 @@ export const Step2CompanyQualification = () => {
                 <label>
                   Qualifying business models <span className="ai-required">*</span>
                 </label>
-                <textarea
-                  value={aiSetup.businessModels}
-                  onChange={(e) => {
-                    setAiSetupSaved(false);
-                    setAiSetup((p) => ({ ...p, businessModels: e.target.value }));
-                  }}
-                  required
-                  className={aiSetupTouched && !aiSetup.businessModels.trim() ? 'invalid' : undefined}
-                  placeholder="Example: Direct sales (online/in-store), rental services, made-to-order/custom furniture, hybrid sales+rental."
-                />
+                {hasProductIcp ? (
+                  <select
+                    value={aiSetup.businessModels}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, businessModels: e.target.value }));
+                    }}
+                    className={`product-icp-select ${aiSetupTouched && !aiSetup.businessModels.trim() ? 'invalid' : ''}`}
+                  >
+                    <option value="">-- Select criteria --</option>
+                    {productQuestions.businessModels?.options.map((opt) => (
+                      <option key={opt.id} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <textarea
+                    value={aiSetup.businessModels}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, businessModels: e.target.value }));
+                    }}
+                    required
+                    className={aiSetupTouched && !aiSetup.businessModels.trim() ? 'invalid' : undefined}
+                    placeholder="Example: Direct sales (online/in-store), rental services, made-to-order/custom furniture, hybrid sales+rental."
+                  />
+                )}
                 {aiSetupTouched && !aiSetup.businessModels.trim() ? (
                   <div className="ai-field-error">This field is required.</div>
                 ) : null}
@@ -536,16 +619,32 @@ export const Step2CompanyQualification = () => {
                 <label>
                   Positive indicators (signals a strong fit) <span className="ai-required">*</span>
                 </label>
-                <textarea
-                  value={aiSetup.positiveIndicators}
-                  onChange={(e) => {
-                    setAiSetupSaved(false);
-                    setAiSetup((p) => ({ ...p, positiveIndicators: e.target.value }));
-                  }}
-                  required
-                  className={aiSetupTouched && !aiSetup.positiveIndicators.trim() ? 'invalid' : undefined}
-                  placeholder="Example: Multiple store locations, strong e-commerce + logistics, customizable options, white-glove delivery, financing/rental plans, metro coverage."
-                />
+                {hasProductIcp ? (
+                  <select
+                    value={aiSetup.positiveIndicators}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, positiveIndicators: e.target.value }));
+                    }}
+                    className={`product-icp-select ${aiSetupTouched && !aiSetup.positiveIndicators.trim() ? 'invalid' : ''}`}
+                  >
+                    <option value="">-- Select criteria --</option>
+                    {productQuestions.positiveIndicators?.options.map((opt) => (
+                      <option key={opt.id} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <textarea
+                    value={aiSetup.positiveIndicators}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, positiveIndicators: e.target.value }));
+                    }}
+                    required
+                    className={aiSetupTouched && !aiSetup.positiveIndicators.trim() ? 'invalid' : undefined}
+                    placeholder="Example: Multiple store locations, strong e-commerce + logistics, customizable options, white-glove delivery, financing/rental plans, metro coverage."
+                  />
+                )}
                 {aiSetupTouched && !aiSetup.positiveIndicators.trim() ? (
                   <div className="ai-field-error">This field is required.</div>
                 ) : null}
@@ -555,16 +654,32 @@ export const Step2CompanyQualification = () => {
                 <label>
                   Exclusion criteria (immediate disqualifiers) <span className="ai-required">*</span>
                 </label>
-                <textarea
-                  value={aiSetup.exclusionCriteria}
-                  onChange={(e) => {
-                    setAiSetupSaved(false);
-                    setAiSetup((p) => ({ ...p, exclusionCriteria: e.target.value }));
-                  }}
-                  required
-                  className={aiSetupTouched && !aiSetup.exclusionCriteria.trim() ? 'invalid' : undefined}
-                  placeholder="Example: Pure B2B suppliers, interior design services only, marketplaces without own inventory, only small decor items, office-only furniture."
-                />
+                {hasProductIcp ? (
+                  <select
+                    value={aiSetup.exclusionCriteria}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, exclusionCriteria: e.target.value }));
+                    }}
+                    className={`product-icp-select ${aiSetupTouched && !aiSetup.exclusionCriteria.trim() ? 'invalid' : ''}`}
+                  >
+                    <option value="">-- Select criteria --</option>
+                    {productQuestions.exclusionCriteria?.options.map((opt) => (
+                      <option key={opt.id} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <textarea
+                    value={aiSetup.exclusionCriteria}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, exclusionCriteria: e.target.value }));
+                    }}
+                    required
+                    className={aiSetupTouched && !aiSetup.exclusionCriteria.trim() ? 'invalid' : undefined}
+                    placeholder="Example: Pure B2B suppliers, interior design services only, marketplaces without own inventory, only small decor items, office-only furniture."
+                  />
+                )}
                 {aiSetupTouched && !aiSetup.exclusionCriteria.trim() ? (
                   <div className="ai-field-error">This field is required.</div>
                 ) : null}
@@ -572,18 +687,34 @@ export const Step2CompanyQualification = () => {
 
               <div className="ai-setup-field">
                 <label>
-                  Reference companies + why they’re relevant <span className="ai-required">*</span>
+                  Reference companies + why they're relevant <span className="ai-required">*</span>
                 </label>
-                <textarea
-                  value={aiSetup.referenceCompanies}
-                  onChange={(e) => {
-                    setAiSetupSaved(false);
-                    setAiSetup((p) => ({ ...p, referenceCompanies: e.target.value }));
-                  }}
-                  required
-                  className={aiSetupTouched && !aiSetup.referenceCompanies.trim() ? 'invalid' : undefined}
-                  placeholder="Example: The Sleep Company (mattress specialist, e-commerce). West Elm/Pottery Barn (multi-location + strong online). CityFurnish (rental)."
-                />
+                {hasProductIcp ? (
+                  <select
+                    value={aiSetup.referenceCompanies}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, referenceCompanies: e.target.value }));
+                    }}
+                    className={`product-icp-select ${aiSetupTouched && !aiSetup.referenceCompanies.trim() ? 'invalid' : ''}`}
+                  >
+                    <option value="">-- Select criteria --</option>
+                    {productQuestions.referenceCompanies?.options.map((opt) => (
+                      <option key={opt.id} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <textarea
+                    value={aiSetup.referenceCompanies}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, referenceCompanies: e.target.value }));
+                    }}
+                    required
+                    className={aiSetupTouched && !aiSetup.referenceCompanies.trim() ? 'invalid' : undefined}
+                    placeholder="Example: The Sleep Company (mattress specialist, e-commerce). West Elm/Pottery Barn (multi-location + strong online). CityFurnish (rental)."
+                  />
+                )}
                 {aiSetupTouched && !aiSetup.referenceCompanies.trim() ? (
                   <div className="ai-field-error">This field is required.</div>
                 ) : null}
@@ -593,16 +724,32 @@ export const Step2CompanyQualification = () => {
                 <label>
                   Additional validations <span className="ai-required">*</span>
                 </label>
-                <textarea
-                  value={aiSetup.additionalValidations}
-                  onChange={(e) => {
-                    setAiSetupSaved(false);
-                    setAiSetup((p) => ({ ...p, additionalValidations: e.target.value }));
-                  }}
-                  required
-                  className={aiSetupTouched && !aiSetup.additionalValidations.trim() ? 'invalid' : undefined}
-                  placeholder="Example: Must meet ALL mandatory criteria AND at least 2 positive indicators, and must avoid ALL exclusion criteria."
-                />
+                {hasProductIcp ? (
+                  <select
+                    value={aiSetup.additionalValidations}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, additionalValidations: e.target.value }));
+                    }}
+                    className={`product-icp-select ${aiSetupTouched && !aiSetup.additionalValidations.trim() ? 'invalid' : ''}`}
+                  >
+                    <option value="">-- Select criteria --</option>
+                    {productQuestions.additionalValidations?.options.map((opt) => (
+                      <option key={opt.id} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <textarea
+                    value={aiSetup.additionalValidations}
+                    onChange={(e) => {
+                      setAiSetupSaved(false);
+                      setAiSetup((p) => ({ ...p, additionalValidations: e.target.value }));
+                    }}
+                    required
+                    className={aiSetupTouched && !aiSetup.additionalValidations.trim() ? 'invalid' : undefined}
+                    placeholder="Example: Must meet ALL mandatory criteria AND at least 2 positive indicators, and must avoid ALL exclusion criteria."
+                  />
+                )}
                 {aiSetupTouched && !aiSetup.additionalValidations.trim() ? (
                   <div className="ai-field-error">This field is required.</div>
                 ) : null}

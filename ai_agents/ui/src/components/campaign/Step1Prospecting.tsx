@@ -3,14 +3,66 @@ import { useCampaignWizard } from './NewCampaignWizard';
 
 import {
   WIZARD_EMPLOYEE_COUNTS as EMPLOYEE_COUNTS,
-  WIZARD_INDUSTRIES as INDUSTRIES,
-  WIZARD_REGIONS as REGIONS,
 } from '../../store/api/wizardMockData';
+
+// Regions list (from Wide Prospecting)
+const REGIONS = [
+  'North America',
+  'South America', 
+  'Europe',
+  'APAC',
+  'EMEA',
+  'Africa',
+  'LATAM',
+];
+
+// Countries list (from Wide Prospecting)
+const COUNTRIES = [
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", 
+  "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", 
+  "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", 
+  "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", 
+  "Chile", "China", "Colombia", "Comoros", "Congo (Congo-Brazzaville)", "Costa Rica", "Croatia", "Cuba", "Cyprus", 
+  "Czech Republic", "Democratic Republic of the Congo", "Denmark", "Djibouti", "Dominica", "Dominican Republic", 
+  "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", 
+  "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", 
+  "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", 
+  "Iraq", "Ireland", "Israel", "Italy", "Ivory Coast", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", 
+  "Kiribati", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", 
+  "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", 
+  "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", 
+  "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", 
+  "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine State", "Panama", 
+  "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", 
+  "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", 
+  "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", 
+  "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", 
+  "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Tajikistan", "Tanzania", "Thailand", 
+  "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", 
+  "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", 
+  "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
+];
 import { useCreateCampaignFromProspectingJobMutation, useGetCampaignDetailsQuery } from '../../store';
+import lushaIndustryConfig from '../../assets/lusha_industry_config.json';
 
 const ITEMS_PER_PAGE = 10;
 const CURRENCIES = ['USD', 'INR'] as const;
 const LOCATION_TYPES = ['country', 'region'] as const;
+const PRODUCTS = [
+  'GaaS',
+  'DaaS',
+  'Storefront',
+  'StoreOS',
+  'Konnect',
+  'Commerce B2B',
+  'OMS',
+  'WMS',
+  'TMS',
+  'Fynd Logistics',
+  'AI PIM',
+  'PixelBin',
+  'GlamAR',
+] as const;
 
 export const Step1Prospecting = () => {
   const { state, setFilters, setCampaignId, nextStep, setLoading } = useCampaignWizard();
@@ -22,6 +74,20 @@ export const Step1Prospecting = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  
+  // Industry dropdown state
+  const [industrySearchQuery, setIndustrySearchQuery] = useState('');
+  const [collapsedIndustryGroups, setCollapsedIndustryGroups] = useState<Record<string, boolean>>(
+    () => lushaIndustryConfig.reduce((acc, main) => {
+      acc[main.main_industry] = true; // Start all collapsed
+      return acc;
+    }, {} as Record<string, boolean>)
+  );
+  const [isIndustryDropdownOpen, setIsIndustryDropdownOpen] = useState(false);
+  
+  // Location (country/region) dropdown state
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
 
   const { data: campaignDetailsData } = useGetCampaignDetailsQuery(
     createdCampaignId
@@ -50,8 +116,70 @@ export const Step1Prospecting = () => {
     }));
   };
 
-  const handleSingleSelect = (field: 'currency' | 'locationType', value: string) => {
+  const handleSingleSelect = (field: 'currency' | 'locationType' | 'productName', value: string) => {
     setLocalFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Industry dropdown helpers
+  const toggleIndustryCollapse = (mainIndustry: string) => {
+    setCollapsedIndustryGroups(prev => ({ ...prev, [mainIndustry]: !prev[mainIndustry] }));
+  };
+
+  const toggleSubIndustry = (subValue: string) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      industry: prev.industry.includes(subValue)
+        ? prev.industry.filter(v => v !== subValue)
+        : [...prev.industry, subValue],
+    }));
+  };
+
+  const toggleMainIndustry = (subValues: string[]) => {
+    const allSelected = subValues.every(v => localFilters.industry.includes(v));
+    setLocalFilters(prev => ({
+      ...prev,
+      industry: allSelected
+        ? prev.industry.filter(v => !subValues.includes(v))
+        : [...new Set([...prev.industry, ...subValues])],
+    }));
+  };
+
+  const industryQuery = industrySearchQuery.trim().toLowerCase();
+  const hasIndustryQuery = industryQuery.length > 0;
+  
+  const filteredIndustries = lushaIndustryConfig.filter(main => {
+    if (!hasIndustryQuery) return true;
+    const mainMatch = main.main_industry.toLowerCase().includes(industryQuery);
+    const subMatch = main.sub_industries.some((s: { value: string }) => s.value.toLowerCase().includes(industryQuery));
+    return mainMatch || subMatch;
+  });
+
+  // Location (country/region) dropdown helpers
+  const locationQuery = locationSearchQuery.trim().toLowerCase();
+  const hasLocationQuery = locationQuery.length > 0;
+  
+  // Get the list based on location type
+  const locationList = localFilters.locationType === 'country' ? COUNTRIES : REGIONS;
+  const filteredLocations = hasLocationQuery
+    ? locationList.filter(loc => loc.toLowerCase().includes(locationQuery))
+    : locationList;
+
+  const toggleLocation = (location: string) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      region: prev.region.includes(location)
+        ? prev.region.filter(v => v !== location)
+        : [...prev.region, location],
+    }));
+  };
+
+  // Clear region selections when location type changes
+  const handleLocationTypeChange = (type: string) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      locationType: type,
+      region: [], // Clear selections when switching type
+    }));
   };
 
   const handleFetchProspects = async () => {
@@ -70,6 +198,7 @@ export const Step1Prospecting = () => {
         location_type: localFilters.locationType || 'country',
         location: localFilters.region[0] || '',
         currency: localFilters.currency || 'USD',
+        product_name: localFilters.productName || '',
         prospecting_cycle_status: 'prospecting',
       };
 
@@ -141,38 +270,145 @@ export const Step1Prospecting = () => {
         <>
           {/* Filters Form */}
           <div className="filters-grid">
-            {/* Industry */}
+            {/* Product Name */}
             <div className="filter-group">
-              <label>Industry</label>
+              <label>Product Name</label>
               <div className="chip-select">
-                {INDUSTRIES.map(industry => (
+                {PRODUCTS.map(product => (
                   <button
-                    key={industry}
+                    key={product}
                     type="button"
-                    className={`chip ${localFilters.industry.includes(industry) ? 'selected' : ''}`}
-                    onClick={() => handleMultiSelect('industry', industry)}
+                    className={`chip ${localFilters.productName === product ? 'selected' : ''}`}
+                    onClick={() => handleSingleSelect('productName', product)}
                   >
-                    {industry}
+                    {product}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Region */}
+            {/* Industry Dropdown */}
             <div className="filter-group">
-              <label>Region / Country</label>
-              <div className="chip-select">
-                {REGIONS.map(region => (
-                  <button
-                    key={region}
-                    type="button"
-                    className={`chip ${localFilters.region.includes(region) ? 'selected' : ''}`}
-                    onClick={() => handleMultiSelect('region', region)}
+              <label>Industry</label>
+              <div className="industry-dropdown-container">
+                <button
+                  type="button"
+                  className="industry-dropdown-trigger"
+                  onClick={() => setIsIndustryDropdownOpen(!isIndustryDropdownOpen)}
+                >
+                  <span>
+                    {localFilters.industry.length > 0
+                      ? `${localFilters.industry.length} selected`
+                      : 'Select industries...'}
+                  </span>
+                  <svg
+                    className={`dropdown-arrow ${isIndustryDropdownOpen ? 'open' : ''}`}
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
                   >
-                    {region}
-                  </button>
-                ))}
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {isIndustryDropdownOpen && (
+                  <div className="industry-dropdown-panel">
+                    <input
+                      type="text"
+                      className="industry-search-input"
+                      placeholder="Search industries..."
+                      value={industrySearchQuery}
+                      onChange={(e) => setIndustrySearchQuery(e.target.value)}
+                      autoFocus
+                    />
+
+                    <div className="industry-tree">
+                      {filteredIndustries.map(main => {
+                        const mainMatches = hasIndustryQuery && main.main_industry.toLowerCase().includes(industryQuery);
+                        const subs = hasIndustryQuery && !mainMatches
+                          ? main.sub_industries.filter((s: { value: string }) => s.value.toLowerCase().includes(industryQuery))
+                          : main.sub_industries;
+
+                        const allSubValues = subs.map((s: { value: string }) => s.value);
+                        const allSubsSelected = allSubValues.length > 0 && allSubValues.every((v: string) => localFilters.industry.includes(v));
+                        const someSubsSelected = allSubValues.some((v: string) => localFilters.industry.includes(v)) && !allSubsSelected;
+                        const isCollapsed = hasIndustryQuery ? false : !!collapsedIndustryGroups[main.main_industry];
+
+                        return (
+                          <div key={main.main_industry} className="industry-group">
+                            <div
+                              className="industry-main"
+                              onClick={() => !hasIndustryQuery && toggleIndustryCollapse(main.main_industry)}
+                            >
+                              <span className={`collapse-icon ${isCollapsed ? 'collapsed' : ''}`}>▶</span>
+                              <input
+                                type="checkbox"
+                                checked={allSubsSelected}
+                                ref={(el) => { if (el) el.indeterminate = someSubsSelected; }}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  toggleMainIndustry(allSubValues);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span>{main.main_industry}</span>
+                            </div>
+
+                            {!isCollapsed && (
+                              <div className="industry-sub-list">
+                                {subs.map((sub: { value: string; id: number }) => (
+                                  <label key={sub.id} className="industry-sub">
+                                    <input
+                                      type="checkbox"
+                                      checked={localFilters.industry.includes(sub.value)}
+                                      onChange={() => toggleSubIndustry(sub.value)}
+                                    />
+                                    <span>{sub.value}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="industry-dropdown-footer">
+                      <button
+                        type="button"
+                        className="btn-small"
+                        onClick={() => setIsIndustryDropdownOpen(false)}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Show selected industries as chips */}
+              {localFilters.industry.length > 0 && (
+                <div className="selected-industries-chips">
+                  {localFilters.industry.slice(0, 5).map(ind => (
+                    <span key={ind} className="chip selected small">
+                      {ind}
+                      <button
+                        type="button"
+                        className="chip-remove"
+                        onClick={() => toggleSubIndustry(ind)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {localFilters.industry.length > 5 && (
+                    <span className="chip small">+{localFilters.industry.length - 5} more</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Location Type */}
@@ -184,12 +420,104 @@ export const Step1Prospecting = () => {
                     key={t}
                     type="button"
                     className={`chip ${localFilters.locationType === t ? 'selected' : ''}`}
-                    onClick={() => handleSingleSelect('locationType', t)}
+                    onClick={() => handleLocationTypeChange(t)}
                   >
                     {t}
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Region / Country Dropdown */}
+            <div className="filter-group">
+              <label>{localFilters.locationType === 'country' ? 'Country' : 'Region'}</label>
+              <div className="location-dropdown-container">
+                <button
+                  type="button"
+                  className="location-dropdown-trigger"
+                  onClick={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
+                >
+                  <span>
+                    {localFilters.region.length > 0
+                      ? `${localFilters.region.length} selected`
+                      : `Select ${localFilters.locationType === 'country' ? 'countries' : 'regions'}...`}
+                  </span>
+                  <svg
+                    className={`dropdown-arrow ${isLocationDropdownOpen ? 'open' : ''}`}
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {isLocationDropdownOpen && (
+                  <div className="location-dropdown-panel">
+                    <input
+                      type="text"
+                      className="location-search-input"
+                      placeholder={`Search ${localFilters.locationType === 'country' ? 'countries' : 'regions'}...`}
+                      value={locationSearchQuery}
+                      onChange={(e) => setLocationSearchQuery(e.target.value)}
+                      autoFocus
+                    />
+
+                    <div className="location-list">
+                      {filteredLocations.map(loc => (
+                        <label key={loc} className="location-item">
+                          <input
+                            type="checkbox"
+                            checked={localFilters.region.includes(loc)}
+                            onChange={() => toggleLocation(loc)}
+                          />
+                          <span>{loc}</span>
+                        </label>
+                      ))}
+                      {filteredLocations.length === 0 && (
+                        <div className="location-empty">No matches found</div>
+                      )}
+                    </div>
+
+                    <div className="location-dropdown-footer">
+                      <button
+                        type="button"
+                        className="btn-small"
+                        onClick={() => {
+                          setIsLocationDropdownOpen(false);
+                          setLocationSearchQuery('');
+                        }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Show selected locations as chips */}
+              {localFilters.region.length > 0 && (
+                <div className="selected-locations-chips">
+                  {localFilters.region.slice(0, 5).map(loc => (
+                    <span key={loc} className="chip selected small">
+                      {loc}
+                      <button
+                        type="button"
+                        className="chip-remove"
+                        onClick={() => toggleLocation(loc)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {localFilters.region.length > 5 && (
+                    <span className="chip small">+{localFilters.region.length - 5} more</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Employee Count */}

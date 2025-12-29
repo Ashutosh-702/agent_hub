@@ -123,6 +123,7 @@ export interface CreateCampaignFromProspectingJobPayload {
   location_type: string;
   location: string;
   currency: string;
+  product_name?: string;
   prospecting_cycle_status: string;
 }
 
