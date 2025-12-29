@@ -70,6 +70,9 @@ export interface CampaignFilters {
 
 export interface CampaignState {
   currentStep: number;
+  // Highest step reached for this campaign in the wizard UI.
+  // Used so that clicking back to an earlier step doesn't "lock" later completed steps.
+  maxStepReached: number;
   filters: CampaignFilters;
   campaignId: string | null;
   prospects: Prospect[];
@@ -144,6 +147,7 @@ export const NewCampaignWizard = () => {
   const navigate = useNavigate();
   const [state, setState] = useState<CampaignState>({
     currentStep: 1,
+    maxStepReached: 1,
     filters: {
       industry: [],
       region: [],
@@ -174,7 +178,9 @@ export const NewCampaignWizard = () => {
     try {
       const raw = window.sessionStorage.getItem(WIZARD_SESSION_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as { campaignId?: string | null; currentStep?: number } | null;
+      const parsed = JSON.parse(raw) as
+        | { campaignId?: string | null; currentStep?: number; maxStepReached?: number }
+        | null;
       if (!parsed) return;
 
       if (parsed.campaignId && !state.campaignId) {
@@ -185,6 +191,16 @@ export const NewCampaignWizard = () => {
             typeof parsed.currentStep === 'number' && parsed.currentStep >= 1 && parsed.currentStep <= STEPS.length
               ? parsed.currentStep
               : prev.currentStep,
+          maxStepReached:
+            typeof parsed.maxStepReached === 'number' &&
+            parsed.maxStepReached >= 1 &&
+            parsed.maxStepReached <= STEPS.length
+              ? parsed.maxStepReached
+              : typeof parsed.currentStep === 'number' &&
+                  parsed.currentStep >= 1 &&
+                  parsed.currentStep <= STEPS.length
+                ? parsed.currentStep
+                : prev.maxStepReached,
         }));
       }
     } catch {
@@ -198,12 +214,16 @@ export const NewCampaignWizard = () => {
     try {
       window.sessionStorage.setItem(
         WIZARD_SESSION_KEY,
-        JSON.stringify({ campaignId: state.campaignId, currentStep: state.currentStep })
+        JSON.stringify({
+          campaignId: state.campaignId,
+          currentStep: state.currentStep,
+          maxStepReached: state.maxStepReached,
+        })
       );
     } catch {
       // ignore storage failures
     }
-  }, [state.campaignId, state.currentStep]);
+  }, [state.campaignId, state.currentStep, state.maxStepReached]);
 
   // Scroll to top on mount and when step changes
   useEffect(() => {
@@ -564,7 +584,10 @@ export const NewCampaignWizard = () => {
   }, []);
 
   const nextStep = useCallback(() => {
-    setState(prev => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, 6) }));
+    setState(prev => {
+      const next = Math.min(prev.currentStep + 1, 6);
+      return { ...prev, currentStep: next, maxStepReached: Math.max(prev.maxStepReached, next) };
+    });
   }, []);
 
   const prevStep = useCallback(() => {
@@ -572,9 +595,11 @@ export const NewCampaignWizard = () => {
   }, []);
 
   const goToStep = useCallback((step: number) => {
-    if (step >= 1 && step <= 6) {
-      setState(prev => ({ ...prev, currentStep: step }));
-    }
+    if (step < 1 || step > 6) return;
+    setState(prev => {
+      if (step > prev.maxStepReached) return prev;
+      return { ...prev, currentStep: step };
+    });
   }, []);
 
   const setLoading = useCallback((loading: boolean, message = '', estimatedCount = 0) => {
@@ -637,13 +662,13 @@ export const NewCampaignWizard = () => {
           {STEPS.map((step, index) => (
             <React.Fragment key={step.id}>
               <div
-                className={`stepper-item ${state.currentStep === step.id ? 'active' : ''} ${state.currentStep > step.id ? 'completed' : ''}`}
-                onClick={() => state.currentStep > step.id && goToStep(step.id)}
+                className={`stepper-item ${state.currentStep === step.id ? 'active' : ''} ${state.maxStepReached > step.id ? 'completed' : ''}`}
+                onClick={() => step.id <= state.maxStepReached && goToStep(step.id)}
                 role="button"
-                tabIndex={state.currentStep > step.id ? 0 : -1}
+                tabIndex={step.id <= state.maxStepReached ? 0 : -1}
               >
                 <div className="stepper-circle">
-                  {state.currentStep > step.id ? (
+                  {state.maxStepReached > step.id ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>
