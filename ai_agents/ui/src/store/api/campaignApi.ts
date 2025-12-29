@@ -78,6 +78,13 @@ export interface GetCampaignsParams {
   product_name?: string;
   campaign_id?: string;
   status?: string;
+  prospecting_cycle_status?: string;
+}
+
+export interface GetProspectingCampaignsParams {
+  page: number;
+  limit: number;
+  prospecting_cycle_status?: string; // e.g., 'prospecting', 'company_qualification', 'contact_qualification', 'contact_enriched'
 }
 
 // Form submission payload
@@ -348,6 +355,22 @@ export const campaignApi = baseApi.injectEndpoints({
       },
       providesTags: ['Campaign'],
     }),
+
+    getProspectingCampaigns: builder.query<CampaignsResponse, GetProspectingCampaignsParams>({
+      query: ({ page, limit, prospecting_cycle_status }) => {
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: limit.toString(),
+        });
+        
+        if (prospecting_cycle_status) {
+          params.append('prospecting_cycle_status', prospecting_cycle_status);
+        }
+        
+        return `/api/v1/prospecting_campaigns?${params}`;
+      },
+      providesTags: ['Campaign'],
+    }),
     
     createCampaign: builder.mutation<CreateCampaignResponse, CreateCampaignPayload>({
       query: (payload) => ({
@@ -503,6 +526,7 @@ export const campaignApi = baseApi.injectEndpoints({
 
 export const { 
   useGetCampaignsQuery, 
+  useGetProspectingCampaignsQuery,
   useCreateCampaignMutation,
   useCreateCampaignFromProspectingJobMutation,
   useGetCampaignDetailsQuery,

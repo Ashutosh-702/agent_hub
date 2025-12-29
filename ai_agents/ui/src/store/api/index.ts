@@ -2,7 +2,8 @@
 export { baseApi } from './baseApi';
 export { 
   campaignApi, 
-  useGetCampaignsQuery, 
+  useGetCampaignsQuery,
+  useGetProspectingCampaignsQuery,
   useCreateCampaignMutation,
   useCreateCampaignFromProspectingJobMutation,
   useGetCampaignDetailsQuery,
@@ -22,6 +23,7 @@ export type {
   Campaign, 
   CampaignsResponse, 
   GetCampaignsParams,
+  GetProspectingCampaignsParams,
   CreateCampaignPayload,
   CreateCampaignResponse,
   CreateCampaignFromProspectingJobPayload,

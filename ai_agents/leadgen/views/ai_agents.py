@@ -200,6 +200,32 @@ async def get_campaigns(query_params: Campaigns = Depends()) -> Dict[str, Any]:
 
     return response_data.dict()
 
+
+async def get_prospecting_campaigns(
+    page: int = 1,
+    limit: int = 10,
+    prospecting_cycle_status: str = None
+) -> Dict[str, Any]:
+    """
+    Get campaigns filtered by prospecting_cycle.status.
+    Only returns campaigns that have prospecting_cycle.status defined.
+    
+    Query params:
+    - page: Page number (default 1)
+    - limit: Page size (default 10)
+    - prospecting_cycle_status: Filter by specific status (e.g., 'prospecting', 'company_qualification', 'contact_qualification', 'contact_enriched')
+    """
+    response_data = ResponseData.model_construct(data={}, success=False)
+    leadgen_campaigns_helper = CampaignsHelper()
+
+    response = await leadgen_campaigns_helper.get_prospecting_campaigns(page, limit, prospecting_cycle_status)
+    response_data.success = True
+    response_data.data = response.get("campaigns")
+    response_data.pagination = response.get("pagination_info")
+
+    return response_data.dict()
+
+
 async def get_companies(query_params: Companies = Depends()) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)
     leadgen_companies_helper = CompaniesHelper()

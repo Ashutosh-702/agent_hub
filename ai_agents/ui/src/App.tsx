@@ -8,6 +8,7 @@ import { CampaignList } from './components/CampaignList';
 import { CampaignDetails } from './components/CampaignDetails';
 import { ComingSoon } from './components/ComingSoon';
 import { NewCampaignWizard } from './components/campaign';
+import { ProspectingCampaigns } from './components/ProspectingCampaigns';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 
 function AppContent() {
@@ -29,7 +30,8 @@ function AppContent() {
             <Route path="/master-data/companies/:companyId" element={<CompanyDetails />} />
             <Route path="/master-data/contacts" element={<ComingSoon />} />
             {/* Prospecting */}
-            <Route path="/prospecting" element={<Navigate to="/prospecting/wide" replace />} />
+            <Route path="/prospecting" element={<Navigate to="/prospecting/campaigns" replace />} />
+            <Route path="/prospecting/campaigns" element={<ProspectingCampaigns />} />
             <Route path="/prospecting/company" element={<ComingSoon />} />
             <Route path="/prospecting/contact" element={<ComingSoon />} />
             <Route path="/prospecting/wide" element={<Form />} />

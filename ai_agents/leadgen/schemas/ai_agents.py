@@ -245,6 +245,14 @@ class Campaigns(BaseModel):
     product_name: Optional[str] = None
     campaign_id: Optional[str] = None
     status: Optional[str] = None
+    prospecting_cycle_status: Optional[str] = None
+
+
+class ProspectingCampaigns(BaseModel):
+    """Schema for fetching campaigns filtered by prospecting_cycle.status"""
+    page: int = 1
+    limit: int = 10
+    prospecting_cycle_status: Optional[str] = None  # e.g., 'prospecting', 'company_qualification', 'contact_qualification', 'contact_enriched'
 
 class Companies(BaseModel):
     page: int = 1

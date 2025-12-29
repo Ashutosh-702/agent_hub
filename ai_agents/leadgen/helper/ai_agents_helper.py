@@ -393,6 +393,21 @@ class CampaignsHelper:
 
         return campaigns
 
+    async def get_prospecting_campaigns(self, page: int = 1, limit: int = 10, prospecting_cycle_status: str = None):
+        """Get campaigns that have prospecting_cycle.status defined (for prospecting workflow)"""
+        campaigns_data = await self.campaign_service.get_prospecting_campaigns(page, limit, prospecting_cycle_status)
+        # Add company/contact counts for each campaign
+        for campaign in campaigns_data.get("campaigns", []):
+            company_mappings_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign["_id"], "is_relevant": True})
+            total_company_mappings_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign["_id"]})
+            contact_runs_count = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count({"campaign_id": campaign["_id"]})
+
+            campaign["relevant_company_mappings_count"] = company_mappings_count
+            campaign["total_company_mappings_count"] = total_company_mappings_count
+            campaign["contact_runs_count"] = contact_runs_count
+
+        return campaigns_data
+
     async def get_campaign_details_with_companies(self, query_params: CampaignDetailsWithCompanies):
         campaign = await self.campaign_service.get_campaign_details(query_params.campaign_id)
         query = {}

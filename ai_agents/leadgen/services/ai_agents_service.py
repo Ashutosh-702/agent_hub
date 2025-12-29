@@ -248,7 +248,22 @@ class CampaignService:
             query["ownership.product_name"] = query_params.product_name
         if query_params.status:
             query["lifecycle.status"] = query_params.status
+        if query_params.prospecting_cycle_status:
+            query["prospecting_cycle.status"] = query_params.prospecting_cycle_status
         campaigns, pagination_info = await self.campaign_dao.get_campaigns_paginated(query, query_params.page, query_params.limit)
+        serialized_campaigns = serialize_objectid(campaigns)
+        return {"campaigns": serialized_campaigns, "pagination_info": pagination_info}
+
+    async def get_prospecting_campaigns(self, page: int = 1, limit: int = 10, prospecting_cycle_status: str = None):
+        """Get campaigns that have prospecting_cycle.status defined (i.e., are part of prospecting workflow)"""
+        query = {
+            "prospecting_cycle.status": {"$exists": True, "$ne": None}
+        }
+        # If specific status provided, filter by it
+        if prospecting_cycle_status:
+            query["prospecting_cycle.status"] = prospecting_cycle_status
+        
+        campaigns, pagination_info = await self.campaign_dao.get_campaigns_paginated(query, page, limit)
         serialized_campaigns = serialize_objectid(campaigns)
         return {"campaigns": serialized_campaigns, "pagination_info": pagination_info}
 

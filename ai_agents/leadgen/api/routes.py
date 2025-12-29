@@ -16,6 +16,7 @@ from ai_agents.leadgen.views.ai_agents import (
     count_company_mappings,
     apollo_contact_enrichment,
     get_campaigns,
+    get_prospecting_campaigns,
     get_companies,
     get_company_details_with_contacts,
     get_campaign_details_with_companies,
@@ -119,6 +120,13 @@ router.add_api_route(
     "/campaigns",
     methods=["GET"],
     endpoint=get_campaigns,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/prospecting_campaigns",
+    methods=["GET"],
+    endpoint=get_prospecting_campaigns,
     response_model=ResponseData,
 )
 

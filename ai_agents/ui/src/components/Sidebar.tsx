@@ -104,6 +104,7 @@ const menuItems: MenuItem[] = [
     label: 'Prospecting', 
     icon: Icons.prospecting,
     children: [
+      { path: '/prospecting/campaigns', label: 'Campaign Prospecting', icon: Icons.campaign },
       { path: '/prospecting/company', label: 'Company Prospecting', icon: Icons.companyProspecting },
       { path: '/prospecting/contact', label: 'Contact Prospecting', icon: Icons.contactProspecting },
       { path: '/prospecting/wide', label: 'Wide Prospecting', icon: Icons.wideProspecting },

@@ -1,5 +1,6 @@
 import React, { useState, createContext, useContext, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useLazyGetCampaignDetailsQuery } from '../../store';
 import './CampaignWizard.css';
 import { Step1Prospecting } from './Step1Prospecting';
 import { Step2CompanyQualification } from './Step2CompanyQualification';
@@ -143,8 +144,24 @@ const STEPS = [
 const DEFAULT_DECK_URL = 'https://decks.example.com/default/standard-company-deck.pdf';
 const WIZARD_SESSION_KEY = 'agent_hub_campaign_wizard_session_v1';
 
+// Derive wizard step from prospecting_cycle.status (ONLY - lifecycle.status is ignored)
+const deriveStepFromCycleStatus = (cycleStatus?: string): number => {
+  if (cycleStatus === 'contact_enriched') return 4;
+  if (cycleStatus === 'contact_qualification') return 3;
+  if (cycleStatus === 'company_qualification') return 2;
+  if (cycleStatus === 'prospecting') return 1;
+  return 1; // Default to step 1
+};
+
 export const NewCampaignWizard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [fetchCampaignDetails] = useLazyGetCampaignDetailsQuery();
+  
+  // Check if we're resuming an existing campaign (has campaign_id in URL)
+  const urlCampaignId = new URLSearchParams(location.search).get('campaign_id');
+  const isResumingCampaign = !!urlCampaignId;
+  
   const [state, setState] = useState<CampaignState>({
     currentStep: 1,
     maxStepReached: 1,
@@ -173,9 +190,16 @@ export const NewCampaignWizard = () => {
 
   const [isComplete, setIsComplete] = useState(false);
 
-  // Restore wizard progress (campaignId + step) on refresh.
+  // Restore wizard progress (campaignId + step) on refresh - ONLY when resuming a campaign.
+  // When creating a NEW campaign (no campaign_id in URL), start fresh.
   useEffect(() => {
     try {
+      // If NOT resuming a campaign (no campaign_id in URL), clear session storage and start fresh
+      if (!isResumingCampaign) {
+        window.sessionStorage.removeItem(WIZARD_SESSION_KEY);
+        return;
+      }
+      
       const raw = window.sessionStorage.getItem(WIZARD_SESSION_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as
@@ -183,7 +207,8 @@ export const NewCampaignWizard = () => {
         | null;
       if (!parsed) return;
 
-      if (parsed.campaignId && !state.campaignId) {
+      // Only restore if the saved campaignId matches the URL campaign_id
+      if (parsed.campaignId === urlCampaignId && !state.campaignId) {
         setState((prev) => ({
           ...prev,
           campaignId: parsed.campaignId || null,
@@ -207,7 +232,45 @@ export const NewCampaignWizard = () => {
       // ignore storage corruption
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isResumingCampaign, urlCampaignId]);
+
+  // When resuming a campaign, fetch its details and derive the correct step from prospecting_cycle.status
+  useEffect(() => {
+    if (!isResumingCampaign || !urlCampaignId) return;
+    
+    let cancelled = false;
+    const fetchAndSetStep = async () => {
+      try {
+        const res = await fetchCampaignDetails({ campaign_id: urlCampaignId, page: 1, limit: 1 }).unwrap();
+        if (cancelled) return;
+        
+        const campaign = res?.data?.campaign;
+        const cycleStatus = campaign?.prospecting_cycle?.status;
+        const derivedStep = deriveStepFromCycleStatus(cycleStatus);
+        
+        setState((prev) => ({
+          ...prev,
+          campaignId: urlCampaignId,
+          currentStep: derivedStep,
+          maxStepReached: Math.max(prev.maxStepReached, derivedStep),
+        }));
+      } catch (err) {
+        // If fetch fails, still set the campaignId but stay on step 1
+        if (!cancelled) {
+          setState((prev) => ({
+            ...prev,
+            campaignId: urlCampaignId,
+          }));
+        }
+      }
+    };
+    
+    void fetchAndSetStep();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [isResumingCampaign, urlCampaignId, fetchCampaignDetails]);
 
   // Persist wizard progress (minimal) so refresh doesn't reset to step 1.
   useEffect(() => {
