@@ -264,6 +264,10 @@ class CampaignDetailsWithCompanies(BaseModel):
     limit: int = 10
 
 
+class CompanyQualificationProgress(BaseModel):
+    campaign_id: str
+
+
 class ApolloContactEnrichment(BaseModel):
     company_domain: List[str] = Field(description="List of company domains to enrich contacts for")
     interested_product: str = Field(description="Interested product to enrich contacts for")

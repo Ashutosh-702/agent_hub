@@ -226,6 +226,40 @@ export interface UpdateApolloContactEnrichmentStatusResponse {
   errors?: string[];
 }
 
+export interface AiCompanyQualificationPayload {
+  campaign_id: string;
+  web_prompt: string;
+}
+
+export interface AiCompanyQualificationResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+    campaign_id?: string;
+  };
+  errors?: string[];
+}
+
+export interface CompanyQualificationProgressData {
+  campaign_id: string;
+  status: 'not_started' | 'queued' | 'running' | 'completed' | 'failed';
+  request_id?: string | null;
+  started_at?: string | null;
+  updated_at?: string | null;
+  error?: string | null;
+  progress: {
+    total: number;
+    processed: number;
+    relevant: number;
+  };
+}
+
+export interface CompanyQualificationProgressResponse {
+  success: boolean;
+  data?: CompanyQualificationProgressData;
+  errors?: string[];
+}
+
 export interface CampaignContactListItem {
   _id: string;
   campaign_id: string;
@@ -387,6 +421,26 @@ export const campaignApi = baseApi.injectEndpoints({
       invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
     }),
 
+    aiCompanyQualification: builder.mutation<AiCompanyQualificationResponse, AiCompanyQualificationPayload>({
+      query: (payload) => ({
+        url: '/api/v1/ai_company_qualification',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    companyQualificationProgress: builder.query<CompanyQualificationProgressResponse, { campaign_id: string }>({
+      query: ({ campaign_id }) => {
+        const params = new URLSearchParams({ campaign_id });
+        return {
+          url: `/api/v1/company_qualification_progress?${params}`,
+          method: 'GET',
+        };
+      },
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
     getCampaignContactList: builder.query<GetCampaignContactListResponse, GetCampaignContactListParams>({
       query: ({ campaign_id, page, limit }) => {
         const params = new URLSearchParams({
@@ -414,6 +468,8 @@ export const {
   useGetApolloContactListMutation,
   useEnrichApolloContactListMutation,
   useUpdateApolloContactEnrichmentStatusMutation,
+  useAiCompanyQualificationMutation,
+  useCompanyQualificationProgressQuery,
   useGetCampaignContactListQuery,
   useLazyGetCampaignContactListQuery,
 } = campaignApi;

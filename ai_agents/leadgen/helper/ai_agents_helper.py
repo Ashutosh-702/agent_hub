@@ -427,6 +427,42 @@ class CampaignsHelper:
         serialized_companies = serialize_objectid(companies)
         return {"campaign": serialized_campaign, "companies": serialized_companies, "pagination_info": pagination_info}
 
+    async def get_company_qualification_progress(self, campaign_id: str):
+        """
+        Lightweight progress info for long-running AI company qualification.
+        Falls back to computing counts from campaign_company_runs if progress isn't present.
+        """
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException("Campaign not found")
+
+        job = campaign.get("prospecting_cycle", {}).get("company_qualification_ai") or {}
+
+        total = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign_id})
+        remaining = await self.campaign_company_runs_dao.get_campaign_company_runs_count(
+            {"campaign_id": campaign_id, "is_relevant": {"$exists": False}}
+        )
+        relevant = await self.campaign_company_runs_dao.get_campaign_company_runs_count(
+            {"campaign_id": campaign_id, "is_relevant": True}
+        )
+        processed = max(total - remaining, 0)
+
+        # Merge computed progress with stored job info
+        progress = (job.get("progress") or {}).copy()
+        progress["total"] = int(progress.get("total") or total)
+        progress["processed"] = int(progress.get("processed") or processed)
+        progress["relevant"] = int(progress.get("relevant") or relevant)
+
+        return {
+            "campaign_id": str(campaign.get("_id")),
+            "status": job.get("status") or "not_started",
+            "request_id": job.get("request_id"),
+            "started_at": job.get("started_at"),
+            "updated_at": job.get("updated_at"),
+            "error": job.get("error"),
+            "progress": progress,
+        }
+
     async def manual_company_qualification(self, query_params: ManualCompanyQualification):
         campaign_id = query_params.campaign_id
         company_ids = query_params.company_ids
@@ -453,11 +489,37 @@ class CampaignsHelper:
         if not web_prompt:
             raise ApiException("Web prompt is required")
 
+        request_id = str(uuid.uuid4())
+
+        # Initialize / update AI qualification job status + progress (non-blocking background job)
+        total = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign_id})
+        remaining = await self.campaign_company_runs_dao.get_campaign_company_runs_count(
+            {"campaign_id": campaign_id, "is_relevant": {"$exists": False}}
+        )
+        relevant = await self.campaign_company_runs_dao.get_campaign_company_runs_count(
+            {"campaign_id": campaign_id, "is_relevant": True}
+        )
+        processed = max(total - remaining, 0)
+
         update_campaign = await self.campaign_dao.update_campaign(
             campaign_id,
-            {"prompts.web": web_prompt, "metadata.updated_at": datetime.utcnow()},
+            {
+                "prompts.web": web_prompt,
+                "metadata.updated_at": datetime.utcnow(),
+                "prospecting_cycle.company_qualification_ai": {
+                    "status": "queued",
+                    "request_id": request_id,
+                    "started_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                    "error": None,
+                    "progress": {
+                        "total": int(total),
+                        "processed": int(processed),
+                        "relevant": int(relevant),
+                    },
+                },
+            },
         )
-        request_id = str(uuid.uuid4())
 
         if not self.event_emitter:
             raise ApiException("EventBridge Producer not initialized")

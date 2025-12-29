@@ -2,6 +2,8 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useEffect, useMemo, useState } from 'react';
 import {
   useGetApolloContactListMutation,
+  useAiCompanyQualificationMutation,
+  useCompanyQualificationProgressQuery,
   useLazyGetCampaignContactListQuery,
   useGetCampaignDetailsQuery,
   useManualCompanyQualificationMutation,
@@ -26,12 +28,68 @@ export const Step2CompanyQualification = () => {
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<Set<string>>(new Set());
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isContactPolling, setIsContactPolling] = useState(false);
+  const [aiView, setAiView] = useState<'setup' | 'verify'>('setup');
+
+  const [aiSetup, setAiSetup] = useState({
+    comprehensiveCriteria: '',
+    mandatoryCriteria: '',
+    businessModels: '',
+    positiveIndicators: '',
+    exclusionCriteria: '',
+    referenceCompanies: '',
+    additionalValidations: '',
+  });
+  const [aiSetupSaved, setAiSetupSaved] = useState(false);
+  const [aiSetupTouched, setAiSetupTouched] = useState(false);
+  const [aiStopPolling, setAiStopPolling] = useState(false);
+
+  const isAiSetupValid =
+    aiSetup.comprehensiveCriteria.trim().length > 0 &&
+    aiSetup.mandatoryCriteria.trim().length > 0 &&
+    aiSetup.businessModels.trim().length > 0 &&
+    aiSetup.positiveIndicators.trim().length > 0 &&
+    aiSetup.exclusionCriteria.trim().length > 0 &&
+    aiSetup.referenceCompanies.trim().length > 0 &&
+    aiSetup.additionalValidations.trim().length > 0;
 
   const [manualCompanyQualification] = useManualCompanyQualificationMutation();
   const [queueApolloContactList] = useGetApolloContactListMutation();
   const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
+  const [aiCompanyQualification] = useAiCompanyQualificationMutation();
 
-  const queryArgs = campaignId ? { campaign_id: campaignId, page, limit: PAGE_SIZE } : skipToken;
+  // Always poll AI job progress when AI mode is selected (UI state like aiSetupSaved can reset on refresh),
+  // but stop polling once the job reaches a terminal state.
+  const shouldPollAiProgress = Boolean(campaignId && state.companyQualificationMode === 'ai');
+  const { data: aiProgressData } = useCompanyQualificationProgressQuery(
+    { campaign_id: campaignId || '' },
+    {
+      pollingInterval: shouldPollAiProgress && !aiStopPolling ? 15000 : 0,
+      skip: !shouldPollAiProgress,
+    }
+  );
+
+  // Once we observe a terminal status, stop polling (prevents continued network spam).
+  useEffect(() => {
+    const status = aiProgressData?.data?.status;
+    if (status === 'completed' || status === 'failed') {
+      setAiStopPolling(true);
+    }
+  }, [aiProgressData?.data?.status]);
+
+  // Auto-switch to Verify view once backend marks AI qualification as completed.
+  useEffect(() => {
+    if (state.companyQualificationMode !== 'ai') return;
+    const status = aiProgressData?.data?.status;
+    if (status === 'completed' && aiView === 'setup') {
+      setAiView('verify');
+    }
+  }, [aiProgressData?.data?.status, aiView, state.companyQualificationMode]);
+
+  const companyStatusFilter =
+    state.companyQualificationMode === 'ai' && aiView === 'verify' ? true : undefined;
+  const queryArgs = campaignId
+    ? { campaign_id: campaignId, page, limit: PAGE_SIZE, company_status: companyStatusFilter }
+    : skipToken;
   const { data, isFetching, isError } = useGetCampaignDetailsQuery(queryArgs);
 
   const companies = data?.data?.companies ?? [];
@@ -158,6 +216,26 @@ export const Step2CompanyQualification = () => {
     setSaveError(null);
     try {
       setLoading(true, 'Queueing Apollo contacts…');
+      await queueApolloContactList({ campaign_id: campaignId, enrichment_status: false }).unwrap();
+      setIsContactPolling(true);
+    } catch (e: unknown) {
+      const msg =
+        typeof e === 'object' && e && 'data' in e
+          ? JSON.stringify((e as any).data)
+          : 'Failed to queue Apollo contact fetch';
+      setSaveError(msg);
+      setLoading(false);
+    }
+  };
+
+  const handleAiVerifyContinue = async () => {
+    if (!campaignId) return;
+    await persistCurrentPage();
+
+    // Explicitly queue contacts (AI flow should behave like manual before Step 3)
+    setSaveError(null);
+    try {
+      setLoading(true, 'Fetching contacts from Apollo…');
       await queueApolloContactList({ campaign_id: campaignId, enrichment_status: false }).unwrap();
       setIsContactPolling(true);
     } catch (e: unknown) {
@@ -331,8 +409,8 @@ export const Step2CompanyQualification = () => {
                 </svg>
               </div>
               <h4>AI Qualification</h4>
-              <p>Coming soon.</p>
-              <span className="mode-tag ai">Soon</span>
+              <p>Answer a few prompts to define relevance criteria for AI.</p>
+              <span className="mode-tag ai">Setup</span>
             </div>
           </div>
         </div>
@@ -340,9 +418,367 @@ export const Step2CompanyQualification = () => {
 
       {state.companyQualificationMode === 'ai' && (
         <div className="manual-qualification">
-          <div className="empty-state">
-            <h3>AI Qualification</h3>
-            <p>Coming soon. Please use Manual Qualification for now.</p>
+          <div className="ai-qualification-setup">
+            <div className="ai-setup-header">
+              <h3>AI Qualification Setup</h3>
+              <p>Fill in the relevance criteria. More detail = better company prioritization.</p>
+            </div>
+
+            {aiProgressData?.data && aiProgressData.data.status !== 'not_started' ? (
+              <div style={{ marginTop: 16, padding: 12, borderRadius: 12, border: '1px solid #e4e7ed', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                  <div style={{ fontWeight: 700, color: '#111827' }}>
+                    AI Qualification: {aiProgressData.data.status}{' '}
+                    {/* Show a persistent spinner while polling is active (requests can be too fast to notice isFetching). */}
+                    {!aiStopPolling &&
+                    (aiProgressData.data.status === 'queued' || aiProgressData.data.status === 'running') ? (
+                      <span className="ai-progress-spinner" aria-label="Loading" />
+                    ) : null}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>
+                    Relevant: {aiProgressData.data.progress.relevant} / {aiProgressData.data.progress.total} (Processed: {aiProgressData.data.progress.processed})
+                  </div>
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ height: 8, borderRadius: 999, background: '#e5e7eb', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        height: '100%',
+                        width:
+                          aiProgressData.data.progress.total > 0
+                            ? `${Math.min(
+                                100,
+                                Math.round((aiProgressData.data.progress.processed / aiProgressData.data.progress.total) * 100)
+                              )}%`
+                            : '0%',
+                        background: 'rgba(46, 49, 190, 0.9)',
+                      }}
+                    />
+                  </div>
+                </div>
+                {aiProgressData.data.error ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626' }}>{aiProgressData.data.error}</div>
+                ) : null}
+                {aiProgressData.data.status === 'completed' ? (
+                  <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button className="btn secondary" onClick={() => setAiView('verify')}>
+                      Verify Qualified Companies
+                    </button>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                      Review & adjust AI-selected companies before moving to contacts.
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {aiView === 'setup' ? (
+              <>
+              <div className="ai-setup-grid">
+              <div className="ai-setup-field">
+                <label>
+                  Comprehensive relevance criteria <span className="ai-required">*</span>
+                </label>
+                <textarea
+                  value={aiSetup.comprehensiveCriteria}
+                  onChange={(e) => {
+                    setAiSetupSaved(false);
+                    setAiSetup((p) => ({ ...p, comprehensiveCriteria: e.target.value }));
+                  }}
+                  required
+                  className={aiSetupTouched && !aiSetup.comprehensiveCriteria.trim() ? 'invalid' : undefined}
+                  placeholder="Example: A relevant company must be a retailer that specializes in or has significant operations in selling or renting furniture, mattresses, or other heavy/bulky home goods items."
+                />
+                {aiSetupTouched && !aiSetup.comprehensiveCriteria.trim() ? (
+                  <div className="ai-field-error">This field is required.</div>
+                ) : null}
+              </div>
+
+              <div className="ai-setup-field">
+                <label>
+                  Mandatory criteria (must-have) <span className="ai-required">*</span>
+                </label>
+                <textarea
+                  value={aiSetup.mandatoryCriteria}
+                  onChange={(e) => {
+                    setAiSetupSaved(false);
+                    setAiSetup((p) => ({ ...p, mandatoryCriteria: e.target.value }));
+                  }}
+                  required
+                  className={aiSetupTouched && !aiSetup.mandatoryCriteria.trim() ? 'invalid' : undefined}
+                  placeholder="Example: Primary business must involve furniture/mattresses/heavy home goods. Must have e-commerce OR physical stores. Must be B2C."
+                />
+                {aiSetupTouched && !aiSetup.mandatoryCriteria.trim() ? (
+                  <div className="ai-field-error">This field is required.</div>
+                ) : null}
+              </div>
+
+              <div className="ai-setup-field">
+                <label>
+                  Qualifying business models <span className="ai-required">*</span>
+                </label>
+                <textarea
+                  value={aiSetup.businessModels}
+                  onChange={(e) => {
+                    setAiSetupSaved(false);
+                    setAiSetup((p) => ({ ...p, businessModels: e.target.value }));
+                  }}
+                  required
+                  className={aiSetupTouched && !aiSetup.businessModels.trim() ? 'invalid' : undefined}
+                  placeholder="Example: Direct sales (online/in-store), rental services, made-to-order/custom furniture, hybrid sales+rental."
+                />
+                {aiSetupTouched && !aiSetup.businessModels.trim() ? (
+                  <div className="ai-field-error">This field is required.</div>
+                ) : null}
+              </div>
+
+              <div className="ai-setup-field">
+                <label>
+                  Positive indicators (signals a strong fit) <span className="ai-required">*</span>
+                </label>
+                <textarea
+                  value={aiSetup.positiveIndicators}
+                  onChange={(e) => {
+                    setAiSetupSaved(false);
+                    setAiSetup((p) => ({ ...p, positiveIndicators: e.target.value }));
+                  }}
+                  required
+                  className={aiSetupTouched && !aiSetup.positiveIndicators.trim() ? 'invalid' : undefined}
+                  placeholder="Example: Multiple store locations, strong e-commerce + logistics, customizable options, white-glove delivery, financing/rental plans, metro coverage."
+                />
+                {aiSetupTouched && !aiSetup.positiveIndicators.trim() ? (
+                  <div className="ai-field-error">This field is required.</div>
+                ) : null}
+              </div>
+
+              <div className="ai-setup-field">
+                <label>
+                  Exclusion criteria (immediate disqualifiers) <span className="ai-required">*</span>
+                </label>
+                <textarea
+                  value={aiSetup.exclusionCriteria}
+                  onChange={(e) => {
+                    setAiSetupSaved(false);
+                    setAiSetup((p) => ({ ...p, exclusionCriteria: e.target.value }));
+                  }}
+                  required
+                  className={aiSetupTouched && !aiSetup.exclusionCriteria.trim() ? 'invalid' : undefined}
+                  placeholder="Example: Pure B2B suppliers, interior design services only, marketplaces without own inventory, only small decor items, office-only furniture."
+                />
+                {aiSetupTouched && !aiSetup.exclusionCriteria.trim() ? (
+                  <div className="ai-field-error">This field is required.</div>
+                ) : null}
+              </div>
+
+              <div className="ai-setup-field">
+                <label>
+                  Reference companies + why they’re relevant <span className="ai-required">*</span>
+                </label>
+                <textarea
+                  value={aiSetup.referenceCompanies}
+                  onChange={(e) => {
+                    setAiSetupSaved(false);
+                    setAiSetup((p) => ({ ...p, referenceCompanies: e.target.value }));
+                  }}
+                  required
+                  className={aiSetupTouched && !aiSetup.referenceCompanies.trim() ? 'invalid' : undefined}
+                  placeholder="Example: The Sleep Company (mattress specialist, e-commerce). West Elm/Pottery Barn (multi-location + strong online). CityFurnish (rental)."
+                />
+                {aiSetupTouched && !aiSetup.referenceCompanies.trim() ? (
+                  <div className="ai-field-error">This field is required.</div>
+                ) : null}
+              </div>
+
+              <div className="ai-setup-field">
+                <label>
+                  Additional validations <span className="ai-required">*</span>
+                </label>
+                <textarea
+                  value={aiSetup.additionalValidations}
+                  onChange={(e) => {
+                    setAiSetupSaved(false);
+                    setAiSetup((p) => ({ ...p, additionalValidations: e.target.value }));
+                  }}
+                  required
+                  className={aiSetupTouched && !aiSetup.additionalValidations.trim() ? 'invalid' : undefined}
+                  placeholder="Example: Must meet ALL mandatory criteria AND at least 2 positive indicators, and must avoid ALL exclusion criteria."
+                />
+                {aiSetupTouched && !aiSetup.additionalValidations.trim() ? (
+                  <div className="ai-field-error">This field is required.</div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="ai-setup-actions">
+              <button
+                className="btn secondary"
+                onClick={() => setCompanyQualificationMode(null)}
+              >
+                Back
+              </button>
+              <div style={{ flex: 1 }} />
+              {aiSetupSaved ? <span className="ai-setup-saved">Saved</span> : null}
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setAiSetupTouched(true);
+                  if (!isAiSetupValid) {
+                    setSaveError('Please fill all required fields before saving.');
+                    return;
+                  }
+                  if (!campaignId) {
+                    setSaveError('Missing campaign id. Please restart prospecting.');
+                    return;
+                  }
+
+                  const web_prompt =
+                    `Comprehensive Outline: ${aiSetup.comprehensiveCriteria}\n\n` +
+                    `Mandatory Criteria: ${aiSetup.mandatoryCriteria}\n\n` +
+                    `Relevant Business Models: ${aiSetup.businessModels}\n\n` +
+                    `Positive Indicators: ${aiSetup.positiveIndicators}\n\n` +
+                    `Exclusion Criteria: ${aiSetup.exclusionCriteria}\n\n` +
+                    `Reference Companies: ${aiSetup.referenceCompanies}\n\n` +
+                    `Other Validations by user: ${aiSetup.additionalValidations}`;
+
+                  setLoading(true, 'Saving AI criteria…');
+                  void (async () => {
+                    try {
+                      setSaveError(null);
+                      await aiCompanyQualification({ campaign_id: campaignId, web_prompt }).unwrap();
+                      setAiSetupSaved(true);
+                      setLoading(false);
+                    } catch (e) {
+                      const msg =
+                        typeof e === 'object' && e && 'data' in e
+                          ? JSON.stringify((e as any).data)
+                          : 'Failed to save AI criteria';
+                      setSaveError(msg);
+                      setLoading(false);
+                    }
+                  })();
+                }}
+              >
+                Save Setup
+              </button>
+            </div>
+              </>
+            ) : (
+              <div style={{ marginTop: 16 }}>
+                <div className="step-header" style={{ marginBottom: 12 }}>
+                  <h3 style={{ margin: 0 }}>Verify AI Qualified Companies</h3>
+                  <p style={{ margin: '6px 0 0 0' }}>
+                    This list shows companies marked relevant by AI. Click cards to deselect companies you don’t want.
+                  </p>
+                </div>
+
+                {/* Reuse the same manual list UI but filtered to is_relevant=true */}
+                {!isFetching && companies.length > 0 && (
+                  <div className="companies-qualification-list">
+                    <div className="select-all-header">
+                      <span className="select-all-text">
+                        Select companies (click cards)
+                        <span className="selected-count">
+                          ({selectedCompanyIds.size} of {companies.length} selected)
+                        </span>
+                      </span>
+                      <div style={{ flex: 1 }} />
+                      <button className="btn secondary" onClick={toggleSelectAllOnPage}>
+                        {allSelectedOnPage ? 'Deselect All (Page)' : 'Select All (Page)'}
+                      </button>
+                    </div>
+
+                    <div className="companies-cards-grid">
+                      {companies.map((c) => {
+                        const companyName = c.company?.identifiers?.name || c.company?.identifiers?.domain || c.company_id;
+                        const companyDomain = c.company?.identifiers?.domain;
+                        const industry = toLabel(c.company?.profile?.industry);
+                        const employeeCount = toLabel(c.company?.profile?.employee_count);
+                        const location = toLabel(c.company?.location?.name);
+                        const revenueMin = toLabel(c.company?.profile?.revenue_min);
+                        const revenueMax = toLabel(c.company?.profile?.revenue_max);
+                        const isSelected = selectedCompanyIds.has(c.company_id);
+                        return (
+                          <div
+                            key={c.company_id}
+                            className={`company-card ${isSelected ? 'selected' : ''}`}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => toggleCompany(c.company_id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                toggleCompany(c.company_id);
+                              }
+                            }}
+                          >
+                            <div className="company-card-header">
+                              <div className="company-card-title">
+                                <div className="company-name">{companyName}</div>
+                                {companyDomain && companyName !== companyDomain ? (
+                                  <div className="company-domain">{companyDomain}</div>
+                                ) : null}
+                              </div>
+                              <div className="company-card-selected-indicator" aria-hidden="true">
+                                {isSelected ? 'Selected' : 'Select'}
+                              </div>
+                            </div>
+                            <div className="company-card-body">
+                              <div className="company-kv-grid">
+                                {industry ? (
+                                  <div className="company-kv">
+                                    <div className="company-k">Industry</div>
+                                    <div className="company-v">{industry}</div>
+                                  </div>
+                                ) : null}
+                                {employeeCount ? (
+                                  <div className="company-kv">
+                                    <div className="company-k">Employees</div>
+                                    <div className="company-v">{employeeCount}</div>
+                                  </div>
+                                ) : null}
+                                {location ? (
+                                  <div className="company-kv">
+                                    <div className="company-k">Location</div>
+                                    <div className="company-v">{location}</div>
+                                  </div>
+                                ) : null}
+                                {revenueMin || revenueMax ? (
+                                  <div className="company-kv">
+                                    <div className="company-k">Revenue</div>
+                                    <div className="company-v">
+                                      {revenueMin && revenueMax ? `${revenueMin} - ${revenueMax}` : revenueMin || revenueMax}
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </div>
+                              {c.metadata?.relevance_reason ? (
+                                <div className="company-reason">{c.metadata.relevance_reason}</div>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="wizard-navigation">
+                  <button className="btn secondary" onClick={() => setAiView('setup')}>
+                    Back to Setup
+                  </button>
+                  <div style={{ flex: 1 }} />
+                  <button className="btn secondary" onClick={handlePrevPage} disabled={page <= 1 || isFetching}>
+                    Save & Prev Page
+                  </button>
+                  <button className="btn secondary" onClick={handleNextPage} disabled={!pagination?.has_next || isFetching}>
+                    Save & Next Page
+                  </button>
+                  <button className="btn primary" onClick={handleAiVerifyContinue} disabled={isFetching}>
+                    Continue to Contacts
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
