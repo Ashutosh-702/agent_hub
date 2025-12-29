@@ -260,6 +260,34 @@ export interface CompanyQualificationProgressResponse {
   errors?: string[];
 }
 
+export interface HubspotSyncCandidate {
+  contact_id: string;
+  company_id?: string | null;
+  company_name: string;
+  first_name: string;
+  last_name: string;
+  designation: string;
+  is_relevant?: boolean;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface GetHubspotSyncCandidatesParams {
+  campaign_id: string;
+  page: number;
+  limit: number;
+}
+
+export interface GetHubspotSyncCandidatesResponse {
+  success: boolean;
+  data: {
+    campaign_id: string;
+    contacts: HubspotSyncCandidate[];
+  };
+  pagination: Pagination | null;
+  errors: string[];
+}
+
 export interface CampaignContactListItem {
   _id: string;
   campaign_id: string;
@@ -455,6 +483,21 @@ export const campaignApi = baseApi.injectEndpoints({
       },
       providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
     }),
+
+    getHubspotSyncCandidates: builder.query<GetHubspotSyncCandidatesResponse, GetHubspotSyncCandidatesParams>({
+      query: ({ campaign_id, page, limit }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          page: String(page),
+          limit: String(limit),
+        });
+        return {
+          url: `/api/v1/hubspot_sync_candidates?${params}`,
+          method: 'GET',
+        };
+      },
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
   }),
 });
 
@@ -472,5 +515,7 @@ export const {
   useCompanyQualificationProgressQuery,
   useGetCampaignContactListQuery,
   useLazyGetCampaignContactListQuery,
+  useGetHubspotSyncCandidatesQuery,
+  useLazyGetHubspotSyncCandidatesQuery,
 } = campaignApi;
 

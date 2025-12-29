@@ -15,6 +15,8 @@ export {
   useCompanyQualificationProgressQuery,
   useGetCampaignContactListQuery,
   useLazyGetCampaignContactListQuery,
+  useGetHubspotSyncCandidatesQuery,
+  useLazyGetHubspotSyncCandidatesQuery,
 } from './campaignApi';
 export type { 
   Campaign, 
@@ -34,6 +36,9 @@ export type {
   AiCompanyQualificationResponse,
   CompanyQualificationProgressData,
   CompanyQualificationProgressResponse,
+  HubspotSyncCandidate,
+  GetHubspotSyncCandidatesParams,
+  GetHubspotSyncCandidatesResponse,
   CampaignContactListItem,
   GetCampaignContactListParams,
   GetCampaignContactListResponse,

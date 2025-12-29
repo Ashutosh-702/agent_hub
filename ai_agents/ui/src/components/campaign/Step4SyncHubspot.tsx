@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
-import { useCampaignWizard, type Contact } from './NewCampaignWizard';
+import { useEffect, useMemo, useState } from 'react';
+import { useCampaignWizard, type Company, type Contact } from './NewCampaignWizard';
+import { useLazyGetCampaignContactListQuery, useLazyGetHubspotSyncCandidatesQuery } from '../../store';
 
 interface CompanyWithContacts {
   id: string;
@@ -13,35 +14,222 @@ interface CompanyWithContacts {
 }
 
 export const Step4SyncHubspot = () => {
-  const { state, nextStep, prevStep, setQualifiedContacts } = useCampaignWizard();
+  const { state, nextStep, prevStep, setQualifiedCompanies, setQualifiedContacts } = useCampaignWizard();
 
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncComplete, setSyncComplete] = useState(false);
+  const [didHydrateFromApi, setDidHydrateFromApi] = useState(false);
+
+  const campaignId = state.campaignId;
+  const [fetchHubspotSyncCandidates] = useLazyGetHubspotSyncCandidatesQuery();
+  const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
 
   const contacts = state.qualifiedContacts;
+
+  // Hydrate Step 4 list from backend (enriched contacts source of truth).
+  // We only do this once to avoid resetting selection state while user interacts.
+  useEffect(() => {
+    if (!campaignId || didHydrateFromApi) return;
+
+    let cancelled = false;
+    const limit = 100;
+
+    const run = async () => {
+      try {
+        const fetchRelevantFromCampaignContactList = async () => {
+          const allFromCampaignList: Array<{
+            contact_id: string;
+            company_id?: string | null;
+            company_name: string;
+            first_name: string;
+            last_name: string;
+            designation: string;
+            is_relevant?: boolean;
+            email: string | null;
+            phone: string | null;
+          }> = [];
+
+          let p = 1;
+          let has = true;
+          let fetched = 0;
+          const MAX = 100;
+
+          while (has && fetched < MAX) {
+            fetched += 1;
+            const res = await fetchCampaignContactList({ campaign_id: campaignId, page: p, limit }).unwrap();
+            const contacts = res.data?.contacts ?? [];
+
+            // Strictly keep only relevant contacts.
+            const relevant = contacts.filter((c) => c.is_relevant === true);
+
+            allFromCampaignList.push(
+              ...relevant.map((c) => ({
+                contact_id: c.contact_id,
+                company_id: c.company_id,
+                company_name: c.contact_data?.company || 'Unknown Company',
+                first_name: c.contact_data?.firstname || '',
+                last_name: c.contact_data?.lastname || '',
+                designation: c.contact_data?.jobtitle || '',
+                is_relevant: c.is_relevant,
+                email: (c.contact_data?.email && c.contact_data.email[0]) || null,
+                phone: (c.contact_data?.phone && c.contact_data.phone[0]) || null,
+              }))
+            );
+
+            has = res.pagination?.has_next ?? false;
+            p += 1;
+          }
+
+          return allFromCampaignList;
+        };
+
+        const allContacts: Array<{
+          contact_id: string;
+          company_id?: string | null;
+          company_name: string;
+          first_name: string;
+          last_name: string;
+          designation: string;
+          is_relevant?: boolean;
+          email: string | null;
+          phone: string | null;
+        }> = [];
+
+        let page = 1;
+        let hasNext = true;
+        let pagesFetched = 0;
+        const MAX_PAGES = 100; // safety cap
+
+        try {
+          while (hasNext && pagesFetched < MAX_PAGES) {
+            pagesFetched += 1;
+            const res = await fetchHubspotSyncCandidates({ campaign_id: campaignId, page, limit }).unwrap();
+            // Only keep contacts that are relevant (is_relevant=true).
+            // Be tolerant if backend sends it as a string.
+            allContacts.push(
+              ...(res.data?.contacts ?? []).filter((c) => {
+                const v = (c as { is_relevant?: unknown }).is_relevant;
+                if (typeof v === 'string') return v.toLowerCase() === 'true';
+                return v === true;
+              })
+            );
+            hasNext = res.pagination?.has_next ?? false;
+            page += 1;
+          }
+        } catch {
+          // hubspot_sync_candidates is not implemented (or failed). Fall back to get_campaign_contact_list.
+          const fallback = await fetchRelevantFromCampaignContactList();
+          allContacts.push(...fallback);
+        }
+
+        // If the candidates endpoint is missing or returns nothing usable, fall back to
+        // get_campaign_contact_list (which includes is_relevant) and filter is_relevant=true.
+        if (allContacts.length === 0) {
+          const fallback = await fetchRelevantFromCampaignContactList();
+          allContacts.push(...fallback);
+        }
+
+        if (cancelled) return;
+
+        // Preserve any existing syncStatus the user may have already set (if any)
+        const existingStatus = new Map<string, Contact['syncStatus']>();
+        state.qualifiedContacts.forEach((c) => {
+          if (c.syncStatus) existingStatus.set(c.id, c.syncStatus);
+        });
+
+        // Ensure companies exist in wizard state so grouping works
+        const existingCompaniesById = new Map(state.qualifiedCompanies.map((c) => [c.id, c]));
+        const mergedCompanies: Company[] = [...state.qualifiedCompanies];
+
+        for (const c of allContacts) {
+          const resolvedCompanyId = c.company_id || c.company_name || 'unknown_company';
+          if (!existingCompaniesById.has(resolvedCompanyId)) {
+            const newCompany: Company = {
+              id: resolvedCompanyId,
+              name: c.company_name,
+              industry: '',
+              employeeCount: '',
+              revenue: '',
+              location: '',
+              website: '',
+              contacts: [],
+              syncStatus: 'not_synced',
+              isQualified: true,
+              qualificationStatus: 'qualified',
+            };
+            existingCompaniesById.set(resolvedCompanyId, newCompany);
+            mergedCompanies.push(newCompany);
+          }
+        }
+
+        const mappedContacts: Contact[] = allContacts.map((c) => ({
+          id: c.contact_id,
+          companyId: c.company_id || c.company_name || 'unknown_company',
+          companyName: c.company_name,
+          firstName: c.first_name || '',
+          lastName: c.last_name || '',
+          jobTitle: c.designation || '',
+          email: c.email || '',
+          phone: c.phone || undefined,
+          qualificationStatus: 'qualified',
+          syncStatus: existingStatus.get(c.contact_id) ?? 'not_synced',
+          personalization: {
+            messageStatus: 'pending',
+            deckStatus: 'pending',
+          },
+        }));
+
+        setQualifiedCompanies(mergedCompanies);
+        setQualifiedContacts(mappedContacts);
+        setDidHydrateFromApi(true);
+      } catch {
+        // If everything fails, fall back to existing wizard state.
+        setDidHydrateFromApi(true);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    campaignId,
+    didHydrateFromApi,
+    fetchCampaignContactList,
+    fetchHubspotSyncCandidates,
+    setQualifiedCompanies,
+    setQualifiedContacts,
+    state.qualifiedCompanies,
+    state.qualifiedContacts,
+  ]);
 
   // Group contacts by company
   const companiesWithContacts = useMemo(() => {
     const companyMap = new Map<string, CompanyWithContacts>();
     
     contacts.forEach(contact => {
-      const company = state.qualifiedCompanies.find(c => c.id === contact.companyId);
-      if (!company) return;
+      // Step4 used to depend on qualifiedCompanies being populated; if it isn't,
+      // we still want to render by grouping contacts using contact-level companyName/companyId.
+      const companyFromState = state.qualifiedCompanies.find(c => c.id === contact.companyId);
+      const companyId = companyFromState?.id || contact.companyId || contact.companyName || 'unknown_company';
+      const companyName = companyFromState?.name || contact.companyName || 'Unknown Company';
+      const companyIndustry = companyFromState?.industry || '';
+      const companyLocation = companyFromState?.location || '';
 
-      if (!companyMap.has(company.id)) {
-        companyMap.set(company.id, {
-          id: company.id,
-          name: company.name,
-          industry: company.industry,
-          location: company.location,
+      if (!companyMap.has(companyId)) {
+        companyMap.set(companyId, {
+          id: companyId,
+          name: companyName,
+          industry: companyIndustry,
+          location: companyLocation,
           contacts: [],
           isSelected: false,
           isSynced: false,
           isSyncing: false,
         });
       }
-      companyMap.get(company.id)!.contacts.push(contact);
+      companyMap.get(companyId)!.contacts.push(contact);
     });
 
     // Calculate selection/sync status for each company
@@ -289,6 +477,7 @@ export const Step4SyncHubspot = () => {
                           <span className="contact-name">{contact.firstName} {contact.lastName}</span>
                           <span className="contact-title">{contact.jobTitle}</span>
                           <span className="contact-email">{contact.email}</span>
+                        {contact.phone ? <span className="contact-phone">{contact.phone}</span> : null}
                         </div>
                         {contact.syncStatus === 'synced' && (
                           <span className="contact-synced-badge">✓</span>

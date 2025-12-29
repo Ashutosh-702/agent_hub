@@ -138,6 +138,7 @@ const STEPS = [
 
 // Default deck URL - used when user wants to replace AI-generated deck with default
 const DEFAULT_DECK_URL = 'https://decks.example.com/default/standard-company-deck.pdf';
+const WIZARD_SESSION_KEY = 'agent_hub_campaign_wizard_session_v1';
 
 export const NewCampaignWizard = () => {
   const navigate = useNavigate();
@@ -167,6 +168,42 @@ export const NewCampaignWizard = () => {
   });
 
   const [isComplete, setIsComplete] = useState(false);
+
+  // Restore wizard progress (campaignId + step) on refresh.
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(WIZARD_SESSION_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { campaignId?: string | null; currentStep?: number } | null;
+      if (!parsed) return;
+
+      if (parsed.campaignId && !state.campaignId) {
+        setState((prev) => ({
+          ...prev,
+          campaignId: parsed.campaignId || null,
+          currentStep:
+            typeof parsed.currentStep === 'number' && parsed.currentStep >= 1 && parsed.currentStep <= STEPS.length
+              ? parsed.currentStep
+              : prev.currentStep,
+        }));
+      }
+    } catch {
+      // ignore storage corruption
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist wizard progress (minimal) so refresh doesn't reset to step 1.
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        WIZARD_SESSION_KEY,
+        JSON.stringify({ campaignId: state.campaignId, currentStep: state.currentStep })
+      );
+    } catch {
+      // ignore storage failures
+    }
+  }, [state.campaignId, state.currentStep]);
 
   // Scroll to top on mount and when step changes
   useEffect(() => {
