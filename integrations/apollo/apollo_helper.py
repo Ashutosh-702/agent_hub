@@ -1025,6 +1025,10 @@ class ApolloHelper:
                 update_set["contact_data.lastname"] = enriched_person.get("last_name")
             update_set["enrichment_status"] = True
 
+            if(enriched_person.get("linkedin_url")):
+                update_set["linkedin_data.linkedin_url"] = enriched_person.get("linkedin_url")
+                update_set["linkedin_data.source"] = "APOLLO-ENRICHER"
+
             await self.contacts_dao.update_contact(contact_id, {"$set": update_set})
 
             return {
