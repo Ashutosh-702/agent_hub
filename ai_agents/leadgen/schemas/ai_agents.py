@@ -275,6 +275,8 @@ class CampaignDetailsWithCompanies(BaseModel):
 class CompanyQualificationProgress(BaseModel):
     campaign_id: str
 
+class SyncToHubspot(BaseModel):
+    campaign_id: str
 
 class ApolloContactEnrichment(BaseModel):
     company_domain: List[str] = Field(description="List of company domains to enrich contacts for")

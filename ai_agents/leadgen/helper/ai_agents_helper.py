@@ -19,6 +19,7 @@ from kafkautils.constants import (
     CONTACTS_ENRICHMENT,
     LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING,
     LEADGEN_APOLLO_CONTACT_LIST_PROCESSING,
+    LEADGEN_HUBSPOT_SYNC_PROCESSING,
 )
 from kafkautils.producer.event_helpers import emit_event_helper
 import uuid
@@ -378,6 +379,7 @@ class CampaignsHelper:
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.company_qualification_ai_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING]
         self.apollo_contact_list_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_APOLLO_CONTACT_LIST_PROCESSING]
+        self.hubspot_sync_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_HUBSPOT_SYNC_PROCESSING]
 
     async def get_campaigns(self, query_params: Campaigns):
         campaigns = await self.campaign_service.get_campaigns(query_params)
@@ -629,6 +631,49 @@ class CampaignsHelper:
             "pagination_info": pagination_info
         }
         return serialized_data
+
+    async def sync_to_hubspot(self, campaign_id: str):
+        """
+        Queue contacts for HubSpot sync via Kafka.
+        This emits an event to the HubSpot sync processing topic.
+        """
+        if not campaign_id:
+            raise ApiException("Campaign ID is required")
+
+        # Verify campaign exists
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException(f"Campaign not found: {campaign_id}")
+
+        request_id = str(uuid.uuid4())
+
+        if not self.event_emitter:
+            raise ApiException("EventBridge Producer not initialized")
+
+        event = {
+            "request_id": request_id,
+            "action": "sync_to_hubspot",
+            "campaign_id": campaign_id,
+            "timestamp": asyncio.get_event_loop().time()
+        }
+
+        await emit_event_helper(
+            event_emitter=self.event_emitter,
+            topics=self.hubspot_sync_kafka_config["topics"],
+            partition_value=request_id,
+            event=event,
+            event_meta={"service": "leadgen", "campaign_id": campaign_id}
+        )
+
+        logger.info(f"📤 HubSpot sync queued for campaign {campaign_id}: {request_id}")
+
+        return {
+            "message": "HubSpot sync queued",
+            "request_id": request_id,
+            "campaign_id": campaign_id
+        }
+
+
 class CompaniesHelper:
 
     def __init__(self):

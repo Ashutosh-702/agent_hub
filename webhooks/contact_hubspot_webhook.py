@@ -11,6 +11,7 @@ from database.collection_dao.contacts import ContactsDao
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaigns import CampaignsDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 from config.logging import logger
 from global_utils.constants import HUBSPOT_BOLTIC_WEBHOOK_URL
 
@@ -29,7 +30,7 @@ class ContactHubspotWebhook:
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
         self.campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-    
+        self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
     async def format_phone_number(self, phone: str, country_code: Optional[str] = None) -> str:
         if not phone:
             return ""
@@ -216,7 +217,7 @@ class ContactHubspotWebhook:
             logger.error(f"❌ Error sending webhook: {e}")
             return False
     
-    async def send_webhook_for_company(self, company_id: str, slack_metadata: dict) -> Dict[str, Any]:
+    async def send_webhook_for_company(self, company_id: str, slack_metadata: dict = None ) -> Dict[str, Any]:
         if not self.contacts_dao:
             logger.error("ContactsDao not initialized")
             return {
@@ -369,7 +370,7 @@ class ContactHubspotWebhook:
                 "webhook_failed": 0
             }
     
-    async def send_company_level_webhook(self, company_id: str, slack_metadata: dict) -> Dict[str, Any]:
+    async def send_company_level_webhook(self, company_id: str, slack_metadata: dict=None) -> Dict[str, Any]:
         if not self.contacts_dao:
             logger.error("ContactsDao not initialized")
             return {
@@ -383,6 +384,7 @@ class ContactHubspotWebhook:
         try:
             # Get interested product
             interested_product = None
+
             if self.campaign_id:
                 interested_product = await self.get_interested_product()
                 #for now, we are using the default product name
@@ -394,11 +396,30 @@ class ContactHubspotWebhook:
             logger.info(f"📇 Processing company-level webhook for company_id: {company_id}")
             
             # Get all contacts for the company (including those already sent)
-            contacts, pagination_info = await self.contacts_dao.get_paginated_contacts({
-                "company_id": ObjectId(company_id),
-                "contact_data.email": {"$ne": []}
-            }, page=1, limit=3
-            )
+            contacts = []
+            pagination_info = None
+            if self.campaign_id:
+                campaign_contact_runs = await self.campaign_contact_runs_dao.get_campaign_contact_runs({"campaign_id": self.campaign_id, "company_id": ObjectId(company_id), "is_relevant": True})
+
+                if not campaign_contact_runs:
+                    logger.info(f"  ⚠️ No campaign contact runs found for company {company_id}")
+                    return {
+                        "status": "success",
+                        "message": "No campaign contact runs found - webhook sent with message",
+                        "total_contacts": 0,
+                        "webhook_success": 1,
+                        "webhook_failed": 0
+                    }
+                else:
+                    contacts_ids = [campaign_contact_run.get("contact_id") for campaign_contact_run in campaign_contact_runs]
+                    if len(contacts_ids) > 0:
+                        contacts, pagination_info = await self.contacts_dao.get_paginated_contacts({"_id": {"$in": contacts_ids},"contact_data.email": {"$ne": []}}, page=1, limit=5)
+            else:
+                contacts, pagination_info = await self.contacts_dao.get_paginated_contacts({
+                    "company_id": ObjectId(company_id),
+                    "contact_data.email": {"$ne": []}
+                }, page=1, limit=3)
+                
             logger.info(f"  ✅ Found {len(contacts)} contacts for company-level webhook")
             logger.info(f"   Pagination info: {pagination_info}")
             if not contacts or len(contacts) == 0:
@@ -606,3 +627,48 @@ class ContactHubspotWebhook:
         except Exception as e:
             logger.error(f"❌ Error sending company-level webhook: {e}")
             return False
+
+
+    async def sync_to_hubspot(self, campaign_id: str):
+        try:
+            campaign = await self.campaigns_dao.get_campaign(campaign_id)
+            self.campaign_id = campaign_id
+            if not campaign:
+                logger.error(f"❌ Campaign not found for campaign_id: {campaign_id}")
+                return
+            if campaign.get("prospecting_cycle", {}).get("status") in ["draft","prospecting","company_qualification","contact_qualification","contact_enriched","hubspot_sync_in_progress"]:
+                logger.error(f"Campaign is not in contact qualification status for campaign_id: {campaign_id}")
+                return
+
+            campaign_company_runs_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign_id, "is_relevant": True,"$or": [{"sync_to_hubspot_status": "not_synced"}, {"sync_to_hubspot_status": {"$exists": False}}]})
+            if campaign_company_runs_count == 0:
+                logger.error(f"❌ No campaign company runs found for campaign_id: {campaign_id}")
+                return
+            total_pages = (campaign_company_runs_count + 1 - 1) // 1
+            for page in range(1, total_pages + 1):
+                campaign_company_runs, pagination_info = await self.campaign_company_runs_dao.get_campaign_company_runs_paginated({"campaign_id": campaign_id, "is_relevant": True,"$or": [{"sync_to_hubspot_status": "not_synced"}, {"sync_to_hubspot_status": {"$exists": False}}]}, 1, 1)
+                if not campaign_company_runs:
+                    logger.error(f"❌ No campaign company runs found for page {page}")
+                    continue
+                for campaign_company_run in campaign_company_runs:
+                    company_id = campaign_company_run.get("company_id")
+                    await self.send_company_level_webhook(str(company_id))
+                    campaign_company_run_id = campaign_company_run.get("_id")
+                    await self.campaign_company_runs_dao.update_campaign_company_run({"_id": campaign_company_run_id}, {"$set": {"sync_to_hubspot_status": "in_progress"}})
+            logger.info(f"✅ Synced to HubSpot for campaign_id: {campaign_id}")
+            await self.campaigns_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "hubspot_sync_in_progress"})
+            return {
+                "status": "success",
+                "message": "Synced to HubSpot",
+                "total_companies": campaign_company_runs_count,
+                "companies_synced": campaign_company_runs_count
+            }
+        except Exception as e:
+            logger.error(f"❌ Error syncing to HubSpot: {e}")
+            await self.campaigns_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "hubspot_sync_failed"})
+            return {
+                "status": "error",
+                "message": "Error syncing to HubSpot",
+                "total_companies": len(campaign_company_runs),
+                "companies_synced": len(campaign_company_runs)
+            }

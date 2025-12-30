@@ -646,3 +646,72 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
     except Exception as e:
         logger.error(f"❌ Error processing contacts enrichment: {e}")
         raise
+
+
+async def leadgen_hubspot_sync_processing_handler(message: Any):
+    """
+    Handler for HubSpot sync processing messages.
+    Receives campaign_id and syncs relevant contacts to HubSpot.
+    """
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+        else:
+            logger.error(f"🔍 payload missing in HubSpot sync message")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received HubSpot sync message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+        
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")
+        
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in HubSpot sync message")
+            return
+        
+        if action != "sync_to_hubspot":
+            logger.error(f"❌ Unknown action for HubSpot sync: {action}")
+            return
+        
+        logger.info(f"🔄 Processing HubSpot sync for campaign: {campaign_id}")
+
+        await sync_to_hubspot(request_id, campaign_id)
+
+    except Exception as e:
+        logger.error(f"❌ Error handling HubSpot sync message: {e}")
+        raise
+
+
+async def sync_to_hubspot(request_id: str, campaign_id: str):
+    """
+    Sync campaign contacts to HubSpot.
+    This function will contain the actual sync logic.
+    
+    Args:
+        request_id: Unique request identifier for tracking
+        campaign_id: Campaign ID to sync contacts from
+    """
+    try:
+        logger.info(f"🔍 Starting HubSpot sync for request: {request_id}, campaign: {campaign_id}")
+        
+        # Initialize database connection if needed
+        await initialize_consumer_connections()
+        
+        hubspot_webhook = ContactHubspotWebhook(campaign_id=campaign_id)
+        await hubspot_webhook.sync_to_hubspot(campaign_id)
+        
+        
+        logger.info(f"✅ HubSpot sync completed for campaign: {campaign_id}")
+        
+        return
+    except Exception as e:
+        logger.error(f"❌ Error syncing to HubSpot: {e}")
+        raise

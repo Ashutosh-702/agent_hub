@@ -24,7 +24,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     ApolloContactList,
     UpdateApolloContactEnrichmentStatus,
     GetCampaignContactList,
-    CompanyQualificationProgress
+    CompanyQualificationProgress,
+    SyncToHubspot
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -348,5 +349,15 @@ async def get_campaign_contact_list(query_params: GetCampaignContactList = Depen
     response_data.data = response.get("campaign")
     response_data.data["contacts"] = response.get("contacts")
     response_data.pagination = response.get("pagination_info")
+
+    return response_data.dict()
+
+async def sync_to_hubspot(query_params: SyncToHubspot = Body()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.sync_to_hubspot(query_params.campaign_id)
+    response_data.success = True
+    response_data.data = response
 
     return response_data.dict()

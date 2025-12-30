@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useCampaignWizard, type Company, type Contact } from './NewCampaignWizard';
 import { useLazyGetCampaignContactListQuery, useLazyGetHubspotSyncCandidatesQuery } from '../../store';
 
+// Feature flag to enable/disable selection functionality
+const ENABLE_SELECTION = false;
+
 interface CompanyWithContacts {
   id: string;
   name: string;
@@ -163,6 +166,7 @@ export const Step4SyncHubspot = () => {
           }
         }
 
+        // All contacts are pre-selected by default (ready to sync)
         const mappedContacts: Contact[] = allContacts.map((c) => ({
           id: c.contact_id,
           companyId: c.company_id || c.company_name || 'unknown_company',
@@ -173,7 +177,8 @@ export const Step4SyncHubspot = () => {
           email: c.email || '',
           phone: c.phone || undefined,
           qualificationStatus: 'qualified',
-          syncStatus: existingStatus.get(c.contact_id) ?? 'not_synced',
+          // Pre-select all contacts by default
+          syncStatus: existingStatus.get(c.contact_id) ?? 'selected',
           personalization: {
             messageStatus: 'pending',
             deckStatus: 'pending',
@@ -267,7 +272,10 @@ export const Step4SyncHubspot = () => {
   };
 
   // Toggle company selection (selects all contacts in company)
+  // Only works when ENABLE_SELECTION is true
   const toggleCompanySelection = (companyId: string) => {
+    if (!ENABLE_SELECTION) return;
+    
     const company = companiesWithContacts.find(c => c.id === companyId);
     if (!company || company.isSynced) return;
 
@@ -282,7 +290,10 @@ export const Step4SyncHubspot = () => {
   };
 
   // Select/Deselect all companies
+  // Only works when ENABLE_SELECTION is true
   const handleSelectAll = () => {
+    if (!ENABLE_SELECTION) return;
+    
     const allSelected = companiesWithContacts.every(c => c.isSelected || c.isSynced);
     const newStatus: Contact['syncStatus'] = allSelected ? 'not_synced' : 'selected';
     
@@ -331,8 +342,8 @@ export const Step4SyncHubspot = () => {
   return (
     <div className="step-container step-sync-hubspot">
       <div className="step-header">
-        <h2>Sync to HubSpot</h2>
-        <p>Select companies to sync their contacts to your CRM</p>
+        <h2>Review & Sync to HubSpot</h2>
+        <p>Review the qualified contacts before syncing to your CRM</p>
       </div>
 
       {/* Stats Bar */}
@@ -380,13 +391,13 @@ export const Step4SyncHubspot = () => {
                 if (el) el.indeterminate = someSelected;
               }}
               onChange={handleSelectAll}
-              disabled={syncComplete}
+              disabled={!ENABLE_SELECTION || syncComplete}
             />
             <span className="checkmark"></span>
           </label>
           <span className="select-all-text">
-            {allSelected ? 'Deselect All' : 'Select All'} 
-            <span className="selected-count">({selectedCompaniesCount} of {totalCompanies} companies selected)</span>
+            {allSelected ? 'All Selected' : 'Select All'} 
+            <span className="selected-count">({selectedCompaniesCount} of {totalCompanies} companies)</span>
           </span>
         </div>
 
@@ -399,14 +410,14 @@ export const Step4SyncHubspot = () => {
               key={company.id} 
               className={`sync-company-card ${company.isSelected ? 'selected' : ''} ${company.isSynced ? 'synced' : ''}`}
             >
-              <div className="company-row" onClick={() => !company.isSynced && toggleCompanySelection(company.id)}>
+              <div className="company-row" onClick={() => toggleExpandCompany(company.id)}>
                 <div className="company-select">
                   <label className="checkbox-container" onClick={(e) => e.stopPropagation()}>
                     <input 
                       type="checkbox"
                       checked={company.isSelected || company.isSynced}
                       onChange={() => toggleCompanySelection(company.id)}
-                      disabled={company.isSynced}
+                      disabled={!ENABLE_SELECTION || company.isSynced}
                     />
                     <span className="checkmark"></span>
                   </label>
@@ -414,8 +425,8 @@ export const Step4SyncHubspot = () => {
                 <div className="company-info">
                   <h4>{company.name}</h4>
                   <div className="company-meta">
-                    <span className="tag">{company.industry}</span>
-                    <span className="tag">{company.location}</span>
+                    {company.industry && <span className="tag">{company.industry}</span>}
+                    {company.location && <span className="tag">{company.location}</span>}
                     <span className="contacts-count">{company.contacts.length} contacts</span>
                   </div>
                 </div>
@@ -471,7 +482,7 @@ export const Step4SyncHubspot = () => {
                     {company.contacts.map((contact) => (
                       <div key={contact.id} className={`contact-card ${contact.syncStatus === 'synced' ? 'synced' : ''}`}>
                         <div className="contact-avatar">
-                          {contact.firstName[0]}{contact.lastName[0]}
+                          {contact.firstName[0] || '?'}{contact.lastName[0] || '?'}
                         </div>
                         <div className="contact-info">
                           <span className="contact-name">{contact.firstName} {contact.lastName}</span>

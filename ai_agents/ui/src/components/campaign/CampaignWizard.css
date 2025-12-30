@@ -1133,6 +1133,37 @@
   border: 1px solid var(--color-gray-200);
 }
 
+/* Review Header (Step 4 - no selection) */
+.review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: linear-gradient(135deg, #f0f9ff 0%, #e8f4ff 100%);
+  border: 1px solid #bae6fd;
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-3);
+}
+
+.review-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-gray-700);
+}
+
+/* Remove checkbox/select column from company cards in review mode */
+.step-sync-hubspot .company-select {
+  display: none;
+}
+
+.step-sync-hubspot .sync-company-card .company-row {
+  cursor: pointer;
+}
+
+.step-sync-hubspot .sync-company-card .company-info {
+  flex: 1;
+}
+
 .select-all-text {
   font-size: var(--text-sm);
   font-weight: 500;
