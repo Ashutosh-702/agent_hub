@@ -590,7 +590,7 @@ class ContactHubspotWebhook:
                 "contact_details": webhook_data.get("contact_details", [])
             }
             if self.company_id:
-                payload["company_id"] = self.company_id
+                payload["company_id"] = str(self.company_id)
             if self.campaign_id:
                 payload["campaign_id"] = self.campaign_id
             if webhook_data.get("slack_metadata"):
@@ -641,7 +641,7 @@ class ContactHubspotWebhook:
             if not campaign:
                 logger.error(f"❌ Campaign not found for campaign_id: {campaign_id}")
                 return
-            if campaign.get("prospecting_cycle", {}).get("status") in ["draft","prospecting","company_qualification","contact_qualification","contact_enriched","hubspot_sync_in_progress"]:
+            if campaign.get("prospecting_cycle", {}).get("status") in ["draft","prospecting","company_qualification","contact_qualification","hubspot_sync_in_progress","hubspot_sync_completed"]:
                 logger.error(f"Campaign is not in contact qualification status for campaign_id: {campaign_id}")
                 return
 
