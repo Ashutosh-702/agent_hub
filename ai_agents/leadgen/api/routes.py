@@ -31,6 +31,10 @@ from ai_agents.leadgen.views.ai_agents import (
     sync_to_hubspot,
     sync_from_hubspot_webhook,
     get_hubspot_synced_companies,
+    save_contact_personalization,
+    bulk_save_contact_personalization,
+    get_enrollment_contacts,
+    enroll_contacts_to_sequence,
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -228,5 +232,33 @@ router.add_api_route(
     "/get_hubspot_syncd_companies",
     methods=["GET"],
     endpoint=get_hubspot_synced_companies,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/save_contact_personalization",
+    methods=["POST"],
+    endpoint=save_contact_personalization,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/bulk_save_contact_personalization",
+    methods=["POST"],
+    endpoint=bulk_save_contact_personalization,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/enrollment_contacts",
+    methods=["GET"],
+    endpoint=get_enrollment_contacts,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/enroll_contacts_to_sequence",
+    methods=["POST"],
+    endpoint=enroll_contacts_to_sequence,
     response_model=ResponseData,
 )

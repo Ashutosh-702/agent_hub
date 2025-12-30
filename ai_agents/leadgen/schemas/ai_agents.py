@@ -278,6 +278,34 @@ class CompanyQualificationProgress(BaseModel):
 class SyncToHubspot(BaseModel):
     campaign_id: str
 
+class SaveContactPersonalization(BaseModel):
+    """Schema for saving personalization data for a contact"""
+    campaign_id: str
+    contact_id: str
+    email_id: str
+    personalized_message: str
+    ai_generated_deck: str  # Public URL of cloud storage
+
+class BulkSaveContactPersonalization(BaseModel):
+    """Schema for saving personalization data for multiple contacts"""
+    campaign_id: str
+    personalizations: List[Dict]  # List of {contact_id, email_id, personalized_message, ai_generated_deck}
+
+
+class GetEnrollmentContacts(BaseModel):
+    """Schema for fetching contacts ready for sequence enrollment"""
+    campaign_id: str
+    page: int = 1
+    limit: int = 100
+
+
+class EnrollContactsToSequence(BaseModel):
+    """Schema for enrolling contacts to a Lemlist sequence"""
+    campaign_id: str
+    sequence_id: str
+    sequence_name: str
+    contact_ids: Optional[List[str]] = None  # If None, enroll all personalized contacts
+
 class ApolloContactEnrichment(BaseModel):
     company_domain: List[str] = Field(description="List of company domains to enrich contacts for")
     interested_product: str = Field(description="Interested product to enrich contacts for")

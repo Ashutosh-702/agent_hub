@@ -556,6 +556,220 @@ export const campaignApi = baseApi.injectEndpoints({
       }),
       providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
     }),
+
+    // Personalization API - generates personalized content for contacts
+    generatePersonalization: builder.mutation<
+      {
+        success: boolean;
+        data: {
+          message: string;
+          request_id: string;
+          campaign_id: string;
+        };
+      },
+      {
+        campaign_id: string;
+        contact_ids: string[];
+      }
+    >({
+      query: (body) => ({
+        url: '/api/v1/generate_personalization',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    // Get personalization status/results for contacts
+    getPersonalizationResults: builder.query<
+      {
+        success: boolean;
+        data: {
+          campaign_id: string;
+          status: 'queued' | 'processing' | 'completed' | 'failed';
+          results: Array<{
+            contact_id: string;
+            email_id: string;
+            text_message: string;
+            deck_url: string; // Public URL of cloud storage
+            status: 'pending' | 'generated' | 'approved' | 'rejected';
+          }>;
+        };
+      },
+      { campaign_id: string }
+    >({
+      query: ({ campaign_id }) => ({
+        url: `/api/v1/personalization_results?campaign_id=${campaign_id}`,
+        method: 'GET',
+      }),
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    // Save personalization for a single contact
+    saveContactPersonalization: builder.mutation<
+      {
+        success: boolean;
+        data: {
+          message: string;
+          campaign_id: string;
+          contact_id: string;
+        };
+      },
+      {
+        campaign_id: string;
+        contact_id: string;
+        email_id: string;
+        personalized_message: string;
+        ai_generated_deck: string;
+      }
+    >({
+      query: (body) => ({
+        url: '/api/v1/save_contact_personalization',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    // Bulk save personalization for multiple contacts
+    bulkSaveContactPersonalization: builder.mutation<
+      {
+        success: boolean;
+        data: {
+          message: string;
+          campaign_id: string;
+          saved_count: number;
+        };
+      },
+      {
+        campaign_id: string;
+        personalizations: Array<{
+          contact_id: string;
+          email_id: string;
+          personalized_message: string;
+          ai_generated_deck: string;
+        }>;
+      }
+    >({
+      query: (body) => ({
+        url: '/api/v1/bulk_save_contact_personalization',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    // Get enrollment contacts with full details and metadata
+    getEnrollmentContacts: builder.query<
+      {
+        success: boolean;
+        data: {
+          campaign: Record<string, unknown>;
+          contacts: Array<{
+            campaign_contact_run_id: string;
+            campaign_id: string;
+            company_id: string | null;
+            contact_id: string | null;
+            is_relevant: boolean;
+            enrichment_status: string | null;
+            personalization_status: string;
+            personalized_message: string;
+            ai_generated_deck: string;
+            email_id: string;
+            campaign_contact_run_metadata: Record<string, unknown>;
+            contact_data: {
+              firstname: string;
+              lastname: string;
+              email: string[];
+              phone: string[];
+              jobtitle: string;
+              company: string;
+              source_id: string;
+            } | null;
+            linkedin_data: {
+              linkedin_url: string | null;
+              source: string;
+            } | null;
+            contact_metadata: Record<string, unknown> | null;
+            company_data: {
+              name: string | null;
+              domain: string | null;
+              website: string | null;
+              industry: string | null;
+              employee_count: string | null;
+              revenue: string | null;
+              location: string | null;
+              description: string | null;
+              company_metadata: Record<string, unknown> | null;
+            } | null;
+          }>;
+          pagination: {
+            page_size: number;
+            page_number: number;
+            has_next: boolean;
+            total_records: number;
+          };
+          total_enrollment_ready: number;
+        };
+        pagination: Record<string, unknown>;
+      },
+      { campaign_id: string; page?: number; limit?: number }
+    >({
+      query: ({ campaign_id, page = 1, limit = 100 }) => ({
+        url: `/api/v1/enrollment_contacts?campaign_id=${campaign_id}&page=${page}&limit=${limit}`,
+        method: 'GET',
+      }),
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    // Enroll contacts to a Lemlist sequence
+    enrollContactsToSequence: builder.mutation<
+      {
+        success: boolean;
+        data: {
+          message: string;
+          campaign_id: string;
+          sequence_id: string;
+          sequence_name: string;
+          enrolled_count: number;
+          enrolled_contacts: Array<{
+            contact_id: string;
+            email: string;
+            first_name: string | null;
+            last_name: string | null;
+            job_title: string | null;
+            phone: string[];
+            linkedin_url: string | null;
+            company_name: string | null;
+            company_domain: string | null;
+            company_website: string | null;
+            company_industry: string | null;
+            company_size: string | null;
+            company_location: string | null;
+            personalized_message: string;
+            ai_generated_deck: string;
+            campaign_contact_run_metadata: Record<string, unknown>;
+            contact_metadata: Record<string, unknown> | null;
+            company_metadata: Record<string, unknown> | null;
+            contact_source_data: Record<string, unknown> | null;
+            linkedin_data: Record<string, unknown> | null;
+          }>;
+        };
+      },
+      {
+        campaign_id: string;
+        sequence_id: string;
+        sequence_name: string;
+        contact_ids?: string[];
+      }
+    >({
+      query: (body) => ({
+        url: '/api/v1/enroll_contacts_to_sequence',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
   }),
 });
 
@@ -578,5 +792,12 @@ export const {
   useLazyGetHubspotSyncCandidatesQuery,
   useSyncToHubspotMutation,
   useLazyGetHubspotSyncProgressQuery,
+  useGeneratePersonalizationMutation,
+  useLazyGetPersonalizationResultsQuery,
+  useSaveContactPersonalizationMutation,
+  useBulkSaveContactPersonalizationMutation,
+  useGetEnrollmentContactsQuery,
+  useLazyGetEnrollmentContactsQuery,
+  useEnrollContactsToSequenceMutation,
 } = campaignApi;
 

@@ -25,7 +25,11 @@ from ai_agents.leadgen.schemas.ai_agents import (
     UpdateApolloContactEnrichmentStatus,
     GetCampaignContactList,
     CompanyQualificationProgress,
-    SyncToHubspot
+    SyncToHubspot,
+    SaveContactPersonalization,
+    BulkSaveContactPersonalization,
+    GetEnrollmentContacts,
+    EnrollContactsToSequence
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -382,5 +386,72 @@ async def get_hubspot_synced_companies(campaign_id: str) -> Dict[str, Any]:
     response_data.data["synced_hubspot_companies_count"] = response.get("synced_hubspot_companies_count")
     response_data.data["total_hubspot_companies_count"] = response.get("total_hubspot_companies_count")
     response_data.data["campaign_id"] = response.get("campaign_id")
+
+    return response_data.dict()
+
+
+async def save_contact_personalization(query_params: SaveContactPersonalization) -> Dict[str, Any]:
+    """Save personalization data for a single contact"""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.save_contact_personalization(
+        campaign_id=query_params.campaign_id,
+        contact_id=query_params.contact_id,
+        email_id=query_params.email_id,
+        personalized_message=query_params.personalized_message,
+        ai_generated_deck=query_params.ai_generated_deck
+    )
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+
+async def bulk_save_contact_personalization(query_params: BulkSaveContactPersonalization) -> Dict[str, Any]:
+    """Save personalization data for multiple contacts"""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.bulk_save_contact_personalization(
+        campaign_id=query_params.campaign_id,
+        personalizations=query_params.personalizations
+    )
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+
+async def get_enrollment_contacts(campaign_id: str, page: int = 1, limit: int = 100) -> Dict[str, Any]:
+    """Get full contact details with all metadata for sequence enrollment"""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.get_enrollment_contacts(
+        campaign_id=campaign_id,
+        page=page,
+        limit=limit
+    )
+    response_data.success = True
+    response_data.data = response
+    response_data.pagination = response.get("pagination")
+
+    return response_data.dict()
+
+
+async def enroll_contacts_to_sequence(query_params: EnrollContactsToSequence) -> Dict[str, Any]:
+    """Enroll contacts to a Lemlist sequence"""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.enroll_contacts_to_sequence(
+        campaign_id=query_params.campaign_id,
+        sequence_id=query_params.sequence_id,
+        sequence_name=query_params.sequence_name,
+        contact_ids=query_params.contact_ids
+    )
+    response_data.success = True
+    response_data.data = response
 
     return response_data.dict()

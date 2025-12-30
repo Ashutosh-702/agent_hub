@@ -20,6 +20,13 @@ export {
   useLazyGetHubspotSyncCandidatesQuery,
   useSyncToHubspotMutation,
   useLazyGetHubspotSyncProgressQuery,
+  useGeneratePersonalizationMutation,
+  useLazyGetPersonalizationResultsQuery,
+  useSaveContactPersonalizationMutation,
+  useBulkSaveContactPersonalizationMutation,
+  useGetEnrollmentContactsQuery,
+  useLazyGetEnrollmentContactsQuery,
+  useEnrollContactsToSequenceMutation,
 } from './campaignApi';
 export type { 
   Campaign, 

@@ -728,6 +728,256 @@ class CampaignsHelper:
             "campaign_id": campaign_id
         }
 
+    async def save_contact_personalization(self, campaign_id: str, contact_id: str, email_id: str, personalized_message: str, ai_generated_deck: str):
+        """Save personalization data for a single contact"""
+        from datetime import datetime
+        
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException("Campaign not found")
+        
+        # Update the campaign_contact_run with personalization data
+        update_data = {
+            "$set": {
+                "personalized_message": personalized_message,
+                "ai_generated_deck": ai_generated_deck,
+                "email_id": email_id,
+                "personalization_status": "approved",
+                "metadata.updated_at": datetime.utcnow()
+            }
+        }
+        
+        result = await self.campaign_contact_runs_dao.update_campaign_contact_run(
+            {"campaign_id": ObjectId(campaign_id), "contact_id": ObjectId(contact_id)},
+            update_data
+        )
+        
+        return {
+            "message": "Personalization saved successfully",
+            "campaign_id": campaign_id,
+            "contact_id": contact_id
+        }
+
+    async def bulk_save_contact_personalization(self, campaign_id: str, personalizations: list):
+        """Save personalization data for multiple contacts"""
+        from datetime import datetime
+        
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException("Campaign not found")
+        
+        saved_count = 0
+        for personalization in personalizations:
+            contact_id = personalization.get("contact_id")
+            email_id = personalization.get("email_id")
+            personalized_message = personalization.get("personalized_message")
+            ai_generated_deck = personalization.get("ai_generated_deck")
+            
+            if not all([contact_id, email_id, personalized_message, ai_generated_deck]):
+                continue
+            
+            update_data = {
+                "$set": {
+                    "personalized_message": personalized_message,
+                    "ai_generated_deck": ai_generated_deck,
+                    "email_id": email_id,
+                    "personalization_status": "approved",
+                    "metadata.updated_at": datetime.utcnow()
+                }
+            }
+            
+            await self.campaign_contact_runs_dao.update_campaign_contact_run(
+                {"campaign_id": ObjectId(campaign_id), "contact_id": ObjectId(contact_id)},
+                update_data
+            )
+            saved_count += 1
+        
+        # Update campaign status to personalization_completed if needed
+        if saved_count > 0:
+            await self.campaign_dao.update_campaign(campaign_id, {
+                "prospecting_cycle.status": "personalization_completed"
+            })
+        
+        return {
+            "message": f"Personalization saved for {saved_count} contacts",
+            "campaign_id": campaign_id,
+            "saved_count": saved_count
+        }
+
+    async def get_enrollment_contacts(self, campaign_id: str, page: int = 1, limit: int = 100):
+        """Get full contact details with all metadata for sequence enrollment"""
+        from datetime import datetime
+        
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException("Campaign not found")
+        
+        # Get all campaign_contact_runs with personalization approved
+        filter_query = {
+            "campaign_id": ObjectId(campaign_id),
+            "personalization_status": "approved"
+        }
+        
+        campaign_contact_runs, pagination_info = await self.campaign_contact_runs_dao.get_campaign_contact_runs_paginated(
+            filter_query, page, limit
+        )
+        
+        contacts_data = []
+        for run in campaign_contact_runs:
+            contact_id = run.get("contact_id")
+            company_id = run.get("company_id")
+            
+            # Get full contact data from contacts collection
+            contact = await self.contacts_dao.get_contact(str(contact_id))
+            
+            # Get company details
+            company = await self.companies_dao.get_company(str(company_id)) if company_id else None
+            
+            # Build complete contact data with all metadata
+            contact_data = {
+                # Campaign contact run data
+                "campaign_contact_run_id": str(run.get("_id")),
+                "campaign_id": str(run.get("campaign_id")),
+                "company_id": str(company_id) if company_id else None,
+                "contact_id": str(contact_id) if contact_id else None,
+                "is_relevant": run.get("is_relevant"),
+                "enrichment_status": run.get("enrichment_status"),
+                "personalization_status": run.get("personalization_status"),
+                "personalized_message": run.get("personalized_message"),
+                "ai_generated_deck": run.get("ai_generated_deck"),
+                "email_id": run.get("email_id"),
+                "campaign_contact_run_metadata": run.get("metadata"),
+                
+                # Contact data from contacts collection
+                "contact_data": contact.get("contact_data") if contact else None,
+                "linkedin_data": contact.get("linkedin_data") if contact else None,
+                "contact_metadata": contact.get("metadata") if contact else None,
+                
+                # Company data
+                "company_data": {
+                    "name": company.get("name") if company else None,
+                    "domain": company.get("domain") if company else None,
+                    "website": company.get("website") if company else None,
+                    "industry": company.get("industry") if company else None,
+                    "employee_count": company.get("employee_count") if company else None,
+                    "revenue": company.get("revenue") if company else None,
+                    "location": company.get("location") if company else None,
+                    "description": company.get("description") if company else None,
+                    "company_metadata": company.get("metadata") if company else None,
+                } if company else None,
+            }
+            
+            contacts_data.append(contact_data)
+        
+        serialized_campaign = serialize_objectid(campaign)
+        
+        return {
+            "campaign": serialized_campaign,
+            "contacts": contacts_data,
+            "pagination": pagination_info,
+            "total_enrollment_ready": len(contacts_data)
+        }
+
+    async def enroll_contacts_to_sequence(self, campaign_id: str, sequence_id: str, sequence_name: str, contact_ids: list = None):
+        """Enroll contacts to a Lemlist sequence - saves enrollment details and returns full contact data"""
+        from datetime import datetime
+        
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException("Campaign not found")
+        
+        # Build filter query
+        filter_query = {
+            "campaign_id": ObjectId(campaign_id),
+            "personalization_status": "approved"
+        }
+        
+        if contact_ids:
+            filter_query["contact_id"] = {"$in": [ObjectId(cid) for cid in contact_ids]}
+        
+        # Get all matching contact runs
+        campaign_contact_runs = await self.campaign_contact_runs_dao.get_campaign_contact_runs(filter_query)
+        
+        enrolled_contacts = []
+        for run in campaign_contact_runs:
+            contact_id = run.get("contact_id")
+            company_id = run.get("company_id")
+            
+            # Update contact run with enrollment info
+            update_data = {
+                "$set": {
+                    "sequence_enrollment": {
+                        "sequence_id": sequence_id,
+                        "sequence_name": sequence_name,
+                        "enrolled_at": datetime.utcnow(),
+                        "status": "enrolled"
+                    },
+                    "metadata.updated_at": datetime.utcnow()
+                }
+            }
+            
+            await self.campaign_contact_runs_dao.update_campaign_contact_run(
+                {"_id": run.get("_id")},
+                update_data
+            )
+            
+            # Get full contact data
+            contact = await self.contacts_dao.get_contact(str(contact_id))
+            company = await self.companies_dao.get_company(str(company_id)) if company_id else None
+            
+            # Build complete contact data for external service (Lemlist)
+            contact_payload = {
+                # Basic contact info
+                "contact_id": str(contact_id),
+                "email": run.get("email_id"),
+                "first_name": contact.get("contact_data", {}).get("firstname") if contact else None,
+                "last_name": contact.get("contact_data", {}).get("lastname") if contact else None,
+                "job_title": contact.get("contact_data", {}).get("jobtitle") if contact else None,
+                "phone": contact.get("contact_data", {}).get("phone", []) if contact else [],
+                "linkedin_url": contact.get("linkedin_data", {}).get("linkedin_url") if contact else None,
+                
+                # Company info
+                "company_name": company.get("name") if company else None,
+                "company_domain": company.get("domain") if company else None,
+                "company_website": company.get("website") if company else None,
+                "company_industry": company.get("industry") if company else None,
+                "company_size": company.get("employee_count") if company else None,
+                "company_location": company.get("location") if company else None,
+                
+                # Personalization data
+                "personalized_message": run.get("personalized_message"),
+                "ai_generated_deck": run.get("ai_generated_deck"),
+                
+                # All metadata
+                "campaign_contact_run_metadata": serialize_objectid(run.get("metadata")),
+                "contact_metadata": serialize_objectid(contact.get("metadata")) if contact else None,
+                "company_metadata": serialize_objectid(company.get("metadata")) if company else None,
+                "contact_source_data": contact.get("contact_data") if contact else None,
+                "linkedin_data": contact.get("linkedin_data") if contact else None,
+            }
+            
+            enrolled_contacts.append(contact_payload)
+        
+        # Update campaign status
+        await self.campaign_dao.update_campaign(campaign_id, {
+            "prospecting_cycle.status": "enrolled_to_sequence",
+            "sequence_enrollment": {
+                "sequence_id": sequence_id,
+                "sequence_name": sequence_name,
+                "enrolled_at": datetime.utcnow(),
+                "enrolled_count": len(enrolled_contacts)
+            }
+        })
+        
+        return {
+            "message": f"Successfully enrolled {len(enrolled_contacts)} contacts to sequence '{sequence_name}'",
+            "campaign_id": campaign_id,
+            "sequence_id": sequence_id,
+            "sequence_name": sequence_name,
+            "enrolled_count": len(enrolled_contacts),
+            "enrolled_contacts": enrolled_contacts
+        }
+
 
 class CompaniesHelper:
 
