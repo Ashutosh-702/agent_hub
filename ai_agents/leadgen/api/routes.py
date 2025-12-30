@@ -29,6 +29,7 @@ from ai_agents.leadgen.views.ai_agents import (
     update_apollo_contact_enrichment_status,
     get_campaign_contact_list,
     sync_to_hubspot,
+    sync_from_hubspot_webhook,
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -212,5 +213,12 @@ router.add_api_route(
     "/sync_to_hubspot",
     methods=["POST"],
     endpoint=sync_to_hubspot,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/sync_from_hubspot_webhook",
+    methods=["POST"],
+    endpoint=sync_from_hubspot_webhook,
     response_model=ResponseData,
 )

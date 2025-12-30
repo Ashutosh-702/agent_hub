@@ -1,5 +1,7 @@
 from datetime import datetime
-
+from bson import ObjectId
+from typing import Dict, Any
+import json
 from ai_agents.leadgen.schemas.ai_agents import LushaContactEnrichment, LushaGetContactEnrichment
 from database.collection_dao.companies import CompaniesDao
 from config.logging import logger
@@ -670,6 +672,24 @@ class CampaignsHelper:
         return {
             "message": "HubSpot sync queued",
             "request_id": request_id,
+            "campaign_id": campaign_id
+        }
+    async def sync_from_hubspot_webhook(self, query_params: Dict[str, Any]):
+        """
+        Sync contacts from HubSpot webhook.
+        """
+        if not query_params.get("company_id") or not query_params.get("campaign_id"):
+            raise ApiException("Company ID and campaign ID are required")
+        company_id = query_params.get("company_id")
+        campaign_id = query_params.get("campaign_id")
+        #here store whole query_params in metadata.sync_hubspot_webhook_received
+        json_query_data = json.dumps(query_params)
+        
+        await self.campaign_company_runs_dao.update_campaign_company_run({"company_id": ObjectId(company_id), "campaign_id": ObjectId(campaign_id)}, {"$set": {"sync_to_hubspot_status": "synced", "metadata.updated_at": datetime.utcnow(),"metadata.sync_hubspot_webhook_received": json_query_data}})
+        await self.campaign_dao.update_campaign(campaign_id, {"metadata.updated_at": datetime.utcnow()})
+        return {
+            "message": "HubSpot sync completed",
+            "company_id": company_id,
             "campaign_id": campaign_id
         }
 

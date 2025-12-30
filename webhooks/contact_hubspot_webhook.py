@@ -25,6 +25,7 @@ class ContactHubspotWebhook:
         else:
             self.webhook_url = HUBSPOT_BOLTIC_WEBHOOK_URL
         self.campaign_id = campaign_id
+        self.company_id = None
         self.source = source
         self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
@@ -588,6 +589,10 @@ class ContactHubspotWebhook:
                 "interestedProduct": webhook_data.get("interestedProduct", ""),
                 "contact_details": webhook_data.get("contact_details", [])
             }
+            if self.company_id:
+                payload["company_id"] = self.company_id
+            if self.campaign_id:
+                payload["campaign_id"] = self.campaign_id
             if webhook_data.get("slack_metadata"):
                 payload["slack_metadata"] = webhook_data.get("slack_metadata")
             if self.source:
@@ -652,6 +657,7 @@ class ContactHubspotWebhook:
                     continue
                 for campaign_company_run in campaign_company_runs:
                     company_id = campaign_company_run.get("company_id")
+                    self.company_id = company_id
                     await self.send_company_level_webhook(str(company_id))
                     campaign_company_run_id = campaign_company_run.get("_id")
                     await self.campaign_company_runs_dao.update_campaign_company_run({"_id": campaign_company_run_id}, {"$set": {"sync_to_hubspot_status": "in_progress"}})

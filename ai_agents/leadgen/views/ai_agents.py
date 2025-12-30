@@ -361,3 +361,13 @@ async def sync_to_hubspot(query_params: SyncToHubspot = Body()) -> Dict[str, Any
     response_data.data = response
 
     return response_data.dict()
+
+async def sync_from_hubspot_webhook(query_params: Dict[str, Any] = Body()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.sync_from_hubspot_webhook(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
