@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useCampaignWizard, type Company, type Contact } from './NewCampaignWizard';
-import { useLazyGetCampaignContactListQuery, useLazyGetHubspotSyncCandidatesQuery } from '../../store';
+import { useLazyGetCampaignContactListQuery, useLazyGetHubspotSyncCandidatesQuery, useSyncToHubspotMutation, useLazyGetHubspotSyncProgressQuery } from '../../store';
 
 // Feature flag to enable/disable selection functionality
 const ENABLE_SELECTION = false;
@@ -23,10 +23,16 @@ export const Step4SyncHubspot = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncComplete, setSyncComplete] = useState(false);
   const [didHydrateFromApi, setDidHydrateFromApi] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{ total: number; synced: number; status: string } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const selectedContactIdsRef = useRef<string[]>([]);
 
   const campaignId = state.campaignId;
   const [fetchHubspotSyncCandidates] = useLazyGetHubspotSyncCandidatesQuery();
   const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
+  const [syncToHubspot] = useSyncToHubspotMutation();
+  const [fetchHubspotSyncProgress] = useLazyGetHubspotSyncProgressQuery();
 
   const contacts = state.qualifiedContacts;
 
@@ -135,10 +141,13 @@ export const Step4SyncHubspot = () => {
 
         if (cancelled) return;
 
-        // Preserve any existing syncStatus the user may have already set (if any)
+        // Only preserve 'synced' status - all other contacts should be pre-selected
         const existingStatus = new Map<string, Contact['syncStatus']>();
         state.qualifiedContacts.forEach((c) => {
-          if (c.syncStatus) existingStatus.set(c.id, c.syncStatus);
+          // Only keep 'synced' status, reset others to 'selected'
+          if (c.syncStatus === 'synced') {
+            existingStatus.set(c.id, 'synced');
+          }
         });
 
         // Ensure companies exist in wizard state so grouping works
@@ -306,12 +315,76 @@ export const Step4SyncHubspot = () => {
   const allSelected = companiesWithContacts.length > 0 && companiesWithContacts.every(c => c.isSelected || c.isSynced);
   const someSelected = companiesWithContacts.some(c => c.isSelected || c.isSynced) && !allSelected;
 
+  // Poll campaign status to check sync progress
+  const pollCampaignStatus = useCallback(async () => {
+    if (!campaignId) return;
+
+    try {
+      const res = await fetchHubspotSyncProgress({ campaign_id: campaignId }).unwrap();
+      const data = res.data;
+      const status = data?.prospecting_cycle?.status;
+      const syncedCount = data?.synced_hubspot_companies_count ?? 0;
+      const totalCount = data?.total_hubspot_companies_count ?? totalCompanies;
+
+      if (status === 'hubspot_sync_completed') {
+        // Sync completed successfully
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        setIsSyncing(false);
+        setSyncComplete(true);
+        setSyncProgress({ total: totalCount, synced: totalCount, status: 'Completed' });
+        
+        // Mark all selected contacts as synced
+        setQualifiedContacts(contacts.map(c => 
+          selectedContactIdsRef.current.includes(c.id) 
+            ? { ...c, syncStatus: 'synced' as const }
+            : c
+        ));
+      } else if (status === 'hubspot_sync_failed') {
+        // Sync failed
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        setSyncError('HubSpot sync failed. Please try again.');
+        setIsSyncing(false);
+        setSyncProgress(null);
+        
+        // Reset to selected status
+        setQualifiedContacts(contacts.map(c => 
+          selectedContactIdsRef.current.includes(c.id) 
+            ? { ...c, syncStatus: 'selected' as const }
+            : c
+        ));
+      } else if (status === 'hubspot_sync_in_progress') {
+        // Still syncing - update progress display with actual counts
+        setSyncProgress({ 
+          total: totalCount, 
+          synced: syncedCount, 
+          status: 'Syncing to HubSpot...' 
+        });
+      }
+    } catch (error) {
+      console.error('Failed to poll campaign status:', error);
+      // Continue polling on error
+    }
+  }, [campaignId, contacts, fetchHubspotSyncProgress, setQualifiedContacts, totalCompanies]);
+
   const handleSyncSelected = async () => {
+    if (!campaignId || totalCompanies === 0) return;
+
     const selectedContactIds = contacts.filter(c => c.syncStatus === 'selected').map(c => c.id);
     if (selectedContactIds.length === 0) return;
 
+    // Store selected contact IDs in ref for use in polling callback
+    selectedContactIdsRef.current = selectedContactIds;
+
     setIsSyncing(true);
-    
+    setSyncError(null);
+    setSyncProgress({ total: totalCompanies, synced: 0, status: 'Starting sync...' });
+
     // Set syncing status
     setQualifiedContacts(contacts.map(c => 
       selectedContactIds.includes(c.id) 
@@ -319,18 +392,43 @@ export const Step4SyncHubspot = () => {
         : c
     ));
 
-    // Simulate sync completion
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setQualifiedContacts(contacts.map(c => 
-      selectedContactIds.includes(c.id) 
-        ? { ...c, syncStatus: 'synced' as const }
-        : c
-    ));
-    
-    setIsSyncing(false);
-    setSyncComplete(true);
+    try {
+      // Call real API to initiate sync
+      await syncToHubspot({ campaign_id: campaignId }).unwrap();
+
+      // Start polling for campaign status
+      setSyncProgress({ total: totalCompanies, synced: 0, status: 'Syncing to HubSpot...' });
+      
+      // Poll every 3 seconds
+      pollIntervalRef.current = setInterval(() => {
+        pollCampaignStatus();
+      }, 3000);
+
+      // Also do an immediate poll
+      pollCampaignStatus();
+    } catch (error) {
+      console.error('Sync failed:', error);
+      setSyncError('Failed to initiate HubSpot sync. Please try again.');
+      setIsSyncing(false);
+      setSyncProgress(null);
+      
+      // Reset to selected status
+      setQualifiedContacts(contacts.map(c => 
+        selectedContactIds.includes(c.id) 
+          ? { ...c, syncStatus: 'selected' as const }
+          : c
+      ));
+    }
   };
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleContinue = () => {
     // Keep only synced contacts for next step
@@ -345,6 +443,38 @@ export const Step4SyncHubspot = () => {
         <h2>Review & Sync to HubSpot</h2>
         <p>Review the qualified contacts before syncing to your CRM</p>
       </div>
+
+      {/* Sync Progress Bar */}
+      {syncProgress && (
+        <div className="sync-progress-container">
+          <div className="sync-progress-header">
+            <span className="sync-progress-status">
+              {!syncComplete && <div className="spinner small" />}
+              {syncProgress.status || 'Syncing to HubSpot...'}
+            </span>
+            <span>{syncProgress.synced} / {syncProgress.total} companies synced</span>
+          </div>
+          <div className="sync-progress-bar">
+            <div 
+              className={`sync-progress-fill ${syncProgress.total > 0 && syncProgress.synced > 0 ? '' : 'sync-progress-indeterminate'}`}
+              style={syncProgress.total > 0 && syncProgress.synced > 0 ? { width: `${(syncProgress.synced / syncProgress.total) * 100}%` } : undefined}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Sync Error Message */}
+      {syncError && (
+        <div className="sync-error-banner">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          <span>{syncError}</span>
+          <button className="btn-text" onClick={() => setSyncError(null)}>Dismiss</button>
+        </div>
+      )}
 
       {/* Stats Bar */}
       <div className="sync-stats">
@@ -432,7 +562,6 @@ export const Step4SyncHubspot = () => {
                 </div>
                 {company.isSyncing && (
                   <div className="syncing-badge">
-                    <div className="spinner small" />
                     Syncing...
                   </div>
                 )}
@@ -494,7 +623,7 @@ export const Step4SyncHubspot = () => {
                           <span className="contact-synced-badge">✓</span>
                         )}
                         {contact.syncStatus === 'syncing' && (
-                          <div className="spinner small" />
+                          <span className="contact-syncing-badge">Syncing</span>
                         )}
                       </div>
                     ))}
@@ -522,19 +651,10 @@ export const Step4SyncHubspot = () => {
             onClick={handleSyncSelected}
             disabled={selectedContactsCount === 0 || isSyncing}
           >
-            {isSyncing ? (
-              <>
-                <div className="spinner" />
-                Syncing to HubSpot...
-              </>
-            ) : (
-              <>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
-                </svg>
-                Sync {selectedCompaniesCount} Companies ({selectedContactsCount} Contacts) to HubSpot
-              </>
-            )}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+            </svg>
+            {isSyncing ? 'Syncing to HubSpot...' : `Sync ${selectedCompaniesCount} Companies (${selectedContactsCount} Contacts) to HubSpot`}
           </button>
         ) : (
           <button

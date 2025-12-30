@@ -2634,6 +2634,87 @@
   font-weight: 500;
 }
 
+/* Sync Progress Bar */
+.sync-progress-container {
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+}
+
+.sync-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-gray-700);
+  font-weight: 500;
+}
+
+.sync-progress-bar {
+  height: 10px;
+  background: var(--color-gray-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.sync-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2E31BE 0%, #10b981 100%);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+.sync-progress-fill.sync-progress-indeterminate {
+  width: 30%;
+  animation: indeterminate-progress 1.5s ease-in-out infinite;
+}
+
+@keyframes indeterminate-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.sync-progress-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Sync Error Banner */
+.sync-error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.sync-error-banner .btn-text {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.sync-error-banner .btn-text:hover {
+  opacity: 0.8;
+}
+
 /* Step 5: Personalization (Contact level) */
 .personalization-contacts-list {
   display: flex;
@@ -3312,6 +3393,16 @@
   justify-content: center !important;
   font-size: 12px !important;
   font-weight: 700 !important;
+  flex-shrink: 0 !important;
+}
+
+.step-sync-hubspot .contact-syncing-badge {
+  padding: 4px 8px !important;
+  background: #EDF0F5 !important;
+  color: #6B7280 !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
   flex-shrink: 0 !important;
 }
 

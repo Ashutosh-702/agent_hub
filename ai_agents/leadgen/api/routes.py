@@ -30,6 +30,7 @@ from ai_agents.leadgen.views.ai_agents import (
     get_campaign_contact_list,
     sync_to_hubspot,
     sync_from_hubspot_webhook,
+    get_hubspot_synced_companies,
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -220,5 +221,12 @@ router.add_api_route(
     "/sync_from_hubspot_webhook",
     methods=["POST"],
     endpoint=sync_from_hubspot_webhook,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/get_hubspot_syncd_companies",
+    methods=["GET"],
+    endpoint=get_hubspot_synced_companies,
     response_model=ResponseData,
 )

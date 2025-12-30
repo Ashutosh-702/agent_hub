@@ -18,6 +18,8 @@ export {
   useLazyGetCampaignContactListQuery,
   useGetHubspotSyncCandidatesQuery,
   useLazyGetHubspotSyncCandidatesQuery,
+  useSyncToHubspotMutation,
+  useLazyGetHubspotSyncProgressQuery,
 } from './campaignApi';
 export type { 
   Campaign, 

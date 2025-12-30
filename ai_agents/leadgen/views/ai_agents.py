@@ -371,3 +371,16 @@ async def sync_from_hubspot_webhook(query_params: Dict[str, Any] = Body()) -> Di
     response_data.data = response
 
     return response_data.dict()
+
+async def get_hubspot_synced_companies(campaign_id: str) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.get_hubspot_synced_companies(campaign_id)
+    response_data.success = True
+    response_data.data = response.get("campaign")
+    response_data.data["synced_hubspot_companies_count"] = response.get("synced_hubspot_companies_count")
+    response_data.data["total_hubspot_companies_count"] = response.get("total_hubspot_companies_count")
+    response_data.data["campaign_id"] = response.get("campaign_id")
+
+    return response_data.dict()

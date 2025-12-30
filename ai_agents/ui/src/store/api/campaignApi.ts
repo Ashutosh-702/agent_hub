@@ -522,6 +522,40 @@ export const campaignApi = baseApi.injectEndpoints({
       },
       providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
     }),
+
+    syncToHubspot: builder.mutation<
+      { success: boolean; data: { message: string; request_id: string; campaign_id: string } },
+      { campaign_id: string }
+    >({
+      query: (body) => ({
+        url: '/api/v1/sync_to_hubspot',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    getHubspotSyncProgress: builder.query<
+      {
+        success: boolean;
+        data: {
+          _id: string;
+          prospecting_cycle?: {
+            status: string;
+          };
+          synced_hubspot_companies_count: number;
+          total_hubspot_companies_count: number;
+          campaign_id: string;
+        };
+      },
+      { campaign_id: string }
+    >({
+      query: ({ campaign_id }) => ({
+        url: `/api/v1/get_hubspot_syncd_companies?campaign_id=${campaign_id}`,
+        method: 'GET',
+      }),
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
   }),
 });
 
@@ -542,5 +576,7 @@ export const {
   useLazyGetCampaignContactListQuery,
   useGetHubspotSyncCandidatesQuery,
   useLazyGetHubspotSyncCandidatesQuery,
+  useSyncToHubspotMutation,
+  useLazyGetHubspotSyncProgressQuery,
 } = campaignApi;
 

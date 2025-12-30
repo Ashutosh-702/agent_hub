@@ -420,8 +420,11 @@ class CampaignsHelper:
             query["is_relevant"] = query_params.company_status
         companies, pagination_info = await self.campaign_company_runs_dao.get_campaign_company_runs_paginated(query, query_params.page, query_params.limit)
 
+        #
+
         # Attach basic company details for better UI rendering (avoid N+1 by bulk fetching).
         company_ids = [c.get("company_id") for c in companies if c.get("company_id")]
+       
         company_map = {}
         if company_ids:
             company_docs = await self.companies_dao.find_many(
@@ -435,12 +438,16 @@ class CampaignsHelper:
                 },
             )
             company_map = {doc.get("_id"): doc for doc in company_docs}
-
         for run in companies:
+            # Override is_relevant if company_status filter was provided
+            if query_params.company_status is not None:
+                run["is_relevant"] = query_params.company_status
+            # Attach company details
             cid = run.get("company_id")
             doc = company_map.get(cid)
             if doc:
                 run["company"] = doc
+            # sync_to_hubspot_status is already included if present in the document
 
         serialized_campaign = serialize_objectid(campaign)
         serialized_companies = serialize_objectid(companies)
@@ -701,6 +708,23 @@ class CampaignsHelper:
         return {
             "message": "HubSpot sync completed",
             "company_id": company_id,
+            "campaign_id": campaign_id
+        }
+
+    async def get_hubspot_synced_companies(self, campaign_id: str):
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        
+        if not campaign:
+            raise ApiException("Campaign not found")
+        synced_hubspot_companies_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True, "sync_to_hubspot_status": "synced"})
+        total_hubspot_companies_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True})
+
+
+        serialized_campaign = serialize_objectid(campaign)
+        return {
+            "campaign": serialized_campaign,
+            "synced_hubspot_companies_count": synced_hubspot_companies_count,
+            "total_hubspot_companies_count": total_hubspot_companies_count,
             "campaign_id": campaign_id
         }
 
