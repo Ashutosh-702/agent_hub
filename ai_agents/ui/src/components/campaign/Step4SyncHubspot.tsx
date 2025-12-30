@@ -372,6 +372,65 @@ export const Step4SyncHubspot = () => {
     }
   }, [campaignId, contacts, fetchHubspotSyncProgress, setQualifiedContacts, totalCompanies]);
 
+  // Check campaign sync status on mount - resume polling if sync is in progress
+  useEffect(() => {
+    if (!campaignId || !didHydrateFromApi) return;
+
+    let cancelled = false;
+
+    const checkInitialStatus = async () => {
+      try {
+        const res = await fetchHubspotSyncProgress({ campaign_id: campaignId }).unwrap();
+        const data = res.data;
+        const status = data?.prospecting_cycle?.status;
+        const syncedCount = data?.synced_hubspot_companies_count ?? 0;
+        const totalCount = data?.total_hubspot_companies_count ?? 0;
+
+        if (cancelled) return;
+
+        if (status === 'hubspot_sync_in_progress') {
+          // Sync is in progress - start polling
+          setIsSyncing(true);
+          setSyncProgress({ 
+            total: totalCount, 
+            synced: syncedCount, 
+            status: 'Syncing to HubSpot...' 
+          });
+          
+          // Store all contact IDs as selected for when sync completes
+          selectedContactIdsRef.current = contacts.map(c => c.id);
+          
+          // Set contacts to syncing status
+          setQualifiedContacts(contacts.map(c => ({ ...c, syncStatus: 'syncing' as const })));
+          
+          // Start polling
+          pollIntervalRef.current = setInterval(() => {
+            pollCampaignStatus();
+          }, 3000);
+          
+          // Also do immediate poll
+          pollCampaignStatus();
+        } else if (status === 'hubspot_sync_completed') {
+          // Sync already completed
+          setSyncComplete(true);
+          setSyncProgress({ total: totalCount, synced: totalCount, status: 'Completed' });
+          setQualifiedContacts(contacts.map(c => ({ ...c, syncStatus: 'synced' as const })));
+        } else if (status === 'hubspot_sync_failed') {
+          // Sync failed
+          setSyncError('HubSpot sync failed. Please try again.');
+        }
+      } catch (error) {
+        console.error('Failed to check initial sync status:', error);
+      }
+    };
+
+    checkInitialStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId, didHydrateFromApi, contacts, fetchHubspotSyncProgress, pollCampaignStatus, setQualifiedContacts]);
+
   const handleSyncSelected = async () => {
     if (!campaignId || totalCompanies === 0) return;
 
