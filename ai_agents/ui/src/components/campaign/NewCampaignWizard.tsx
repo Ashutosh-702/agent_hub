@@ -147,10 +147,27 @@ const WIZARD_SESSION_KEY = 'agent_hub_campaign_wizard_session_v1';
 
 // Derive wizard step from prospecting_cycle.status (ONLY - lifecycle.status is ignored)
 const deriveStepFromCycleStatus = (cycleStatus?: string): number => {
+  // Step 6: Enrollment complete or ready for enrollment
+  if (cycleStatus === 'enrolled_to_sequence') return 6;
+  if (cycleStatus === 'personalization_completed') return 6;
+  
+  // Step 5: Personalization
+  if (cycleStatus === 'hubspot_sync_completed') return 5;
+  
+  // Step 4: HubSpot Sync
+  if (cycleStatus === 'hubspot_sync_in_progress') return 4;
+  if (cycleStatus === 'hubspot_sync_failed') return 4;
   if (cycleStatus === 'contact_enriched') return 4;
+  
+  // Step 3: Contact Qualification
   if (cycleStatus === 'contact_qualification') return 3;
+  
+  // Step 2: Company Qualification
   if (cycleStatus === 'company_qualification') return 2;
+  
+  // Step 1: Prospecting
   if (cycleStatus === 'prospecting') return 1;
+  
   return 1; // Default to step 1
 };
 

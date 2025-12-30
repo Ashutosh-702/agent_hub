@@ -4,8 +4,23 @@ import {
   useEnrichApolloContactListMutation,
   useLazyGetCampaignContactListQuery,
   useUpdateApolloContactEnrichmentStatusMutation,
+  useGetCampaignContactListQuery,
   type CampaignContactListItem,
 } from '../../store';
+import { skipToken } from '@reduxjs/toolkit/query';
+
+// Check if campaign has already completed contact qualification based on prospecting_cycle.status
+const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
+  const completedStatuses = [
+    'contact_enriched',
+    'hubspot_sync_in_progress',
+    'hubspot_sync_completed',
+    'hubspot_sync_failed',
+    'personalization_completed',
+    'enrolled_to_sequence',
+  ];
+  return cycleStatus ? completedStatuses.includes(cycleStatus) : false;
+};
 
 export const Step3ContactQualification = () => {
   const { 
@@ -24,6 +39,15 @@ export const Step3ContactQualification = () => {
   const [enrichApolloContactList] = useEnrichApolloContactListMutation();
   const [updateApolloContactEnrichmentStatus] = useUpdateApolloContactEnrichmentStatusMutation();
   const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
+
+  // Query to check campaign status for detecting if step is already completed
+  const { data: contactListData } = useGetCampaignContactListQuery(
+    campaignId ? { campaign_id: campaignId, page: 1, limit: 100 } : skipToken
+  );
+  
+  const campaignCycleStatus = contactListData?.data?.campaign?.prospecting_cycle?.status;
+  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
+  const apiContacts = contactListData?.data?.contacts || [];
 
   const contacts = state.qualifiedContacts;
   const qualifiedCount = contacts.filter(c => c.qualificationStatus === 'qualified').length;
@@ -196,8 +220,8 @@ export const Step3ContactQualification = () => {
         </div>
       )}
 
-      {/* Mode Selection */}
-      {!state.contactQualificationMode && (
+      {/* Mode Selection - Show only if step not already completed and no mode selected */}
+      {!state.contactQualificationMode && !stepAlreadyCompleted && (
         <div className="qualification-mode-selection">
           <h3>Choose Qualification Method</h3>
           <div className="mode-cards">
@@ -232,6 +256,86 @@ export const Step3ContactQualification = () => {
               <p>Coming soon.</p>
               <span className="mode-tag ai">Soon</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step Already Completed - Show review mode */}
+      {!state.contactQualificationMode && stepAlreadyCompleted && (
+        <div className="step-completed-view">
+          <div className="sync-success-banner" style={{ marginBottom: '24px' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <span>Contact Qualification Completed</span>
+          </div>
+
+          <div className="qualification-stats">
+            <div className="stat">
+              <span className="stat-value">{contactListData?.pagination?.total_records ?? apiContacts.length}</span>
+              <span className="stat-label">Total Contacts</span>
+            </div>
+            <div className="stat qualified">
+              <span className="stat-value">
+                {apiContacts.filter(c => c.is_relevant).length}
+              </span>
+              <span className="stat-label">Qualified (this page)</span>
+            </div>
+          </div>
+
+          {/* Show qualified contacts (read-only view) */}
+          {apiContacts.length > 0 && (
+            <div className="contacts-qualification-list">
+              <div className="select-all-header">
+                <span className="select-all-text">
+                  Qualified Contacts (view only)
+                </span>
+              </div>
+
+              {apiContacts.filter(c => c.is_relevant).slice(0, 10).map((c) => (
+                <div key={c.contact_id} className="contact-qualification-card qualified" style={{ cursor: 'default' }}>
+                  <div className="contact-avatar">
+                    {c.contact_data?.firstname?.[0] || '?'}{c.contact_data?.lastname?.[0] || '?'}
+                  </div>
+                  <div className="contact-info">
+                    <h4>{c.contact_data?.firstname || ''} {c.contact_data?.lastname || ''}</h4>
+                    <div className="contact-meta">
+                      <span className="job-title">{c.contact_data?.jobtitle || 'N/A'}</span>
+                      <span className="company-name">{c.contact_data?.company || 'Unknown'}</span>
+                    </div>
+                    <span className="contact-email">{c.contact_data?.email?.[0] || 'No email'}</span>
+                  </div>
+                  <div className="qualified-badge">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                </div>
+              ))}
+              {apiContacts.filter(c => c.is_relevant).length > 10 && (
+                <div style={{ padding: '12px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>
+                  + {apiContacts.filter(c => c.is_relevant).length - 10} more contacts...
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="step-navigation">
+            <button className="btn-secondary" onClick={prevStep}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12"/>
+                <polyline points="12 19 5 12 12 5"/>
+              </svg>
+              Back
+            </button>
+            <button className="btn-primary" onClick={nextStep}>
+              Continue to Sync to HubSpot
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </button>
           </div>
         </div>
       )}

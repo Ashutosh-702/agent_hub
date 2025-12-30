@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useCampaignWizard } from './NewCampaignWizard';
-import { useBulkSaveContactPersonalizationMutation } from '../../store';
+import { useCampaignWizard, type Contact } from './NewCampaignWizard';
+import { 
+  useBulkSaveContactPersonalizationMutation,
+  useGetCampaignContactListQuery,
+} from '../../store';
+import { skipToken } from '@reduxjs/toolkit/query';
 
 // Mock personalization data generator
 const generateMockPersonalization = (contact: { id: string; firstName: string; lastName: string; email: string; jobTitle: string; companyName?: string }) => {
@@ -49,10 +53,93 @@ export const Step5Personalization = () => {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const campaignId = state.campaignId || '';
-  const contacts = state.qualifiedContacts;
   
   // RTK Query mutations
   const [bulkSaveContactPersonalization] = useBulkSaveContactPersonalizationMutation();
+
+  // Track if we've hydrated from API to prevent re-fetching
+  const [hasHydratedFromApi, setHasHydratedFromApi] = useState(false);
+  
+  // Always fetch contacts from API when campaignId exists (to restore personalization data)
+  const { data: contactListData, isLoading: isLoadingCandidates } = useGetCampaignContactListQuery(
+    campaignId ? { campaign_id: campaignId, page: 1, limit: 200 } : skipToken
+  );
+  
+  console.log('[Step5] State check:', { 
+    campaignId, 
+    contactsLength: state.qualifiedContacts.length, 
+    hasHydratedFromApi,
+    hasApiData: !!contactListData?.data?.contacts?.length,
+    isLoading: isLoadingCandidates,
+  });
+
+  // Hydrate contacts and personalization results from API
+  useEffect(() => {
+    // Only hydrate once per mount
+    if (hasHydratedFromApi || !contactListData?.data?.contacts || contactListData.data.contacts.length === 0) {
+      return;
+    }
+
+    const apiContacts = contactListData.data.contacts;
+    console.log('[Step5] Hydrating from API:', apiContacts.length, 'contacts from API');
+    
+    // Filter for relevant contacts
+    const relevantContacts = apiContacts.filter((c) => c.is_relevant);
+    console.log('[Step5] Relevant contacts:', relevantContacts.length);
+    
+    // Check if any contacts have personalization data
+    const contactsWithPersonalization = relevantContacts.filter(c => c.personalized_message && c.ai_generated_deck);
+    console.log('[Step5] Contacts with existing personalization:', contactsWithPersonalization.length);
+    
+    // Always map contacts from API (to ensure we have the latest data)
+    const mappedContacts: Contact[] = relevantContacts.map((c) => ({
+      id: c.contact_id,
+      companyId: c.company_id || '',
+      companyName: c.contact_data?.company || '',
+      firstName: c.contact_data?.firstname || '',
+      lastName: c.contact_data?.lastname || '',
+      email: c.contact_data?.email?.[0] || '',
+      phone: c.contact_data?.phone?.[0] || undefined,
+      jobTitle: c.contact_data?.jobtitle || '',
+      linkedinUrl: c.linkedin_data?.linkedin_url || undefined,
+      qualificationStatus: 'qualified' as const,
+      syncStatus: 'synced' as const,
+      personalization: {
+        messageStatus: c.personalization_status === 'approved' ? 'approved' as const : 'pending' as const,
+        deckStatus: c.personalization_status === 'approved' ? 'approved' as const : 'pending' as const,
+        isSelected: true, // Always pre-select for personalization
+      },
+    }));
+    
+    // Restore personalization results for contacts that have saved data
+    const restoredResults = new Map<string, PersonalizationResult>();
+    relevantContacts.forEach((c) => {
+      if (c.personalized_message && c.ai_generated_deck) {
+        restoredResults.set(c.contact_id, {
+          contact_id: c.contact_id,
+          email_id: c.email_id || c.contact_data?.email?.[0] || '',
+          text_message: c.personalized_message,
+          deck_url: c.ai_generated_deck,
+          status: c.personalization_status === 'approved' ? 'approved' : 'generated',
+        });
+      }
+    });
+    
+    console.log('[Step5] Setting state - Contacts:', mappedContacts.length, 'Personalization results:', restoredResults.size);
+    
+    setHasHydratedFromApi(true);
+    
+    if (mappedContacts.length > 0) {
+      setQualifiedContacts(mappedContacts);
+    }
+    
+    // Always restore personalization results (even if empty, to reset stale state)
+    if (restoredResults.size > 0) {
+      setPersonalizationResults(restoredResults);
+    }
+  }, [hasHydratedFromApi, contactListData, setQualifiedContacts]);
+
+  const contacts = state.qualifiedContacts;
 
   // Get company name for a contact
   const getCompanyName = useCallback((companyId: string) => {
@@ -274,6 +361,32 @@ export const Step5Personalization = () => {
         return <span className="status-badge pending">Pending</span>;
     }
   };
+
+  // Show loading state when fetching from API
+  if (isLoadingCandidates) {
+    return (
+      <div className="step-container step-personalization">
+        <div className="step-header">
+          <h2>Personalization</h2>
+          <p>Loading contacts...</p>
+        </div>
+        <div className="loading-overlay" style={{ position: 'relative', minHeight: '200px' }}>
+          <div className="loading-card">
+            <div className="loading-animation ai-animation">
+              <div className="ai-brain">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <div className="ai-pulse" />
+            </div>
+            <h3>Loading contacts from server...</h3>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="step-container step-personalization">

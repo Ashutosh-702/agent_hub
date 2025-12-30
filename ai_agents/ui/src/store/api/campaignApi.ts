@@ -303,6 +303,11 @@ export interface CampaignContactListItem {
   contact_id: string;
   is_relevant: boolean;
   enrichment_status?: boolean;
+  // Personalization fields (populated after Step 5 saves)
+  personalization_status?: 'pending' | 'approved' | 'rejected';
+  personalized_message?: string;
+  ai_generated_deck?: string;
+  email_id?: string;
   metadata?: {
     created_at?: string;
     updated_at?: string;

@@ -42,6 +42,20 @@ const toLabel = (value: unknown): string => {
   return String(value);
 };
 
+// Check if campaign has already completed company qualification based on prospecting_cycle.status
+const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
+  const completedStatuses = [
+    'contact_qualification',
+    'contact_enriched',
+    'hubspot_sync_in_progress',
+    'hubspot_sync_completed',
+    'hubspot_sync_failed',
+    'personalization_completed',
+    'enrolled_to_sequence',
+  ];
+  return cycleStatus ? completedStatuses.includes(cycleStatus) : false;
+};
+
 export const Step2CompanyQualification = () => {
   const { state, setCompanyQualificationMode, nextStep, prevStep, setLoading, setQualifiedContacts } = useCampaignWizard();
   const campaignId = state.campaignId;
@@ -120,6 +134,10 @@ export const Step2CompanyQualification = () => {
     ? { campaign_id: campaignId, page, limit: PAGE_SIZE, company_status: companyStatusFilter }
     : skipToken;
   const { data, isFetching, isError } = useGetCampaignDetailsQuery(queryArgs);
+
+  // Check if this step was already completed (campaign has progressed past company qualification)
+  const campaignCycleStatus = data?.data?.campaign?.prospecting_cycle?.status;
+  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
 
   const companies = data?.data?.companies ?? [];
   const pagination = data?.pagination;
@@ -409,8 +427,8 @@ export const Step2CompanyQualification = () => {
         </div>
       )}
 
-      {/* Mode Selection */}
-      {!state.companyQualificationMode && (
+      {/* Mode Selection - Show only if step not already completed and no mode selected */}
+      {!state.companyQualificationMode && !stepAlreadyCompleted && (
         <div className="qualification-mode-selection">
           <h3>Choose Qualification Method</h3>
           <div className="mode-cards">
@@ -441,6 +459,101 @@ export const Step2CompanyQualification = () => {
               <p>Answer a few prompts to define relevance criteria for AI.</p>
               <span className="mode-tag ai">Setup</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step Already Completed - Show review mode */}
+      {!state.companyQualificationMode && stepAlreadyCompleted && (
+        <div className="step-completed-view">
+          <div className="sync-success-banner" style={{ marginBottom: '24px' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <span>Company Qualification Completed</span>
+          </div>
+
+          <div className="qualification-stats">
+            <div className="stat">
+              <span className="stat-value">{pagination?.total_records ?? '—'}</span>
+              <span className="stat-label">Total Companies</span>
+            </div>
+            <div className="stat qualified">
+              <span className="stat-value">
+                {companies.filter(c => c.is_relevant).length}
+              </span>
+              <span className="stat-label">Qualified (this page)</span>
+            </div>
+          </div>
+
+          {/* Show qualified companies (read-only view) */}
+          {!isFetching && companies.length > 0 && (
+            <div className="companies-qualification-list">
+              <div className="select-all-header">
+                <span className="select-all-text">
+                  Qualified Companies (view only)
+                  <span className="selected-count">
+                    (Page {page} of {Math.ceil((pagination?.total_records || 0) / PAGE_SIZE)})
+                  </span>
+                </span>
+              </div>
+
+              <div className="companies-cards-grid">
+                {companies.filter(c => c.is_relevant).map((c) => {
+                  const companyName = c.company?.identifiers?.name || c.company?.identifiers?.domain || c.company_id;
+                  const companyDomain = c.company?.identifiers?.domain;
+                  const industry = toLabel(c.company?.profile?.industry);
+                  const employeeCount = toLabel(c.company?.profile?.employee_count);
+                  return (
+                    <div key={c.company_id} className="company-card selected" style={{ cursor: 'default' }}>
+                      <div className="company-card-header">
+                        <div className="company-card-title">
+                          <div className="company-name">{companyName}</div>
+                          {companyDomain && companyName !== companyDomain && (
+                            <div className="company-domain">{companyDomain}</div>
+                          )}
+                        </div>
+                        <div className="company-card-selected-indicator">Qualified ✓</div>
+                      </div>
+                      <div className="company-card-body">
+                        <div className="company-kv-grid">
+                          {industry && (
+                            <div className="company-kv">
+                              <div className="company-k">Industry</div>
+                              <div className="company-v">{industry}</div>
+                            </div>
+                          )}
+                          {employeeCount && (
+                            <div className="company-kv">
+                              <div className="company-k">Employees</div>
+                              <div className="company-v">{employeeCount}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="step-navigation">
+            <button className="btn-secondary" onClick={prevStep}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12"/>
+                <polyline points="12 19 5 12 12 5"/>
+              </svg>
+              Back
+            </button>
+            <button className="btn-primary" onClick={nextStep}>
+              Continue to Contact Qualification
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </button>
           </div>
         </div>
       )}

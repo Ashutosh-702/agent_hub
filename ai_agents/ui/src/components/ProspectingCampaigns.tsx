@@ -11,12 +11,30 @@ const deriveWizardStepFromStatuses = (
   _lifecycle: string,
   cycle: string
 ): { stepId: WizardStepId; label: string } => {
+  // Step 6: Enrollment complete or in progress
+  if (cycle === 'enrolled_to_sequence') return { stepId: 6, label: 'Enrolled to Sequence ✓' };
+  
+  // Step 6: Ready for enrollment
+  if (cycle === 'personalization_completed') return { stepId: 6, label: 'Enroll for Outreach' };
+  
+  // Step 5: Personalization
+  if (cycle === 'hubspot_sync_completed') return { stepId: 5, label: 'Personalization' };
+  
+  // Step 4: HubSpot Sync in progress or ready
+  if (cycle === 'hubspot_sync_in_progress') return { stepId: 4, label: 'Syncing to HubSpot...' };
+  if (cycle === 'hubspot_sync_failed') return { stepId: 4, label: 'HubSpot Sync Failed' };
   if (cycle === 'contact_enriched') return { stepId: 4, label: 'Sync to HubSpot' };
+  
+  // Step 3: Contact Qualification
   if (cycle === 'contact_qualification') return { stepId: 3, label: 'Contact Qualification' };
+  
+  // Step 2: Company Qualification
   if (cycle === 'company_qualification') return { stepId: 2, label: 'Company Qualification' };
+  
+  // Step 1: Prospecting
   if (cycle === 'prospecting') return { stepId: 1, label: 'Prospecting' };
 
-  // Fallback for unknown/new statuses.
+  // Fallback for unknown/new statuses - show what the status is
   if (cycle) return { stepId: 1, label: `Unknown: ${cycle}` };
   return { stepId: 1, label: 'Prospecting' };
 };
