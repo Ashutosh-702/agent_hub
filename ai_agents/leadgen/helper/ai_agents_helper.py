@@ -678,15 +678,26 @@ class CampaignsHelper:
         """
         Sync contacts from HubSpot webhook.
         """
-        if not query_params.get("company_id") or not query_params.get("campaign_id"):
+        webhook_data = query_params.get("webhook_data")
+        campaign_id = webhook_data.get("campaign_id")
+        company_id = webhook_data.get("company_id")
+        if not company_id or not campaign_id:
             raise ApiException("Company ID and campaign ID are required")
-        company_id = query_params.get("company_id")
-        campaign_id = query_params.get("campaign_id")
         #here store whole query_params in metadata.sync_hubspot_webhook_received
-        json_query_data = json.dumps(query_params)
-        
+        json_query_data = json.dumps(webhook_data)
+        update_campaign = {
+            "metadata.updated_at": datetime.utcnow(),
+            "metadata.sync_hubspot_webhook_received": json_query_data
+        }
         await self.campaign_company_runs_dao.update_campaign_company_run({"company_id": ObjectId(company_id), "campaign_id": ObjectId(campaign_id)}, {"$set": {"sync_to_hubspot_status": "synced", "metadata.updated_at": datetime.utcnow(),"metadata.sync_hubspot_webhook_received": json_query_data}})
-        await self.campaign_dao.update_campaign(campaign_id, {"metadata.updated_at": datetime.utcnow()})
+        #total company runs count
+        total_company_runs_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True})
+        #total company runs count synced
+        total_company_runs_count_synced = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True, "sync_to_hubspot_status": "synced"})
+
+        if total_company_runs_count_synced == total_company_runs_count:
+            update_campaign["prospecting_cycle.status"] = "hubspot_sync_completed"
+        await self.campaign_dao.update_campaign(campaign_id, update_campaign)
         return {
             "message": "HubSpot sync completed",
             "company_id": company_id,
