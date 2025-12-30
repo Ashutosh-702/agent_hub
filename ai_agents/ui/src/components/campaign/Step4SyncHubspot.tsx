@@ -443,7 +443,7 @@ export const Step4SyncHubspot = () => {
     setIsSyncing(true);
     setSyncError(null);
     setSyncProgress({ total: totalCompanies, synced: 0, status: 'Starting sync...' });
-
+    
     // Set syncing status
     setQualifiedContacts(contacts.map(c => 
       selectedContactIds.includes(c.id) 
@@ -472,11 +472,11 @@ export const Step4SyncHubspot = () => {
       setSyncProgress(null);
       
       // Reset to selected status
-      setQualifiedContacts(contacts.map(c => 
-        selectedContactIds.includes(c.id) 
+    setQualifiedContacts(contacts.map(c => 
+      selectedContactIds.includes(c.id) 
           ? { ...c, syncStatus: 'selected' as const }
-          : c
-      ));
+        : c
+    ));
     }
   };
 
@@ -710,9 +710,9 @@ export const Step4SyncHubspot = () => {
             onClick={handleSyncSelected}
             disabled={selectedContactsCount === 0 || isSyncing}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
-            </svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+                </svg>
             {isSyncing ? 'Syncing to HubSpot...' : `Sync ${selectedCompaniesCount} Companies (${selectedContactsCount} Contacts) to HubSpot`}
           </button>
         ) : (

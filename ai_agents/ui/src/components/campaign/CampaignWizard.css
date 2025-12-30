@@ -2732,7 +2732,7 @@
   border-radius: var(--radius-lg);
   cursor: pointer;
   transition: all 0.2s ease;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .personalization-contact-card:hover {
@@ -4121,5 +4121,523 @@ button:disabled .coming-soon-tag {
 .product-icp-select option:checked {
   background: var(--color-primary);
   color: white;
+}
+
+/* ============================================
+   STEP 5: PERSONALIZATION - ENHANCED STYLES
+   ============================================ */
+
+.step-personalization .personalization-contact-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  background: var(--color-white);
+  margin-bottom: var(--space-3);
+  transition: all var(--transition-fast);
+  overflow: hidden;
+  flex-wrap: nowrap !important;
+}
+
+.step-personalization .personalization-contact-card.approved {
+  border-color: var(--color-success);
+  background: rgba(16, 185, 129, 0.02);
+}
+
+.step-personalization .personalization-contact-card .contact-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: var(--space-3) !important;
+  padding: var(--space-4) !important;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  flex-wrap: nowrap !important;
+  width: 100%;
+}
+
+.step-personalization .personalization-contact-card .contact-row:hover {
+  background: var(--color-gray-50);
+}
+
+.step-personalization .personalization-contact-card .contact-select {
+  flex-shrink: 0 !important;
+  width: 24px;
+}
+
+.step-personalization .personalization-contact-card .contact-avatar {
+  flex-shrink: 0 !important;
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.step-personalization .personalization-contact-card .contact-info {
+  flex: 1 !important;
+  min-width: 0 !important;
+  overflow: hidden;
+}
+
+.step-personalization .personalization-contact-card .contact-info h4 {
+  margin: 0 0 var(--space-1) 0 !important;
+  font-size: var(--text-base) !important;
+  font-weight: 600 !important;
+  color: var(--color-gray-900) !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step-personalization .personalization-contact-card .contact-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  font-size: var(--text-sm) !important;
+  color: var(--color-gray-500) !important;
+}
+
+.step-personalization .personalization-contact-card .contact-meta .job-title {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.step-personalization .personalization-contact-card .contact-meta .company-name {
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.step-personalization .personalization-contact-card .contact-status {
+  flex-shrink: 0 !important;
+  margin-left: auto;
+}
+
+.step-personalization .personalization-contact-card .qualified-badge {
+  flex-shrink: 0 !important;
+}
+
+.step-personalization .personalization-contact-card .expand-btn {
+  flex-shrink: 0 !important;
+  margin-left: var(--space-2);
+}
+
+.step-personalization .personalization-content {
+  padding: var(--space-4);
+  background: var(--color-gray-50);
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.step-personalization .personalization-content.pending-content {
+  text-align: center;
+  color: var(--color-gray-500);
+  font-style: italic;
+}
+
+/* Personalization Field */
+.personalization-field {
+  margin-bottom: var(--space-4);
+}
+
+.personalization-field:last-child {
+  margin-bottom: 0;
+}
+
+.personalization-field label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-gray-700);
+  margin-bottom: var(--space-2);
+}
+
+.personalization-field .field-value {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-gray-800);
+}
+
+.personalization-field .email-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.personalization-field .email-field svg {
+  color: var(--color-gray-400);
+  flex-shrink: 0;
+}
+
+.personalization-field .message-preview {
+  padding: var(--space-4);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-gray-800);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: var(--font-sans);
+  margin: 0;
+}
+
+.personalization-field .message-edit textarea {
+  width: 100%;
+  padding: var(--space-4);
+  background: var(--color-white);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-gray-800);
+  line-height: 1.6;
+  font-family: var(--font-sans);
+  resize: vertical;
+  min-height: 150px;
+}
+
+.personalization-field .message-edit .edit-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  justify-content: flex-end;
+}
+
+.personalization-field .deck-url-display {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.personalization-field .deck-url-display .deck-url-input {
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+  font-family: var(--font-mono);
+}
+
+.personalization-field .deck-url-display .open-deck-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.personalization-field .deck-url-display .open-deck-btn:hover {
+  background: var(--color-primary-dark);
+  transform: scale(1.05);
+}
+
+/* Review Actions */
+.step-personalization .review-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-gray-200);
+}
+
+/* Rejected Actions */
+.step-personalization .rejected-actions {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-md);
+}
+
+.step-personalization .rejected-actions p {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+  margin-bottom: var(--space-3);
+}
+
+.step-personalization .rejected-actions .action-buttons {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* Approved Badge Large */
+.step-personalization .approved-badge-large {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-4);
+}
+
+.step-personalization .approved-badge-large svg {
+  color: var(--color-success);
+}
+
+.step-personalization .approved-badge-large span {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+/* Small spinner for progress */
+.spinner.small {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+/* ============================================
+   STEP 6: ENROLL OUTREACH - ENHANCED STYLES
+   ============================================ */
+
+.step-enroll-outreach .enrollment-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+  margin-bottom: var(--space-4);
+}
+
+.step-enroll-outreach .enrollment-info svg {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.step-enroll-outreach .contact-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+}
+
+.step-enroll-outreach .contact-preview-card .contact-email {
+  font-size: var(--text-xs);
+  color: var(--color-gray-500);
+}
+
+.step-enroll-outreach .contact-preview-card .contact-badges {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.step-enroll-outreach .contact-preview-card .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  border-radius: var(--radius-sm);
+}
+
+.step-enroll-outreach .contact-preview-card .badge.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+}
+
+.step-enroll-outreach .data-preview-section {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  background: var(--color-gray-50);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+}
+
+.step-enroll-outreach .data-preview-section h3 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-gray-800);
+  margin-bottom: var(--space-4);
+}
+
+.step-enroll-outreach .data-preview-info {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 1024px) {
+  .step-enroll-outreach .data-preview-info {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .step-enroll-outreach .data-preview-info {
+    grid-template-columns: 1fr;
+  }
+}
+
+.step-enroll-outreach .data-category {
+  padding: var(--space-3);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+}
+
+.step-enroll-outreach .data-category h5 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-gray-700);
+  margin-bottom: var(--space-2);
+}
+
+.step-enroll-outreach .data-category ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.step-enroll-outreach .data-category li {
+  font-size: var(--text-xs);
+  color: var(--color-gray-600);
+  padding: var(--space-1) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.step-enroll-outreach .data-category li::before {
+  content: '✓';
+  color: var(--color-success);
+  font-size: 10px;
+}
+
+/* Enrolled Data Preview */
+.step-enroll-outreach .enrolled-data-preview {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-lg);
+}
+
+.step-enroll-outreach .enrolled-data-preview h3 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-gray-800);
+  margin-bottom: var(--space-2);
+}
+
+.step-enroll-outreach .enrolled-data-preview .data-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-success);
+  margin-bottom: var(--space-4);
+}
+
+.step-enroll-outreach .enrolled-data-preview .data-info svg {
+  flex-shrink: 0;
+}
+
+.step-enroll-outreach .enrolled-data-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 1024px) {
+  .step-enroll-outreach .enrolled-data-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .step-enroll-outreach .enrolled-data-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.step-enroll-outreach .enrolled-contact-card {
+  padding: var(--space-4);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+}
+
+.step-enroll-outreach .enrolled-contact-card .contact-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.step-enroll-outreach .enrolled-contact-card .contact-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+
+.step-enroll-outreach .enrolled-contact-card .contact-basic h4 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-gray-900);
+  margin: 0;
+}
+
+.step-enroll-outreach .enrolled-contact-card .contact-basic span {
+  font-size: var(--text-sm);
+  color: var(--color-gray-500);
+}
+
+.step-enroll-outreach .enrolled-contact-card .contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.step-enroll-outreach .enrolled-contact-card .detail-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.step-enroll-outreach .enrolled-contact-card .detail-row .label {
+  color: var(--color-gray-500);
+  min-width: 80px;
+}
+
+.step-enroll-outreach .enrolled-contact-card .detail-row .value {
+  color: var(--color-gray-800);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-enroll-outreach .enrolled-contact-card .detail-row .value.success {
+  color: var(--color-success);
+  font-weight: 500;
 }
 

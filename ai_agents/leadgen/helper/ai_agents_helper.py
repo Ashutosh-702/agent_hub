@@ -958,6 +958,13 @@ class CampaignsHelper:
             
             enrolled_contacts.append(contact_payload)
         
+        # Send contacts to Lemlist API (MOCK - placeholder for actual integration)
+        lemlist_response = await self._send_to_lemlist_mock(
+            sequence_id=sequence_id,
+            sequence_name=sequence_name,
+            contacts=enrolled_contacts
+        )
+        
         # Update campaign status
         await self.campaign_dao.update_campaign(campaign_id, {
             "prospecting_cycle.status": "enrolled_to_sequence",
@@ -965,7 +972,8 @@ class CampaignsHelper:
                 "sequence_id": sequence_id,
                 "sequence_name": sequence_name,
                 "enrolled_at": datetime.utcnow(),
-                "enrolled_count": len(enrolled_contacts)
+                "enrolled_count": len(enrolled_contacts),
+                "lemlist_response": lemlist_response  # Store mock response
             }
         })
         
@@ -975,7 +983,130 @@ class CampaignsHelper:
             "sequence_id": sequence_id,
             "sequence_name": sequence_name,
             "enrolled_count": len(enrolled_contacts),
-            "enrolled_contacts": enrolled_contacts
+            "enrolled_contacts": enrolled_contacts,
+            "lemlist_api_response": lemlist_response
+        }
+
+    async def _send_to_lemlist_mock(self, sequence_id: str, sequence_name: str, contacts: list) -> dict:
+        """
+        MOCK: Placeholder for actual Lemlist API integration.
+        
+        In production, this would:
+        1. For each contact, call Lemlist API: POST https://api.lemlist.com/api/campaigns/{campaignId}/leads/{email}
+        2. Send contact data with personalization variables
+        3. Handle rate limiting and retries
+        
+        Lemlist API expects data like:
+        {
+            "email": "contact@example.com",
+            "firstName": "John",
+            "lastName": "Doe",
+            "companyName": "Acme Inc",
+            "customFields": {
+                "personalized_message": "...",
+                "deck_url": "..."
+            }
+        }
+        """
+        import json
+        
+        logger.info(f"[MOCK LEMLIST API] Starting to send {len(contacts)} contacts to sequence '{sequence_name}' (ID: {sequence_id})")
+        
+        leads_added = 0
+        leads_failed = 0
+        contact_responses = []
+        
+        # Send each contact individually to Lemlist API
+        for contact in contacts:
+            # Transform contact to Lemlist format
+            lemlist_payload = {
+                "email": contact.get("email"),
+                "firstName": contact.get("first_name"),
+                "lastName": contact.get("last_name"),
+                "companyName": contact.get("company_name"),
+                "phone": contact.get("phone")[0] if contact.get("phone") else None,
+                "linkedinUrl": contact.get("linkedin_url"),
+                "picture": None,  # Optional profile picture URL
+                # Custom variables for personalization in email templates
+                "customFields": {
+                    "jobTitle": contact.get("job_title"),
+                    "companyDomain": contact.get("company_domain"),
+                    "companyWebsite": contact.get("company_website"),
+                    "companyIndustry": contact.get("company_industry"),
+                    "companySize": contact.get("company_size"),
+                    "companyLocation": contact.get("company_location"),
+                    "personalizedMessage": contact.get("personalized_message"),
+                    "aiGeneratedDeck": contact.get("ai_generated_deck"),
+                    # Include all metadata
+                    "contactId": contact.get("contact_id"),
+                    "campaignContactRunMetadata": contact.get("campaign_contact_run_metadata"),
+                    "contactMetadata": contact.get("contact_metadata"),
+                    "companyMetadata": contact.get("company_metadata"),
+                    "contactSourceData": contact.get("contact_source_data"),
+                    "linkedinData": contact.get("linkedin_data"),
+                }
+            }
+            
+            # Log each contact being sent
+            logger.info(f"[MOCK LEMLIST API] Sending contact: {contact.get('email')} - {contact.get('first_name')} {contact.get('last_name')}")
+            logger.debug(f"[MOCK LEMLIST API] Payload: {json.dumps(lemlist_payload, indent=2, default=str)}")
+            
+            # Mock API call for this contact
+            # In production: response = await self._call_lemlist_api(sequence_id, lemlist_payload)
+            contact_response = await self._mock_lemlist_single_contact_api(sequence_id, lemlist_payload)
+            
+            if contact_response.get("success"):
+                leads_added += 1
+            else:
+                leads_failed += 1
+            
+            contact_responses.append({
+                "email": contact.get("email"),
+                "contact_id": contact.get("contact_id"),
+                "status": "added" if contact_response.get("success") else "failed",
+                "lemlist_response": contact_response
+            })
+        
+        # Summary response
+        mock_response = {
+            "success": leads_failed == 0,
+            "message": f"[MOCK] Processed {len(contacts)} contacts: {leads_added} added, {leads_failed} failed",
+            "sequence_id": sequence_id,
+            "sequence_name": sequence_name,
+            "leads_added": leads_added,
+            "leads_failed": leads_failed,
+            "contact_responses": contact_responses,
+            "mock": True,
+            "note": "Replace with actual Lemlist API integration"
+        }
+        
+        logger.info(f"[MOCK LEMLIST API] Completed: {leads_added} added, {leads_failed} failed")
+        
+        return mock_response
+
+    async def _mock_lemlist_single_contact_api(self, sequence_id: str, contact_payload: dict) -> dict:
+        """
+        MOCK: Simulates a single contact API call to Lemlist.
+        
+        In production, this would be:
+        POST https://api.lemlist.com/api/campaigns/{sequence_id}/leads/{email}
+        Headers: { "Authorization": "Bearer {API_KEY}" }
+        Body: contact_payload
+        """
+        import asyncio
+        
+        # Simulate API latency (50-100ms per contact)
+        await asyncio.sleep(0.05)
+        
+        email = contact_payload.get("email")
+        
+        # Mock success response (in production, handle errors, duplicates, etc.)
+        return {
+            "success": True,
+            "email": email,
+            "leadId": f"mock_lead_{email}",
+            "message": f"[MOCK] Lead {email} added to sequence {sequence_id}",
+            "mock": True
         }
 
 
