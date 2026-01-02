@@ -351,22 +351,23 @@ export const NewCampaignWizard = () => {
       if (!parsed) return;
 
       // Only restore if the saved campaignId matches the URL campaign_id
+      const MAX_STEPS = 6; // Maximum possible steps in the wizard
       if (parsed.campaignId === urlCampaignId && !state.campaignId) {
         setState((prev) => ({
           ...prev,
           campaignId: parsed.campaignId || null,
           currentStep:
-            typeof parsed.currentStep === 'number' && parsed.currentStep >= 1 && parsed.currentStep <= STEPS.length
+            typeof parsed.currentStep === 'number' && parsed.currentStep >= 1 && parsed.currentStep <= MAX_STEPS
               ? parsed.currentStep
               : prev.currentStep,
           maxStepReached:
             typeof parsed.maxStepReached === 'number' &&
             parsed.maxStepReached >= 1 &&
-            parsed.maxStepReached <= STEPS.length
+            parsed.maxStepReached <= MAX_STEPS
               ? parsed.maxStepReached
               : typeof parsed.currentStep === 'number' &&
                   parsed.currentStep >= 1 &&
-                  parsed.currentStep <= STEPS.length
+                  parsed.currentStep <= MAX_STEPS
                 ? parsed.currentStep
                 : prev.maxStepReached,
         }));
@@ -1001,13 +1002,13 @@ export const NewCampaignWizard = () => {
           {currentSteps.map((step, index) => (
             <React.Fragment key={step.id}>
               <div
-                className={`stepper-item ${state.currentStep === step.id ? 'active' : ''} ${state.maxStepReached > step.id ? 'completed' : ''}`}
-                onClick={() => step.id <= state.maxStepReached && goToStep(step.id)}
+                className={`stepper-item ${state.currentStep === step.stepNumber ? 'active' : ''} ${state.maxStepReached > step.stepNumber ? 'completed' : ''}`}
+                onClick={() => step.stepNumber <= state.maxStepReached && goToStep(step.stepNumber)}
                 role="button"
-                tabIndex={step.id <= state.maxStepReached ? 0 : -1}
+                tabIndex={step.stepNumber <= state.maxStepReached ? 0 : -1}
               >
                 <div className="stepper-circle">
-                  {state.maxStepReached > step.id ? (
+                  {state.maxStepReached > step.stepNumber ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>

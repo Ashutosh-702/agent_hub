@@ -29,7 +29,7 @@ const generateMockContacts = (companyId: string, companyName: string): Contact[]
 };
 
 // Mock companies generator based on NL query with realistic data
-const generateCompaniesFromNL = (query: string): Company[] => {
+const generateCompaniesFromNL = (_query: string): Company[] => {
   const realCompanies = [
     { name: 'Acme Corp', industry: 'Enterprise Software', location: 'San Francisco, USA', employees: '201-500', revenue: '$25M - $50M' },
     { name: 'TechNova', industry: 'Cloud Infrastructure', location: 'Seattle, USA', employees: '501-1000', revenue: '$50M - $100M' },

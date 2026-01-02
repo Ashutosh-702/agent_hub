@@ -29,7 +29,7 @@ const generateMockContacts = (companyId: string, companyName: string): Contact[]
 };
 
 // Mock similar companies generator with realistic company names
-const generateSimilarCompanies = (baseCompanyName: string): Company[] => {
+const generateSimilarCompanies = (_baseCompanyName: string): Company[] => {
   const realCompanies = [
     { name: 'Attentive', industry: 'Marketing Tech', location: 'New York, USA', employees: '501-1000', revenue: '$500M+' },
     { name: 'Klaviyo', industry: 'E-commerce Marketing', location: 'Boston, USA', employees: '1001-2000', revenue: '$700M+' },
