@@ -1,5 +1,6 @@
 import React, { useState, createContext, useContext, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useLazyGetCampaignDetailsQuery } from '../../store';
 import './CampaignWizard.css';
 import { useSidebar } from '../../context/SidebarContext';
 import { CampaignTypeSelection, type CampaignType } from './CampaignTypeSelection';
@@ -34,6 +35,7 @@ export interface Prospect {
 export interface Contact {
   id: string;
   companyId: string;
+  companyName?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -71,6 +73,9 @@ export interface CampaignFilters {
   employeeCount: string[];
   revenueMin: string;
   revenueMax: string;
+  currency: string;
+  locationType: string;
+  productName: string;
 }
 
 export interface CampaignState {
@@ -83,7 +88,11 @@ export interface CampaignState {
   
   // Existing fields
   currentStep: number;
+  // Highest step reached for this campaign in the wizard UI.
+  // Used so that clicking back to an earlier step doesn't "lock" later completed steps.
+  maxStepReached: number;
   filters: CampaignFilters;
+  campaignId: string | null;
   prospects: Prospect[];
   qualifiedCompanies: Company[];
   qualifiedContacts: Contact[];
@@ -100,6 +109,7 @@ export interface CampaignState {
 interface CampaignContextType {
   state: CampaignState;
   setFilters: (filters: CampaignFilters) => void;
+  setCampaignId: (campaignId: string | null) => void;
   setProspects: (prospects: Prospect[]) => void;
   setQualifiedCompanies: (companies: Company[]) => void;
   setQualifiedContacts: (contacts: Contact[]) => void;
@@ -239,6 +249,33 @@ const getStepsForType = (
 
 // Default deck URL - used when user wants to replace AI-generated deck with default
 const DEFAULT_DECK_URL = 'https://decks.example.com/default/standard-company-deck.pdf';
+const WIZARD_SESSION_KEY = 'agent_hub_campaign_wizard_session_v1';
+
+// Derive wizard step from prospecting_cycle.status (ONLY - lifecycle.status is ignored)
+const deriveStepFromCycleStatus = (cycleStatus?: string): number => {
+  // Step 6: Enrollment complete or ready for enrollment
+  if (cycleStatus === 'enrolled_to_sequence') return 6;
+  if (cycleStatus === 'personalization_completed') return 6;
+  
+  // Step 5: Personalization
+  if (cycleStatus === 'hubspot_sync_completed') return 5;
+  
+  // Step 4: HubSpot Sync
+  if (cycleStatus === 'hubspot_sync_in_progress') return 4;
+  if (cycleStatus === 'hubspot_sync_failed') return 4;
+  if (cycleStatus === 'contact_enriched') return 4;
+  
+  // Step 3: Contact Qualification
+  if (cycleStatus === 'contact_qualification') return 3;
+  
+  // Step 2: Company Qualification
+  if (cycleStatus === 'company_qualification') return 2;
+  
+  // Step 1: Prospecting
+  if (cycleStatus === 'prospecting') return 1;
+  
+  return 1; // Default to step 1
+};
 
 // Campaign type labels for display
 const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
@@ -251,6 +288,13 @@ const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
 
 export const NewCampaignWizard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [fetchCampaignDetails] = useLazyGetCampaignDetailsQuery();
+  
+  // Check if we're resuming an existing campaign (has campaign_id in URL)
+  const urlCampaignId = new URLSearchParams(location.search).get('campaign_id');
+  const isResumingCampaign = !!urlCampaignId;
+  
   const { setWizardProgress, clearWizardProgress } = useSidebar();
   const [state, setState] = useState<CampaignState>({
     // New fields
@@ -262,13 +306,18 @@ export const NewCampaignWizard = () => {
     
     // Existing fields
     currentStep: 1,
+    maxStepReached: 1,
     filters: {
       industry: [],
       region: [],
       employeeCount: [],
       revenueMin: '',
       revenueMax: '',
+      currency: 'USD',
+      locationType: 'country',
+      productName: '',
     },
+    campaignId: null,
     prospects: [],
     qualifiedCompanies: [],
     qualifiedContacts: [],
@@ -283,6 +332,104 @@ export const NewCampaignWizard = () => {
   });
 
   const [isComplete, setIsComplete] = useState(false);
+
+  // Restore wizard progress (campaignId + step) on refresh - ONLY when resuming a campaign.
+  // When creating a NEW campaign (no campaign_id in URL), start fresh.
+  useEffect(() => {
+    try {
+      // If NOT resuming a campaign (no campaign_id in URL), clear session storage and start fresh
+      if (!isResumingCampaign) {
+        window.sessionStorage.removeItem(WIZARD_SESSION_KEY);
+        return;
+      }
+      
+      const raw = window.sessionStorage.getItem(WIZARD_SESSION_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as
+        | { campaignId?: string | null; currentStep?: number; maxStepReached?: number }
+        | null;
+      if (!parsed) return;
+
+      // Only restore if the saved campaignId matches the URL campaign_id
+      if (parsed.campaignId === urlCampaignId && !state.campaignId) {
+        setState((prev) => ({
+          ...prev,
+          campaignId: parsed.campaignId || null,
+          currentStep:
+            typeof parsed.currentStep === 'number' && parsed.currentStep >= 1 && parsed.currentStep <= STEPS.length
+              ? parsed.currentStep
+              : prev.currentStep,
+          maxStepReached:
+            typeof parsed.maxStepReached === 'number' &&
+            parsed.maxStepReached >= 1 &&
+            parsed.maxStepReached <= STEPS.length
+              ? parsed.maxStepReached
+              : typeof parsed.currentStep === 'number' &&
+                  parsed.currentStep >= 1 &&
+                  parsed.currentStep <= STEPS.length
+                ? parsed.currentStep
+                : prev.maxStepReached,
+        }));
+      }
+    } catch {
+      // ignore storage corruption
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isResumingCampaign, urlCampaignId]);
+
+  // When resuming a campaign, fetch its details and derive the correct step from prospecting_cycle.status
+  useEffect(() => {
+    if (!isResumingCampaign || !urlCampaignId) return;
+    
+    let cancelled = false;
+    const fetchAndSetStep = async () => {
+      try {
+        const res = await fetchCampaignDetails({ campaign_id: urlCampaignId, page: 1, limit: 1 }).unwrap();
+        if (cancelled) return;
+        
+        const campaign = res?.data?.campaign;
+        const cycleStatus = campaign?.prospecting_cycle?.status;
+        const derivedStep = deriveStepFromCycleStatus(cycleStatus);
+        
+        setState((prev) => ({
+          ...prev,
+          campaignId: urlCampaignId,
+          currentStep: derivedStep,
+          maxStepReached: Math.max(prev.maxStepReached, derivedStep),
+        }));
+      } catch (err) {
+        // If fetch fails, still set the campaignId but stay on step 1
+        if (!cancelled) {
+          setState((prev) => ({
+            ...prev,
+            campaignId: urlCampaignId,
+          }));
+        }
+      }
+    };
+    
+    void fetchAndSetStep();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [isResumingCampaign, urlCampaignId, fetchCampaignDetails]);
+
+  // Persist wizard progress (minimal) so refresh doesn't reset to step 1.
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        WIZARD_SESSION_KEY,
+        JSON.stringify({
+          campaignId: state.campaignId,
+          currentStep: state.currentStep,
+          maxStepReached: state.maxStepReached,
+        })
+      );
+    } catch {
+      // ignore storage failures
+    }
+  }, [state.campaignId, state.currentStep, state.maxStepReached]);
 
   // Get current steps based on campaign type
   const currentSteps = getStepsForType(state.campaignType, state.skipCompanyQualification);
@@ -349,6 +496,10 @@ export const NewCampaignWizard = () => {
 
   const setFilters = useCallback((filters: CampaignFilters) => {
     setState(prev => ({ ...prev, filters }));
+  }, []);
+
+  const setCampaignId = useCallback((campaignId: string | null) => {
+    setState(prev => ({ ...prev, campaignId }));
   }, []);
 
   const setProspects = useCallback((prospects: Prospect[]) => {
@@ -701,18 +852,23 @@ export const NewCampaignWizard = () => {
   }, []);
 
   const nextStep = useCallback(() => {
-    setState(prev => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, currentSteps.length) }));
-  }, [currentSteps.length]);
+    setState(prev => {
+      const next = Math.min(prev.currentStep + 1, 6);
+      return { ...prev, currentStep: next, maxStepReached: Math.max(prev.maxStepReached, next) };
+    });
+  }, []);
 
   const prevStep = useCallback(() => {
     setState(prev => ({ ...prev, currentStep: Math.max(prev.currentStep - 1, 1) }));
   }, []);
 
   const goToStep = useCallback((step: number) => {
-    if (step >= 1 && step <= currentSteps.length) {
-      setState(prev => ({ ...prev, currentStep: step }));
-    }
-  }, [currentSteps.length]);
+    if (step < 1 || step > 6) return;
+    setState(prev => {
+      if (step > prev.maxStepReached) return prev;
+      return { ...prev, currentStep: step };
+    });
+  }, []);
 
   const setLoading = useCallback((loading: boolean, message = '', estimatedCount = 0) => {
     setState(prev => ({ ...prev, isLoading: loading, loadingMessage: message, estimatedCount }));
@@ -729,6 +885,7 @@ export const NewCampaignWizard = () => {
   const contextValue: CampaignContextType = {
     state,
     setFilters,
+    setCampaignId,
     setProspects,
     setQualifiedCompanies,
     setQualifiedContacts,
@@ -844,13 +1001,13 @@ export const NewCampaignWizard = () => {
           {currentSteps.map((step, index) => (
             <React.Fragment key={step.id}>
               <div
-                className={`stepper-item ${state.currentStep === step.stepNumber ? 'active' : ''} ${state.currentStep > step.stepNumber ? 'completed' : ''}`}
-                onClick={() => state.currentStep > step.stepNumber && goToStep(step.stepNumber)}
+                className={`stepper-item ${state.currentStep === step.id ? 'active' : ''} ${state.maxStepReached > step.id ? 'completed' : ''}`}
+                onClick={() => step.id <= state.maxStepReached && goToStep(step.id)}
                 role="button"
-                tabIndex={state.currentStep > step.stepNumber ? 0 : -1}
+                tabIndex={step.id <= state.maxStepReached ? 0 : -1}
               >
                 <div className="stepper-circle">
-                  {state.currentStep > step.stepNumber ? (
+                  {state.maxStepReached > step.id ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>

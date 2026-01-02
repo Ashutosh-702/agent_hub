@@ -6,6 +6,10 @@ class LeadgenServices:
 
 # Topic names
 LEADGEN_BATCH_PROCESSING = "leadgen-batch-processing"
+LEADGEN_PROSPECTING_JOB_PROCESSING = "leadgen-prospecting-job-processing"
+LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING = "leadgen-company-qualification-ai-processing"
+LEADGEN_APOLLO_CONTACT_LIST_PROCESSING = "leadgen-apollo-contact-list-processing"
+LEADGEN_HUBSPOT_SYNC_PROCESSING = "leadgen-hubspot-sync-processing"
 LUSHA_COMPANY_COLLECTION = "lusha-company-collection"
 CONTACTS_ENRICHMENT = "contacts-enrichment"
 # Service configurations mapping
@@ -14,6 +18,22 @@ KAFKA_SERVICE_CONFIG_MAPPING = {
         LEADGEN_BATCH_PROCESSING: {
             "topics": ["leadgen_batch_processing"],  # Use underscores to match EventBridge output
             "description": "Process company search requests"
+        },
+        LEADGEN_PROSPECTING_JOB_PROCESSING: {
+            "topics": ["leadgen_prospecting_job_processing"],  # Use underscores to match EventBridge output
+            "description": "Process prospecting job requests"
+        },
+        LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING: {
+            "topics": ["leadgen_company_qualification_ai_processing"],  # Use underscores to match EventBridge output
+            "description": "Process AI company qualification requests"
+        },
+        LEADGEN_APOLLO_CONTACT_LIST_PROCESSING: {
+            "topics": ["leadgen_apollo_contact_list_processing"],  # Use underscores to match EventBridge output
+            "description": "Fetch Apollo contacts for a campaign (campaign_id -> relevant company_ids -> Apollo)"
+        },
+        LEADGEN_HUBSPOT_SYNC_PROCESSING: {
+            "topics": ["leadgen_hubspot_sync_processing"],  # Use underscores to match EventBridge output
+            "description": "Sync campaign contacts to HubSpot CRM"
         },
         LUSHA_COMPANY_COLLECTION: {
             "topics": ["lusha_company_collection"],  # Use underscores to match EventBridge output

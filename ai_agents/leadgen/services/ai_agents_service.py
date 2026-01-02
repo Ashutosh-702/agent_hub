@@ -30,10 +30,12 @@ from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import(
     LEADGEN_BATCH_PROCESSING, 
+    LEADGEN_PROSPECTING_JOB_PROCESSING,
     KAFKA_SERVICE_CONFIG_MAPPING, 
     LeadgenServices
 )
 from integrations.lusha.lusha_api import LushaAPIClient
+from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob
 
 
 class CampaignService:
@@ -41,6 +43,7 @@ class CampaignService:
         self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
+        self.prospecting_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_PROSPECTING_JOB_PROCESSING]
 
     async def upload_leadgen_form(self, form_submission: FormSubmission) -> Dict[str, str]:
 
@@ -80,6 +83,78 @@ class CampaignService:
         return {
             "request_id": request_id,
             "campaign_id": str(campaign_id)
+        }
+
+    async def create_campaign_from_prospecting_job(self, query_params: CreateCampaignFromProspectingJob) -> Dict[str, Any]:
+        db_data = self._transform_create_campaign_from_prospecting_job_to_db_data(query_params)
+        campaign_id = await self.campaign_dao.create_campaign(db_data)
+
+        if not campaign_id:
+            raise ApiException("campaign_id not generated")
+
+        request_id = str(uuid.uuid4())
+
+        if not self.event_emitter:
+            raise ApiException("EventBridge Producer not initialized")
+
+        event = {
+            "request_id": request_id,
+            "action": "process_prospecting_job",
+            "campaign_id": str(campaign_id), 
+            "timestamp": asyncio.get_event_loop().time()
+        }
+
+        await emit_event_helper(
+            event_emitter=self.event_emitter,
+            topics=self.prospecting_kafka_config["topics"],
+            partition_value=request_id,
+            event=event,
+            event_meta={"service": "leadgen", "campaign_id": str(campaign_id)}
+        )
+
+        logger.info(f"📤 Campaign ID {str(campaign_id)} queued for processing: {request_id}")
+
+        return {
+            "request_id": request_id,
+            "campaign_id": str(campaign_id)
+        }
+
+    def _transform_create_campaign_from_prospecting_job_to_db_data(self, query_params: CreateCampaignFromProspectingJob) -> Dict[str, Any]:
+        return {
+            "prompts": {
+                "web": query_params.web_prompt,
+                "persona": query_params.persona_prompt
+            },
+            "segmentation": {
+                "industry": self._parse_list(query_params.industry, ';'),
+                "keywords": query_params.keywords,
+                "categories": query_params.categories
+            },
+            "target": {
+                "employee_count": self._parse_list(query_params.employee_count, ','),
+                "revenue_min": query_params.revenue_min,
+                "revenue_max": query_params.revenue_max,
+                "currency": query_params.currency,
+                "location": {
+                    "type": query_params.location_type,
+                    "names": self._parse_list(query_params.location, ',')
+                }
+            },
+            "ownership": {
+                "hubspot_email": query_params.hubspot_email,
+                "product_name": query_params.product_name,
+                "business_team": query_params.business_team,
+                "user_email": query_params.user_email
+            },
+            "lifecycle": {"status": "active"},
+            "prospecting_cycle": {
+                "status": query_params.prospecting_cycle_status
+            },
+            "shortlisting_approach": query_params.shortlisting_approach,
+            "metadata": {
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
         }
 
     def _transform_form_to_db_data(self, form_submission: FormSubmission) -> Dict[str, Any]:
@@ -173,7 +248,22 @@ class CampaignService:
             query["ownership.product_name"] = query_params.product_name
         if query_params.status:
             query["lifecycle.status"] = query_params.status
+        if query_params.prospecting_cycle_status:
+            query["prospecting_cycle.status"] = query_params.prospecting_cycle_status
         campaigns, pagination_info = await self.campaign_dao.get_campaigns_paginated(query, query_params.page, query_params.limit)
+        serialized_campaigns = serialize_objectid(campaigns)
+        return {"campaigns": serialized_campaigns, "pagination_info": pagination_info}
+
+    async def get_prospecting_campaigns(self, page: int = 1, limit: int = 10, prospecting_cycle_status: str = None):
+        """Get campaigns that have prospecting_cycle.status defined (i.e., are part of prospecting workflow)"""
+        query = {
+            "prospecting_cycle.status": {"$exists": True, "$ne": None}
+        }
+        # If specific status provided, filter by it
+        if prospecting_cycle_status:
+            query["prospecting_cycle.status"] = prospecting_cycle_status
+        
+        campaigns, pagination_info = await self.campaign_dao.get_campaigns_paginated(query, page, limit)
         serialized_campaigns = serialize_objectid(campaigns)
         return {"campaigns": serialized_campaigns, "pagination_info": pagination_info}
 

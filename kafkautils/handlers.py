@@ -89,6 +89,216 @@ async def leadgen_batch_processing_handler(message: Any):
         traceback.print_exc()
         raise
 
+async def leadgen_prospecting_job_processing_handler(message: Any):
+    try:
+        # Try different ways to extract the payload
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+
+        else:
+            logger.error(f"🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+        
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")  # Now we get campaign_id instead of form_data
+        
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+        
+        if action != "process_prospecting_job":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+        
+        logger.info(f"🔄 Processing prospecting job: {request_id}")
+        await process_prospecting_job(request_id, campaign_id)
+        
+    except Exception as e:
+        logger.error(f"❌ Error handling leadgen message: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+async def leadgen_company_qualification_ai_processing_handler(message: Any):
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+        else:
+            logger.error("🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")
+
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+
+        if action != "process_company_qualification_ai":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+
+        logger.info(f"🔄 Processing AI company qualification: {request_id}")
+        await process_company_qualification_ai(request_id, campaign_id)
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        await campaigns_dao.update_campaign( campaign_id, {"prospecting_cycle.status":"contact_qualification"})
+
+    except Exception as e:
+        logger.error(f"❌ Error handling leadgen message: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+async def leadgen_apollo_contact_list_processing_handler(message: Any):
+    """
+    Handler for get_apollo_contact_list events.
+    Expands campaign_id -> relevant company_ids and then reuses contacts enrichment logic (Apollo fetch).
+    """
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+        else:
+            logger.error("🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received leadgen message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")
+        slack_metadata = payload.get("slack_metadata", {})
+
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+
+        if action != "get_apollo_contact_list" and action != "enrich_apollo_contact_list":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+
+        logger.info(f"🔄 Processing Apollo contact list for campaign: {campaign_id}")
+        await process_apollo_contact_list(request_id, campaign_id, slack_metadata, action)
+
+    except Exception as e:
+        logger.error(f"❌ Error handling apollo contact list message: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+async def process_apollo_contact_list(request_id: str, campaign_id: str, slack_metadata: dict, action: str):
+    """
+    Fetch Apollo contacts for all relevant companies in a campaign.
+    This reuses `process_contacts_enrichment` (which calls ApolloHelper.get_company_contacts).
+    """
+    try:
+        await initialize_consumer_connections()
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaign_data = await campaigns_dao.get_campaign(campaign_id)
+        
+        if not campaign_data:
+            logger.error(f"❌ Campaign not found: {campaign_id}")
+            return
+        orchestrator = IntegrationOrchestrator(campaign_data)
+        if action == "get_apollo_contact_list":
+            await orchestrator.fetch_apollo_contact_list()
+        elif action == "enrich_apollo_contact_list":
+            await orchestrator.enrich_apollo_contact_list()
+
+    except Exception as e:
+        logger.error(f"❌ Error processing apollo contact list {request_id}: {e}")
+        raise
+
+async def process_company_qualification_ai(request_id: str, campaign_id: str):
+    """Re-run AI company qualification (relevance check) using updated campaign prompts."""
+    try:
+        logger.info(f"🔍 Processing request: {request_id}")
+        logger.info(f"📋 Campaign ID: {campaign_id}")
+
+        await initialize_consumer_connections()
+
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaign_data = await campaigns_dao.get_campaign(campaign_id)
+
+        if not campaign_data:
+            logger.error(f"❌ Campaign not found: {campaign_id}")
+            return
+
+        orchestrator = IntegrationOrchestrator(campaign_data)
+        # Uses the campaign config (including updated prompts.web) to re-run relevance check.
+        await orchestrator.relevance_check.company_relevance_check(campaign_id, request_id=request_id)
+        update_campaign_status = await campaigns_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "company_qualification"})
+        if update_campaign_status:
+            logger.info(f"✅ Updated campaign status to company_qualification: {campaign_id}")
+        else:
+            logger.error(f"❌ Failed to update campaign status to company_qualification: {campaign_id}")
+        logger.info(f"✅ Completed AI company qualification: {request_id}")
+
+    except Exception as e:
+        logger.error(f"❌ Error processing AI company qualification {request_id}: {e}")
+        raise
+
+async def process_prospecting_job(request_id: str, campaign_id: str):
+    """Process a single prospecting job request using campaign_id."""
+    try:
+        logger.info(f"🔍 Processing request: {request_id}")
+        logger.info(f"📋 Campaign ID: {campaign_id}")
+        
+        # Initialize database connection if needed
+        await initialize_consumer_connections()
+        
+        # Fetch campaign data from database using campaign_id
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaign_data = await campaigns_dao.get_campaign(campaign_id)
+        
+        if not campaign_data:
+            logger.error(f"❌ Campaign not found: {campaign_id}")
+            return
+        
+        logger.info(f"🔍 DEBUG: Campaign data structure: {campaign_data}")
+        logger.info(f"📊 Industry: {campaign_data.get('segmentation', {}).get('industry', 'Unknown')}")
+        logger.info(f"📍 Location: {campaign_data.get('target', {}).get('location', {}).get('names', 'Unknown')}")
+        
+        # Run the prospecting job pipeline for this campaign
+        orchestrator = IntegrationOrchestrator(campaign_data)
+        await orchestrator.process_prospecting_job()
+        
+        logger.info(f"✅ Completed processing: {request_id}")
+        # print(f"📝 Result: {result}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error processing request {request_id}: {e}")
+        raise 
+
 
 async def process_leadgen_message(request_id: str, campaign_id: str):
     """Process a single leadgen company search request using campaign_id."""
@@ -435,4 +645,73 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
         return
     except Exception as e:
         logger.error(f"❌ Error processing contacts enrichment: {e}")
+        raise
+
+
+async def leadgen_hubspot_sync_processing_handler(message: Any):
+    """
+    Handler for HubSpot sync processing messages.
+    Receives campaign_id and syncs relevant contacts to HubSpot.
+    """
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+        else:
+            logger.error(f"🔍 payload missing in HubSpot sync message")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received HubSpot sync message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+        
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")
+        
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in HubSpot sync message")
+            return
+        
+        if action != "sync_to_hubspot":
+            logger.error(f"❌ Unknown action for HubSpot sync: {action}")
+            return
+        
+        logger.info(f"🔄 Processing HubSpot sync for campaign: {campaign_id}")
+
+        await sync_to_hubspot(request_id, campaign_id)
+
+    except Exception as e:
+        logger.error(f"❌ Error handling HubSpot sync message: {e}")
+        raise
+
+
+async def sync_to_hubspot(request_id: str, campaign_id: str):
+    """
+    Sync campaign contacts to HubSpot.
+    This function will contain the actual sync logic.
+    
+    Args:
+        request_id: Unique request identifier for tracking
+        campaign_id: Campaign ID to sync contacts from
+    """
+    try:
+        logger.info(f"🔍 Starting HubSpot sync for request: {request_id}, campaign: {campaign_id}")
+        
+        # Initialize database connection if needed
+        await initialize_consumer_connections()
+        
+        hubspot_webhook = ContactHubspotWebhook(campaign_id=campaign_id)
+        await hubspot_webhook.sync_to_hubspot(campaign_id)
+        
+        
+        logger.info(f"✅ HubSpot sync completed for campaign: {campaign_id}")
+        
+        return
+    except Exception as e:
+        logger.error(f"❌ Error syncing to HubSpot: {e}")
         raise

@@ -1,13 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCampaignWizard, type Contact } from './NewCampaignWizard';
+import {
+  useEnrichApolloContactListMutation,
+  useLazyGetCampaignContactListQuery,
+  useUpdateApolloContactEnrichmentStatusMutation,
+  useGetCampaignContactListQuery,
+  type CampaignContactListItem,
+} from '../../store';
+import { skipToken } from '@reduxjs/toolkit/query';
 
-const CONTACT_AI_QUESTIONS = [
-  'Should the contact be in a decision-making role (Director/VP/C-level)?',
-  'Should the contact have technical background?',
-  'Should the contact be actively posting on LinkedIn?',
-  'Should the contact have been in the role for at least 6 months?',
-  'Should the contact be based in the same region as the company HQ?',
-];
+// Check if campaign has already completed contact qualification based on prospecting_cycle.status
+const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
+  const completedStatuses = [
+    'contact_enriched',
+    'hubspot_sync_in_progress',
+    'hubspot_sync_completed',
+    'hubspot_sync_failed',
+    'personalization_completed',
+    'enrolled_to_sequence',
+  ];
+  return cycleStatus ? completedStatuses.includes(cycleStatus) : false;
+};
 
 export const Step3ContactQualification = () => {
   const { 
@@ -21,19 +34,28 @@ export const Step3ContactQualification = () => {
     setQualifiedContacts,
   } = useCampaignWizard();
 
-  const [aiQuestionsAnswers, setAiQuestionsAnswers] = useState<Record<string, boolean>>({});
-  const [isQualifying, setIsQualifying] = useState(false);
-  const [qualificationComplete, setQualificationComplete] = useState(false);
-  const [activeTab, setActiveTab] = useState<'qualified' | 'rejected'>('qualified');
-  const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
+  const campaignId = state.campaignId;
+  const [isEnrichPolling, setIsEnrichPolling] = useState(false);
+  const [enrichApolloContactList] = useEnrichApolloContactListMutation();
+  const [updateApolloContactEnrichmentStatus] = useUpdateApolloContactEnrichmentStatusMutation();
+  const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
+
+  // Query to check campaign status for detecting if step is already completed
+  const { data: contactListData } = useGetCampaignContactListQuery(
+    campaignId ? { campaign_id: campaignId, page: 1, limit: 100 } : skipToken
+  );
+  
+  const campaignCycleStatus = contactListData?.data?.campaign?.prospecting_cycle?.status;
+  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
+  const apiContacts = contactListData?.data?.contacts || [];
 
   const contacts = state.qualifiedContacts;
   const qualifiedCount = contacts.filter(c => c.qualificationStatus === 'qualified').length;
-  const rejectedCount = contacts.filter(c => c.qualificationStatus === 'rejected').length;
 
-  // Get company name for a contact
-  const getCompanyName = (companyId: string) => {
-    const company = state.qualifiedCompanies.find(c => c.id === companyId);
+  // Get company name for a contact (prefer API-provided name)
+  const getCompanyName = (contact: Contact) => {
+    if (contact.companyName) return contact.companyName;
+    const company = state.qualifiedCompanies.find(c => c.id === contact.companyId);
     return company?.name || 'Unknown Company';
   };
 
@@ -55,69 +77,115 @@ export const Step3ContactQualification = () => {
   const allSelected = contacts.length > 0 && contacts.every(c => c.qualificationStatus === 'qualified');
   const someSelected = contacts.some(c => c.qualificationStatus === 'qualified') && !allSelected;
 
-  const handleAIQualification = async () => {
-    setIsQualifying(true);
-    setLoading(true, 'AI is qualifying contacts based on your criteria...', 0);
-
-    // Simulate AI qualification process with animation
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 10) + 5;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-      }
-      setLoading(true, `Analyzing contacts... ${Math.min(progress, 100)}%`, progress);
-    }, 200);
-
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    clearInterval(interval);
-
-    // Mock rejection reasons for contacts
-    const REJECTION_REASONS = [
-      'Role level does not match decision-maker criteria',
-      'Limited LinkedIn activity and engagement',
-      'Recently joined the company (less than 6 months)',
-      'Job title does not align with target persona',
-      'No technical background detected',
-      'Contact appears to be in a transitional role',
-      'Email domain suggests personal account',
-      'Profile indicates non-purchasing role',
-    ];
-
-    // Simulate AI qualification results
-    const reasons: Record<string, string> = {};
-    const updatedContacts = contacts.map(contact => {
-      // Random qualification based on "AI analysis"
-      const score = Math.random();
-      const qualified = score > 0.35; // 65% qualification rate
-      
-      if (!qualified) {
-        reasons[contact.id] = REJECTION_REASONS[Math.floor(Math.random() * REJECTION_REASONS.length)];
-      }
-      
-      return {
-        ...contact,
-        qualificationStatus: qualified ? 'qualified' : 'rejected',
-      } as Contact;
-    });
-
-    setRejectionReasons(reasons);
-    setQualifiedContacts(updatedContacts);
-    setLoading(false);
-    setIsQualifying(false);
-    setQualificationComplete(true);
-    
-    // Scroll to top to show results
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  };
-
   const handleContinue = () => {
-    // Filter only qualified contacts for next step
-    const qualified = contacts.filter(c => c.qualificationStatus === 'qualified');
-    setQualifiedContacts(qualified);
-    nextStep();
+    // Before going to Step 4, queue contact enrichment and poll until campaign status becomes contact_enriched.
+    if (!campaignId) {
+      nextStep();
+      return;
+    }
+
+    const selectedContactIds = contacts
+      .filter((c) => c.qualificationStatus === 'qualified')
+      .map((c) => c.id);
+
+    if (selectedContactIds.length === 0) {
+      // nothing selected; don't start enrichment chain
+      return;
+    }
+
+    setLoading(true, 'Saving selected contacts…');
+    void (async () => {
+      try {
+        // 1) Persist selected contact ids (is_relevant=true)
+        await updateApolloContactEnrichmentStatus({
+          campaign_id: campaignId,
+          selection_type: 'selected',
+          is_relevant: true,
+          contact_ids: selectedContactIds,
+        }).unwrap();
+
+        // 2) Queue enrichment job
+        await enrichApolloContactList({ campaign_id: campaignId, enrichment_status: true }).unwrap();
+        setLoading(true, 'Enriching contacts from Apollo…');
+        // 3) Start polling for contact_enriched
+        setIsEnrichPolling(true);
+      } catch (e) {
+        setLoading(false);
+        setIsEnrichPolling(false);
+      }
+    })();
   };
+
+  // Poll get_campaign_contact_list until prospecting_cycle.status is contact_enriched,
+  // then refresh contacts and advance to Step 4.
+  useEffect(() => {
+    if (!campaignId || !isEnrichPolling) return;
+
+    let cancelled = false;
+    const limit = 100;
+
+    const poll = async () => {
+      try {
+        const first = await fetchCampaignContactList({ campaign_id: campaignId, page: 1, limit }).unwrap();
+        const status = first?.data?.campaign?.prospecting_cycle?.status;
+        if (status !== 'contact_enriched') return;
+
+        // Fetch all contacts pages once enriched
+        let page = 1;
+        let hasNext = first.pagination?.has_next ?? false;
+        const all: CampaignContactListItem[] = [];
+        all.push(...(first.data?.contacts || []));
+
+        let pagesFetched = 0;
+        const MAX_PAGES = 50; // safety cap
+
+        while (hasNext && pagesFetched < MAX_PAGES) {
+          pagesFetched += 1;
+          page += 1;
+          const res = await fetchCampaignContactList({ campaign_id: campaignId, page, limit }).unwrap();
+          all.push(...(res.data?.contacts || []));
+          hasNext = res.pagination?.has_next ?? false;
+        }
+
+        if (cancelled) return;
+
+        const mapped = all.map((c) => ({
+          id: c.contact_id,
+          companyId: c.company_id,
+          companyName: c.contact_data?.company || undefined,
+          firstName: c.contact_data?.firstname || '',
+          lastName: c.contact_data?.lastname || '',
+          email: (c.contact_data?.email && c.contact_data.email[0]) || '',
+          phone: (c.contact_data?.phone && c.contact_data.phone[0]) || undefined,
+          jobTitle: c.contact_data?.jobtitle || '',
+          linkedinUrl: c.linkedin_data?.linkedin_url || undefined,
+          qualificationStatus: 'pending' as const,
+          syncStatus: 'not_synced' as const,
+          personalization: {
+            messageStatus: 'pending' as const,
+            deckStatus: 'pending' as const,
+          },
+        })) as Contact[];
+
+        setQualifiedContacts(mapped);
+        setLoading(false);
+        setIsEnrichPolling(false);
+        nextStep();
+      } catch (e) {
+        // ignore transient errors during polling
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void poll();
+    }, 3000);
+    void poll();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [campaignId, fetchCampaignContactList, isEnrichPolling, nextStep, setLoading, setQualifiedContacts]);
 
   return (
     <div className="step-container step-contact-qualification">
@@ -152,8 +220,8 @@ export const Step3ContactQualification = () => {
         </div>
       )}
 
-      {/* Mode Selection */}
-      {!state.contactQualificationMode && (
+      {/* Mode Selection - Show only if step not already completed and no mode selected */}
+      {!state.contactQualificationMode && !stepAlreadyCompleted && (
         <div className="qualification-mode-selection">
           <h3>Choose Qualification Method</h3>
           <div className="mode-cards">
@@ -172,8 +240,7 @@ export const Step3ContactQualification = () => {
               <span className="mode-tag">Full Control</span>
             </div>
             <div 
-              className="mode-card"
-              onClick={() => setContactQualificationMode('ai')}
+              className="mode-card disabled"
             >
               <div className="mode-icon ai">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -186,9 +253,89 @@ export const Step3ContactQualification = () => {
                 </svg>
               </div>
               <h4>AI Qualification</h4>
-              <p>Let AI qualify contacts based on your custom criteria</p>
-              <span className="mode-tag ai">Recommended</span>
+              <p>Coming soon.</p>
+              <span className="mode-tag ai">Soon</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step Already Completed - Show review mode */}
+      {!state.contactQualificationMode && stepAlreadyCompleted && (
+        <div className="step-completed-view">
+          <div className="sync-success-banner" style={{ marginBottom: '24px' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <span>Contact Qualification Completed</span>
+          </div>
+
+          <div className="qualification-stats">
+            <div className="stat">
+              <span className="stat-value">{contactListData?.pagination?.total_records ?? apiContacts.length}</span>
+              <span className="stat-label">Total Contacts</span>
+            </div>
+            <div className="stat qualified">
+              <span className="stat-value">
+                {apiContacts.filter(c => c.is_relevant).length}
+              </span>
+              <span className="stat-label">Qualified (this page)</span>
+            </div>
+          </div>
+
+          {/* Show qualified contacts (read-only view) */}
+          {apiContacts.length > 0 && (
+            <div className="contacts-qualification-list">
+              <div className="select-all-header">
+                <span className="select-all-text">
+                  Qualified Contacts (view only)
+                </span>
+              </div>
+
+              {apiContacts.filter(c => c.is_relevant).slice(0, 10).map((c) => (
+                <div key={c.contact_id} className="contact-qualification-card qualified" style={{ cursor: 'default' }}>
+                  <div className="contact-avatar">
+                    {c.contact_data?.firstname?.[0] || '?'}{c.contact_data?.lastname?.[0] || '?'}
+                  </div>
+                  <div className="contact-info">
+                    <h4>{c.contact_data?.firstname || ''} {c.contact_data?.lastname || ''}</h4>
+                    <div className="contact-meta">
+                      <span className="job-title">{c.contact_data?.jobtitle || 'N/A'}</span>
+                      <span className="company-name">{c.contact_data?.company || 'Unknown'}</span>
+                    </div>
+                    <span className="contact-email">{c.contact_data?.email?.[0] || 'No email'}</span>
+                  </div>
+                  <div className="qualified-badge">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                </div>
+              ))}
+              {apiContacts.filter(c => c.is_relevant).length > 10 && (
+                <div style={{ padding: '12px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>
+                  + {apiContacts.filter(c => c.is_relevant).length - 10} more contacts...
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="step-navigation">
+            <button className="btn-secondary" onClick={prevStep}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12"/>
+                <polyline points="12 19 5 12 12 5"/>
+              </svg>
+              Back
+            </button>
+            <button className="btn-primary" onClick={nextStep}>
+              Continue to Sync to HubSpot
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </button>
           </div>
         </div>
       )}
@@ -256,9 +403,9 @@ export const Step3ContactQualification = () => {
                     <h4>{contact.firstName} {contact.lastName}</h4>
                     <div className="contact-meta">
                       <span className="job-title">{contact.jobTitle}</span>
-                      <span className="company-name">{getCompanyName(contact.companyId)}</span>
+                      <span className="company-name">{getCompanyName(contact)}</span>
                     </div>
-                    <span className="contact-email">{contact.email}</span>
+                    <span className="contact-email">{contact.email || 'No email found'}</span>
                   </div>
                   {isQualified && (
                     <div className="qualified-badge">
@@ -274,186 +421,18 @@ export const Step3ContactQualification = () => {
         </div>
       )}
 
-      {/* AI Qualification */}
-      {state.contactQualificationMode === 'ai' && !qualificationComplete && (
-        <div className="ai-qualification">
-          <div className="ai-questions-card">
-            <h3>Define Contact Qualification Criteria</h3>
-            <p>Answer these questions to help AI understand your ideal contact profile</p>
-            
-            <div className="ai-questions-list">
-              {CONTACT_AI_QUESTIONS.map((question, index) => (
-                <div key={index} className="ai-question">
-                  <span className="question-text">{question}</span>
-                  <div className="question-options">
-                    <button
-                      className={`option-btn ${aiQuestionsAnswers[question] === true ? 'selected yes' : ''}`}
-                      onClick={() => setAiQuestionsAnswers(prev => ({ ...prev, [question]: true }))}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      className={`option-btn ${aiQuestionsAnswers[question] === false ? 'selected no' : ''}`}
-                      onClick={() => setAiQuestionsAnswers(prev => ({ ...prev, [question]: false }))}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button 
-              className="btn-primary btn-large"
-              onClick={handleAIQualification}
-              disabled={isQualifying || Object.keys(aiQuestionsAnswers).length < 3}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2a4 4 0 0 1 4 4c0 1.1-.9 2-2 2h-4c-1.1 0-2-.9-2-2a4 4 0 0 1 4-4z"/>
-                <path d="M12 8v8"/>
-              </svg>
-              Run AI Qualification
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* AI Qualification Results */}
-      {state.contactQualificationMode === 'ai' && qualificationComplete && (
-        <div className="ai-results">
-          {/* Summary Cards - Also act as tab switchers */}
-          <div className="results-summary">
-            <div 
-              className={`result-card success ${activeTab === 'qualified' ? 'active' : ''}`}
-              onClick={() => setActiveTab('qualified')}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="card-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
-              <h3>{qualifiedCount}</h3>
-              <p>Qualified Contacts</p>
-            </div>
-            <div 
-              className={`result-card danger ${activeTab === 'rejected' ? 'active' : ''}`}
-              onClick={() => setActiveTab('rejected')}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="card-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="15" y1="9" x2="9" y2="15"/>
-                  <line x1="9" y1="9" x2="15" y2="15"/>
-                </svg>
-              </div>
-              <h3>{rejectedCount}</h3>
-              <p>Rejected</p>
+      {/* AI Qualification (Coming soon) */}
+      {state.contactQualificationMode === 'ai' && (
+        <div className="manual-qualification">
+          <div className="empty-state">
+            <h3>AI Contact Qualification</h3>
+            <p>Coming soon. Please use Manual Qualification for now.</p>
+            <div className="wizard-navigation">
+              <button className="btn secondary" onClick={() => setContactQualificationMode('manual')}>
+                Switch to Manual
+              </button>
             </div>
           </div>
-
-          {/* Qualified Contacts Tab */}
-          {activeTab === 'qualified' && (
-            <div className="contacts-tab-content">
-              {contacts.filter(c => c.qualificationStatus === 'qualified').length === 0 ? (
-                <div className="empty-state">
-                  <p>No qualified contacts yet</p>
-                </div>
-              ) : (
-                contacts.filter(c => c.qualificationStatus === 'qualified').map((contact) => (
-                  <div key={contact.id} className="contact-result-card qualified">
-                    <div className="contact-avatar">
-                      {contact.firstName[0]}{contact.lastName[0]}
-                    </div>
-                    <div className="contact-info">
-                      <h4>{contact.firstName} {contact.lastName}</h4>
-                      <div className="contact-meta">
-                        <span className="job-title">{contact.jobTitle}</span>
-                        <span className="separator">-</span>
-                        <span className="company-name">{getCompanyName(contact.companyId)}</span>
-                      </div>
-                      <span className="contact-email">{contact.email}</span>
-                      {contact.linkedinUrl && (
-                        <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="contact-linkedin">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                          </svg>
-                          LinkedIn
-                        </a>
-                      )}
-                    </div>
-                    <button 
-                      className="btn-override btn-reject"
-                      onClick={() => qualifyContact(contact.id, false)}
-                      title="Reject this contact"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                      </svg>
-                      Reject
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* Rejected Contacts Tab */}
-          {activeTab === 'rejected' && (
-            <div className="contacts-tab-content">
-              {contacts.filter(c => c.qualificationStatus === 'rejected').length === 0 ? (
-                <div className="empty-state">
-                  <p>No rejected contacts</p>
-                </div>
-              ) : (
-                contacts.filter(c => c.qualificationStatus === 'rejected').map((contact) => (
-                  <div key={contact.id} className="contact-result-card rejected">
-                    <div className="contact-avatar">
-                      {contact.firstName[0]}{contact.lastName[0]}
-                    </div>
-                    <div className="contact-info">
-                      <h4>{contact.firstName} {contact.lastName}</h4>
-                      <div className="contact-meta">
-                        <span className="job-title">{contact.jobTitle}</span>
-                        <span className="separator">-</span>
-                        <span className="company-name">{getCompanyName(contact.companyId)}</span>
-                      </div>
-                      {contact.linkedinUrl && (
-                        <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="contact-linkedin">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                          </svg>
-                          LinkedIn
-                        </a>
-                      )}
-                      <div className="rejection-reason">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10"/>
-                          <line x1="12" y1="8" x2="12" y2="12"/>
-                          <line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                        <span>{rejectionReasons[contact.id] || 'Does not meet qualification criteria'}</span>
-                      </div>
-                    </div>
-                    <button 
-                      className="btn-override"
-                      onClick={() => qualifyContact(contact.id, true)}
-                      title="Override AI decision and qualify this contact"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                      Qualify
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
         </div>
       )}
 
@@ -461,7 +440,6 @@ export const Step3ContactQualification = () => {
       <div className="step-navigation">
         <button className="btn-secondary" onClick={() => {
           setContactQualificationMode(null);
-          setQualificationComplete(false);
           prevStep();
         }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -474,13 +452,12 @@ export const Step3ContactQualification = () => {
         {state.contactQualificationMode && (
           <button className="btn-secondary" onClick={() => {
             setContactQualificationMode(null);
-            setQualificationComplete(false);
           }}>
             Change Method
           </button>
         )}
 
-        {qualifiedCount > 0 && (
+        {qualifiedCount > 0 && state.contactQualificationMode !== 'ai' && (
           <button className="btn-primary btn-large" onClick={handleContinue}>
             Continue with {qualifiedCount} Contacts
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -14,6 +14,8 @@ class ApolloResponseSchema(BaseModel):
     reveal_phone_number: bool = False
     additional_params: Optional[Dict[str, Any]] = None
     organization_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+    prospecting_approach: Optional[str] = None
     
 class SearchEnrichPeopleSchema(BaseModel):
     person_seniorities: Optional[List[str]] = None  

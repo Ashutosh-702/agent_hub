@@ -1,85 +1,146 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCampaignWizard } from './NewCampaignWizard';
+import { useLazyGetEnrollmentContactsQuery, useEnrollContactsToSequenceMutation } from '../../store';
 
-const MOCK_SEQUENCES = [
-  { 
-    id: 'seq-1', 
-    name: 'Enterprise Outreach - Q1 2025',
-    description: 'Multi-touch sequence for enterprise prospects with personalized follow-ups',
-    steps: 5,
-    avgOpenRate: 42,
-    avgReplyRate: 8,
-  },
-  { 
-    id: 'seq-2', 
-    name: 'SMB Cold Outreach',
-    description: 'Quick and direct sequence for small and medium businesses',
-    steps: 3,
-    avgOpenRate: 38,
-    avgReplyRate: 12,
-  },
-  { 
-    id: 'seq-3', 
-    name: 'Healthcare Decision Makers',
-    description: 'Tailored sequence for healthcare industry executives',
-    steps: 4,
-    avgOpenRate: 35,
-    avgReplyRate: 6,
-  },
-  { 
-    id: 'seq-4', 
-    name: 'Tech Founders Sequence',
-    description: 'Casual, founder-to-founder outreach for tech startups',
-    steps: 4,
-    avgOpenRate: 45,
-    avgReplyRate: 15,
-  },
-  { 
-    id: 'seq-5', 
-    name: 'Re-engagement Campaign',
-    description: 'Win-back sequence for previously contacted prospects',
-    steps: 3,
-    avgOpenRate: 28,
-    avgReplyRate: 5,
-  },
-];
+import { MOCK_LEMLIST_SEQUENCES as MOCK_SEQUENCES } from '../../store/api/wizardMockData';
+
+interface EnrollmentContact {
+  campaign_contact_run_id: string;
+  campaign_id: string;
+  company_id: string | null;
+  contact_id: string | null;
+  is_relevant: boolean;
+  enrichment_status: string | null;
+  personalization_status: string;
+  personalized_message: string;
+  ai_generated_deck: string;
+  email_id: string;
+  campaign_contact_run_metadata: Record<string, unknown>;
+  contact_data: {
+    firstname: string;
+    lastname: string;
+    email: string[];
+    phone: string[];
+    jobtitle: string;
+    company: string;
+    source_id: string;
+  } | null;
+  linkedin_data: {
+    linkedin_url: string | null;
+    source: string;
+  } | null;
+  contact_metadata: Record<string, unknown> | null;
+  company_data: {
+    name: string | null;
+    domain: string | null;
+    website: string | null;
+    industry: string | null;
+    employee_count: string | null;
+    revenue: string | null;
+    location: string | null;
+    description: string | null;
+    company_metadata: Record<string, unknown> | null;
+  } | null;
+}
 
 export const Step6EnrollOutreach = () => {
   const {
     state,
     setSelectedSequence,
-    enrollToSequence,
     prevStep,
   } = useCampaignWizard();
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [enrollmentComplete, setEnrollmentComplete] = useState(false);
+  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const [enrollmentContacts, setEnrollmentContacts] = useState<EnrollmentContact[]>([]);
+  const [enrolledContactsData, setEnrolledContactsData] = useState<unknown[]>([]);
 
-  const contacts = state.qualifiedContacts;
+  const campaignId = state.campaignId || '';
   const selectedSequence = MOCK_SEQUENCES.find(s => s.id === state.selectedSequence);
 
+  // RTK Query hooks
+  const [fetchEnrollmentContacts] = useLazyGetEnrollmentContactsQuery();
+  const [enrollContactsToSequence] = useEnrollContactsToSequenceMutation();
+
+  // Fetch contacts on mount
+  useEffect(() => {
+    const loadContacts = async () => {
+      if (!campaignId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const result = await fetchEnrollmentContacts({ campaign_id: campaignId, limit: 500 }).unwrap();
+        if (result.success && result.data.contacts) {
+          setEnrollmentContacts(result.data.contacts);
+        }
+      } catch (error) {
+        console.error('Failed to fetch enrollment contacts:', error);
+        setEnrollmentError('Failed to load contacts. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadContacts();
+  }, [campaignId, fetchEnrollmentContacts]);
+
   // Get company name for a contact
-  const getCompanyName = (companyId: string) => {
-    const company = state.qualifiedCompanies.find(c => c.id === companyId);
-    return company?.name || 'Unknown Company';
+  const getCompanyName = (contact: EnrollmentContact) => {
+    return contact.company_data?.name || contact.contact_data?.company || 'Unknown Company';
   };
 
   const handleEnroll = async () => {
-    if (!state.selectedSequence) return;
+    if (!state.selectedSequence || !campaignId) return;
     
+    const sequence = MOCK_SEQUENCES.find(s => s.id === state.selectedSequence);
+    if (!sequence) return;
+
     setIsEnrolling(true);
+    setEnrollmentError(null);
     
-    // Simulate enrollment
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    setIsEnrolling(false);
-    setEnrollmentComplete(true);
+    try {
+      const result = await enrollContactsToSequence({
+        campaign_id: campaignId,
+        sequence_id: sequence.id,
+        sequence_name: sequence.name,
+      }).unwrap();
+
+      if (result.success) {
+        setEnrolledContactsData(result.data.enrolled_contacts);
+        setEnrollmentComplete(true);
+      }
+    } catch (error) {
+      console.error('Failed to enroll contacts:', error);
+      setEnrollmentError('Failed to enroll contacts. Please try again.');
+    } finally {
+      setIsEnrolling(false);
+    }
   };
 
   const handleViewInLemlist = () => {
     // Open Lemlist in new tab (mock URL)
     window.open('https://app.lemlist.com/campaigns', '_blank');
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="step-container step-enroll-outreach">
+        <div className="loading-overlay">
+          <div className="loading-card">
+            <div className="loading-animation">
+              <div className="spinner large" />
+            </div>
+            <h3>Loading contacts for enrollment...</h3>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Enrollment complete view
   if (enrollmentComplete) {
@@ -93,12 +154,12 @@ export const Step6EnrollOutreach = () => {
             </svg>
           </div>
           <h2>Contacts Enrolled Successfully!</h2>
-          <p>{contacts.length} contacts have been enrolled to "{selectedSequence?.name}"</p>
+          <p>{enrollmentContacts.length} contacts have been enrolled to "{selectedSequence?.name}"</p>
           
           <div className="enrollment-summary">
             <div className="summary-card">
               <h4>Enrolled Contacts</h4>
-              <span className="value">{contacts.length}</span>
+              <span className="value">{enrollmentContacts.length}</span>
             </div>
             <div className="summary-card">
               <h4>Sequence</h4>
@@ -107,6 +168,57 @@ export const Step6EnrollOutreach = () => {
             <div className="summary-card">
               <h4>Expected Steps</h4>
               <span className="value">{selectedSequence?.steps}</span>
+            </div>
+          </div>
+
+          {/* Enrolled Contacts Data Preview */}
+          <div className="enrolled-data-preview">
+            <h3>Enrolled Contact Data (sent to sequence)</h3>
+            <p className="data-info">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              Full contact details including all metadata were sent to the sequence
+            </p>
+            <div className="enrolled-data-grid">
+              {(enrolledContactsData as Array<Record<string, unknown>>).slice(0, 3).map((contact, idx) => (
+                <div key={idx} className="enrolled-contact-card">
+                  <div className="contact-header">
+                    <div className="contact-avatar">
+                      {(contact.first_name as string)?.[0] || '?'}{(contact.last_name as string)?.[0] || '?'}
+                    </div>
+                    <div className="contact-basic">
+                      <h4>{String(contact.first_name || '')} {String(contact.last_name || '')}</h4>
+                      <span>{String(contact.job_title || '')}</span>
+                    </div>
+                  </div>
+                  <div className="contact-details">
+                    <div className="detail-row">
+                      <span className="label">Email:</span>
+                      <span className="value">{contact.email as string}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="label">Company:</span>
+                      <span className="value">{contact.company_name as string}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="label">Personalized:</span>
+                      <span className="value success">✓ Message & Deck</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="label">Metadata:</span>
+                      <span className="value success">✓ Included</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {(enrolledContactsData as unknown[]).length > 3 && (
+                <div className="more-contacts-indicator">
+                  +{(enrolledContactsData as unknown[]).length - 3} more contacts enrolled with full data
+                </div>
+              )}
             </div>
           </div>
 
@@ -119,7 +231,7 @@ export const Step6EnrollOutreach = () => {
               </svg>
               View in Lemlist
             </button>
-            <button className="btn-secondary" onClick={() => window.location.href = '/campaign'}>
+            <button className="btn-secondary" onClick={() => window.location.href = '/prospecting/campaigns'}>
               Back to Campaigns
             </button>
           </div>
@@ -141,8 +253,26 @@ export const Step6EnrollOutreach = () => {
     <div className="step-container step-enroll-outreach">
       <div className="step-header">
         <h2>Enroll for Outreach</h2>
-        <p>Select a Lemlist sequence to enroll {contacts.length} contacts for outreach</p>
+        <p>Select a Lemlist sequence to enroll {enrollmentContacts.length} contacts for outreach</p>
       </div>
+
+      {/* Error Banner */}
+      {enrollmentError && (
+        <div className="sync-error-banner">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>{enrollmentError}</span>
+          <button className="btn-icon" onClick={() => setEnrollmentError(null)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Loading State */}
       {isEnrolling && (
@@ -152,29 +282,58 @@ export const Step6EnrollOutreach = () => {
               <div className="spinner large" />
             </div>
             <h3>Enrolling contacts to sequence...</h3>
-            <p>This may take a few moments</p>
+            <p>Sending full contact details with metadata to Lemlist</p>
           </div>
         </div>
       )}
 
       {/* Contacts Preview */}
       <div className="enrollment-preview">
-        <h3>Contacts to Enroll ({contacts.length})</h3>
+        <h3>Contacts to Enroll ({enrollmentContacts.length})</h3>
+        <p className="enrollment-info">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          Full contact data including personalized message, AI deck, and all metadata will be sent
+        </p>
         <div className="contacts-preview-grid">
-          {contacts.slice(0, 6).map((contact) => (
-            <div key={contact.id} className="contact-preview-card">
+          {enrollmentContacts.slice(0, 6).map((contact) => (
+            <div key={contact.campaign_contact_run_id} className="contact-preview-card">
               <div className="contact-avatar">
-                {contact.firstName[0]}{contact.lastName[0]}
+                {contact.contact_data?.firstname?.[0] || '?'}{contact.contact_data?.lastname?.[0] || '?'}
               </div>
               <div className="contact-info">
-                <span className="contact-name">{contact.firstName} {contact.lastName}</span>
-                <span className="contact-company">{getCompanyName(contact.companyId)}</span>
+                <span className="contact-name">
+                  {contact.contact_data?.firstname} {contact.contact_data?.lastname}
+                </span>
+                <span className="contact-company">{getCompanyName(contact)}</span>
+                <span className="contact-email">{contact.email_id}</span>
+              </div>
+              <div className="contact-badges">
+                {contact.personalized_message && (
+                  <span className="badge success" title="Personalized message included">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    Message
+                  </span>
+                )}
+                {contact.ai_generated_deck && (
+                  <span className="badge success" title="AI deck included">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    Deck
+                  </span>
+                )}
               </div>
             </div>
           ))}
-          {contacts.length > 6 && (
+          {enrollmentContacts.length > 6 && (
             <div className="more-contacts-indicator">
-              +{contacts.length - 6} more contacts
+              +{enrollmentContacts.length - 6} more contacts
             </div>
           )}
         </div>
@@ -253,12 +412,50 @@ export const Step6EnrollOutreach = () => {
               </div>
               <div className="detail-stat">
                 <span className="label">Contacts to Enroll</span>
-                <span className="value">{contacts.length}</span>
+                <span className="value">{enrollmentContacts.length}</span>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Data Preview Info */}
+      <div className="data-preview-section">
+        <h3>Data to be Sent</h3>
+        <div className="data-preview-info">
+          <div className="data-category">
+            <h5>Contact Information</h5>
+            <ul>
+              <li>Email, Name, Job Title</li>
+              <li>Phone Numbers</li>
+              <li>LinkedIn URL</li>
+            </ul>
+          </div>
+          <div className="data-category">
+            <h5>Company Information</h5>
+            <ul>
+              <li>Company Name, Domain</li>
+              <li>Industry, Size</li>
+              <li>Location</li>
+            </ul>
+          </div>
+          <div className="data-category">
+            <h5>Personalization</h5>
+            <ul>
+              <li>Personalized Message</li>
+              <li>AI Generated Deck URL</li>
+            </ul>
+          </div>
+          <div className="data-category">
+            <h5>All Metadata</h5>
+            <ul>
+              <li>Contact Metadata</li>
+              <li>Company Metadata</li>
+              <li>Campaign Run Metadata</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
       {/* Navigation */}
       <div className="step-navigation">
@@ -272,7 +469,7 @@ export const Step6EnrollOutreach = () => {
 
         <button
           className="btn-primary btn-large enroll-btn"
-          disabled={!state.selectedSequence || isEnrolling}
+          disabled={!state.selectedSequence || isEnrolling || enrollmentContacts.length === 0}
           onClick={handleEnroll}
         >
           {isEnrolling ? (
@@ -286,7 +483,7 @@ export const Step6EnrollOutreach = () => {
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
-              Enroll {contacts.length} Contacts to Sequence
+              Enroll {enrollmentContacts.length} Contacts to Sequence
             </>
           )}
         </button>
@@ -294,4 +491,3 @@ export const Step6EnrollOutreach = () => {
     </div>
   );
 };
-

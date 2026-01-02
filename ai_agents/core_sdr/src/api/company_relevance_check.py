@@ -11,6 +11,7 @@ from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
 from config.loaded_config import loaded_config
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.collection_dao.campaigns import CampaignsDao
 from bson import ObjectId
 
 
@@ -248,7 +249,7 @@ Please try a different search approach or be more thorough in your analysis.
 
         return fallback_data
 
-    async def company_relevance_check(self, campaign_id: str) -> Any:
+    async def company_relevance_check(self, campaign_id: str, request_id: str | None = None) -> Any:
 
         try:
             prompts = self.config.get('prompts', {})
@@ -261,96 +262,141 @@ Please try a different search approach or be more thorough in your analysis.
 
             self.prompts = PromptsConfig(custom_prompts)
 
-            limit = 1
-
             companies_dao = CompaniesDao(
                 loaded_config.connection_manager.mongo_client)
 
             campaign_company_runs_dao = CampaignCompanyRunsDao(
                 loaded_config.connection_manager.mongo_client)
+            campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
 
-            filter_criteria = {
-                "campaign_id": ObjectId(campaign_id),
-                "is_relevant": {"$exists": False}
+            # Progress bootstrap (resume-safe)
+            total = await campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign_id})
+            remaining = await campaign_company_runs_dao.get_campaign_company_runs_count(
+                {"campaign_id": campaign_id, "is_relevant": {"$exists": False}}
+            )
+            relevant = await campaign_company_runs_dao.get_campaign_company_runs_count(
+                {"campaign_id": campaign_id, "is_relevant": True}
+            )
+            processed = max(total - remaining, 0)
+
+            running_update = {
+                "prospecting_cycle.company_qualification_ai.status": "running",
+                "prospecting_cycle.company_qualification_ai.updated_at": datetime.utcnow(),
+                "prospecting_cycle.company_qualification_ai.progress.total": int(total),
+                "prospecting_cycle.company_qualification_ai.progress.processed": int(processed),
+                "prospecting_cycle.company_qualification_ai.progress.relevant": int(relevant),
+                "prospecting_cycle.company_qualification_ai.error": None,
             }
+            if request_id:
+                running_update["prospecting_cycle.company_qualification_ai.request_id"] = request_id
 
-            company_count = await campaign_company_runs_dao.get_campaign_company_runs_count(filter_criteria)
-            print(f"  Company count: {company_count}")
-            count = 0
-            total_pages = (company_count + limit - 1) // limit
-            print(f"total_pages: {total_pages}")
+            await campaigns_dao.update_campaign(campaign_id, running_update)
 
-            for page in range(1, total_pages + 1):
+            # Process companies one-by-one (intentionally) and keep logic simple.
+            # We always pull the first unprocessed mapping (page=1, limit=1) and update it.
+            local_processed = int(processed)
+            local_relevant = int(relevant)
 
-                campaign_company_runs = await campaign_company_runs_dao.get_campaign_company_runs_paginated(
-                    filter_criteria, page=1, limit=limit)
+            filter_criteria = {"campaign_id": ObjectId(campaign_id), "is_relevant": {"$exists": False}}
+            remaining_count = await campaign_company_runs_dao.get_campaign_company_runs_count(filter_criteria)
 
-                for campaign_company_run in campaign_company_runs[0]:
-                    count += 1
-                    company_id = campaign_company_run.get("company_id")
-                    company = await companies_dao.get_company(ObjectId(company_id))
-                    company_name = self.safe_extract_array(
-                        company, "identifiers", "name")
+            for _ in range(int(remaining_count)):
+                runs, _pagination = await campaign_company_runs_dao.get_campaign_company_runs_paginated(
+                    filter_criteria, page=1, limit=1
+                )
+                if not runs:
+                    break
 
-                    print(f"  current company count: {count}/{company_count}")
-                    print(f"  Company: {company_name}")
+                campaign_company_run = runs[0]
+                company_id = campaign_company_run.get("company_id")
+                company = await companies_dao.get_company(str(company_id))
+                company_name = self.safe_extract_array(company, "identifiers", "name")
 
-                    company_data = Company(
-                        company_id=str(company.get("_id", "")),
-                        name=self.safe_extract_array(
-                            company, "identifiers", "name"),
-                        industry=self.safe_extract_array(
-                            company, "profile", "industry"),
-                        location=self.safe_extract_array(
-                            company, "location", "name"),
-                        size=self.safe_extract_array(
-                            company, "profile", "employee_count"),
-                    )
+                local_processed += 1
+                print(f"  processed: {local_processed}/{total}")
+                print(f"  Company: {company_name}")
 
-                    # web_analysis = await self.web_search_analysis(company_data)
-                    web_analysis = {
-                        "relevance_assessment": {
-                            "is_relevant": True,
-                            "confidence_level": "high",
-                            "reasoning": "Company is relevant",
-                            "key_factors": ["company is relevant"]
-                        }
+                company_data = Company(
+                    company_id=str(company.get("_id", "")),
+                    name=self.safe_extract_array(company, "identifiers", "name"),
+                    industry=self.safe_extract_array(company, "profile", "industry"),
+                    location=self.safe_extract_array(company, "location", "name"),
+                    size=self.safe_extract_array(company, "profile", "employee_count"),
+                )
+
+                # web_analysis = await self.web_search_analysis(company_data)
+                web_analysis = {
+                    "relevance_assessment": {
+                        "is_relevant": True,
+                        "confidence_level": "high",
+                        "reasoning": "Company is relevant",
+                        "key_factors": ["company is relevant"],
                     }
+                }
 
-                    # Log results and create relevance assessment
-                    relevance = web_analysis.get('relevance_assessment', {})
-                    is_relevant = relevance.get('is_relevant', False)
-                    confidence = relevance.get('confidence_level', 'unknown')
-                    reasoning = relevance.get(
-                        'relevance_reason', 'No reasoning provided')
-                    key_factors = relevance.get('key_factors', [])
+                # Log results and create relevance assessment
+                relevance = web_analysis.get('relevance_assessment', {})
+                is_relevant = relevance.get('is_relevant', False)
+                confidence = relevance.get('confidence_level', 'unknown')
+                reasoning = relevance.get('relevance_reason', 'No reasoning provided')
+                key_factors = relevance.get('key_factors', [])
 
-                    campaign_run = campaign_company_run
-                    update_data = {
-                        "$set": {
-                            "is_relevant": is_relevant,
-                            "metadata.relevance_reason": reasoning,
-                            "metadata.confidence_level": confidence,
-                            "metadata.key_factors": key_factors,
-                            "metadata.updated_at": datetime.utcnow()
-                        }
+                update_data = {
+                    "$set": {
+                        "is_relevant": is_relevant,
+                        "metadata.relevance_reason": reasoning,
+                        "metadata.confidence_level": confidence,
+                        "metadata.key_factors": key_factors,
+                        "metadata.updated_at": datetime.utcnow(),
                     }
-                    # Update the document
-                    update_result = await campaign_company_runs_dao.update_campaign_company_run(
-                        {"_id": campaign_run["_id"]},
-                        update_data
-                    )
+                }
+                # Update the document
+                await campaign_company_runs_dao.update_campaign_company_run(
+                    {"_id": campaign_company_run["_id"]},
+                    update_data,
+                )
 
-                    if update_result:
-                        print(
-                            f"✅ Campaign company run updated for company {company_name}")
-                    else:
-                        print(
-                            f"❌ Failed to update campaign company run for company {company_name}")
+                if is_relevant:
+                    local_relevant += 1
 
-            print(f"total company relevance update: {count}")
+                # Update progress on every company (simple & accurate).
+                await campaigns_dao.update_campaign(
+                    campaign_id,
+                    {
+                        "prospecting_cycle.company_qualification_ai.status": "running",
+                        "prospecting_cycle.company_qualification_ai.updated_at": datetime.utcnow(),
+                        "prospecting_cycle.company_qualification_ai.progress.total": int(total),
+                        "prospecting_cycle.company_qualification_ai.progress.processed": int(local_processed),
+                        "prospecting_cycle.company_qualification_ai.progress.relevant": int(local_relevant),
+                    },
+                )
+
+            # Completed
+            await campaigns_dao.update_campaign(
+                campaign_id,
+                {
+                    "prospecting_cycle.company_qualification_ai.status": "completed",
+                    "prospecting_cycle.company_qualification_ai.updated_at": datetime.utcnow(),
+                    "prospecting_cycle.company_qualification_ai.progress.total": int(total),
+                    "prospecting_cycle.company_qualification_ai.progress.processed": int(local_processed),
+                    "prospecting_cycle.company_qualification_ai.progress.relevant": int(local_relevant),
+                },
+            )
 
         except Exception as e:
+            # Mark job failed (do not crash the consumer)
+            try:
+                campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+                await campaigns_dao.update_campaign(
+                    campaign_id,
+                    {
+                        "prospecting_cycle.company_qualification_ai.status": "failed",
+                        "prospecting_cycle.company_qualification_ai.updated_at": datetime.utcnow(),
+                        "prospecting_cycle.company_qualification_ai.error": str(e),
+                    },
+                )
+            except Exception:
+                pass
             print(f"error: {e}")
         finally:
             return
