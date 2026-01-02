@@ -44,6 +44,18 @@ export interface Campaign {
     company_name?: string;
     error?: string;
   };
+  csv_import?: {
+    domains?: string[];
+    total_count?: number;
+    processed_count?: number;
+    existing_count?: number;
+    already_enriched_count?: number;  // Companies that already had Apollo data (skipped Apollo search)
+    new_count?: number;
+    success_count?: number;
+    failed_count?: number;
+    status?: 'pending' | 'processing' | 'completed' | 'failed';
+    error?: string;
+  };
   campaign_type?: string;
   metadata: {
     created_at: string;
@@ -161,6 +173,28 @@ export interface CreateCampaignFromSingleCompanyResponse {
     request_id?: string | null;
     company_exists?: boolean;
     company_id?: string;
+  };
+  errors?: string[];
+}
+
+// CSV Import Campaign
+export interface CreateCampaignFromCSVImportPayload {
+  company_domains: string[];
+  product_name?: string;
+  campaign_type?: string;
+  prospecting_cycle_status?: string;
+}
+
+export interface CreateCampaignFromCSVImportResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+    campaign_id?: string;
+    request_id?: string | null;
+    total_companies?: number;
+    // These are now populated asynchronously via Kafka and available in campaign details
+    existing_companies?: number;
+    new_companies?: number;
   };
   errors?: string[];
 }
@@ -460,6 +494,18 @@ export const campaignApi = baseApi.injectEndpoints({
     >({
       query: (payload) => ({
         url: '/api/v1/create_campaign_from_single_company',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Campaign'],
+    }),
+
+    createCampaignFromCSVImport: builder.mutation<
+      CreateCampaignFromCSVImportResponse,
+      CreateCampaignFromCSVImportPayload
+    >({
+      query: (payload) => ({
+        url: '/api/v1/create_campaign_from_csv_import',
         method: 'POST',
         body: payload,
       }),
@@ -851,6 +897,7 @@ export const {
   useCreateCampaignMutation,
   useCreateCampaignFromProspectingJobMutation,
   useCreateCampaignFromSingleCompanyMutation,
+  useCreateCampaignFromCSVImportMutation,
   useGetCampaignDetailsQuery,
   useLazyGetCampaignDetailsQuery,
   useManualCompanyQualificationMutation,

@@ -191,9 +191,10 @@ const getStepsForType = (
 
   switch (campaignType) {
     case 'import_csv':
+      // CSV import skips enrichment step - Apollo enrichment is done in Kafka handler during import
       steps = [
         { id: 'import', stepNumber: 1, title: 'Import Companies', component: Step1ImportCSV },
-        enrichmentStep,
+        // No enrichment step - companies are enriched via Apollo during import
         ...(skipCompanyQual ? [] : [companyQualStep]),
         ...commonStepsAfterQualification,
       ];

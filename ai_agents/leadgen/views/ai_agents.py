@@ -20,6 +20,7 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CampaignDetailsWithCompanies,
     CreateCampaignFromProspectingJob,
     CreateCampaignFromSingleCompany,
+    CreateCampaignFromCSVImport,
     ManualCompanyQualification,
     AiCompanyQualification,
     ApolloContactList,
@@ -300,6 +301,25 @@ async def create_campaign_from_single_company(query_params: CreateCampaignFromSi
         "message": "Single company campaign created and queued for Apollo domain search",
         "campaign_id": response.get("campaign_id"),
         "request_id": response.get("request_id")
+    }
+
+    return response_data.dict()
+
+
+async def create_campaign_from_csv_import(query_params: CreateCampaignFromCSVImport = Body()) -> Dict[str, Any]:
+    """Create a campaign from CSV import with company domains and queue for Apollo search."""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_service = CampaignService()
+
+    response = await campaign_service.create_campaign_from_csv_import(query_params)
+    response_data.success = True
+    response_data.data = {
+        "message": "CSV import campaign created and queued for processing",
+        "campaign_id": response.get("campaign_id"),
+        "request_id": response.get("request_id"),
+        "existing_companies": response.get("existing_companies"),
+        "new_companies": response.get("new_companies"),
+        "total_companies": response.get("total_companies")
     }
 
     return response_data.dict()

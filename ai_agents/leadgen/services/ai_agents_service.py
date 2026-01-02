@@ -32,11 +32,12 @@ from kafkautils.constants import(
     LEADGEN_BATCH_PROCESSING, 
     LEADGEN_PROSPECTING_JOB_PROCESSING,
     LEADGEN_SINGLE_COMPANY_PROCESSING,
+    LEADGEN_CSV_IMPORT_PROCESSING,
     KAFKA_SERVICE_CONFIG_MAPPING, 
     LeadgenServices
 )
 from integrations.lusha.lusha_api import LushaAPIClient
-from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob, CreateCampaignFromSingleCompany
+from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob, CreateCampaignFromSingleCompany, CreateCampaignFromCSVImport
 
 
 class CampaignService:
@@ -46,6 +47,7 @@ class CampaignService:
         self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
         self.prospecting_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_PROSPECTING_JOB_PROCESSING]
         self.single_company_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_SINGLE_COMPANY_PROCESSING]
+        self.csv_import_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_CSV_IMPORT_PROCESSING]
 
     async def upload_leadgen_form(self, form_submission: FormSubmission) -> Dict[str, str]:
 
@@ -256,6 +258,97 @@ class CampaignService:
             "request_id": request_id,
             "campaign_id": str(campaign_id),
             "company_exists": False
+        }
+
+    async def create_campaign_from_csv_import(self, query_params: CreateCampaignFromCSVImport) -> Dict[str, Any]:
+        """
+        Create a campaign from CSV import with multiple company domains.
+        Optimized for large datasets (10,000+ domains):
+        - Creates campaign immediately and returns
+        - Stores domains in campaign document
+        - Kafka handler processes domains in batches
+        """
+        # 1. Create campaign with domains stored in csv_import field
+        db_data = self._transform_csv_import_to_db_data(query_params)
+        campaign_id = await self.campaign_dao.create_campaign(db_data)
+        
+        if not campaign_id:
+            raise ApiException("campaign_id not generated")
+        
+        total_domains = len(query_params.company_domains)
+        logger.info(f"📤 CSV Import Campaign {campaign_id} created with {total_domains} domains")
+        
+        # 2. Emit Kafka event immediately - all processing happens in Kafka handler
+        # This keeps the API response fast even for 10,000+ domains
+        request_id = str(uuid.uuid4())
+        
+        if not self.event_emitter:
+            raise ApiException("EventBridge Producer not initialized")
+        
+        event = {
+            "request_id": request_id,
+            "action": "process_csv_import",
+            "campaign_id": str(campaign_id),
+            "domains_count": total_domains,
+            "timestamp": asyncio.get_event_loop().time()
+        }
+        
+        await emit_event_helper(
+            event_emitter=self.event_emitter,
+            topics=self.csv_import_kafka_config["topics"],
+            partition_value=request_id,
+            event=event,
+            event_meta={"service": "leadgen", "campaign_id": str(campaign_id)}
+        )
+        
+        logger.info(f"📤 CSV Import Campaign ID {str(campaign_id)} queued for processing: {request_id} ({total_domains} domains)")
+        
+        return {
+            "request_id": request_id,
+            "campaign_id": str(campaign_id),
+            "total_companies": total_domains
+        }
+
+    def _transform_csv_import_to_db_data(self, query_params: CreateCampaignFromCSVImport) -> Dict[str, Any]:
+        """Transform CSV import request to database format"""
+        return {
+            "prompts": {
+                "web": None,
+                "persona": None
+            },
+            "segmentation": {
+                "industry": [],
+                "keywords": None,
+                "categories": None
+            },
+            "target": {
+                "employee_count": [],
+                "revenue_min": None,
+                "revenue_max": None,
+                "currency": None,
+                "location": {"type": None, "names": []}
+            },
+            "ownership": {
+                "hubspot_email": query_params.hubspot_email,
+                "product_name": query_params.product_name,
+                "business_team": query_params.business_team,
+                "user_email": query_params.user_email
+            },
+            "lifecycle": {"status": "active"},
+            "prospecting_cycle": {
+                "status": query_params.prospecting_cycle_status
+            },
+            "campaign_type": query_params.campaign_type,
+            "csv_import": {
+                "domains": query_params.company_domains,
+                "total_count": len(query_params.company_domains),
+                "processed_count": 0,
+                "status": "pending"  # pending -> processing -> completed -> failed
+            },
+            "metadata": {
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
         }
 
     def _transform_single_company_to_db_data(self, query_params: CreateCampaignFromSingleCompany) -> Dict[str, Any]:

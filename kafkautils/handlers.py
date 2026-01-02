@@ -172,6 +172,322 @@ async def leadgen_single_company_processing_handler(message: Any):
         raise
 
 
+async def leadgen_csv_import_processing_handler(message: Any):
+    """Handler for CSV import campaigns - batch searches Apollo by domain."""
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+        else:
+            logger.error("🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received CSV import message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")
+
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+
+        if action != "process_csv_import":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+
+        logger.info(f"🔄 Processing CSV import for campaign: {campaign_id}")
+        await process_csv_import(request_id, campaign_id)
+
+    except Exception as e:
+        logger.error(f"❌ Error handling CSV import message: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+async def process_csv_import(request_id: str, campaign_id: str):
+    """
+    Process CSV import campaign - optimized for large datasets (10,000+ domains).
+    
+    Strategy:
+    1. Read domains from campaign.csv_import.domains
+    2. Check for existing companies in batches
+    3. Bulk insert new companies and mappings
+    4. Process Apollo enrichment with rate limiting
+    5. Update progress periodically
+    """
+    import asyncio
+    
+    BATCH_SIZE = 100  # Process domains in batches of 100
+    APOLLO_DELAY = 0.5  # 500ms delay between Apollo calls to respect rate limits
+    PROGRESS_UPDATE_INTERVAL = 10  # Update progress every N domains
+    
+    campaigns_dao = None
+    companies_dao = None
+    campaign_company_runs_dao = None
+    
+    try:
+        logger.info(f"🔍 Processing CSV import: {request_id}")
+        logger.info(f"📋 Campaign ID: {campaign_id}")
+        
+        # Initialize database connection if needed
+        await initialize_consumer_connections()
+        
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        apollo_client = ApolloAPIClient()
+        
+        # 1. Fetch campaign to get domains list
+        campaign_data = await campaigns_dao.get_campaign(campaign_id)
+        if not campaign_data:
+            logger.error(f"❌ Campaign not found: {campaign_id}")
+            return
+        
+        domains = campaign_data.get("csv_import", {}).get("domains", [])
+        if not domains:
+            logger.warning(f"⚠️ No domains found in campaign {campaign_id}")
+            await campaigns_dao.update_campaign(campaign_id, {
+                "csv_import.status": "completed",
+                "prospecting_cycle.status": "company_qualification",
+                "lifecycle.status": "company_qualification",
+                "metadata.updated_at": datetime.utcnow()
+            })
+            return
+        
+        total_count = len(domains)
+        processed_count = 0
+        existing_count = 0
+        already_enriched_count = 0  # Existing companies that already had Apollo data (skipped Apollo)
+        new_count = 0
+        success_count = 0
+        failed_count = 0
+        
+        logger.info(f"📋 Processing {total_count} domains for campaign {campaign_id}")
+        
+        # Update campaign status to processing
+        await campaigns_dao.update_campaign(campaign_id, {
+            "csv_import.status": "processing",
+            "csv_import.total_count": total_count,
+            "csv_import.processed_count": 0,
+            "metadata.updated_at": datetime.utcnow()
+        })
+        
+        # 2. Process domains in batches
+        for batch_start in range(0, total_count, BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, total_count)
+            batch_domains = domains[batch_start:batch_end]
+            
+            logger.info(f"📦 Processing batch {batch_start + 1}-{batch_end} of {total_count}")
+            
+            for domain in batch_domains:
+                try:
+                    # Check if company already exists
+                    existing_company = await companies_dao.get_company_by_source_domain(domain)
+                    
+                    if existing_company:
+                        company_id = str(existing_company.get("_id"))
+                        
+                        # Check if already enriched via Apollo (has source_id)
+                        source_id = existing_company.get("identifiers", {}).get("source_id", "")
+                        already_enriched = bool(source_id and source_id.strip())
+                        
+                        if already_enriched:
+                            # Company already has Apollo data - just create mapping, skip Apollo search
+                            enrichment_source = "existing_enriched_company"
+                            already_enriched_count += 1
+                            logger.info(f"✅ Company already enriched for domain {domain}, skipping Apollo search")
+                        else:
+                            # Company exists but not enriched - search Apollo
+                            enrichment_source = "apollo_domain_search"
+                            logger.info(f"🔍 Company exists but not enriched for domain {domain}, searching Apollo")
+                            
+                            try:
+                                search_result = await apollo_client.apollo_company_search_by_domain_api(domain)
+                                
+                                if search_result.get('status_code') == 200:
+                                    organizations = search_result.get('results', {}).get('organizations', [])
+                                    
+                                    if organizations:
+                                        org = organizations[0]
+                                        # Update company with Apollo data
+                                        company_update = {
+                                            "identifiers.name": org.get("name", ""),
+                                            "identifiers.source_id": org.get("id", ""),
+                                            "identifiers.website_url": org.get("website_url", f"https://{domain}"),
+                                            "source": "apollo",
+                                            "metadata.api_response": org,
+                                            "metadata.updated_at": datetime.utcnow(),
+                                            "location.name": org.get("country", ""),
+                                            "location.type": "country",
+                                            "profile.industry": org.get("industry", ""),
+                                            "profile.employee_count": org.get("organization_headcount", "")
+                                        }
+                                        await companies_dao.update_company(company_id, company_update)
+                                        logger.info(f"✅ Enriched existing company for domain {domain}")
+                                
+                                # Rate limiting for Apollo API
+                                await asyncio.sleep(APOLLO_DELAY)
+                                
+                            except Exception as apollo_error:
+                                logger.warning(f"⚠️ Apollo search failed for {domain}: {apollo_error}")
+                                enrichment_source = "apollo_search_failed"
+                        
+                        # Create campaign_company_run mapping
+                        campaign_company_run = {
+                            "campaign_id": str(campaign_id),
+                            "company_id": company_id,
+                            "company_status": False,
+                            "linkedin_contact_status": False,
+                            "is_relevant": True,
+                            "metadata": {
+                                "created_at": datetime.utcnow(),
+                                "updated_at": datetime.utcnow(),
+                                "source": "csv_import",
+                                "enrichment_source": enrichment_source,
+                                "domain": domain
+                            }
+                        }
+                        await campaign_company_runs_dao.create_campaign_company_run(campaign_company_run)
+                        existing_count += 1
+                        success_count += 1
+                    else:
+                        # Company doesn't exist - create placeholder, search Apollo, update
+                        company_data = {
+                            "identifiers": {
+                                "name": "",
+                                "source_domain": domain,
+                                "source_id": "",
+                                "website_url": f"https://{domain}"
+                            },
+                            "source": "csv_import",
+                            "webhook_sent": False,
+                            "metadata": {
+                                "created_at": datetime.utcnow(),
+                                "updated_at": datetime.utcnow(),
+                                "api_response": {}
+                            },
+                            "location": {"name": "", "type": ""},
+                            "profile": {
+                                "employee_count": [],
+                                "industry": [],
+                                "revenue_max": "",
+                                "revenue_min": ""
+                            }
+                        }
+                        company_id = await companies_dao.create_company(company_data)
+                        new_count += 1
+                        
+                        enrichment_source = "apollo_domain_search"
+                        
+                        # Search Apollo by domain (with rate limiting)
+                        try:
+                            search_result = await apollo_client.apollo_company_search_by_domain_api(domain)
+                            
+                            if search_result.get('status_code') == 200:
+                                organizations = search_result.get('results', {}).get('organizations', [])
+                                
+                                if organizations:
+                                    org = organizations[0]
+                                    # Update company with Apollo data
+                                    company_update = {
+                                        "identifiers.name": org.get("name", ""),
+                                        "identifiers.source_id": org.get("id", ""),
+                                        "identifiers.website_url": org.get("website_url", f"https://{domain}"),
+                                        "source": "apollo",
+                                        "metadata.api_response": org,
+                                        "metadata.updated_at": datetime.utcnow(),
+                                        "location.name": org.get("country", ""),
+                                        "location.type": "country",
+                                        "profile.industry": org.get("industry", ""),
+                                        "profile.employee_count": org.get("organization_headcount", "")
+                                    }
+                                    await companies_dao.update_company(company_id, company_update)
+                                else:
+                                    enrichment_source = "apollo_not_found"
+                            else:
+                                enrichment_source = "apollo_api_failed"
+                            
+                            # Rate limiting for Apollo API
+                            await asyncio.sleep(APOLLO_DELAY)
+                            
+                        except Exception as apollo_error:
+                            logger.warning(f"⚠️ Apollo search failed for {domain}: {apollo_error}")
+                            enrichment_source = "apollo_search_failed"
+                        
+                        # Create campaign_company_run (always mark as relevant so user sees it)
+                        campaign_company_run = {
+                            "campaign_id": str(campaign_id),
+                            "company_id": str(company_id),
+                            "company_status": False,
+                            "linkedin_contact_status": False,
+                            "is_relevant": True,
+                            "metadata": {
+                                "created_at": datetime.utcnow(),
+                                "updated_at": datetime.utcnow(),
+                                "source": "csv_import",
+                                "enrichment_source": enrichment_source,
+                                "domain": domain
+                            }
+                        }
+                        await campaign_company_runs_dao.create_campaign_company_run(campaign_company_run)
+                        success_count += 1
+                    
+                except Exception as domain_error:
+                    logger.error(f"❌ Error processing domain {domain}: {domain_error}")
+                    failed_count += 1
+                
+                processed_count += 1
+                
+                # Update progress periodically
+                if processed_count % PROGRESS_UPDATE_INTERVAL == 0 or processed_count == total_count:
+                    await campaigns_dao.update_campaign(campaign_id, {
+                        "csv_import.processed_count": processed_count,
+                        "csv_import.existing_count": existing_count,
+                        "csv_import.already_enriched_count": already_enriched_count,
+                        "csv_import.new_count": new_count,
+                        "metadata.updated_at": datetime.utcnow()
+                    })
+                    logger.info(f"📊 Progress: {processed_count}/{total_count} ({already_enriched_count} cached, {existing_count - already_enriched_count} enriched existing, {new_count} new)")
+        
+        # 3. All done - update campaign status
+        await campaigns_dao.update_campaign(campaign_id, {
+            "csv_import.status": "completed",
+            "csv_import.processed_count": processed_count,
+            "csv_import.existing_count": existing_count,
+            "csv_import.already_enriched_count": already_enriched_count,
+            "csv_import.new_count": new_count,
+            "csv_import.success_count": success_count,
+            "csv_import.failed_count": failed_count,
+            "prospecting_cycle.status": "company_qualification",
+            "lifecycle.status": "company_qualification",
+            "metadata.updated_at": datetime.utcnow()
+        })
+        
+        apollo_calls_made = new_count + (existing_count - already_enriched_count)
+        logger.info(f"✅ CSV import completed for campaign {campaign_id}: {success_count} success, {failed_count} failed, {already_enriched_count} skipped (cached), {apollo_calls_made} Apollo calls made")
+        
+    except Exception as e:
+        logger.error(f"❌ Error processing CSV import for campaign {campaign_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        if campaigns_dao:
+            await campaigns_dao.update_campaign(campaign_id, {
+                "csv_import.status": "failed",
+                "csv_import.error": str(e),
+                "metadata.updated_at": datetime.utcnow()
+            })
+        raise
+
+
 async def leadgen_company_qualification_ai_processing_handler(message: Any):
     try:
         payload = None
@@ -205,7 +521,7 @@ async def leadgen_company_qualification_ai_processing_handler(message: Any):
         await process_company_qualification_ai(request_id, campaign_id)
         campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         await campaigns_dao.update_campaign( campaign_id, {"prospecting_cycle.status":"contact_qualification"})
-
+        
     except Exception as e:
         logger.error(f"❌ Error handling leadgen message: {e}")
         import traceback
@@ -540,7 +856,7 @@ async def process_single_company(request_id: str, campaign_id: str):
                 })
         except:
             pass
-        raise
+        raise 
 
 
 async def process_leadgen_message(request_id: str, campaign_id: str):

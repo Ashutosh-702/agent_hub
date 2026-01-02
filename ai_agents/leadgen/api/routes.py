@@ -23,6 +23,7 @@ from ai_agents.leadgen.views.ai_agents import (
     company_qualification_progress,
     create_campaign_from_prospecting_job,
     create_campaign_from_single_company,
+    create_campaign_from_csv_import,
     manual_company_qualification,
     ai_company_qualification,
     get_apollo_contact_list,
@@ -177,6 +178,13 @@ router.add_api_route(
     "/create_campaign_from_single_company",
     methods=["POST"],
     endpoint=create_campaign_from_single_company,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/create_campaign_from_csv_import",
+    methods=["POST"],
+    endpoint=create_campaign_from_csv_import,
     response_model=ResponseData,
 )
 

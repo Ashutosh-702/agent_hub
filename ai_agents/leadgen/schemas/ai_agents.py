@@ -76,6 +76,50 @@ class CreateCampaignFromSingleCompany(BaseModel):
     prospecting_cycle_status: Optional[str] = "prospecting"
 
 
+class CreateCampaignFromCSVImport(BaseModel):
+    """Schema for creating a campaign from CSV import with company domains"""
+    company_domains: List[str]  # List of domains (e.g., ['fynd.com', 'shopify.com'])
+    product_name: Optional[str] = None
+    hubspot_email: Optional[str] = None
+    business_team: Optional[str] = None
+    user_email: Optional[str] = None
+    campaign_type: Optional[str] = "import_csv"
+    prospecting_cycle_status: Optional[str] = "prospecting"
+
+    @field_validator('company_domains')
+    @classmethod
+    def validate_domains(cls, domains: List[str]):
+        if not domains:
+            raise ValueError("company_domains cannot be empty")
+        
+        # Normalize and dedupe domains
+        seen = set()
+        normalized: List[str] = []
+        for domain in domains:
+            if not isinstance(domain, str) or not domain.strip():
+                continue
+            # Extract domain from URL if needed
+            d = domain.strip().lower()
+            # Remove protocol and www
+            if d.startswith('http://'):
+                d = d[7:]
+            elif d.startswith('https://'):
+                d = d[8:]
+            if d.startswith('www.'):
+                d = d[4:]
+            # Remove trailing slash and path
+            d = d.split('/')[0]
+            
+            if d and d not in seen:
+                seen.add(d)
+                normalized.append(d)
+        
+        if not normalized:
+            raise ValueError("No valid domains found in company_domains")
+        
+        return normalized
+
+
 class ManualCompanyQualification(BaseModel):
     campaign_id: str
     company_ids: Optional[List[str]] = None
