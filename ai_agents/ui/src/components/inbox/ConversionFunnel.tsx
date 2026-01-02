@@ -6,11 +6,11 @@ interface ConversionFunnelProps {
 
 export const ConversionFunnel = ({ data }: ConversionFunnelProps) => {
   const stages = [
-    { key: 'sent', label: 'Sent', value: data.sent, color: '#6366f1' },
-    { key: 'opened', label: 'Opened', value: data.opened, color: '#8b5cf6' },
-    { key: 'replied', label: 'Replied', value: data.replied, color: '#10b981' },
-    { key: 'meeting', label: 'Meeting', value: data.meeting, color: '#f59e0b' },
-    { key: 'deal', label: 'Deal', value: data.deal, color: '#059669' },
+    { key: 'sent', label: 'Sent', value: data.sent },
+    { key: 'opened', label: 'Opened', value: data.opened },
+    { key: 'replied', label: 'Replied', value: data.replied },
+    { key: 'meeting', label: 'Meeting', value: data.meeting },
+    { key: 'deal', label: 'Deal', value: data.deal },
   ];
 
   const maxValue = Math.max(...stages.map((s) => s.value), 1);
@@ -18,30 +18,32 @@ export const ConversionFunnel = ({ data }: ConversionFunnelProps) => {
   return (
     <div
       style={{
-        background: 'var(--color-white)',
-        borderRadius: '12px',
-        padding: '1.5rem',
-        border: '1px solid var(--color-gray-200)',
+        background: '#ffffff',
+        borderRadius: '8px',
+        padding: '1.25rem',
+        border: '1px solid #e5e7eb',
       }}
     >
       <h3
         style={{
-          fontSize: '1rem',
+          fontSize: '0.8125rem',
           fontWeight: 600,
-          color: 'var(--color-gray-900)',
+          color: '#374151',
           margin: 0,
-          marginBottom: '1.5rem',
+          marginBottom: '1.25rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
         }}
       >
         Conversion Funnel
       </h3>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
         {stages.map((stage, index) => {
           const widthPercent = (stage.value / maxValue) * 100;
           const conversionRate =
             index > 0 && stages[index - 1].value > 0
-              ? ((stage.value / stages[index - 1].value) * 100).toFixed(1)
+              ? ((stage.value / stages[index - 1].value) * 100).toFixed(0)
               : null;
 
           return (
@@ -51,15 +53,15 @@ export const ConversionFunnel = ({ data }: ConversionFunnelProps) => {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '0.5rem',
+                  marginBottom: '0.375rem',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span
                     style={{
-                      fontSize: '0.875rem',
+                      fontSize: '0.8125rem',
                       fontWeight: 500,
-                      color: 'var(--color-gray-700)',
+                      color: '#374151',
                     }}
                   >
                     {stage.label}
@@ -67,19 +69,19 @@ export const ConversionFunnel = ({ data }: ConversionFunnelProps) => {
                   {conversionRate && (
                     <span
                       style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--color-gray-400)',
+                        fontSize: '0.6875rem',
+                        color: '#9ca3af',
                       }}
                     >
-                      ({conversionRate}%)
+                      {conversionRate}%
                     </span>
                   )}
                 </div>
                 <span
                   style={{
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    color: stage.color,
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: '#111827',
                   }}
                 >
                   {stage.value.toLocaleString()}
@@ -87,9 +89,9 @@ export const ConversionFunnel = ({ data }: ConversionFunnelProps) => {
               </div>
               <div
                 style={{
-                  height: '8px',
-                  background: 'var(--color-gray-100)',
-                  borderRadius: '4px',
+                  height: '6px',
+                  background: '#f3f4f6',
+                  borderRadius: '3px',
                   overflow: 'hidden',
                 }}
               >
@@ -97,9 +99,10 @@ export const ConversionFunnel = ({ data }: ConversionFunnelProps) => {
                   style={{
                     height: '100%',
                     width: `${widthPercent}%`,
-                    background: stage.color,
-                    borderRadius: '4px',
-                    transition: 'width 0.5s ease',
+                    background: '#374151',
+                    borderRadius: '3px',
+                    transition: 'width 0.4s ease',
+                    opacity: 1 - index * 0.15,
                   }}
                 />
               </div>
@@ -108,12 +111,12 @@ export const ConversionFunnel = ({ data }: ConversionFunnelProps) => {
         })}
       </div>
 
-      {/* Overall conversion rate */}
+      {/* Overall conversion */}
       <div
         style={{
-          marginTop: '1.5rem',
+          marginTop: '1.25rem',
           paddingTop: '1rem',
-          borderTop: '1px solid var(--color-gray-100)',
+          borderTop: '1px solid #f3f4f6',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -121,16 +124,16 @@ export const ConversionFunnel = ({ data }: ConversionFunnelProps) => {
       >
         <span
           style={{
-            fontSize: '0.875rem',
-            color: 'var(--color-gray-600)',
+            fontSize: '0.8125rem',
+            color: '#6b7280',
           }}
         >
-          Overall Conversion (Sent → Deal)
+          Overall Conversion
         </span>
         <span
           style={{
-            fontSize: '1.25rem',
-            fontWeight: 700,
+            fontSize: '1rem',
+            fontWeight: 600,
             color: '#059669',
           }}
         >
@@ -140,4 +143,3 @@ export const ConversionFunnel = ({ data }: ConversionFunnelProps) => {
     </div>
   );
 };
-

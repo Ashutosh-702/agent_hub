@@ -78,13 +78,33 @@ export const InboxDashboard = () => {
 
   return (
     <div className="inbox-dashboard">
-      {/* Header */}
+      {/* Header with Quick Actions */}
       <div className="inbox-dashboard__header">
         <div className="inbox-dashboard__header-left">
           <h1 className="inbox-dashboard__title">Inbox</h1>
           <p className="inbox-dashboard__subtitle">Your unified outreach command center</p>
         </div>
         <div className="inbox-dashboard__header-right">
+          {/* Quick Action Buttons */}
+          <div className="quick-action-buttons">
+            <button
+              className="quick-action-btn quick-action-btn--primary"
+              onClick={() => handleNavigate('/inbox/messages')}
+            >
+              View All Messages
+              <span className="quick-action-btn__badge">{metrics.funnel.replied}</span>
+            </button>
+            {metrics.needs_attention.total > 0 && (
+              <button
+                className="quick-action-btn quick-action-btn--attention"
+                onClick={() => handleNavigate('/inbox/messages?tab=attention')}
+              >
+                Needs Attention
+                <span className="quick-action-btn__badge">{metrics.needs_attention.total}</span>
+              </button>
+            )}
+          </div>
+          
           {/* Period Selector */}
           <div className="period-selector">
             {(['7d', '30d', '90d'] as PeriodType[]).map((p) => (
@@ -93,133 +113,61 @@ export const InboxDashboard = () => {
                 onClick={() => setPeriod(p)}
                 className={`period-selector__btn ${period === p ? 'period-selector__btn--active' : ''}`}
               >
-                {p === '7d' ? '7 Days' : p === '30d' ? '30 Days' : '90 Days'}
+                {p === '7d' ? '7D' : p === '30d' ? '30D' : '90D'}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Quick Stats Bar */}
-      <div className="inbox-dashboard__stats">
+      {/* Key Metrics Row */}
+      <div className="inbox-dashboard__metrics">
         <MetricsCard
           title="Response Rate"
           value={`${metrics.response_rate.value}%`}
           trend={metrics.response_rate.trend}
           trendLabel="vs last period"
-          icon={<span>📈</span>}
-          color="#10b981"
+          color="var(--metric-primary)"
           onClick={() => handleNavigate('/inbox/messages')}
         />
         <MetricsCard
           title="Hot Leads"
           value={metrics.hot_leads.count}
-          subtitle={`${metrics.hot_leads.urgent} need urgent attention`}
-          icon={<span>🔥</span>}
-          color="#ef4444"
+          subtitle={metrics.hot_leads.urgent > 0 ? `${metrics.hot_leads.urgent} urgent` : undefined}
+          color="var(--metric-hot)"
           onClick={() => handleNavigate('/inbox/messages?temperature=hot')}
         />
         <MetricsCard
-          title="Needs Attention"
-          value={metrics.needs_attention.total}
-          subtitle={`${metrics.needs_attention.unread} unread, ${metrics.needs_attention.overdue} overdue`}
-          icon={<span>⚡</span>}
-          color="#f59e0b"
+          title="Awaiting Response"
+          value={metrics.needs_attention.unread}
+          subtitle={metrics.needs_attention.overdue > 0 ? `${metrics.needs_attention.overdue} overdue` : undefined}
+          color="var(--metric-warning)"
           onClick={() => handleNavigate('/inbox/messages?tab=attention')}
         />
         <MetricsCard
           title="Pipeline Value"
           value={formatCurrency(metrics.pipeline_value.amount)}
-          subtitle={`${metrics.pipeline_value.deals} active deals`}
-          icon={<span>💰</span>}
-          color="#6366f1"
+          subtitle={`${metrics.pipeline_value.deals} deals`}
+          color="var(--metric-success)"
           onClick={() => handleNavigate('/inbox/messages?status=deal_open')}
         />
       </div>
 
       {/* Main Content Grid */}
       <div className="inbox-dashboard__grid">
-        {/* Left Column - Inboxy Recommender */}
-        <div className="inbox-dashboard__left">
-          <InboxyRecommender maxItems={5} />
-
-          {/* Quick Actions */}
-          <div className="quick-actions">
-            <h3 className="quick-actions__title">Quick Actions</h3>
-            <div className="quick-actions__grid">
-              <button
-                className="quick-action-card"
-                onClick={() => handleNavigate('/inbox/messages')}
-              >
-                <span className="quick-action-card__icon">📬</span>
-                <span className="quick-action-card__label">All Messages</span>
-                <span className="quick-action-card__count">{metrics.funnel.replied}</span>
-              </button>
-              <button
-                className="quick-action-card quick-action-card--hot"
-                onClick={() => handleNavigate('/inbox/messages?temperature=hot')}
-              >
-                <span className="quick-action-card__icon">🔥</span>
-                <span className="quick-action-card__label">Hot Leads</span>
-                <span className="quick-action-card__count">{metrics.hot_leads.count}</span>
-              </button>
-              <button
-                className="quick-action-card quick-action-card--attention"
-                onClick={() => handleNavigate('/inbox/messages?tab=attention')}
-              >
-                <span className="quick-action-card__icon">⚡</span>
-                <span className="quick-action-card__label">Needs Attention</span>
-                <span className="quick-action-card__count">{metrics.needs_attention.total}</span>
-              </button>
-              <button
-                className="quick-action-card"
-                onClick={() => handleNavigate('/inbox/messages?tab=sequence')}
-              >
-                <span className="quick-action-card__icon">📋</span>
-                <span className="quick-action-card__label">In Sequence</span>
-              </button>
-            </div>
-          </div>
+        {/* Left Column - AI Insights */}
+        <div className="inbox-dashboard__section">
+          <InboxyRecommender maxItems={4} />
         </div>
 
-        {/* Right Column - Charts */}
-        <div className="inbox-dashboard__right">
-          <ConversionFunnel data={metrics.funnel} />
-          <ChannelPerformance data={metrics.channel_performance} />
-
-          {/* Weekly Comparison */}
-          <div className="weekly-comparison">
-            <h3 className="weekly-comparison__title">This Week vs Last Week</h3>
-            <div className="weekly-comparison__content">
-              <div className="weekly-comparison__stat">
-                <span className="weekly-comparison__label">This Week</span>
-                <span className="weekly-comparison__value">{metrics.weekly_comparison.this_week} replies</span>
-              </div>
-              <div className="weekly-comparison__arrow">
-                {metrics.weekly_comparison.change >= 0 ? (
-                  <span style={{ color: '#10b981', fontSize: '1.5rem' }}>↑</span>
-                ) : (
-                  <span style={{ color: '#ef4444', fontSize: '1.5rem' }}>↓</span>
-                )}
-              </div>
-              <div className="weekly-comparison__stat">
-                <span className="weekly-comparison__label">Last Week</span>
-                <span className="weekly-comparison__value">{metrics.weekly_comparison.last_week} replies</span>
-              </div>
-            </div>
-            <div
-              className="weekly-comparison__change"
-              style={{
-                color: metrics.weekly_comparison.change >= 0 ? '#10b981' : '#ef4444',
-              }}
-            >
-              {metrics.weekly_comparison.change >= 0 ? '+' : ''}
-              {metrics.weekly_comparison.change.toFixed(1)}% change
-            </div>
+        {/* Right Column - Analytics */}
+        <div className="inbox-dashboard__section">
+          <div className="inbox-dashboard__charts">
+            <ConversionFunnel data={metrics.funnel} />
+            <ChannelPerformance data={metrics.channel_performance} />
           </div>
         </div>
       </div>
     </div>
   );
 };
-

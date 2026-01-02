@@ -5,10 +5,10 @@ interface ChannelPerformanceProps {
 }
 
 const channelConfig = {
-  email: { label: 'Email', icon: '✉️', color: '#3b82f6' },
-  linkedin: { label: 'LinkedIn', icon: '💼', color: '#0077b5' },
-  whatsapp: { label: 'WhatsApp', icon: '💬', color: '#25d366' },
-  call: { label: 'Call', icon: '📞', color: '#8b5cf6' },
+  email: { label: 'Email', abbr: 'EM' },
+  linkedin: { label: 'LinkedIn', abbr: 'LI' },
+  whatsapp: { label: 'WhatsApp', abbr: 'WA' },
+  call: { label: 'Call', abbr: 'CL' },
 };
 
 export const ChannelPerformance = ({ data }: ChannelPerformanceProps) => {
@@ -21,28 +21,31 @@ export const ChannelPerformance = ({ data }: ChannelPerformanceProps) => {
   return (
     <div
       style={{
-        background: 'var(--color-white)',
-        borderRadius: '12px',
-        padding: '1.5rem',
-        border: '1px solid var(--color-gray-200)',
+        background: '#ffffff',
+        borderRadius: '8px',
+        padding: '1.25rem',
+        border: '1px solid #e5e7eb',
       }}
     >
       <h3
         style={{
-          fontSize: '1rem',
+          fontSize: '0.8125rem',
           fontWeight: 600,
-          color: 'var(--color-gray-900)',
+          color: '#374151',
           margin: 0,
-          marginBottom: '1.5rem',
+          marginBottom: '1.25rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
         }}
       >
         Channel Performance
       </h3>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {channels.map(([channel, metrics]) => {
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {channels.map(([channel, metrics], index) => {
           const config = channelConfig[channel as keyof typeof channelConfig];
           const barWidth = (metrics.rate / maxRate) * 100;
+          const isTop = index === 0;
 
           return (
             <div key={channel}>
@@ -51,16 +54,31 @@ export const ChannelPerformance = ({ data }: ChannelPerformanceProps) => {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '0.5rem',
+                  marginBottom: '0.375rem',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '1.25rem' }}>{config.icon}</span>
                   <span
                     style={{
-                      fontSize: '0.9375rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '4px',
+                      background: isTop ? '#374151' : '#f3f4f6',
+                      color: isTop ? '#ffffff' : '#6b7280',
+                      fontSize: '0.625rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {config.abbr}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.875rem',
                       fontWeight: 500,
-                      color: 'var(--color-gray-700)',
+                      color: '#374151',
                     }}
                   >
                     {config.label}
@@ -69,18 +87,18 @@ export const ChannelPerformance = ({ data }: ChannelPerformanceProps) => {
                 <div style={{ textAlign: 'right' }}>
                   <span
                     style={{
-                      fontSize: '1.125rem',
-                      fontWeight: 700,
-                      color: config.color,
+                      fontSize: '0.9375rem',
+                      fontWeight: 600,
+                      color: '#111827',
                     }}
                   >
                     {metrics.rate.toFixed(1)}%
                   </span>
                   <span
                     style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--color-gray-400)',
-                      marginLeft: '0.5rem',
+                      fontSize: '0.6875rem',
+                      color: '#9ca3af',
+                      marginLeft: '0.375rem',
                     }}
                   >
                     ({metrics.replied}/{metrics.sent})
@@ -89,9 +107,9 @@ export const ChannelPerformance = ({ data }: ChannelPerformanceProps) => {
               </div>
               <div
                 style={{
-                  height: '10px',
-                  background: 'var(--color-gray-100)',
-                  borderRadius: '5px',
+                  height: '6px',
+                  background: '#f3f4f6',
+                  borderRadius: '3px',
                   overflow: 'hidden',
                 }}
               >
@@ -99,9 +117,9 @@ export const ChannelPerformance = ({ data }: ChannelPerformanceProps) => {
                   style={{
                     height: '100%',
                     width: `${barWidth}%`,
-                    background: `linear-gradient(90deg, ${config.color}, ${config.color}cc)`,
-                    borderRadius: '5px',
-                    transition: 'width 0.5s ease',
+                    background: isTop ? '#374151' : '#9ca3af',
+                    borderRadius: '3px',
+                    transition: 'width 0.4s ease',
                   }}
                 />
               </div>
@@ -114,41 +132,14 @@ export const ChannelPerformance = ({ data }: ChannelPerformanceProps) => {
         <div
           style={{
             textAlign: 'center',
-            padding: '2rem',
-            color: 'var(--color-gray-400)',
+            padding: '1.5rem',
+            color: '#9ca3af',
+            fontSize: '0.875rem',
           }}
         >
           No channel data available
         </div>
       )}
-
-      {/* Best channel insight */}
-      {channels.length > 0 && (
-        <div
-          style={{
-            marginTop: '1.5rem',
-            padding: '1rem',
-            background: 'rgba(16, 185, 129, 0.05)',
-            borderRadius: '8px',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '1rem' }}>💡</span>
-            <span
-              style={{
-                fontSize: '0.875rem',
-                color: '#059669',
-                fontWeight: 500,
-              }}
-            >
-              {channelConfig[channels[0][0] as keyof typeof channelConfig].label} has the highest
-              reply rate at {channels[0][1].rate.toFixed(1)}%
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
-

@@ -1,19 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Recommendation } from '../../services/inboxyApi';
-import { getRecommendations, getRecommendationIcon, getPriorityColor } from '../../services/inboxyApi';
+import type { Recommendation, RecommendationType, RecommendationPriority } from '../../services/inboxyApi';
+import { getRecommendations } from '../../services/inboxyApi';
 
 interface InboxyRecommenderProps {
   maxItems?: number;
   compact?: boolean;
 }
 
-export const InboxyRecommender = ({ maxItems = 5, compact = false }: InboxyRecommenderProps) => {
+// Simple, professional icons as text
+const typeIcons: Record<RecommendationType, string> = {
+  priority_leads: '●',
+  followup_alert: '○',
+  channel_insight: '◐',
+  timing_optimization: '◑',
+  buying_signals: '◆',
+  risk_alert: '▲',
+  performance_insight: '◇',
+};
+
+const priorityStyles: Record<RecommendationPriority, { bg: string; border: string; dot: string }> = {
+  high: { bg: '#fef2f2', border: '#fecaca', dot: '#dc2626' },
+  medium: { bg: '#fffbeb', border: '#fde68a', dot: '#d97706' },
+  low: { bg: '#f9fafb', border: '#e5e7eb', dot: '#6b7280' },
+};
+
+export const InboxyRecommender = ({ maxItems = 5 }: InboxyRecommenderProps) => {
   const navigate = useNavigate();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [aiPowered, setAiPowered] = useState(false);
 
   useEffect(() => {
     const fetchRecommendations = async () => {
@@ -21,7 +36,6 @@ export const InboxyRecommender = ({ maxItems = 5, compact = false }: InboxyRecom
       try {
         const data = await getRecommendations(maxItems);
         setRecommendations(data.recommendations);
-        setAiPowered(data.ai_powered);
       } catch (err) {
         console.error('Failed to fetch recommendations:', err);
       } finally {
@@ -40,24 +54,42 @@ export const InboxyRecommender = ({ maxItems = 5, compact = false }: InboxyRecom
     return (
       <div
         style={{
-          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
-          borderRadius: '16px',
-          padding: '1.5rem',
-          color: 'white',
+          background: '#ffffff',
+          borderRadius: '8px',
+          padding: '1.25rem',
+          border: '1px solid #e5e7eb',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-          <span style={{ fontSize: '1.5rem' }}>✨</span>
-          <span style={{ fontWeight: 600, fontSize: '1.125rem' }}>Inboxy</span>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '1rem',
+          }}
+        >
           <span
             style={{
-              fontSize: '0.75rem',
-              background: 'rgba(255,255,255,0.2)',
-              padding: '0.25rem 0.5rem',
-              borderRadius: '4px',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              color: '#374151',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
             }}
           >
-            AI Recommender
+            AI Insights
+          </span>
+          <span
+            style={{
+              fontSize: '0.625rem',
+              fontWeight: 500,
+              padding: '0.125rem 0.375rem',
+              borderRadius: '3px',
+              background: '#f3f4f6',
+              color: '#6b7280',
+            }}
+          >
+            INBOXY
           </span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -66,8 +98,8 @@ export const InboxyRecommender = ({ maxItems = 5, compact = false }: InboxyRecom
               key={i}
               style={{
                 height: '60px',
-                background: 'rgba(255,255,255,0.1)',
-                borderRadius: '8px',
+                background: '#f9fafb',
+                borderRadius: '6px',
                 animation: 'pulse 1.5s infinite',
               }}
             />
@@ -80,186 +112,167 @@ export const InboxyRecommender = ({ maxItems = 5, compact = false }: InboxyRecom
   return (
     <div
       style={{
-        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
-        borderRadius: '16px',
-        overflow: 'hidden',
-        color: 'white',
+        background: '#ffffff',
+        borderRadius: '8px',
+        padding: '1.25rem',
+        border: '1px solid #e5e7eb',
       }}
     >
       {/* Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
+      <div
         style={{
-          width: '100%',
-          padding: '1.25rem 1.5rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'none',
-          border: 'none',
-          color: 'white',
-          cursor: 'pointer',
+          marginBottom: '1rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '1.5rem' }}>✨</span>
-          <span style={{ fontWeight: 700, fontSize: '1.125rem' }}>Inboxy</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span
+            style={{
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              color: '#374151',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            AI Insights
+          </span>
+          <span
+            style={{
+              fontSize: '0.625rem',
+              fontWeight: 500,
+              padding: '0.125rem 0.375rem',
+              borderRadius: '3px',
+              background: '#374151',
+              color: '#ffffff',
+            }}
+          >
+            INBOXY
+          </span>
+        </div>
+        {recommendations.filter((r) => r.priority === 'high').length > 0 && (
           <span
             style={{
               fontSize: '0.6875rem',
               fontWeight: 600,
-              background: aiPowered ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255,255,255,0.2)',
-              padding: '0.25rem 0.625rem',
+              padding: '0.25rem 0.5rem',
               borderRadius: '4px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              background: '#fef2f2',
+              color: '#dc2626',
             }}
           >
-            {aiPowered ? 'AI Powered' : 'Smart Insights'}
+            {recommendations.filter((r) => r.priority === 'high').length} action needed
           </span>
-          {recommendations.filter((r) => r.priority === 'high').length > 0 && (
-            <span
-              style={{
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                background: '#ef4444',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '10px',
-              }}
-            >
-              {recommendations.filter((r) => r.priority === 'high').length} urgent
-            </span>
-          )}
-        </div>
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
+        )}
+      </div>
+
+      {/* Recommendations */}
+      {recommendations.length === 0 ? (
+        <div
           style={{
-            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s ease',
-            opacity: 0.7,
+            textAlign: 'center',
+            padding: '2rem 1rem',
+            color: '#9ca3af',
+            fontSize: '0.875rem',
           }}
         >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+          No recommendations right now. You're all caught up!
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+          {recommendations.map((rec) => {
+            const styles = priorityStyles[rec.priority];
 
-      {/* Content */}
-      {isExpanded && (
-        <div style={{ padding: '0 1.5rem 1.5rem' }}>
-          {recommendations.length === 0 ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '2rem',
-                opacity: 0.7,
-              }}
-            >
-              <p style={{ margin: 0 }}>No recommendations right now. You're all caught up! 🎉</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {recommendations.map((rec) => (
+            return (
+              <div
+                key={rec.id}
+                style={{
+                  background: styles.bg,
+                  border: `1px solid ${styles.border}`,
+                  borderRadius: '6px',
+                  padding: '1rem',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.04)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
                 <div
-                  key={rec.id}
                   style={{
-                    background: 'rgba(255,255,255,0.08)',
-                    borderRadius: '12px',
-                    padding: compact ? '1rem' : '1.25rem',
-                    borderLeft: `4px solid ${getPriorityColor(rec.priority)}`,
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.12)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.75rem',
                   }}
                 >
-                  <div
+                  {/* Priority indicator */}
+                  <span
                     style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '0.75rem',
+                      color: styles.dot,
+                      fontSize: '0.5rem',
+                      marginTop: '0.375rem',
                     }}
                   >
-                    <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>
-                      {getRecommendationIcon(rec.type)}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p
-                        style={{
-                          fontSize: '0.9375rem',
-                          fontWeight: 600,
-                          margin: 0,
-                          marginBottom: '0.375rem',
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {rec.title}
-                      </p>
-                      {!compact && (
-                        <p
-                          style={{
-                            fontSize: '0.8125rem',
-                            opacity: 0.8,
-                            margin: 0,
-                            marginBottom: '0.75rem',
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {rec.description}
-                        </p>
-                      )}
-                      <button
-                        onClick={() => handleActionClick(rec.action.route)}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          fontSize: '0.8125rem',
-                          fontWeight: 600,
-                          background: 'rgba(255,255,255,0.15)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.375rem',
-                          transition: 'all 0.15s ease',
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                        }}
-                      >
-                        {rec.action.label}
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <line x1="5" y1="12" x2="19" y2="12" />
-                          <polyline points="12 5 19 12 12 19" />
-                        </svg>
-                      </button>
-                    </div>
+                    {typeIcons[rec.type]}
+                  </span>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p
+                      style={{
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        color: '#111827',
+                        margin: 0,
+                        marginBottom: '0.25rem',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {rec.title}
+                    </p>
+                    <p
+                      style={{
+                        fontSize: '0.8125rem',
+                        color: '#6b7280',
+                        margin: 0,
+                        marginBottom: '0.75rem',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {rec.description}
+                    </p>
+                    <button
+                      onClick={() => handleActionClick(rec.action.route)}
+                      style={{
+                        padding: '0.375rem 0.75rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        background: '#374151',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#1f2937';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#374151';
+                      }}
+                    >
+                      {rec.action.label} →
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 };
-
