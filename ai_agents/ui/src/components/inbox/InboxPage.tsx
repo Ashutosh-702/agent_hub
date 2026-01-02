@@ -5,6 +5,7 @@ import { LeadDetail } from './LeadDetail';
 import { InboxFilters } from './InboxFilters';
 import type { LeadSummary, ListLeadsParams } from '../../types/inbox';
 import * as inboxApi from '../../services/inboxApi';
+import './InboxPage.css';
 
 type TabType = 'all' | 'attention' | 'sequence';
 
@@ -107,12 +108,7 @@ export const InboxPage = () => {
   // Mobile: Show detail view when lead is selected
   if (isMobile && selectedLeadId) {
     return (
-      <div style={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        background: 'var(--color-gray-50)',
-      }}>
+      <div className="inbox-page inbox-page--mobile">
         <LeadDetail
           leadId={selectedLeadId}
           onBack={handleBack}
@@ -124,99 +120,34 @@ export const InboxPage = () => {
   }
 
   return (
-    <div style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'var(--color-gray-50)',
-    }}>
+    <div className="inbox-page">
       {/* Header */}
-      <div style={{
-        padding: '1.5rem 2rem 0',
-        background: 'var(--color-white)',
-        borderBottom: '1px solid var(--color-gray-200)',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1.25rem',
-        }}>
+      <div className="inbox-header">
+        <div className="inbox-header__top">
           <div>
-            <h1 style={{
-              fontSize: '1.75rem',
-              fontWeight: 700,
-              color: 'var(--color-gray-900)',
-              margin: 0,
-              marginBottom: '0.25rem',
-            }}>
-              Inbox
-            </h1>
-            <p style={{
-              fontSize: '0.9375rem',
-              color: 'var(--color-gray-500)',
-              margin: 0,
-            }}>
+            <h1 className="inbox-header__title">Inbox</h1>
+            <p className="inbox-header__subtitle">
               Unified view of all outreach conversations
             </p>
           </div>
-          <div style={{ 
-            display: 'flex', 
-            gap: '1rem', 
-            alignItems: 'center',
-          }}>
-            <span style={{
-              padding: '0.5rem 1rem',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              background: 'var(--color-gray-100)',
-              color: 'var(--color-gray-700)',
-              borderRadius: '8px',
-            }}>
+          <div className="inbox-header__actions">
+            <span className="inbox-header__count">
               {total} lead{total !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
 
         {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-        }}>
+        <div className="inbox-tabs">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              style={{
-                padding: '0.875rem 1.5rem',
-                fontSize: '0.9375rem',
-                fontWeight: 600,
-                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-gray-500)',
-                background: activeTab === tab.id ? 'var(--color-primary-lighter)' : 'transparent',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '3px solid var(--color-primary)' : '3px solid transparent',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                marginBottom: '-1px',
-                borderRadius: '8px 8px 0 0',
-              }}
+              className={`inbox-tabs__tab ${activeTab === tab.id ? 'inbox-tabs__tab--active' : ''}`}
             >
               {tab.label}
               {tab.id === 'attention' && leads.filter(l => (l.attentionReasons?.length || 0) > 0).length > 0 && (
-                <span style={{
-                  marginLeft: '0.625rem',
-                  padding: '0.1875rem 0.5rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  background: 'var(--color-error)',
-                  color: 'white',
-                  borderRadius: '10px',
-                }}>
+                <span className="inbox-tabs__badge">
                   {leads.filter(l => (l.attentionReasons?.length || 0) > 0).length}
                 </span>
               )}
@@ -232,24 +163,10 @@ export const InboxPage = () => {
         activeTab={activeTab}
       />
 
-      {/* Split Pane - This is the key fix for independent scrolling */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        overflow: 'hidden', // Prevent parent from scrolling
-        minHeight: 0, // Allow flex to shrink below content size
-      }}>
+      {/* Split Pane Container */}
+      <div className="inbox-split">
         {/* Lead List - Left Pane */}
-        <div style={{
-          width: isMobile ? '100%' : '420px',
-          minWidth: isMobile ? '100%' : '380px',
-          maxWidth: isMobile ? '100%' : '500px',
-          borderRight: isMobile ? 'none' : '1px solid var(--color-gray-200)',
-          background: 'var(--color-white)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden', // Important: contain the scroll
-        }}>
+        <div className="inbox-split__left">
           <LeadList
             leads={leads}
             selectedLeadId={selectedLeadId}
@@ -263,61 +180,24 @@ export const InboxPage = () => {
 
         {/* Lead Detail - Right Pane */}
         {!isMobile && (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden', // Important: contain the scroll
-            minWidth: 0,
-          }}>
+          <div className="inbox-split__right">
             {selectedLeadId ? (
               <LeadDetail
                 leadId={selectedLeadId}
                 onUpdate={handleLeadUpdate}
               />
             ) : (
-              <div style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'var(--color-gray-50)',
-              }}>
-                <div style={{
-                  textAlign: 'center',
-                  color: 'var(--color-gray-400)',
-                  padding: '3rem',
-                }}>
-                  <div style={{
-                    width: '80px',
-                    height: '80px',
-                    margin: '0 auto 1.5rem',
-                    borderRadius: '50%',
-                    background: 'var(--color-gray-100)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4 }}>
-                      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
-                      <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
-                    </svg>
-                  </div>
-                  <p style={{ 
-                    fontSize: '1.125rem', 
-                    fontWeight: 600,
-                    color: 'var(--color-gray-600)',
-                    marginBottom: '0.5rem',
-                  }}>
-                    Select a lead
-                  </p>
-                  <p style={{ 
-                    fontSize: '0.9375rem',
-                    color: 'var(--color-gray-400)',
-                  }}>
-                    Choose a lead from the list to view details and conversation history
-                  </p>
+              <div className="inbox-empty-state">
+                <div className="inbox-empty-state__icon">
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+                    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+                  </svg>
                 </div>
+                <p className="inbox-empty-state__title">Select a lead</p>
+                <p className="inbox-empty-state__subtitle">
+                  Choose a lead from the list to view details and conversation history
+                </p>
               </div>
             )}
           </div>
