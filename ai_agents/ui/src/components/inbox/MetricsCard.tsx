@@ -16,8 +16,6 @@ export const MetricsCard = ({
   value,
   subtitle,
   trend,
-  trendLabel,
-  color = '#374151',
   onClick,
 }: MetricsCardProps) => {
   const isPositiveTrend = trend !== undefined && trend >= 0;
@@ -97,20 +95,6 @@ export const MetricsCard = ({
           {subtitle}
         </p>
       )}
-
-      {/* Subtle accent line */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: '1.25rem',
-          right: '1.25rem',
-          height: '2px',
-          background: color,
-          opacity: 0.3,
-          borderRadius: '1px',
-        }}
-      />
     </div>
   );
 };
