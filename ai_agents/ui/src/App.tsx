@@ -10,6 +10,7 @@ import { ComingSoon } from './components/ComingSoon';
 import { NewCampaignWizard } from './components/campaign';
 import { ProspectingCampaigns } from './components/ProspectingCampaigns';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
+import { HubSpotLayout, CreateCompanyWizard, CreateContactWizard, CreateDealWizard } from './components/hubspot';
 
 function AppContent() {
   const { isCollapsed } = useSidebar();
@@ -35,6 +36,13 @@ function AppContent() {
             <Route path="/prospecting/company" element={<ComingSoon />} />
             <Route path="/prospecting/contact" element={<ComingSoon />} />
             <Route path="/prospecting/wide" element={<Form />} />
+            {/* HubSpot Integration */}
+            <Route path="/hubspot" element={<HubSpotLayout />}>
+              <Route index element={null} />
+              <Route path="company" element={<CreateCompanyWizard />} />
+              <Route path="contact" element={<CreateContactWizard />} />
+              <Route path="deal" element={<CreateDealWizard />} />
+            </Route>
           </Routes>
       </main>
     </div>

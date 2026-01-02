@@ -67,6 +67,12 @@ const Icons = {
       <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
     </svg>
   ),
+  hubspot: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18.38 7.46V6.28a2.28 2.28 0 0 0 1.32-2.07 2.3 2.3 0 0 0-4.6 0 2.28 2.28 0 0 0 1.32 2.07v1.18a5.51 5.51 0 0 0-2.76 1.28l-6.7-5.21a2.3 2.3 0 1 0-1.31 1.68l6.53 5.07a5.52 5.52 0 0 0 .51 7.09 5.51 5.51 0 0 0 7.78 0 5.52 5.52 0 0 0 0-7.8 5.51 5.51 0 0 0-2.09-1.28z"/>
+      <circle cx="16.4" cy="15.07" r="3.3"/>
+    </svg>
+  ),
   chevronRight: (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="9 18 15 12 9 6"/>
@@ -125,6 +131,16 @@ const menuItems: MenuItem[] = [
       { path: '/prospecting/company', label: 'Company Prospecting', icon: Icons.companyProspecting },
       { path: '/prospecting/contact', label: 'Contact Prospecting', icon: Icons.contactProspecting },
       { path: '/prospecting/wide', label: 'Wide Prospecting', icon: Icons.wideProspecting },
+    ]
+  },
+  { 
+    path: '/hubspot', 
+    label: 'HubSpot', 
+    icon: Icons.hubspot,
+    children: [
+      { path: '/hubspot/company', label: 'Create Company', icon: Icons.companies },
+      { path: '/hubspot/contact', label: 'Create Contact', icon: Icons.contactProspecting },
+      { path: '/hubspot/deal', label: 'Create Deal', icon: Icons.campaign },
     ]
   },
 ];
