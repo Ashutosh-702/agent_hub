@@ -221,10 +221,11 @@ const getStepsForType = (
       break;
 
     case 'similar_companies':
+      // Similar companies skips enrichment step - Apollo enrichment is done in Kafka handler (same as CSV import)
       steps = [
         { id: 'similar-search', stepNumber: 1, title: 'Find Similar', component: Step1SimilarCompanies },
-        enrichmentStep,
-        companyQualStep,
+        // No enrichment step - companies are enriched via Apollo during backend processing
+        ...(skipCompanyQual ? [] : [companyQualStep]),
         ...commonStepsAfterQualification,
       ];
       break;
