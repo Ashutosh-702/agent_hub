@@ -1,7 +1,15 @@
 import React, { useState, createContext, useContext, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './CampaignWizard.css';
+import { useSidebar } from '../../context/SidebarContext';
+import { CampaignTypeSelection, type CampaignType } from './CampaignTypeSelection';
+import { ProductSelection, type ProductSelectionMode } from './ProductSelection';
 import { Step1Prospecting } from './Step1Prospecting';
+import { Step1ImportCSV } from './Step1ImportCSV';
+import { Step1SingleCompany } from './Step1SingleCompany';
+import { Step1SimilarCompanies } from './Step1SimilarCompanies';
+import { Step1NLFilter } from './Step1NLFilter';
+import { StepCompanyEnrichment } from './StepCompanyEnrichment';
 import { Step2CompanyQualification } from './Step2CompanyQualification';
 import { Step3ContactQualification } from './Step3ContactQualification';
 import { Step4SyncHubspot } from './Step4SyncHubspot';
@@ -66,6 +74,14 @@ export interface CampaignFilters {
 }
 
 export interface CampaignState {
+  // New fields for multi-funnel support
+  campaignType: CampaignType | null;
+  productSelectionMode: ProductSelectionMode | null;
+  selectedProducts: string[];
+  skipCompanyQualification: boolean;
+  wizardPhase: 'type_selection' | 'product_selection' | 'steps';
+  
+  // Existing fields
   currentStep: number;
   filters: CampaignFilters;
   prospects: Prospect[];
@@ -110,6 +126,9 @@ interface CampaignContextType {
   prevStep: () => void;
   goToStep: (step: number) => void;
   setLoading: (loading: boolean, message?: string, estimatedCount?: number) => void;
+  setSkipCompanyQualification: (skip: boolean) => void;
+  getStepsForCampaignType: () => StepConfig[];
+  getCurrentStepInfo: () => StepConfig | undefined;
 }
 
 const CampaignContext = createContext<CampaignContextType | null>(null);
@@ -122,21 +141,126 @@ export const useCampaignWizard = () => {
   return context;
 };
 
-const STEPS = [
-  { id: 1, title: 'Prospecting' },
-  { id: 2, title: 'Company Qualification' },
-  { id: 3, title: 'Contact Qualification' },
-  { id: 4, title: 'Sync to Hubspot' },
-  { id: 5, title: 'Personalization' },
-  { id: 6, title: 'Enroll for Outreach' },
-];
+// Step configuration based on campaign type
+interface StepConfig {
+  id: string;
+  stepNumber: number;
+  title: string;
+  component: React.FC;
+}
+
+// Get steps based on campaign type
+const getStepsForType = (
+  campaignType: CampaignType | null,
+  skipCompanyQual: boolean
+): StepConfig[] => {
+  if (!campaignType) return [];
+
+  const commonStepsAfterQualification: StepConfig[] = [
+    { id: 'contact-qualification', stepNumber: 0, title: 'Contact Qualification', component: Step3ContactQualification },
+    { id: 'sync-hubspot', stepNumber: 0, title: 'Sync to Hubspot', component: Step4SyncHubspot },
+    { id: 'personalization', stepNumber: 0, title: 'Personalization', component: Step5Personalization },
+    { id: 'enroll-outreach', stepNumber: 0, title: 'Enroll for Outreach', component: Step6EnrollOutreach },
+  ];
+
+  const enrichmentStep: StepConfig = {
+    id: 'enrichment',
+    stepNumber: 0,
+    title: 'Company Enrichment',
+    component: StepCompanyEnrichment,
+  };
+
+  const companyQualStep: StepConfig = {
+    id: 'company-qualification',
+    stepNumber: 0,
+    title: 'Company Qualification',
+    component: Step2CompanyQualification,
+  };
+
+  let steps: StepConfig[] = [];
+
+  switch (campaignType) {
+    case 'import_csv':
+      steps = [
+        { id: 'import', stepNumber: 1, title: 'Import Companies', component: Step1ImportCSV },
+        enrichmentStep,
+        ...(skipCompanyQual ? [] : [companyQualStep]),
+        ...commonStepsAfterQualification,
+      ];
+      break;
+
+    case 'single_company':
+      // Single company skips company qualification entirely
+      steps = [
+        { id: 'company-input', stepNumber: 1, title: 'Company Input', component: Step1SingleCompany },
+        enrichmentStep,
+        // Skip company qualification for single company
+        ...commonStepsAfterQualification,
+      ];
+      break;
+
+    case 'wide_prospecting':
+      steps = [
+        { id: 'prospecting', stepNumber: 1, title: 'Lead Generation', component: Step1Prospecting },
+        enrichmentStep,
+        companyQualStep,
+        ...commonStepsAfterQualification,
+      ];
+      break;
+
+    case 'similar_companies':
+      steps = [
+        { id: 'similar-search', stepNumber: 1, title: 'Find Similar', component: Step1SimilarCompanies },
+        enrichmentStep,
+        companyQualStep,
+        ...commonStepsAfterQualification,
+      ];
+      break;
+
+    case 'nl_filter':
+      steps = [
+        { id: 'nl-search', stepNumber: 1, title: 'Natural Language Search', component: Step1NLFilter },
+        enrichmentStep,
+        companyQualStep,
+        ...commonStepsAfterQualification,
+      ];
+      break;
+
+    default:
+      return [];
+  }
+
+  // Renumber steps
+  return steps.map((step, index) => ({
+    ...step,
+    stepNumber: index + 1,
+  }));
+};
 
 // Default deck URL - used when user wants to replace AI-generated deck with default
 const DEFAULT_DECK_URL = 'https://decks.example.com/default/standard-company-deck.pdf';
 
+// Campaign type labels for display
+const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
+  import_csv: 'Import Company List',
+  single_company: 'Single Company URL',
+  wide_prospecting: 'Wide Prospecting',
+  similar_companies: 'Similar Companies',
+  nl_filter: 'Natural Language Filter',
+};
+
 export const NewCampaignWizard = () => {
   const navigate = useNavigate();
+  const { setWizardProgress, clearWizardProgress } = useSidebar();
   const [state, setState] = useState<CampaignState>({
+    // New fields
+    campaignType: null,
+    productSelectionMode: null,
+    selectedProducts: [],
+    skipCompanyQualification: false,
+    wizardPhase: 'type_selection',
+    
+    // Existing fields
     currentStep: 1,
     filters: {
       industry: [],
@@ -160,10 +284,68 @@ export const NewCampaignWizard = () => {
 
   const [isComplete, setIsComplete] = useState(false);
 
+  // Get current steps based on campaign type
+  const currentSteps = getStepsForType(state.campaignType, state.skipCompanyQualification);
+
   // Scroll to top on mount and when step changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [state.currentStep]);
+  }, [state.currentStep, state.wizardPhase]);
+
+  // Sync wizard progress with sidebar
+  useEffect(() => {
+    if (state.wizardPhase === 'steps' && currentSteps.length > 0) {
+      setWizardProgress({
+        isActive: true,
+        campaignType: state.campaignType,
+        currentStep: state.currentStep,
+        totalSteps: currentSteps.length,
+        steps: currentSteps.map(s => ({ id: s.id, title: s.title, stepNumber: s.stepNumber })),
+      });
+    } else if (state.wizardPhase !== 'steps') {
+      setWizardProgress({
+        isActive: true,
+        campaignType: state.campaignType,
+        currentStep: 0,
+        totalSteps: 0,
+        steps: [],
+      });
+    }
+
+    // Clear wizard progress when component unmounts
+    return () => {
+      clearWizardProgress();
+    };
+  }, [state.wizardPhase, state.currentStep, state.campaignType, currentSteps, setWizardProgress, clearWizardProgress]);
+
+  // Handle campaign type selection
+  const handleTypeSelect = (type: CampaignType) => {
+    setState(prev => ({
+      ...prev,
+      campaignType: type,
+      wizardPhase: 'product_selection',
+    }));
+  };
+
+  // Handle product selection completion
+  const handleProductComplete = (mode: ProductSelectionMode, products: string[]) => {
+    setState(prev => ({
+      ...prev,
+      productSelectionMode: mode,
+      selectedProducts: products,
+      wizardPhase: 'steps',
+      currentStep: 1,
+    }));
+  };
+
+  // Go back to type selection
+  const handleBackToTypeSelection = () => {
+    setState(prev => ({
+      ...prev,
+      wizardPhase: 'type_selection',
+      campaignType: null,
+    }));
+  };
 
   const setFilters = useCallback((filters: CampaignFilters) => {
     setState(prev => ({ ...prev, filters }));
@@ -187,6 +369,10 @@ export const NewCampaignWizard = () => {
 
   const setContactQualificationMode = useCallback((mode: 'manual' | 'ai' | null) => {
     setState(prev => ({ ...prev, contactQualificationMode: mode }));
+  }, []);
+
+  const setSkipCompanyQualification = useCallback((skip: boolean) => {
+    setState(prev => ({ ...prev, skipCompanyQualification: skip }));
   }, []);
 
   const qualifyCompany = useCallback((companyId: string, qualified: boolean) => {
@@ -262,42 +448,6 @@ export const NewCampaignWizard = () => {
         ...prev,
         qualifiedContacts: prev.qualifiedContacts.map(c =>
           contactIds.includes(c.id) ? { ...c, syncStatus: 'synced' } : c
-        ),
-      }));
-    }, 2000);
-  }, []);
-
-  const syncCompany = useCallback((companyId: string) => {
-    setState(prev => ({
-      ...prev,
-      qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-        c.id === companyId ? { ...c, syncStatus: 'syncing' } : c
-      ),
-    }));
-    // Simulate sync
-    setTimeout(() => {
-      setState(prev => ({
-        ...prev,
-        qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-          c.id === companyId ? { ...c, syncStatus: 'synced' } : c
-        ),
-      }));
-    }, 1500);
-  }, []);
-
-  const bulkSync = useCallback((companyIds: string[]) => {
-    setState(prev => ({
-      ...prev,
-      qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-        companyIds.includes(c.id) ? { ...c, syncStatus: 'syncing' } : c
-      ),
-    }));
-    // Simulate bulk sync
-    setTimeout(() => {
-      setState(prev => ({
-        ...prev,
-        qualifiedCompanies: prev.qualifiedCompanies.map(c =>
-          companyIds.includes(c.id) ? { ...c, syncStatus: 'synced' } : c
         ),
       }));
     }, 2000);
@@ -551,22 +701,30 @@ export const NewCampaignWizard = () => {
   }, []);
 
   const nextStep = useCallback(() => {
-    setState(prev => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, 6) }));
-  }, []);
+    setState(prev => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, currentSteps.length) }));
+  }, [currentSteps.length]);
 
   const prevStep = useCallback(() => {
     setState(prev => ({ ...prev, currentStep: Math.max(prev.currentStep - 1, 1) }));
   }, []);
 
   const goToStep = useCallback((step: number) => {
-    if (step >= 1 && step <= 6) {
+    if (step >= 1 && step <= currentSteps.length) {
       setState(prev => ({ ...prev, currentStep: step }));
     }
-  }, []);
+  }, [currentSteps.length]);
 
   const setLoading = useCallback((loading: boolean, message = '', estimatedCount = 0) => {
     setState(prev => ({ ...prev, isLoading: loading, loadingMessage: message, estimatedCount }));
   }, []);
+
+  const getStepsForCampaignType = useCallback(() => {
+    return currentSteps;
+  }, [currentSteps]);
+
+  const getCurrentStepInfo = useCallback(() => {
+    return currentSteps.find(s => s.stepNumber === state.currentStep);
+  }, [currentSteps, state.currentStep]);
 
   const contextValue: CampaignContextType = {
     state,
@@ -597,11 +755,69 @@ export const NewCampaignWizard = () => {
     prevStep,
     goToStep,
     setLoading,
+    setSkipCompanyQualification,
+    getStepsForCampaignType,
+    getCurrentStepInfo,
   };
 
   if (isComplete) {
     return <CampaignComplete sequenceName={state.selectedSequence || 'Default Sequence'} />;
   }
+
+  // Render campaign type selection
+  if (state.wizardPhase === 'type_selection') {
+    return (
+      <div className="new-campaign-wizard">
+        <div className="wizard-header">
+          <button className="back-btn" onClick={() => navigate('/campaign')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"/>
+              <polyline points="12 19 5 12 12 5"/>
+            </svg>
+            Back to Campaigns
+          </button>
+          <h1 className="wizard-title">Create New Campaign</h1>
+        </div>
+        <div className="wizard-content">
+          <CampaignTypeSelection
+            onSelect={handleTypeSelect}
+            selectedType={state.campaignType}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Render product selection
+  if (state.wizardPhase === 'product_selection' && state.campaignType) {
+    return (
+      <div className="new-campaign-wizard">
+        <div className="wizard-header">
+          <button className="back-btn" onClick={handleBackToTypeSelection}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"/>
+              <polyline points="12 19 5 12 12 5"/>
+            </svg>
+            Back
+          </button>
+          <h1 className="wizard-title">Create New Campaign</h1>
+          <div className="campaign-type-badge">
+            {CAMPAIGN_TYPE_LABELS[state.campaignType]}
+          </div>
+        </div>
+        <div className="wizard-content">
+          <ProductSelection
+            campaignType={state.campaignType}
+            onComplete={handleProductComplete}
+            onBack={handleBackToTypeSelection}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Get current step component
+  const CurrentStepComponent = currentSteps.find(s => s.stepNumber === state.currentStep)?.component;
 
   return (
     <CampaignContext.Provider value={contextValue}>
@@ -616,45 +832,44 @@ export const NewCampaignWizard = () => {
             Back to Campaigns
           </button>
           <h1 className="wizard-title">Create New Campaign</h1>
+          {state.campaignType && (
+            <div className="campaign-type-badge">
+              {CAMPAIGN_TYPE_LABELS[state.campaignType]}
+            </div>
+          )}
         </div>
 
         {/* Progress Stepper */}
         <div className="wizard-stepper">
-          {STEPS.map((step, index) => (
+          {currentSteps.map((step, index) => (
             <React.Fragment key={step.id}>
               <div
-                className={`stepper-item ${state.currentStep === step.id ? 'active' : ''} ${state.currentStep > step.id ? 'completed' : ''}`}
-                onClick={() => state.currentStep > step.id && goToStep(step.id)}
+                className={`stepper-item ${state.currentStep === step.stepNumber ? 'active' : ''} ${state.currentStep > step.stepNumber ? 'completed' : ''}`}
+                onClick={() => state.currentStep > step.stepNumber && goToStep(step.stepNumber)}
                 role="button"
-                tabIndex={state.currentStep > step.id ? 0 : -1}
+                tabIndex={state.currentStep > step.stepNumber ? 0 : -1}
               >
                 <div className="stepper-circle">
-                  {state.currentStep > step.id ? (
+                  {state.currentStep > step.stepNumber ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>
                   ) : (
-                    step.id
+                    step.stepNumber
                   )}
                 </div>
                 <span className="stepper-title">{step.title}</span>
               </div>
-              {index < STEPS.length - 1 && <div className="stepper-connector" />}
+              {index < currentSteps.length - 1 && <div className="stepper-connector" />}
             </React.Fragment>
           ))}
         </div>
 
         {/* Step Content */}
         <div className="wizard-content">
-          {state.currentStep === 1 && <Step1Prospecting />}
-          {state.currentStep === 2 && <Step2CompanyQualification />}
-          {state.currentStep === 3 && <Step3ContactQualification />}
-          {state.currentStep === 4 && <Step4SyncHubspot />}
-          {state.currentStep === 5 && <Step5Personalization />}
-          {state.currentStep === 6 && <Step6EnrollOutreach />}
+          {CurrentStepComponent && <CurrentStepComponent />}
         </div>
       </div>
     </CampaignContext.Provider>
   );
 };
-

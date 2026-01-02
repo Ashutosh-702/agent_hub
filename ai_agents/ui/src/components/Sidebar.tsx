@@ -2,6 +2,15 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useSidebar } from '../context/SidebarContext';
 
+// Campaign type labels for display
+const CAMPAIGN_TYPE_LABELS: Record<string, string> = {
+  import_csv: 'Import List',
+  single_company: 'Single Company',
+  wide_prospecting: 'Wide Prospecting',
+  similar_companies: 'Similar Companies',
+  nl_filter: 'NL Filter',
+};
+
 // SVG Icon Components - Clean, accessible icons
 const Icons = {
   masterData: (
@@ -75,6 +84,14 @@ const Icons = {
       <polyline points="12 5 19 12 12 19"/>
     </svg>
   ),
+  rocket: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+      <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+      <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+      <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+    </svg>
+  ),
 };
 
 interface MenuItem {
@@ -112,9 +129,11 @@ const menuItems: MenuItem[] = [
 ];
 
 export const Sidebar = () => {
-  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { isCollapsed, toggleSidebar, wizardProgress } = useSidebar();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const location = useLocation();
+
+  const isInWizard = location.pathname.includes('/campaign/new');
 
   const toggleExpand = (path: string) => {
     setExpandedItems(prev => 
@@ -146,6 +165,68 @@ export const Sidebar = () => {
       <div className="sidebar-header">
         <h2>{isCollapsed ? 'AH' : 'Agent Hub'}</h2>
       </div>
+
+      {/* Wizard Progress Section - shown when in campaign wizard */}
+      {isInWizard && wizardProgress.isActive && !isCollapsed && (
+        <div className="wizard-progress-section">
+          <div className="wizard-progress-header">
+            <span className="wizard-icon">{Icons.rocket}</span>
+            <span className="wizard-label">Creating Campaign</span>
+          </div>
+          
+          {wizardProgress.campaignType && (
+            <div className="wizard-type-badge">
+              {CAMPAIGN_TYPE_LABELS[wizardProgress.campaignType] || wizardProgress.campaignType}
+            </div>
+          )}
+
+          {wizardProgress.steps.length > 0 && (
+            <div className="wizard-steps-progress">
+              <div className="progress-bar-mini">
+                <div 
+                  className="progress-fill-mini" 
+                  style={{ 
+                    width: `${(wizardProgress.currentStep / wizardProgress.totalSteps) * 100}%` 
+                  }}
+                />
+              </div>
+              <span className="progress-text-mini">
+                Step {wizardProgress.currentStep} of {wizardProgress.totalSteps}
+              </span>
+              
+              <div className="wizard-steps-list">
+                {wizardProgress.steps.map((step) => (
+                  <div 
+                    key={step.id}
+                    className={`wizard-step-item ${
+                      step.stepNumber === wizardProgress.currentStep ? 'active' : ''
+                    } ${step.stepNumber < wizardProgress.currentStep ? 'completed' : ''}`}
+                  >
+                    <span className="step-indicator">
+                      {step.stepNumber < wizardProgress.currentStep ? (
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      ) : (
+                        step.stepNumber
+                      )}
+                    </span>
+                    <span className="step-title">{step.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Collapsed wizard indicator */}
+      {isInWizard && wizardProgress.isActive && isCollapsed && (
+        <div className="wizard-progress-collapsed" title={`Step ${wizardProgress.currentStep} of ${wizardProgress.totalSteps}`}>
+          <span className="wizard-icon-small">{Icons.rocket}</span>
+          <span className="wizard-step-badge">{wizardProgress.currentStep}/{wizardProgress.totalSteps}</span>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="sidebar-nav" role="navigation" aria-label="Main navigation">
