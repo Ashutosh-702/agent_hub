@@ -705,7 +705,7 @@ async def sync_to_hubspot(request_id: str, campaign_id: str):
         # Initialize database connection if needed
         await initialize_consumer_connections()
         
-        hubspot_webhook = ContactHubspotWebhook(campaign_id=campaign_id)
+        hubspot_webhook = ContactHubspotWebhook(custom_webhook_url="https://asia-south1.api.boltic.io/service/webhook/temporal/v1.0/b156f5b3-c90d-449a-b104-2735e1259e5c/workflows/execute/2821387b-9e86-4c9a-ac83-b5ffeb7ba959", campaign_id=campaign_id)
         await hubspot_webhook.sync_to_hubspot(campaign_id)
         
         
