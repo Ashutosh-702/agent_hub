@@ -62,6 +62,7 @@ class CreateCampaignFromProspectingJob(BaseModel):
     user_email: Optional[str] = None
     shortlisting_approach: Optional[str] = None
     prospecting_cycle_status: Optional[str] = "prospecting"
+    campaign_type: Optional[str] = None  # Type of campaign: wide_prospecting, import_csv, single_company, etc.
 
 class ManualCompanyQualification(BaseModel):
     campaign_id: str

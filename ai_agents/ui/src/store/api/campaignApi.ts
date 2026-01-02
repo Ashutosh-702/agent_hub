@@ -124,6 +124,7 @@ export interface CreateCampaignFromProspectingJobPayload {
   location: string;
   currency: string;
   product_name?: string;
+  campaign_type?: string; // Type of campaign (wide_prospecting, import_csv, etc.)
   prospecting_cycle_status: string;
 }
 

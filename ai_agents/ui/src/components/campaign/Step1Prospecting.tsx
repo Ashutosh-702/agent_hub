@@ -48,21 +48,6 @@ import lushaIndustryConfig from '../../assets/lusha_industry_config.json';
 const ITEMS_PER_PAGE = 10;
 const CURRENCIES = ['USD', 'INR'] as const;
 const LOCATION_TYPES = ['country', 'region'] as const;
-const PRODUCTS = [
-  'GaaS',
-  'DaaS',
-  'Storefront',
-  'StoreOS',
-  'Konnect',
-  'Commerce B2B',
-  'OMS',
-  'WMS',
-  'TMS',
-  'Fynd Logistics',
-  'AI PIM',
-  'PixelBin',
-  'GlamAR',
-] as const;
 
 export const Step1Prospecting = () => {
   const { state, setFilters, setCampaignId, nextStep, setLoading } = useCampaignWizard();
@@ -190,6 +175,9 @@ export const Step1Prospecting = () => {
     setCurrentPage(1);
 
     try {
+      // Use products selected in ProductSelection step (state.selectedProducts)
+      const productNames = state.selectedProducts.join(',');
+      
       const payload = {
         industry: localFilters.industry[0] || '',
         employee_count: localFilters.employeeCount.join(','),
@@ -198,7 +186,8 @@ export const Step1Prospecting = () => {
         location_type: localFilters.locationType || 'country',
         location: localFilters.region[0] || '',
         currency: localFilters.currency || 'USD',
-        product_name: localFilters.productName || '',
+        product_name: productNames, // From ProductSelection step
+        campaign_type: state.campaignType || 'wide_prospecting', // Store campaign type
         prospecting_cycle_status: 'prospecting',
       };
 
@@ -270,23 +259,6 @@ export const Step1Prospecting = () => {
         <>
           {/* Filters Form */}
           <div className="filters-grid">
-            {/* Product Name */}
-            <div className="filter-group">
-              <label>Product Name</label>
-              <div className="chip-select">
-                {PRODUCTS.map(product => (
-                  <button
-                    key={product}
-                    type="button"
-                    className={`chip ${localFilters.productName === product ? 'selected' : ''}`}
-                    onClick={() => handleSingleSelect('productName', product)}
-                  >
-                    {product}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Industry Dropdown */}
             <div className="filter-group">
               <label>Industry</label>

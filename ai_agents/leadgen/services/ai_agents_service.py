@@ -151,6 +151,7 @@ class CampaignService:
                 "status": query_params.prospecting_cycle_status
             },
             "shortlisting_approach": query_params.shortlisting_approach,
+            "campaign_type": query_params.campaign_type,  # Store campaign type for future reference
             "metadata": {
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow()
