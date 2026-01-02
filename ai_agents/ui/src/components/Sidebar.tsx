@@ -2,6 +2,12 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useSidebar } from '../context/SidebarContext';
 
+// Force page reload navigation - needed when leaving the wizard to ensure clean state
+const forceNavigate = (path: string, event: React.MouseEvent) => {
+  event.preventDefault();
+  window.location.href = path;
+};
+
 // Campaign type labels for display
 const CAMPAIGN_TYPE_LABELS: Record<string, string> = {
   import_csv: 'Import List',
@@ -269,6 +275,7 @@ export const Sidebar = () => {
                         className={({ isActive }) =>
                           `sidebar-link sidebar-child ${isActive ? 'active' : ''}`
                         }
+                        onClick={isInWizard ? (e) => forceNavigate(child.path, e) : undefined}
                       >
                         <span className="sidebar-icon" aria-hidden="true">{child.icon}</span>
                         <span className="sidebar-label">{child.label}</span>
@@ -288,6 +295,7 @@ export const Sidebar = () => {
                         }
                         title={child.label}
                         aria-label={child.label}
+                        onClick={isInWizard ? (e) => forceNavigate(child.path, e) : undefined}
                       >
                         <span className="sidebar-icon" aria-hidden="true">{child.icon}</span>
                       </NavLink>
@@ -302,6 +310,7 @@ export const Sidebar = () => {
                   `sidebar-link ${isActive ? 'active' : ''}`
                 }
                 title={isCollapsed ? item.label : undefined}
+                onClick={isInWizard ? (e) => forceNavigate(item.path, e) : undefined}
               >
                 <span className="sidebar-icon" aria-hidden="true">{item.icon}</span>
                 {!isCollapsed && <span className="sidebar-label">{item.label}</span>}

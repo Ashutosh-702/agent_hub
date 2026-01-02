@@ -391,9 +391,20 @@ export const NewCampaignWizard = () => {
         const cycleStatus = campaign?.prospecting_cycle?.status;
         const derivedStep = deriveStepFromCycleStatus(cycleStatus);
         
+        // Derive campaign type from campaign data
+        // If campaign has prospecting_cycle.status, it's a wide_prospecting campaign
+        // We can infer this from the presence of prospecting_cycle status or other indicators
+        let derivedCampaignType: CampaignType = 'wide_prospecting'; // Default for prospecting campaigns
+        
+        // Check if campaign has indicators of other types
+        // For now, assume all resuming campaigns with prospecting_cycle are wide_prospecting
+        // This can be enhanced later if campaign stores its type explicitly
+        
         setState((prev) => ({
           ...prev,
           campaignId: urlCampaignId,
+          campaignType: derivedCampaignType,
+          wizardPhase: 'steps', // IMPORTANT: Set to 'steps' so wizard renders the actual steps
           currentStep: derivedStep,
           maxStepReached: Math.max(prev.maxStepReached, derivedStep),
         }));
@@ -403,6 +414,8 @@ export const NewCampaignWizard = () => {
           setState((prev) => ({
             ...prev,
             campaignId: urlCampaignId,
+            campaignType: 'wide_prospecting',
+            wizardPhase: 'steps',
           }));
         }
       }
