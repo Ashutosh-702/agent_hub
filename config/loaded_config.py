@@ -20,7 +20,7 @@ class Settings:
     serve_static = os.getenv("SERVE_STATIC", "true").lower() == "true"
     static_path = os.getenv("STATIC_PATH", "/Users/ahmedropewala/PycharmProjects/etc1/agent_hub/ai_agents/ui/dist")
     # Lemlist Integration
-    lemlist_api_key = os.getenv("LEMLIST_API_KEY", "bda032d972797c0301b3ad74fddb55e3")
+    lemlist_api_key = os.getenv("LEMLIST_API_KEY", "bda032d972797c0301b3ad74fddb55e2")
     lemlist_webhook_secret = os.getenv("LEMLIST_WEBHOOK_SECRET", "")
     
 loaded_config = Settings()

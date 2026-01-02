@@ -125,11 +125,14 @@ export const InboxPage = () => {
 
   return (
     <div style={{
-      height: '100%',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       display: 'flex',
       flexDirection: 'column',
       background: 'var(--color-gray-50)',
-      overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{
@@ -229,14 +232,14 @@ export const InboxPage = () => {
         activeTab={activeTab}
       />
 
-      {/* Split Pane */}
+      {/* Split Pane - This is the key fix for independent scrolling */}
       <div style={{
         flex: 1,
         display: 'flex',
-        overflow: 'hidden',
-        minHeight: 0,
+        overflow: 'hidden', // Prevent parent from scrolling
+        minHeight: 0, // Allow flex to shrink below content size
       }}>
-        {/* Lead List */}
+        {/* Lead List - Left Pane */}
         <div style={{
           width: isMobile ? '100%' : '420px',
           minWidth: isMobile ? '100%' : '380px',
@@ -245,7 +248,7 @@ export const InboxPage = () => {
           background: 'var(--color-white)',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
+          overflow: 'hidden', // Important: contain the scroll
         }}>
           <LeadList
             leads={leads}
@@ -258,13 +261,13 @@ export const InboxPage = () => {
           />
         </div>
 
-        {/* Lead Detail (desktop only) */}
+        {/* Lead Detail - Right Pane */}
         {!isMobile && (
           <div style={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
+            overflow: 'hidden', // Important: contain the scroll
             minWidth: 0,
           }}>
             {selectedLeadId ? (

@@ -268,6 +268,8 @@ const LeadDetailContent = ({ leadId, onBack, onUpdate, isMobile }: LeadDetailPro
       flexDirection: 'column',
       background: 'var(--color-gray-50)',
       overflow: 'hidden',
+      height: '100%',
+      minHeight: 0,
     }}>
       {/* Header with back button (mobile) */}
       {isMobile && onBack && (
