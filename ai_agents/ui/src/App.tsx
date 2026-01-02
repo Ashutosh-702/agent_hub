@@ -11,6 +11,7 @@ import { NewCampaignWizard } from './components/campaign';
 import { ProspectingCampaigns } from './components/ProspectingCampaigns';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { HubSpotLayout, CreateCompanyWizard, CreateContactWizard, CreateDealWizard } from './components/hubspot';
+import { InboxPage } from './components/inbox';
 
 function AppContent() {
   const { isCollapsed } = useSidebar();
@@ -20,7 +21,10 @@ function AppContent() {
       <Sidebar />
       <main className={`main-content ${isCollapsed ? 'sidebar-collapsed' : ''}`}>
           <Routes>
-            <Route path="/" element={<Navigate to="/campaign" replace />} />
+            <Route path="/" element={<Navigate to="/inbox" replace />} />
+            {/* Inbox - Unified Outreach Inbox */}
+            <Route path="/inbox" element={<InboxPage />} />
+            <Route path="/inbox/:leadId" element={<InboxPage />} />
             {/* Campaign - Top level section */}
             <Route path="/campaign" element={<CampaignList />} />
             <Route path="/campaign/new" element={<NewCampaignWizard />} />
