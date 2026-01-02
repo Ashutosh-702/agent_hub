@@ -15,6 +15,7 @@ const API_BASE = '/api/v1/inbox';
 // Check if we should use mock API
 // Default to mock mode unless explicitly set to use real API
 const USE_MOCK = import.meta.env.VITE_USE_REAL_API !== 'true';
+const FALLBACK_TO_MOCK = true; // Fall back to mock data if real API fails
 
 // ============ API Functions ============
 
@@ -23,36 +24,44 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
     return mockApi.listLeads(params);
   }
 
-  const searchParams = new URLSearchParams();
-  
-  if (params.query) searchParams.set('query', params.query);
-  if (params.channel) searchParams.set('channel', params.channel);
-  if (params.temperature) searchParams.set('temperature', params.temperature);
-  if (params.status) searchParams.set('status', params.status);
-  if (params.inSequence) searchParams.set('in_sequence', params.inSequence);
-  if (params.stageStatus) searchParams.set('stage_status', params.stageStatus);
-  if (params.ownerEmail) searchParams.set('owner_email', params.ownerEmail);
-  if (params.sort) searchParams.set('sort', params.sort);
-  if (params.tab) searchParams.set('tab', params.tab);
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
+  try {
+    const searchParams = new URLSearchParams();
+    
+    if (params.query) searchParams.set('query', params.query);
+    if (params.channel) searchParams.set('channel', params.channel);
+    if (params.temperature) searchParams.set('temperature', params.temperature);
+    if (params.status) searchParams.set('status', params.status);
+    if (params.inSequence) searchParams.set('in_sequence', params.inSequence);
+    if (params.stageStatus) searchParams.set('stage_status', params.stageStatus);
+    if (params.ownerEmail) searchParams.set('owner_email', params.ownerEmail);
+    if (params.sort) searchParams.set('sort', params.sort);
+    if (params.tab) searchParams.set('tab', params.tab);
+    if (params.page) searchParams.set('page', String(params.page));
+    if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
 
-  const response = await fetch(`${API_BASE}/leads?${searchParams.toString()}`);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch leads: ${response.statusText}`);
+    const response = await fetch(`${API_BASE}/leads?${searchParams.toString()}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch leads: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    // Transform snake_case to camelCase
+    return {
+      leads: data.leads.map(transformLeadSummary),
+      total: data.total,
+      page: data.page,
+      pageSize: data.page_size,
+      hasNext: data.has_next,
+    };
+  } catch (error) {
+    console.warn('Real API failed, falling back to mock:', error);
+    if (FALLBACK_TO_MOCK) {
+      return mockApi.listLeads(params);
+    }
+    throw error;
   }
-
-  const data = await response.json();
-  
-  // Transform snake_case to camelCase
-  return {
-    leads: data.leads.map(transformLeadSummary),
-    total: data.total,
-    page: data.page,
-    pageSize: data.page_size,
-    hasNext: data.has_next,
-  };
 }
 
 export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> {
@@ -60,23 +69,31 @@ export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> 
     return mockApi.getLeadDetail(leadId);
   }
 
-  const response = await fetch(`${API_BASE}/leads/${leadId}`);
-  
-  if (response.status === 404) {
-    return null;
-  }
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch lead detail: ${response.statusText}`);
-  }
+  try {
+    const response = await fetch(`${API_BASE}/leads/${leadId}`);
+    
+    if (response.status === 404) {
+      return null;
+    }
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch lead detail: ${response.statusText}`);
+    }
 
-  const data = await response.json();
-  
-  return {
-    summary: transformLeadSummary(data.summary),
-    events: data.events.map(transformEvent),
-    notes: data.notes.map(transformNote),
-  };
+    const data = await response.json();
+    
+    return {
+      summary: transformLeadSummary(data.summary),
+      events: data.events.map(transformEvent),
+      notes: data.notes.map(transformNote),
+    };
+  } catch (error) {
+    console.warn('Real API failed, falling back to mock:', error);
+    if (FALLBACK_TO_MOCK) {
+      return mockApi.getLeadDetail(leadId);
+    }
+    throw error;
+  }
 }
 
 export async function updateLead(leadId: string, update: UpdateLeadRequest): Promise<void> {

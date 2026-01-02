@@ -17,11 +17,12 @@ class LemlistInboxClient:
 
     def __init__(self):
         self.api_key = loaded_config.lemlist_api_key
+        self.email = loaded_config.lemlist_email
         self.http_session = loaded_config.http_session
         self.timeout = 30
         
-        # Lemlist uses Basic auth with API key as password
-        auth_string = f":{self.api_key}"
+        # Lemlist uses Basic auth with email:apikey
+        auth_string = f"{self.email}:{self.api_key}"
         auth_bytes = base64.b64encode(auth_string.encode()).decode()
         
         self.headers = {
@@ -30,16 +31,63 @@ class LemlistInboxClient:
             "Content-Type": "application/json"
         }
 
+    async def get_team(self) -> Dict[str, Any]:
+        """
+        Fetch team information including user IDs
+        
+        GET /api/team
+        
+        Returns:
+            {
+                "_id": "team_id",
+                "userIds": ["user_id1", "user_id2"],
+                "name": "Team Name",
+                ...
+            }
+        """
+        url = f"{LEMLIST_BASE_URL}/team"
+        
+        try:
+            logger.info("Fetching Lemlist team info")
+            
+            response = await self.http_session.get(
+                url,
+                headers=self.headers,
+                timeout=self.timeout
+            )
+
+            if response.status == 200:
+                result = await response.json()
+                logger.info(
+                    f"Fetched Lemlist team successfully",
+                    team_name=result.get("name"),
+                    user_count=len(result.get("userIds", []))
+                )
+                return result
+            elif response.status == 401:
+                logger.error("Lemlist API authentication failed")
+                raise Exception("Lemlist API authentication failed. Check API key.")
+            else:
+                error_text = await response.text()
+                logger.error(f"Lemlist API error: {response.status} - {error_text}")
+                raise Exception(f"Lemlist API error: {response.status}")
+
+        except Exception as e:
+            logger.exception(f"Error fetching Lemlist team: {str(e)}")
+            raise
+
     async def get_inboxes(
         self,
-        user_id: Optional[str] = None,
+        user_id: str,
         page: int = 1,
         limit: int = 50
     ) -> Dict[str, Any]:
         """
-        Fetch all inbox conversations
+        Fetch all inbox conversations for a user
         
-        GET /api/inbox
+        GET /api/inbox?userId=xxx
+        
+        Note: userId is REQUIRED by Lemlist API
         
         Returns:
             {
@@ -49,14 +97,13 @@ class LemlistInboxClient:
         """
         url = f"{LEMLIST_BASE_URL}/inbox"
         params = {
+            "userId": user_id,
             "page": page,
             "limit": limit
         }
-        if user_id:
-            params["userId"] = user_id
 
         try:
-            logger.info(f"Fetching Lemlist inboxes", page=page, limit=limit)
+            logger.info(f"Fetching Lemlist inboxes", user_id=user_id, page=page, limit=limit)
             
             response = await self.http_session.get(
                 url,
@@ -375,29 +422,55 @@ class LemlistInboxClient:
 
     async def get_all_inboxes_paginated(self) -> List[Dict[str, Any]]:
         """
-        Fetch all inboxes with automatic pagination
+        Fetch all inboxes with automatic pagination for all team users
         """
         all_inboxes = []
-        page = 1
-        limit = 50
-
-        while True:
-            result = await self.get_inboxes(page=page, limit=limit)
+        seen_inbox_ids = set()
+        
+        # First get team info to get user IDs
+        try:
+            team = await self.get_team()
+            user_ids = team.get("userIds", [])
             
-            if result.get("rate_limited"):
-                logger.warning("Rate limited while fetching all inboxes")
-                break
-                
-            data = result.get("data", [])
-            all_inboxes.extend(data)
+            if not user_ids:
+                logger.warning("No users found in team")
+                return []
             
-            pagination = result.get("pagination", {})
-            if not pagination.get("nextPage"):
-                break
+            logger.info(f"Fetching inboxes for {len(user_ids)} team users")
+            
+            # Fetch inboxes for each user
+            for user_id in user_ids:
+                page = 1
+                limit = 50
                 
-            page += 1
-
-        return all_inboxes
+                while True:
+                    result = await self.get_inboxes(user_id=user_id, page=page, limit=limit)
+                    
+                    if result.get("rate_limited"):
+                        logger.warning(f"Rate limited while fetching inboxes for user {user_id}")
+                        break
+                    
+                    data = result.get("data", [])
+                    
+                    # Deduplicate by inbox ID
+                    for inbox in data:
+                        inbox_id = inbox.get("_id")
+                        if inbox_id and inbox_id not in seen_inbox_ids:
+                            seen_inbox_ids.add(inbox_id)
+                            all_inboxes.append(inbox)
+                    
+                    pagination = result.get("pagination", {})
+                    if not pagination.get("nextPage"):
+                        break
+                    
+                    page += 1
+            
+            logger.info(f"Fetched {len(all_inboxes)} unique inboxes from all users")
+            return all_inboxes
+            
+        except Exception as e:
+            logger.exception(f"Error fetching all inboxes: {str(e)}")
+            raise
 
     async def get_all_messages_for_inbox(self, inbox_id: str) -> List[Dict[str, Any]]:
         """
