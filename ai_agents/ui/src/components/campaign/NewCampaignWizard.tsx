@@ -10,7 +10,8 @@ import { Step1ImportCSV } from './Step1ImportCSV';
 import { Step1SingleCompany } from './Step1SingleCompany';
 import { Step1SimilarCompanies } from './Step1SimilarCompanies';
 import { Step1NLFilter } from './Step1NLFilter';
-import { StepCompanyEnrichment } from './StepCompanyEnrichment';
+// StepCompanyEnrichment is no longer used - enrichment happens in Kafka during backend processing
+// import { StepCompanyEnrichment } from './StepCompanyEnrichment';
 import { Step2CompanyQualification } from './Step2CompanyQualification';
 import { Step3ContactQualification } from './Step3ContactQualification';
 import { Step4SyncHubspot } from './Step4SyncHubspot';
@@ -173,12 +174,7 @@ const getStepsForType = (
     { id: 'enroll-outreach', stepNumber: 0, title: 'Enroll for Outreach', component: Step6EnrollOutreach },
   ];
 
-  const enrichmentStep: StepConfig = {
-    id: 'enrichment',
-    stepNumber: 0,
-    title: 'Company Enrichment',
-    component: StepCompanyEnrichment,
-  };
+  // enrichmentStep removed - all campaign types now do enrichment in Kafka backend
 
   const companyQualStep: StepConfig = {
     id: 'company-qualification',
@@ -231,10 +227,11 @@ const getStepsForType = (
       break;
 
     case 'nl_filter':
+      // NL Filter skips enrichment step - Apollo enrichment is done in Kafka handler (same as CSV import)
       steps = [
         { id: 'nl-search', stepNumber: 1, title: 'Natural Language Search', component: Step1NLFilter },
-        enrichmentStep,
-        companyQualStep,
+        // No enrichment step - companies are enriched via Apollo during backend processing
+        ...(skipCompanyQual ? [] : [companyQualStep]),
         ...commonStepsAfterQualification,
       ];
       break;

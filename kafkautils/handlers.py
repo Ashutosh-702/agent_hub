@@ -297,13 +297,24 @@ async def process_csv_import(request_id: str, campaign_id: str):
                         
                         # Check if already enriched via Apollo (has source_id)
                         source_id = existing_company.get("identifiers", {}).get("source_id", "")
+                        # Check if already enriched OR already attempted (NOT_FOUND means we tried before)
                         already_enriched = bool(source_id and source_id.strip())
+                        already_attempted = source_id == "NOT_FOUND"  # We tried Apollo before, it had no data
+                        
+                        apollo_found_data = False  # Track if we have valid Apollo data
                         
                         if already_enriched:
                             # Company already has Apollo data - just create mapping, skip Apollo search
                             enrichment_source = "existing_enriched_company"
+                            apollo_found_data = True  # Already enriched means we have data
                             already_enriched_count += 1
                             logger.info(f"✅ Company already enriched for domain {domain}, skipping Apollo search")
+                        elif already_attempted:
+                            # We already tried Apollo before and it returned nothing - skip
+                            enrichment_source = "apollo_previously_not_found"
+                            apollo_found_data = False
+                            already_enriched_count += 1  # Count as "cached" since we're not making an API call
+                            logger.info(f"⏭️ Skipping Apollo for domain {domain} - previously searched with no results")
                         else:
                             # Company exists but not enriched - search Apollo
                             enrichment_source = "apollo_domain_search"
@@ -331,7 +342,19 @@ async def process_csv_import(request_id: str, campaign_id: str):
                                             "profile.employee_count": org.get("organization_headcount", "")
                                         }
                                         await companies_dao.update_company(company_id, company_update)
+                                        apollo_found_data = True
                                         logger.info(f"✅ Enriched existing company for domain {domain}")
+                                    else:
+                                        enrichment_source = "apollo_not_found"
+                                        # Mark as NOT_FOUND so we don't retry Apollo next time
+                                        await companies_dao.update_company(company_id, {
+                                            "identifiers.source_id": "NOT_FOUND",
+                                            "metadata.updated_at": datetime.utcnow()
+                                        })
+                                        logger.warning(f"⚠️ Apollo returned no organizations for existing company {domain}, marked as NOT_FOUND")
+                                else:
+                                    enrichment_source = "apollo_api_failed"
+                                    logger.warning(f"⚠️ Apollo API failed for existing company {domain}")
                                 
                                 # Rate limiting for Apollo API
                                 await asyncio.sleep(APOLLO_DELAY)
@@ -341,12 +364,13 @@ async def process_csv_import(request_id: str, campaign_id: str):
                                 enrichment_source = "apollo_search_failed"
                         
                         # Create campaign_company_run mapping
+                        # Only mark is_relevant=True if we have valid Apollo data
                         campaign_company_run = {
                             "campaign_id": str(campaign_id),
                             "company_id": company_id,
                             "company_status": False,
                             "linkedin_contact_status": False,
-                            "is_relevant": True,
+                            "is_relevant": apollo_found_data,  # Only relevant if Apollo data exists
                             "metadata": {
                                 "created_at": datetime.utcnow(),
                                 "updated_at": datetime.utcnow(),
@@ -386,6 +410,7 @@ async def process_csv_import(request_id: str, campaign_id: str):
                         new_count += 1
                         
                         enrichment_source = "apollo_domain_search"
+                        apollo_found_data = False  # Track if Apollo returned valid data
                         
                         # Search Apollo by domain (with rate limiting)
                         try:
@@ -410,10 +435,19 @@ async def process_csv_import(request_id: str, campaign_id: str):
                                         "profile.employee_count": org.get("organization_headcount", "")
                                     }
                                     await companies_dao.update_company(company_id, company_update)
+                                    apollo_found_data = True
+                                    logger.info(f"✅ Apollo found data for domain {domain}: {org.get('name', 'N/A')}")
                                 else:
                                     enrichment_source = "apollo_not_found"
+                                    # Mark as NOT_FOUND so we don't retry Apollo next time
+                                    await companies_dao.update_company(company_id, {
+                                        "identifiers.source_id": "NOT_FOUND",
+                                        "metadata.updated_at": datetime.utcnow()
+                                    })
+                                    logger.warning(f"⚠️ Apollo returned no organizations for domain {domain}, marked as NOT_FOUND")
                             else:
                                 enrichment_source = "apollo_api_failed"
+                                logger.warning(f"⚠️ Apollo API failed for domain {domain}, status: {search_result.get('status_code')}")
                             
                             # Rate limiting for Apollo API
                             await asyncio.sleep(APOLLO_DELAY)
@@ -422,13 +456,14 @@ async def process_csv_import(request_id: str, campaign_id: str):
                             logger.warning(f"⚠️ Apollo search failed for {domain}: {apollo_error}")
                             enrichment_source = "apollo_search_failed"
                         
-                        # Create campaign_company_run (always mark as relevant so user sees it)
+                        # Create campaign_company_run
+                        # Only mark is_relevant=True if Apollo found actual data
                         campaign_company_run = {
                             "campaign_id": str(campaign_id),
                             "company_id": str(company_id),
                             "company_status": False,
                             "linkedin_contact_status": False,
-                            "is_relevant": True,
+                            "is_relevant": apollo_found_data,  # Only relevant if Apollo found data
                             "metadata": {
                                 "created_at": datetime.utcnow(),
                                 "updated_at": datetime.utcnow(),

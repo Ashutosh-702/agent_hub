@@ -6060,12 +6060,25 @@ button:disabled .coming-soon-tag {
 }
 
 .company-preview-card {
+  position: relative;
   padding: var(--space-4);
   background: var(--color-white);
   border: 1px solid var(--color-gray-200);
   border-radius: var(--radius-lg);
   animation: slideIn 0.3s ease forwards;
   opacity: 0;
+}
+
+.company-preview-card .relevance-badge {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 100%);
+  color: var(--color-white);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
 }
 
 .company-preview-card h4 {
