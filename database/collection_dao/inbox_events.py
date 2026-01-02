@@ -129,6 +129,15 @@ class InboxEventsDao(BaseMongoDao):
             return result.upserted_count + result.modified_count
         return 0
 
+    async def count_events(self, query: Dict[str, Any] = None) -> int:
+        """Count events matching query"""
+        return await self.collection.count_documents(query or {})
+
+    async def aggregate(self, pipeline: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Run aggregation pipeline"""
+        cursor = self.collection.aggregate(pipeline)
+        return await cursor.to_list(length=None)
+
 
 class InboxLeadsDao(BaseMongoDao):
     """DAO for inbox_leads collection - aggregated lead inbox data"""
@@ -348,6 +357,23 @@ class InboxLeadsDao(BaseMongoDao):
         cursor = self.collection.find({}, {"lead_id": 1})
         docs = await cursor.to_list(length=None)
         return [doc["lead_id"] for doc in docs]
+
+    async def count_leads(self, query: Dict[str, Any] = None) -> int:
+        """Count leads matching query"""
+        return await self.collection.count_documents(query or {})
+
+    async def find_leads(
+        self,
+        query: Dict[str, Any] = None,
+        limit: int = 50,
+        sort: List[tuple] = None
+    ) -> List[Dict[str, Any]]:
+        """Find leads matching query"""
+        cursor = self.collection.find(query or {})
+        if sort:
+            cursor = cursor.sort(sort)
+        cursor = cursor.limit(limit)
+        return await cursor.to_list(length=limit)
 
 
 class InboxNotesDao(BaseMongoDao):

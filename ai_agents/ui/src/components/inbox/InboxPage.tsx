@@ -79,14 +79,14 @@ export const InboxPage = () => {
   const handleSelectLead = (lead: LeadSummary) => {
     setSelectedLeadId(lead.leadId);
     if (isMobile) {
-      navigate(`/inbox/${lead.leadId}`);
+      navigate(`/inbox/messages/${lead.leadId}`);
     }
   };
 
   // Handle back (mobile)
   const handleBack = () => {
     setSelectedLeadId(null);
-    navigate('/inbox');
+    navigate('/inbox/messages');
   };
 
   // Handle tab change

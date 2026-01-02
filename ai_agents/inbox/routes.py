@@ -3,6 +3,7 @@ Inbox API Routes
 FastAPI routes for unified inbox operations
 """
 from typing import Optional
+from datetime import datetime
 from fastapi import APIRouter, Query, HTTPException, Body
 from fastapi.responses import ORJSONResponse
 
@@ -13,6 +14,8 @@ from ai_agents.inbox.models import (
     AttentionReason
 )
 from ai_agents.inbox.service import get_inbox_service
+from ai_agents.inbox.metrics_service import get_metrics_service, MetricsPeriod
+from ai_agents.inbox.inboxy_service import get_inboxy_service
 from config.logging import logger
 
 
@@ -244,5 +247,96 @@ async def get_attention_reasons(lead_id: str):
         raise
     except Exception as e:
         logger.exception(f"Error getting attention reasons: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Dashboard Metrics ============
+
+@router.get("/metrics")
+async def get_dashboard_metrics(
+    period: str = Query("7d", description="Period: 7d, 30d, 90d, or custom"),
+    start_date: Optional[str] = Query(None, description="Start date for custom period (ISO format)"),
+    end_date: Optional[str] = Query(None, description="End date for custom period (ISO format)")
+):
+    """
+    Get dashboard metrics for CXO view.
+    
+    Returns:
+    - Response rate with trend
+    - Hot leads count
+    - Needs attention breakdown
+    - Pipeline value
+    - Conversion funnel
+    - Channel performance
+    - Weekly comparison
+    """
+    try:
+        service = get_metrics_service()
+        
+        # Parse period
+        try:
+            metrics_period = MetricsPeriod(period)
+        except ValueError:
+            metrics_period = MetricsPeriod.WEEK
+        
+        # Parse dates for custom period
+        parsed_start = None
+        parsed_end = None
+        if metrics_period == MetricsPeriod.CUSTOM:
+            if start_date:
+                parsed_start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            if end_date:
+                parsed_end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+        
+        metrics = await service.get_dashboard_metrics(
+            period=metrics_period,
+            start_date=parsed_start,
+            end_date=parsed_end
+        )
+        
+        return ORJSONResponse(metrics)
+        
+    except Exception as e:
+        logger.exception(f"Error getting metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Inboxy AI Recommendations ============
+
+@router.get("/recommendations")
+async def get_recommendations(
+    limit: int = Query(5, ge=1, le=10, description="Number of recommendations to return")
+):
+    """
+    Get AI-powered recommendations from Inboxy.
+    
+    Returns actionable insights for CXO/Founders:
+    - Priority leads to focus on
+    - Follow-up alerts
+    - Channel insights
+    - Risk alerts
+    - Performance insights
+    """
+    try:
+        # Get metrics context for recommendations
+        metrics_service = get_metrics_service()
+        metrics = await metrics_service.get_dashboard_metrics(MetricsPeriod.WEEK)
+        
+        # Get recommendations with context
+        inboxy_service = get_inboxy_service()
+        recommendations = await inboxy_service.get_recommendations(
+            context={
+                "weekly_comparison": metrics.get("weekly_comparison", {}),
+                "needs_attention": metrics.get("needs_attention", {}),
+                "hot_leads": metrics.get("hot_leads", {}),
+                "response_rate": metrics.get("response_rate", {})
+            },
+            limit=limit
+        )
+        
+        return ORJSONResponse(recommendations)
+        
+    except Exception as e:
+        logger.exception(f"Error getting recommendations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
