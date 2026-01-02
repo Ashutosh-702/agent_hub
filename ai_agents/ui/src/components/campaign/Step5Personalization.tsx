@@ -6,29 +6,74 @@ import {
 } from '../../store';
 import { skipToken } from '@reduxjs/toolkit/query';
 
-// Mock personalization data generator
-const generateMockPersonalization = (contact: { id: string; firstName: string; lastName: string; email: string; jobTitle: string; companyName?: string }) => {
-  const messages = [
-    `Hi ${contact.firstName},\n\nI noticed your role as ${contact.jobTitle} at ${contact.companyName || 'your company'} and wanted to reach out. Based on your company's growth trajectory, I believe our solution could help streamline your operations.\n\nWould you be open to a brief 15-minute call this week?\n\nBest regards`,
-    `Hello ${contact.firstName},\n\nI came across your profile and was impressed by your work at ${contact.companyName || 'your organization'}. Given your focus on ${contact.jobTitle?.toLowerCase().includes('sales') ? 'driving revenue' : 'business growth'}, I think you'd find our platform valuable.\n\nLet me know if you'd like to explore this further.\n\nCheers`,
-    `Dear ${contact.firstName},\n\nAs ${contact.jobTitle} at ${contact.companyName || 'your company'}, you're likely facing challenges in scaling efficiently. Our solution has helped similar companies achieve 3x productivity gains.\n\nI'd love to share some insights that could benefit your team.\n\nWarm regards`,
+// Generate multiple message options for a contact
+const generateMessageOptions = (contact: { firstName: string; jobTitle: string; companyName?: string }) => {
+  return [
+    {
+      id: 'msg-1',
+      text: `Hi ${contact.firstName},\n\nI noticed your role as ${contact.jobTitle} at ${contact.companyName || 'your company'} and wanted to reach out. Based on your company's growth trajectory, I believe our solution could help streamline your operations.\n\nWould you be open to a brief 15-minute call this week?\n\nBest regards`,
+      label: 'Professional & Direct',
+    },
+    {
+      id: 'msg-2',
+      text: `Hello ${contact.firstName},\n\nI came across your profile and was impressed by your work at ${contact.companyName || 'your organization'}. Given your focus on ${contact.jobTitle?.toLowerCase().includes('sales') ? 'driving revenue' : 'business growth'}, I think you'd find our platform valuable.\n\nLet me know if you'd like to explore this further.\n\nCheers`,
+      label: 'Friendly & Casual',
+    },
+    {
+      id: 'msg-3',
+      text: `Dear ${contact.firstName},\n\nAs ${contact.jobTitle} at ${contact.companyName || 'your company'}, you're likely facing challenges in scaling efficiently. Our solution has helped similar companies achieve 3x productivity gains.\n\nI'd love to share some insights that could benefit your team.\n\nWarm regards`,
+      label: 'Value-Focused',
+    },
   ];
-
-  const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-  const deckId = `deck_${contact.id}_${Date.now()}`;
-
-  return {
-    contact_id: contact.id,
-    email_id: contact.email || `${contact.firstName.toLowerCase()}.${contact.lastName.toLowerCase()}@example.com`,
-    text_message: randomMessage,
-    deck_url: `https://storage.cloud.example.com/personalized-decks/${deckId}.pdf`,
-    status: 'generated' as const,
-  };
 };
+
+// Generate multiple deck options for a contact
+const generateDeckOptions = (contactId: string) => {
+  const timestamp = Date.now();
+  return [
+    {
+      id: 'deck-1',
+      url: `https://storage.cloud.example.com/personalized-decks/deck_${contactId}_${timestamp}_standard.pdf`,
+      label: 'Standard Deck',
+    },
+    {
+      id: 'deck-2',
+      url: `https://storage.cloud.example.com/personalized-decks/deck_${contactId}_${timestamp}_detailed.pdf`,
+      label: 'Detailed Deck',
+    },
+    {
+      id: 'deck-3',
+      url: `https://storage.cloud.example.com/personalized-decks/deck_${contactId}_${timestamp}_executive.pdf`,
+      label: 'Executive Summary',
+    },
+  ];
+};
+
+interface MessageOption {
+  id: string;
+  text: string;
+  label: string;
+}
+
+interface DeckOption {
+  id: string;
+  url: string;
+  label: string;
+}
 
 interface PersonalizationResult {
   contact_id: string;
   email_id: string;
+  // Multiple options
+  messageOptions: MessageOption[];
+  deckOptions: DeckOption[];
+  // Selected options
+  selectedMessageId: string | null;
+  selectedDeckId: string | null;
+  // Approval status (separate for message and deck)
+  messageApproved: boolean;
+  deckApproved: boolean;
+  // Legacy fields for compatibility
   text_message: string;
   deck_url: string;
   status: 'pending' | 'generated' | 'approved' | 'rejected';
@@ -46,8 +91,6 @@ export const Step5Personalization = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingProgress, setGeneratingProgress] = useState<{ current: number; total: number } | null>(null);
   const [personalizationResults, setPersonalizationResults] = useState<Map<string, PersonalizationResult>>(new Map());
-  const [editingMessage, setEditingMessage] = useState<string | null>(null);
-  const [editedMessages, setEditedMessages] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -115,9 +158,27 @@ export const Step5Personalization = () => {
     const restoredResults = new Map<string, PersonalizationResult>();
     relevantContacts.forEach((c) => {
       if (c.personalized_message && c.ai_generated_deck) {
+        // Create single-option arrays for restored data
+        const messageOptions: MessageOption[] = [{
+          id: 'saved-msg',
+          text: c.personalized_message,
+          label: 'Saved Message',
+        }];
+        const deckOptions: DeckOption[] = [{
+          id: 'saved-deck',
+          url: c.ai_generated_deck,
+          label: 'Saved Deck',
+        }];
+        
         restoredResults.set(c.contact_id, {
           contact_id: c.contact_id,
           email_id: c.email_id || c.contact_data?.email?.[0] || '',
+          messageOptions,
+          deckOptions,
+          selectedMessageId: 'saved-msg',
+          selectedDeckId: 'saved-deck',
+          messageApproved: c.personalization_status === 'approved',
+          deckApproved: c.personalization_status === 'approved',
           text_message: c.personalized_message,
           deck_url: c.ai_generated_deck,
           status: c.personalization_status === 'approved' ? 'approved' : 'generated',
@@ -149,7 +210,73 @@ export const Step5Personalization = () => {
 
   // Count stats
   const generatedCount = Array.from(personalizationResults.values()).filter(r => r.status === 'generated' || r.status === 'approved').length;
-  const approvedCount = Array.from(personalizationResults.values()).filter(r => r.status === 'approved').length;
+  // Approved means both message AND deck are approved
+  const approvedCount = Array.from(personalizationResults.values()).filter(r => r.messageApproved && r.deckApproved).length;
+  
+  // Handlers for selecting message/deck options
+  const handleSelectMessage = (contactId: string, messageId: string) => {
+    setPersonalizationResults(prev => {
+      const newMap = new Map(prev);
+      const result = newMap.get(contactId);
+      if (result) {
+        const selectedMessage = result.messageOptions.find(m => m.id === messageId);
+        newMap.set(contactId, {
+          ...result,
+          selectedMessageId: messageId,
+          text_message: selectedMessage?.text || '',
+        });
+      }
+      return newMap;
+    });
+  };
+  
+  const handleSelectDeck = (contactId: string, deckId: string) => {
+    setPersonalizationResults(prev => {
+      const newMap = new Map(prev);
+      const result = newMap.get(contactId);
+      if (result) {
+        const selectedDeck = result.deckOptions.find(d => d.id === deckId);
+        newMap.set(contactId, {
+          ...result,
+          selectedDeckId: deckId,
+          deck_url: selectedDeck?.url || '',
+        });
+      }
+      return newMap;
+    });
+  };
+  
+  const handleApproveMessage = (contactId: string) => {
+    setPersonalizationResults(prev => {
+      const newMap = new Map(prev);
+      const result = newMap.get(contactId);
+      if (result && result.selectedMessageId) {
+        const bothApproved = true && result.deckApproved;
+        newMap.set(contactId, {
+          ...result,
+          messageApproved: true,
+          status: bothApproved ? 'approved' : result.status,
+        });
+      }
+      return newMap;
+    });
+  };
+  
+  const handleApproveDeck = (contactId: string) => {
+    setPersonalizationResults(prev => {
+      const newMap = new Map(prev);
+      const result = newMap.get(contactId);
+      if (result && result.selectedDeckId) {
+        const bothApproved = result.messageApproved && true;
+        newMap.set(contactId, {
+          ...result,
+          deckApproved: true,
+          status: bothApproved ? 'approved' : result.status,
+        });
+      }
+      return newMap;
+    });
+  };
 
   // Toggle contact selection
   const toggleContactSelection = (contactId: string) => {
@@ -188,15 +315,27 @@ export const Step5Personalization = () => {
       // Simulate processing delay (1-2 seconds per contact)
       await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
       
-      // Generate mock personalization
-      const result = generateMockPersonalization({
-        id: contact.id,
+      // Generate multiple options for message and deck
+      const messageOptions = generateMessageOptions({
         firstName: contact.firstName,
-        lastName: contact.lastName,
-        email: contact.email,
         jobTitle: contact.jobTitle,
         companyName: contact.companyName || getCompanyName(contact.companyId),
       });
+      const deckOptions = generateDeckOptions(contact.id);
+      
+      const result: PersonalizationResult = {
+        contact_id: contact.id,
+        email_id: contact.email || `${contact.firstName.toLowerCase()}.${contact.lastName.toLowerCase()}@example.com`,
+        messageOptions,
+        deckOptions,
+        selectedMessageId: null, // User needs to select
+        selectedDeckId: null, // User needs to select
+        messageApproved: false,
+        deckApproved: false,
+        text_message: '', // Will be set when user selects
+        deck_url: '', // Will be set when user selects
+        status: 'generated' as const,
+      };
 
       setPersonalizationResults(prev => {
         const newMap = new Map(prev);
@@ -212,25 +351,20 @@ export const Step5Personalization = () => {
   };
 
   // Approve personalization - updates local state (saves to DB on Continue)
-  const handleApprove = (contactId: string) => {
-    const result = personalizationResults.get(contactId);
-    if (!result) return;
-
-    // Update local state to approved
-    setPersonalizationResults(prev => {
-      const newMap = new Map(prev);
-      newMap.set(contactId, { ...result, status: 'approved' });
-      return newMap;
-    });
-  };
-
   // Reject personalization
   const handleReject = (contactId: string) => {
     setPersonalizationResults(prev => {
       const newMap = new Map(prev);
       const result = newMap.get(contactId);
       if (result) {
-        newMap.set(contactId, { ...result, status: 'rejected' });
+        newMap.set(contactId, { 
+          ...result, 
+          status: 'rejected',
+          messageApproved: false,
+          deckApproved: false,
+          selectedMessageId: null,
+          selectedDeckId: null,
+        });
       }
       return newMap;
     });
@@ -254,46 +388,43 @@ export const Step5Personalization = () => {
     // Simulate regeneration
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    const result = generateMockPersonalization({
-      id: contact.id,
+    // Generate new options
+    const messageOptions = generateMessageOptions({
       firstName: contact.firstName,
-      lastName: contact.lastName,
-      email: contact.email,
       jobTitle: contact.jobTitle,
       companyName: contact.companyName || getCompanyName(contact.companyId),
     });
+    const deckOptions = generateDeckOptions(contact.id);
+
+    const newResult: PersonalizationResult = {
+      contact_id: contact.id,
+      email_id: contact.email || `${contact.firstName.toLowerCase()}.${contact.lastName.toLowerCase()}@example.com`,
+      messageOptions,
+      deckOptions,
+      selectedMessageId: null,
+      selectedDeckId: null,
+      messageApproved: false,
+      deckApproved: false,
+      text_message: '',
+      deck_url: '',
+      status: 'generated' as const,
+    };
 
     setPersonalizationResults(prev => {
       const newMap = new Map(prev);
-      newMap.set(contactId, result);
+      newMap.set(contactId, newResult);
       return newMap;
     });
-  };
-
-  // Save edited message
-  const handleSaveEdit = (contactId: string) => {
-    const editedMessage = editedMessages[contactId];
-    if (!editedMessage) return;
-
-    setPersonalizationResults(prev => {
-      const newMap = new Map(prev);
-      const result = newMap.get(contactId);
-      if (result) {
-        newMap.set(contactId, { ...result, text_message: editedMessage });
-      }
-      return newMap;
-    });
-    setEditingMessage(null);
   };
 
   // Continue to next step - saves all approved personalizations to database first
   const handleContinue = async () => {
-    // Get all approved personalizations
+    // Get all fully approved personalizations (both message AND deck approved)
     const approvedResults = Array.from(personalizationResults.entries())
-      .filter(([_, result]) => result.status === 'approved');
+      .filter(([_, result]) => result.messageApproved && result.deckApproved);
     
     if (approvedResults.length === 0) {
-      setSaveError('Please approve at least one contact personalization before continuing.');
+      setSaveError('Please approve both message AND deck for at least one contact before continuing.');
       return;
     }
 
@@ -301,13 +432,19 @@ export const Step5Personalization = () => {
     setSaveError(null);
 
     try {
-      // Build personalizations payload for API
-      const personalizations = approvedResults.map(([_, result]) => ({
-        contact_id: result.contact_id,
-        email_id: result.email_id,
-        personalized_message: result.text_message,
-        ai_generated_deck: result.deck_url,
-      }));
+      // Build personalizations payload for API - use selected options
+      const personalizations = approvedResults.map(([_, result]) => {
+        // Get the selected message text
+        const selectedMessage = result.messageOptions.find(m => m.id === result.selectedMessageId);
+        const selectedDeck = result.deckOptions.find(d => d.id === result.selectedDeckId);
+        
+        return {
+          contact_id: result.contact_id,
+          email_id: result.email_id,
+          personalized_message: selectedMessage?.text || result.text_message,
+          ai_generated_deck: selectedDeck?.url || result.deck_url,
+        };
+      });
 
       // Save all approved personalizations to database
       if (campaignId) {
@@ -348,13 +485,28 @@ export const Step5Personalization = () => {
     const result = personalizationResults.get(contactId);
     if (!result) return <span className="status-badge pending">Pending</span>;
     
+    // Check if both message and deck are approved
+    if (result.messageApproved && result.deckApproved) {
+      return <span className="status-badge approved">Approved ✓</span>;
+    }
+    
+    // Check partial approvals
+    if (result.messageApproved || result.deckApproved) {
+      const msgStatus = result.messageApproved ? '✓' : '○';
+      const deckStatus = result.deckApproved ? '✓' : '○';
+      return <span className="status-badge generated">Msg {msgStatus} | Deck {deckStatus}</span>;
+    }
+    
+    // Check if options are selected but not approved
+    if (result.selectedMessageId || result.selectedDeckId) {
+      return <span className="status-badge generated">Select & Approve</span>;
+    }
+    
     switch (result.status) {
       case 'pending':
         return <span className="status-badge generating">Generating...</span>;
       case 'generated':
         return <span className="status-badge generated">Ready for Review</span>;
-      case 'approved':
-        return <span className="status-badge approved">Approved ✓</span>;
       case 'rejected':
         return <span className="status-badge rejected">Rejected</span>;
       default:
@@ -565,96 +717,173 @@ export const Step5Personalization = () => {
                       </svg>
                       <span>{result.email_id}</span>
                     </div>
-                      </div>
+                  </div>
 
-                  {/* Text Message */}
-                  <div className="personalization-field">
-                    <label>Personalized Message</label>
-                        {editingMessage === contact.id ? (
-                      <div className="message-edit">
-                          <textarea
-                          value={editedMessages[contact.id] || result.text_message}
-                          onChange={(e) => setEditedMessages(prev => ({ ...prev, [contact.id]: e.target.value }))}
-                          rows={8}
-                        />
-                        <div className="edit-actions">
-                          <button className="btn-primary btn-small" onClick={() => handleSaveEdit(contact.id)}>
-                            Save Changes
-                          </button>
-                          <button className="btn-secondary btn-small" onClick={() => setEditingMessage(null)}>
-                            Cancel
+                  {/* Message Selection Section */}
+                  <div className={`personalization-section ${result.messageApproved ? 'approved' : ''}`}>
+                    <div className="personalization-section-header">
+                      <label>
+                        Personalized Message
+                        {result.messageApproved && (
+                          <span className="personalization-approved-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Approved
+                          </span>
+                        )}
+                      </label>
+                      {result.selectedMessageId && !result.messageApproved && (
+                        <div className="personalization-section-actions">
+                          <button className="btn-approve" onClick={() => handleApproveMessage(contact.id)}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Approve Message
                           </button>
                         </div>
+                      )}
+                    </div>
+                    
+                    {result.messageOptions && result.messageOptions.length > 1 ? (
+                      <div className="message-options-list">
+                        {result.messageOptions.map((option) => (
+                          <div 
+                            key={option.id}
+                            className={`message-option ${result.selectedMessageId === option.id ? 'selected' : ''}`}
+                            onClick={() => !result.messageApproved && handleSelectMessage(contact.id, option.id)}
+                          >
+                            <input 
+                              type="radio" 
+                              name={`message-${contact.id}`}
+                              checked={result.selectedMessageId === option.id}
+                              onChange={() => handleSelectMessage(contact.id, option.id)}
+                              disabled={result.messageApproved}
+                            />
+                            <div className="message-option-content">
+                              <strong>{option.label}</strong>
+                              <pre>{option.text}</pre>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : (
-                      <pre className="message-preview">{result.text_message}</pre>
+                      <pre className="message-preview">{result.text_message || result.messageOptions?.[0]?.text || 'No message generated'}</pre>
                     )}
                   </div>
 
-                  {/* Deck URL (Public Cloud Storage) */}
-                  <div className="personalization-field">
-                    <label>AI Generated Deck (Cloud Storage URL)</label>
-                    <div className="deck-url-display">
-                          <input 
-                            type="text" 
-                        value={result.deck_url} 
-                            readOnly 
-                            className="deck-url-input"
-                          />
-                          <button
-                            className="btn-icon open-deck-btn"
-                        title="Open Deck"
-                        onClick={() => window.open(result.deck_url, '_blank', 'noopener,noreferrer')}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                              <polyline points="15 3 21 3 21 9"/>
-                              <line x1="10" y1="14" x2="21" y2="3"/>
+                  {/* Deck Selection Section */}
+                  <div className={`personalization-section ${result.deckApproved ? 'approved' : ''}`}>
+                    <div className="personalization-section-header">
+                      <label>
+                        AI Generated Deck
+                        {result.deckApproved && (
+                          <span className="personalization-approved-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12"/>
                             </svg>
+                            Approved
+                          </span>
+                        )}
+                      </label>
+                      {result.selectedDeckId && !result.deckApproved && (
+                        <div className="personalization-section-actions">
+                          <button className="btn-approve" onClick={() => handleApproveDeck(contact.id)}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Approve Deck
                           </button>
                         </div>
+                      )}
+                    </div>
+                    
+                    {result.deckOptions && result.deckOptions.length > 1 ? (
+                      <div className="message-options-list">
+                        {result.deckOptions.map((option) => (
+                          <div 
+                            key={option.id}
+                            className={`message-option ${result.selectedDeckId === option.id ? 'selected' : ''}`}
+                            onClick={() => !result.deckApproved && handleSelectDeck(contact.id, option.id)}
+                          >
+                            <input 
+                              type="radio" 
+                              name={`deck-${contact.id}`}
+                              checked={result.selectedDeckId === option.id}
+                              onChange={() => handleSelectDeck(contact.id, option.id)}
+                              disabled={result.deckApproved}
+                            />
+                            <div className="message-option-content">
+                              <strong>{option.label}</strong>
+                              <div className="deck-url-display" style={{ marginTop: '8px' }}>
+                                <input type="text" value={option.url} readOnly className="deck-url-input" />
+                                <button
+                                  className="btn-icon open-deck-btn"
+                                  title="Open Deck"
+                                  onClick={(e) => { e.stopPropagation(); window.open(option.url, '_blank', 'noopener,noreferrer'); }}
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                    <polyline points="15 3 21 3 21 9"/>
+                                    <line x1="10" y1="14" x2="21" y2="3"/>
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      <div className="deck-url-display">
+                        <input type="text" value={result.deck_url || result.deckOptions?.[0]?.url || ''} readOnly className="deck-url-input" />
+                        <button
+                          className="btn-icon open-deck-btn"
+                          title="Open Deck"
+                          onClick={() => window.open(result.deck_url || result.deckOptions?.[0]?.url, '_blank', 'noopener,noreferrer')}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
-                  {/* Actions */}
-                  {result.status === 'generated' && (
+                  {/* Overall Status */}
+                  {result.messageApproved && result.deckApproved && (
+                    <div className="approved-badge-large">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                      </svg>
+                      <span>Both Message and Deck Approved - Ready to save</span>
+                    </div>
+                  )}
+
+                  {/* Reject/Regenerate Actions */}
+                  {result.status === 'generated' && !result.messageApproved && !result.deckApproved && (
                     <div className="review-actions">
-                      <button className="btn-success" onClick={() => handleApprove(contact.id)}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Approve
-                      </button>
                       <button className="btn-danger" onClick={() => handleReject(contact.id)}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <line x1="18" y1="6" x2="6" y2="18"/>
                           <line x1="6" y1="6" x2="18" y2="18"/>
                         </svg>
-                        Reject
-                      </button>
-                      <button className="btn-secondary" onClick={() => {
-                        setEditedMessages(prev => ({ ...prev, [contact.id]: result.text_message }));
-                        setEditingMessage(contact.id);
-                      }}>
-                        Edit Message
+                        Reject All
                       </button>
                     </div>
                   )}
 
                   {result.status === 'rejected' && (
                     <div className="rejected-actions">
-                      <p>Personalization was rejected. You can:</p>
+                      <p>Personalization was rejected. You can regenerate:</p>
                       <div className="action-buttons">
                         <button className="btn-primary" onClick={() => handleRegenerate(contact.id)}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
                           </svg>
                           Regenerate
-                        </button>
-                        <button className="btn-secondary" onClick={() => {
-                          setEditedMessages(prev => ({ ...prev, [contact.id]: result.text_message }));
-                          setEditingMessage(contact.id);
-                        }}>
-                          Edit Manually
                         </button>
                       </div>
                     </div>
