@@ -107,7 +107,12 @@ export const InboxPage = () => {
   // Mobile: Show detail view when lead is selected
   if (isMobile && selectedLeadId) {
     return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        background: 'var(--color-gray-50)',
+      }}>
         <LeadDetail
           leadId={selectedLeadId}
           onBack={handleBack}
@@ -120,35 +125,55 @@ export const InboxPage = () => {
 
   return (
     <div style={{
-      height: 'calc(100vh - 64px)',
+      height: '100%',
       display: 'flex',
       flexDirection: 'column',
       background: 'var(--color-gray-50)',
+      overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{
         padding: '1.5rem 2rem 0',
         background: 'var(--color-white)',
         borderBottom: '1px solid var(--color-gray-200)',
+        flexShrink: 0,
       }}>
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '1rem',
+          marginBottom: '1.25rem',
         }}>
-          <h1 style={{
-            fontSize: '1.5rem',
-            fontWeight: 700,
-            color: 'var(--color-gray-900)',
-            margin: 0,
-          }}>
-            Inbox
-          </h1>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <span style={{
-              fontSize: '0.875rem',
+          <div>
+            <h1 style={{
+              fontSize: '1.75rem',
+              fontWeight: 700,
+              color: 'var(--color-gray-900)',
+              margin: 0,
+              marginBottom: '0.25rem',
+            }}>
+              Inbox
+            </h1>
+            <p style={{
+              fontSize: '0.9375rem',
               color: 'var(--color-gray-500)',
+              margin: 0,
+            }}>
+              Unified view of all outreach conversations
+            </p>
+          </div>
+          <div style={{ 
+            display: 'flex', 
+            gap: '1rem', 
+            alignItems: 'center',
+          }}>
+            <span style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              background: 'var(--color-gray-100)',
+              color: 'var(--color-gray-700)',
+              borderRadius: '8px',
             }}>
               {total} lead{total !== 1 ? 's' : ''}
             </span>
@@ -158,32 +183,32 @@ export const InboxPage = () => {
         {/* Tabs */}
         <div style={{
           display: 'flex',
-          gap: '0.25rem',
-          borderBottom: 'none',
-          marginBottom: '-1px',
+          gap: '0.5rem',
         }}>
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
               style={{
-                padding: '0.75rem 1.25rem',
-                fontSize: '0.875rem',
+                padding: '0.875rem 1.5rem',
+                fontSize: '0.9375rem',
                 fontWeight: 600,
                 color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-gray-500)',
-                background: 'none',
+                background: activeTab === tab.id ? 'var(--color-primary-lighter)' : 'transparent',
                 border: 'none',
-                borderBottom: activeTab === tab.id ? '2px solid var(--color-primary)' : '2px solid transparent',
+                borderBottom: activeTab === tab.id ? '3px solid var(--color-primary)' : '3px solid transparent',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                transition: 'all 0.2s ease',
+                marginBottom: '-1px',
+                borderRadius: '8px 8px 0 0',
               }}
             >
               {tab.label}
               {tab.id === 'attention' && leads.filter(l => (l.attentionReasons?.length || 0) > 0).length > 0 && (
                 <span style={{
-                  marginLeft: '0.5rem',
-                  padding: '0.125rem 0.5rem',
-                  fontSize: '0.6875rem',
+                  marginLeft: '0.625rem',
+                  padding: '0.1875rem 0.5rem',
+                  fontSize: '0.75rem',
                   fontWeight: 700,
                   background: 'var(--color-error)',
                   color: 'white',
@@ -209,16 +234,18 @@ export const InboxPage = () => {
         flex: 1,
         display: 'flex',
         overflow: 'hidden',
+        minHeight: 0,
       }}>
         {/* Lead List */}
         <div style={{
-          width: isMobile ? '100%' : '400px',
-          minWidth: isMobile ? '100%' : '360px',
+          width: isMobile ? '100%' : '420px',
+          minWidth: isMobile ? '100%' : '380px',
+          maxWidth: isMobile ? '100%' : '500px',
           borderRight: isMobile ? 'none' : '1px solid var(--color-gray-200)',
           background: 'var(--color-white)',
-          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
+          overflow: 'hidden',
         }}>
           <LeadList
             leads={leads}
@@ -235,9 +262,10 @@ export const InboxPage = () => {
         {!isMobile && (
           <div style={{
             flex: 1,
-            overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
+            overflow: 'hidden',
+            minWidth: 0,
           }}>
             {selectedLeadId ? (
               <LeadDetail
@@ -255,12 +283,37 @@ export const InboxPage = () => {
                 <div style={{
                   textAlign: 'center',
                   color: 'var(--color-gray-400)',
+                  padding: '3rem',
                 }}>
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.5, marginBottom: '1rem' }}>
-                    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
-                    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
-                  </svg>
-                  <p style={{ fontSize: '0.9375rem' }}>Select a lead to view details</p>
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    margin: '0 auto 1.5rem',
+                    borderRadius: '50%',
+                    background: 'var(--color-gray-100)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4 }}>
+                      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+                      <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+                    </svg>
+                  </div>
+                  <p style={{ 
+                    fontSize: '1.125rem', 
+                    fontWeight: 600,
+                    color: 'var(--color-gray-600)',
+                    marginBottom: '0.5rem',
+                  }}>
+                    Select a lead
+                  </p>
+                  <p style={{ 
+                    fontSize: '0.9375rem',
+                    color: 'var(--color-gray-400)',
+                  }}>
+                    Choose a lead from the list to view details and conversation history
+                  </p>
                 </div>
               </div>
             )}
@@ -270,4 +323,3 @@ export const InboxPage = () => {
     </div>
   );
 };
-

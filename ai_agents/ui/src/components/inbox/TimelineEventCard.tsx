@@ -4,6 +4,7 @@ import { CHANNEL_LABELS } from '../../types/inbox';
 
 interface TimelineEventCardProps {
   event: EngagementEvent;
+  isLast?: boolean;
 }
 
 // Channel icons
@@ -37,7 +38,7 @@ const ChannelIcon = ({ channel, size = 16 }: { channel: Channel; size?: number }
 };
 
 // Direction icons
-const DirectionIcon = ({ direction, size = 12 }: { direction: 'inbound' | 'outbound'; size?: number }) => {
+const DirectionIcon = ({ direction, size = 14 }: { direction: 'inbound' | 'outbound'; size?: number }) => {
   if (direction === 'inbound') {
     return (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -61,10 +62,10 @@ function formatEventTime(dateString: string): string {
   const isToday = date.toDateString() === now.toDateString();
   
   if (isToday) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return 'Today at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
   
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) +
     ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -78,7 +79,7 @@ function formatDuration(seconds: number): string {
   return `${secs}s`;
 }
 
-export const TimelineEventCard = ({ event }: TimelineEventCardProps) => {
+export const TimelineEventCard = ({ event, isLast = false }: TimelineEventCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
   const isInbound = event.direction === 'inbound';
@@ -96,8 +97,8 @@ export const TimelineEventCard = ({ event }: TimelineEventCardProps) => {
   return (
     <div style={{
       display: 'flex',
-      gap: '0.75rem',
-      marginBottom: '1rem',
+      gap: '1rem',
+      marginBottom: isLast ? 0 : '1.5rem',
     }}>
       {/* Timeline marker */}
       <div style={{
@@ -107,56 +108,68 @@ export const TimelineEventCard = ({ event }: TimelineEventCardProps) => {
         paddingTop: '0.25rem',
       }}>
         <div style={{
-          width: '32px',
-          height: '32px',
+          width: '40px',
+          height: '40px',
           borderRadius: '50%',
-          background: `${channelColor}15`,
+          background: `${channelColor}12`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color: channelColor,
+          flexShrink: 0,
         }}>
-          <ChannelIcon channel={event.channel} size={16} />
+          <ChannelIcon channel={event.channel} size={18} />
         </div>
-        <div style={{
-          flex: 1,
-          width: '2px',
-          background: 'var(--color-gray-200)',
-          marginTop: '0.5rem',
-        }} />
+        {!isLast && (
+          <div style={{
+            flex: 1,
+            width: '2px',
+            background: 'var(--color-gray-200)',
+            marginTop: '0.75rem',
+            minHeight: '24px',
+          }} />
+        )}
       </div>
 
       {/* Event content */}
       <div style={{
         flex: 1,
-        background: 'var(--color-white)',
-        borderRadius: '8px',
+        background: 'var(--color-gray-50)',
+        borderRadius: '12px',
         border: '1px solid var(--color-gray-200)',
         overflow: 'hidden',
+        minWidth: 0,
       }}>
         {/* Header */}
         <div style={{
-          padding: '0.75rem 1rem',
-          borderBottom: '1px solid var(--color-gray-100)',
+          padding: '1rem 1.25rem',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: 'flex-start',
+          gap: '1rem',
         }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
           }}>
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.25rem',
-              color: isInbound ? 'var(--color-success)' : 'var(--color-gray-500)',
+              gap: '0.375rem',
+              padding: '0.25rem 0.625rem',
+              background: isInbound ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+              color: isInbound ? '#059669' : '#6b7280',
+              borderRadius: '6px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
             }}>
-              <DirectionIcon direction={event.direction} />
+              <DirectionIcon direction={event.direction} size={12} />
+              {isInbound ? 'Received' : 'Sent'}
             </span>
             <span style={{
-              fontSize: '0.875rem',
+              fontSize: '0.9375rem',
               fontWeight: 600,
               color: 'var(--color-gray-800)',
             }}>
@@ -164,20 +177,22 @@ export const TimelineEventCard = ({ event }: TimelineEventCardProps) => {
             </span>
             {event.meta?.sequence && (
               <span style={{
-                padding: '0.125rem 0.5rem',
+                padding: '0.25rem 0.625rem',
                 fontSize: '0.6875rem',
                 fontWeight: 600,
                 background: 'var(--color-primary-light)',
                 color: 'var(--color-primary)',
-                borderRadius: '4px',
+                borderRadius: '6px',
               }}>
                 Sequence Step
               </span>
             )}
           </div>
           <span style={{
-            fontSize: '0.75rem',
+            fontSize: '0.8125rem',
             color: 'var(--color-gray-400)',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
           }}>
             {formatEventTime(event.at)}
           </span>
@@ -186,29 +201,32 @@ export const TimelineEventCard = ({ event }: TimelineEventCardProps) => {
         {/* Meta line (subject, status, duration) */}
         {(event.meta?.subject || event.meta?.messageStatus || event.meta?.callDurationSec) && (
           <div style={{
-            padding: '0.5rem 1rem',
-            background: 'var(--color-gray-50)',
-            fontSize: '0.75rem',
-            color: 'var(--color-gray-500)',
+            padding: '0.75rem 1.25rem',
+            background: 'var(--color-white)',
+            borderTop: '1px solid var(--color-gray-100)',
+            borderBottom: '1px solid var(--color-gray-100)',
+            fontSize: '0.8125rem',
+            color: 'var(--color-gray-600)',
             display: 'flex',
-            gap: '1rem',
+            gap: '1.5rem',
             flexWrap: 'wrap',
           }}>
             {event.meta?.subject && (
               <span>
-                <strong>Subject:</strong> {event.meta.subject}
+                <strong style={{ color: 'var(--color-gray-500)', fontWeight: 500 }}>Subject:</strong>{' '}
+                {event.meta.subject}
               </span>
             )}
             {event.meta?.messageStatus && (
-              <span style={{
-                textTransform: 'capitalize',
-              }}>
-                <strong>Status:</strong> {event.meta.messageStatus}
+              <span style={{ textTransform: 'capitalize' }}>
+                <strong style={{ color: 'var(--color-gray-500)', fontWeight: 500 }}>Status:</strong>{' '}
+                {event.meta.messageStatus}
               </span>
             )}
             {event.meta?.callDurationSec && (
               <span>
-                <strong>Duration:</strong> {formatDuration(event.meta.callDurationSec)}
+                <strong style={{ color: 'var(--color-gray-500)', fontWeight: 500 }}>Duration:</strong>{' '}
+                {formatDuration(event.meta.callDurationSec)}
               </span>
             )}
           </div>
@@ -216,36 +234,54 @@ export const TimelineEventCard = ({ event }: TimelineEventCardProps) => {
 
         {/* Content */}
         <div style={{
-          padding: '0.75rem 1rem',
+          padding: '1rem 1.25rem',
+          background: 'var(--color-white)',
         }}>
           <p style={{
-            fontSize: '0.8125rem',
-            color: 'var(--color-gray-600)',
+            fontSize: '0.9375rem',
+            color: 'var(--color-gray-700)',
             margin: 0,
-            lineHeight: 1.6,
+            lineHeight: 1.7,
             whiteSpace: 'pre-wrap',
             overflow: 'hidden',
             display: '-webkit-box',
-            WebkitLineClamp: isExpanded ? 'unset' : 3,
+            WebkitLineClamp: isExpanded ? 'unset' : 4,
             WebkitBoxOrient: 'vertical',
           }}>
             {event.content}
           </p>
-          {event.content.length > 200 && (
+          {event.content.length > 250 && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
               style={{
-                marginTop: '0.5rem',
-                padding: 0,
-                fontSize: '0.8125rem',
+                marginTop: '0.75rem',
+                padding: '0.375rem 0',
+                fontSize: '0.875rem',
                 fontWeight: 600,
                 color: 'var(--color-primary)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.375rem',
               }}
             >
-              {isExpanded ? 'Show less' : 'Show more'}
+              {isExpanded ? (
+                <>
+                  Show less
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="18 15 12 9 6 15"/>
+                  </svg>
+                </>
+              ) : (
+                <>
+                  Show more
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </>
+              )}
             </button>
           )}
         </div>
@@ -253,25 +289,26 @@ export const TimelineEventCard = ({ event }: TimelineEventCardProps) => {
         {/* External link */}
         {event.meta?.externalLink && (
           <div style={{
-            padding: '0.5rem 1rem',
+            padding: '0.75rem 1.25rem',
             borderTop: '1px solid var(--color-gray-100)',
+            background: 'var(--color-white)',
           }}>
             <a
               href={event.meta.externalLink}
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                fontSize: '0.8125rem',
+                fontSize: '0.875rem',
                 fontWeight: 600,
                 color: 'var(--color-primary)',
                 textDecoration: 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.25rem',
+                gap: '0.375rem',
               }}
             >
               Open in {CHANNEL_LABELS[event.channel]}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                 <polyline points="15 3 21 3 21 9"/>
                 <line x1="10" y1="14" x2="21" y2="3"/>
@@ -283,4 +320,3 @@ export const TimelineEventCard = ({ event }: TimelineEventCardProps) => {
     </div>
   );
 };
-

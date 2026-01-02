@@ -41,9 +41,9 @@ const ChannelIcon = ({ channel, size = 14 }: { channel: Channel; size?: number }
 
 // Temperature badge colors
 const tempColors = {
-  cold: { bg: 'rgba(59, 130, 246, 0.1)', text: '#2563eb' },
-  warm: { bg: 'rgba(245, 158, 11, 0.1)', text: '#d97706' },
-  hot: { bg: 'rgba(239, 68, 68, 0.1)', text: '#dc2626' },
+  cold: { bg: 'rgba(59, 130, 246, 0.12)', text: '#2563eb', icon: '🥶' },
+  warm: { bg: 'rgba(245, 158, 11, 0.12)', text: '#d97706', icon: '🌡️' },
+  hot: { bg: 'rgba(239, 68, 68, 0.12)', text: '#dc2626', icon: '🔥' },
 };
 
 // Status badge colors
@@ -85,18 +85,18 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
     <div
       onClick={onClick}
       style={{
-        padding: '1rem 1.25rem',
+        padding: '1.25rem 1.5rem',
         borderBottom: '1px solid var(--color-gray-100)',
         cursor: 'pointer',
-        background: isSelected ? 'var(--color-primary-lighter)' : 'transparent',
-        borderLeft: isSelected ? '3px solid var(--color-primary)' : '3px solid transparent',
+        background: isSelected ? 'var(--color-primary-lighter)' : 'var(--color-white)',
+        borderLeft: isSelected ? '4px solid var(--color-primary)' : '4px solid transparent',
         transition: 'all 0.15s ease',
       }}
       onMouseOver={(e) => {
         if (!isSelected) e.currentTarget.style.background = 'var(--color-gray-50)';
       }}
       onMouseOut={(e) => {
-        if (!isSelected) e.currentTarget.style.background = 'transparent';
+        if (!isSelected) e.currentTarget.style.background = 'var(--color-white)';
       }}
     >
       {/* Top row: Company + Unread */}
@@ -104,16 +104,17 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: '0.375rem',
+        marginBottom: '0.625rem',
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
+            gap: '0.625rem',
+            marginBottom: '0.375rem',
           }}>
             <span style={{
-              fontSize: '0.9375rem',
+              fontSize: '1rem',
               fontWeight: 600,
               color: 'var(--color-gray-900)',
               whiteSpace: 'nowrap',
@@ -124,21 +125,21 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
             </span>
             {lead.company.domain && (
               <span style={{
-                fontSize: '0.75rem',
+                fontSize: '0.8125rem',
                 color: 'var(--color-gray-400)',
+                fontWeight: 400,
               }}>
                 {lead.company.domain}
               </span>
             )}
           </div>
           <div style={{
-            fontSize: '0.8125rem',
+            fontSize: '0.9375rem',
             color: 'var(--color-gray-600)',
-            marginTop: '0.125rem',
           }}>
             {lead.contact.name}
             {lead.contact.title && (
-              <span style={{ color: 'var(--color-gray-400)' }}> · {lead.contact.title}</span>
+              <span style={{ color: 'var(--color-gray-400)', fontWeight: 400 }}> · {lead.contact.title}</span>
             )}
           </div>
         </div>
@@ -146,13 +147,14 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
         {/* Unread badge */}
         {lead.unreadCount > 0 && (
           <span style={{
-            padding: '0.125rem 0.5rem',
-            fontSize: '0.6875rem',
+            padding: '0.25rem 0.625rem',
+            fontSize: '0.75rem',
             fontWeight: 700,
             background: 'var(--color-primary)',
             color: 'white',
-            borderRadius: '10px',
-            marginLeft: '0.5rem',
+            borderRadius: '12px',
+            marginLeft: '0.75rem',
+            flexShrink: 0,
           }}>
             {lead.unreadCount}
           </span>
@@ -162,14 +164,15 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
       {/* Channel chips + badges */}
       <div style={{
         display: 'flex',
-        gap: '0.375rem',
+        gap: '0.5rem',
         flexWrap: 'wrap',
-        marginBottom: '0.5rem',
+        alignItems: 'center',
+        marginBottom: '0.75rem',
       }}>
         {/* Channels */}
         <div style={{
           display: 'flex',
-          gap: '0.25rem',
+          gap: '0.375rem',
         }}>
           {lead.channelsPresent.map(channel => (
             <span
@@ -179,14 +182,14 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '22px',
-                height: '22px',
+                width: '28px',
+                height: '28px',
                 background: 'var(--color-gray-100)',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 color: 'var(--color-gray-600)',
               }}
             >
-              <ChannelIcon channel={channel} size={12} />
+              <ChannelIcon channel={channel} size={14} />
             </span>
           ))}
         </div>
@@ -195,26 +198,28 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
         <span
           title={lead.temperatureDrivers.join(', ')}
           style={{
-            padding: '0.125rem 0.5rem',
-            fontSize: '0.6875rem',
+            padding: '0.25rem 0.625rem',
+            fontSize: '0.75rem',
             fontWeight: 600,
             background: tempStyle.bg,
             color: tempStyle.text,
-            borderRadius: '4px',
-            textTransform: 'capitalize',
+            borderRadius: '6px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.25rem',
           }}
         >
-          {TEMPERATURE_LABELS[lead.temperature]}
+          {tempStyle.icon} {TEMPERATURE_LABELS[lead.temperature]}
         </span>
 
         {/* Status badge */}
         <span style={{
-          padding: '0.125rem 0.5rem',
-          fontSize: '0.6875rem',
+          padding: '0.25rem 0.625rem',
+          fontSize: '0.75rem',
           fontWeight: 600,
           background: statusStyle.bg,
           color: statusStyle.text,
-          borderRadius: '4px',
+          borderRadius: '6px',
         }}>
           {LEAD_STATUS_LABELS[lead.status]}
         </span>
@@ -223,18 +228,25 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
       {/* Sequence chip */}
       {lead.inSequence && lead.sequence && (
         <div style={{
-          fontSize: '0.75rem',
-          color: 'var(--color-gray-500)',
-          marginBottom: '0.375rem',
+          fontSize: '0.8125rem',
+          color: 'var(--color-gray-600)',
+          marginBottom: '0.625rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.375rem',
+          gap: '0.5rem',
+          padding: '0.5rem 0.75rem',
+          background: 'var(--color-primary-lighter)',
+          borderRadius: '6px',
         }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
-          <span style={{ fontWeight: 500 }}>{lead.sequence.outreachCampaignName}</span>
-          <span>· Step {lead.sequence.currentStage.stepNumber}: {lead.sequence.currentStage.stepName}</span>
+          <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+            {lead.sequence.outreachCampaignName}
+          </span>
+          <span style={{ color: 'var(--color-gray-500)' }}>
+            · Step {lead.sequence.currentStage.stepNumber}: {lead.sequence.currentStage.stepName}
+          </span>
         </div>
       )}
 
@@ -243,22 +255,27 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.375rem',
-          fontSize: '0.75rem',
+          gap: '0.5rem',
+          fontSize: '0.8125rem',
           color: 'var(--color-gray-500)',
+          padding: '0.625rem 0.75rem',
+          background: 'var(--color-gray-50)',
+          borderRadius: '6px',
         }}>
-          <ChannelIcon channel={lead.lastTouch.channel} size={12} />
+          <ChannelIcon channel={lead.lastTouch.channel} size={14} />
           <span style={{
             flex: 1,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            color: 'var(--color-gray-600)',
           }}>
             {lead.lastTouch.snippet}
           </span>
           <span style={{
             flexShrink: 0,
             color: 'var(--color-gray-400)',
+            fontWeight: 500,
           }}>
             {formatRelativeTime(lead.lastTouch.at)}
           </span>
@@ -268,23 +285,31 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
       {/* Attention reasons (when in attention tab) */}
       {showAttentionReasons && lead.attentionReasons && lead.attentionReasons.length > 0 && (
         <div style={{
-          marginTop: '0.5rem',
+          marginTop: '0.75rem',
           display: 'flex',
-          gap: '0.375rem',
+          gap: '0.5rem',
           flexWrap: 'wrap',
         }}>
           {lead.attentionReasons.map((reason, idx) => (
             <span
               key={idx}
               style={{
-                padding: '0.125rem 0.5rem',
-                fontSize: '0.6875rem',
+                padding: '0.375rem 0.75rem',
+                fontSize: '0.75rem',
                 fontWeight: 600,
                 background: 'var(--color-error-light)',
                 color: 'var(--color-error)',
-                borderRadius: '4px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.375rem',
               }}
             >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
               {reason.message}
             </span>
           ))}
@@ -293,4 +318,3 @@ export const LeadRow = ({ lead, isSelected, onClick, showAttentionReasons }: Lea
     </div>
   );
 };
-
