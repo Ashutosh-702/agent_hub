@@ -97,10 +97,16 @@ export async function enrichCompany(params: { url: string; domain: string }): Pr
   
   // Simulate enrichment based on domain
   const domainPart = params.domain.split('.')[0];
+  const companyName = domainPart.charAt(0).toUpperCase() + domainPart.slice(1) + ' Inc.';
+  
+  // Legal entity types for auto-fill
+  const legalEntityTypes = ['Inc.', 'LLC', 'Corp.', 'Pvt. Ltd.', 'Limited'];
+  const randomType = legalEntityTypes[Math.floor(Math.random() * legalEntityTypes.length)];
+  const legalEntityName = `${domainPart.charAt(0).toUpperCase() + domainPart.slice(1)} ${randomType}`;
   
   return {
-    companyName: domainPart.charAt(0).toUpperCase() + domainPart.slice(1) + ' Inc.',
-    legalEntityName: '',
+    companyName,
+    legalEntityName, // Now auto-filled from enrichment
     industry: ['Technology', 'E-Commerce', 'Retail', 'Fashion'][Math.floor(Math.random() * 4)],
     employeeBand: ['1-50', '51-200', '201-500', '501-1000', '1000+'][Math.floor(Math.random() * 5)],
     hqLocation: ['San Francisco, CA', 'New York, NY', 'Mumbai, India', 'London, UK'][Math.floor(Math.random() * 4)],
@@ -109,7 +115,7 @@ export async function enrichCompany(params: { url: string; domain: string }): Pr
     linkedIn: `https://linkedin.com/company/${domainPart}`,
     confidence: {
       companyName: 'high',
-      legalEntityName: 'low',
+      legalEntityName: 'medium', // Now medium confidence since it's auto-filled
       industry: 'medium',
       employeeBand: 'medium',
       hqLocation: 'high',

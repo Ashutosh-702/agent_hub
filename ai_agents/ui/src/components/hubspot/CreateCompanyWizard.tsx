@@ -14,6 +14,9 @@ import { ConfidenceBadge } from './ui/Badge';
 
 type Step = 'input' | 'match' | 'enrich' | 'review' | 'done';
 
+// Fields that can be edited in review step
+type EditableField = 'companyName' | 'legalEntityName' | 'industry' | 'employeeBand' | 'hqLocation' | 'website';
+
 const STEPS = [
   { id: 'input', title: 'Input' },
   { id: 'match', title: 'Match' },
@@ -28,6 +31,21 @@ const initialDraft: CompanyDraft = {
   ownerEmail: '',
 };
 
+// Pencil Icon component
+const PencilIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    <path d="m15 5 4 4" />
+  </svg>
+);
+
+// Check Icon component
+const CheckIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
 export const CreateCompanyWizard = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -37,12 +55,29 @@ export const CreateCompanyWizard = () => {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<HubSpotCompany | null>(null);
   const [editableEnrichment, setEditableEnrichment] = useState<CompanyEnrichment | null>(null);
+  const [editingFields, setEditingFields] = useState<Set<EditableField>>(new Set());
 
   const completedSteps = STEPS.slice(0, STEPS.findIndex(s => s.id === currentStep)).map(s => s.id);
 
   const updateDraft = useCallback((updates: Partial<CompanyDraft>) => {
     setDraft(prev => ({ ...prev, ...updates }));
   }, []);
+
+  // Toggle edit mode for a specific field
+  const toggleEditField = (field: EditableField) => {
+    setEditingFields(prev => {
+      const next = new Set(prev);
+      if (next.has(field)) {
+        next.delete(field);
+      } else {
+        next.add(field);
+      }
+      return next;
+    });
+  };
+
+  // Check if a field is being edited
+  const isEditing = (field: EditableField) => editingFields.has(field);
 
   // Step 1: Input
   const handleInputSubmit = async () => {
@@ -118,13 +153,16 @@ export const CreateCompanyWizard = () => {
 
   // Step 4: Review & Create/Link
   const handleFinalSubmit = async () => {
+    // Legal Entity Name should be auto-filled from enrichment
+    // Only show error if it's somehow missing
     if (!editableEnrichment?.legalEntityName) {
-      setError('Legal Entity Name is required');
+      setError('Legal Entity Name is missing. Please click the edit button to add it.');
       return;
     }
 
     setIsLoading(true);
     setError(null);
+    setEditingFields(new Set()); // Clear all editing states
 
     try {
       let company: HubSpotCompany;
@@ -173,6 +211,7 @@ export const CreateCompanyWizard = () => {
     setResult(null);
     setEditableEnrichment(null);
     setError(null);
+    setEditingFields(new Set());
   };
 
   // Render Step Content
@@ -396,145 +435,142 @@ export const CreateCompanyWizard = () => {
         );
 
       case 'review':
+        // Reusable review field component
+        const ReviewField = ({
+          field,
+          label,
+          value,
+          confidence,
+          type = 'text',
+        }: {
+          field: EditableField;
+          label: string;
+          value: string;
+          confidence?: 'high' | 'medium' | 'low';
+          type?: string;
+        }) => {
+          const editing = isEditing(field);
+          
+          return (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <label style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>{label}</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {confidence && <ConfidenceBadge confidence={confidence} />}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input
+                  type={type}
+                  value={value}
+                  onChange={(e) => {
+                    if (editing) {
+                      setEditableEnrichment(prev => prev ? { ...prev, [field]: e.target.value } : null);
+                    }
+                  }}
+                  readOnly={!editing}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    border: `1px solid ${editing ? 'var(--color-primary)' : 'var(--color-gray-200)'}`,
+                    borderRadius: '8px',
+                    fontSize: '0.9375rem',
+                    background: editing ? 'var(--color-white)' : 'var(--color-gray-50)',
+                    color: 'var(--color-gray-800)',
+                    cursor: editing ? 'text' : 'default',
+                    transition: 'all 0.15s ease',
+                  }}
+                />
+                <button
+                  onClick={() => toggleEditField(field)}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: 'none',
+                    borderRadius: '8px',
+                    background: editing ? 'var(--color-success)' : 'var(--color-gray-100)',
+                    color: editing ? 'white' : 'var(--color-gray-500)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0,
+                  }}
+                  title={editing ? 'Save changes' : 'Edit field'}
+                  onMouseOver={(e) => {
+                    if (!editing) {
+                      e.currentTarget.style.background = 'var(--color-gray-200)';
+                      e.currentTarget.style.color = 'var(--color-primary)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!editing) {
+                      e.currentTarget.style.background = 'var(--color-gray-100)';
+                      e.currentTarget.style.color = 'var(--color-gray-500)';
+                    }
+                  }}
+                >
+                  {editing ? <CheckIcon /> : <PencilIcon />}
+                </button>
+              </div>
+            </div>
+          );
+        };
+
         return (
           <div style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             <Card padding="lg">
-              <h2 style={{ margin: '0 0 1.5rem 0', fontSize: '1.125rem', fontWeight: 700, color: 'var(--color-gray-900)' }}>
-                Review & Edit Company Data
+              <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.125rem', fontWeight: 700, color: 'var(--color-gray-900)' }}>
+                Review Company Data
               </h2>
+              <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.8125rem', color: 'var(--color-gray-500)' }}>
+                Click the pencil icon to edit any field if needed.
+              </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <label style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>Company Name</label>
-                    {editableEnrichment?.confidence?.companyName && (
-                      <ConfidenceBadge confidence={editableEnrichment.confidence.companyName} />
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={editableEnrichment?.companyName || ''}
-                    onChange={(e) => setEditableEnrichment(prev => prev ? { ...prev, companyName: e.target.value } : null)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid var(--color-gray-300)',
-                      borderRadius: '8px',
-                      fontSize: '0.9375rem',
-                    }}
-                  />
-                </div>
+                <ReviewField
+                  field="companyName"
+                  label="Company Name"
+                  value={editableEnrichment?.companyName || ''}
+                  confidence={editableEnrichment?.confidence?.companyName}
+                />
 
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <label style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>
-                      Legal Entity Name <span style={{ color: 'var(--color-error)' }}>*</span>
-                    </label>
-                    {editableEnrichment?.confidence?.legalEntityName && (
-                      <ConfidenceBadge confidence={editableEnrichment.confidence.legalEntityName} />
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={editableEnrichment?.legalEntityName || ''}
-                    onChange={(e) => setEditableEnrichment(prev => prev ? { ...prev, legalEntityName: e.target.value } : null)}
-                    placeholder="Enter legal entity name (required)"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: `1px solid ${!editableEnrichment?.legalEntityName ? 'var(--color-error)' : 'var(--color-gray-300)'}`,
-                      borderRadius: '8px',
-                      fontSize: '0.9375rem',
-                    }}
-                  />
-                  {!editableEnrichment?.legalEntityName && (
-                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--color-error)' }}>
-                      This field is required
-                    </p>
-                  )}
-                </div>
+                <ReviewField
+                  field="legalEntityName"
+                  label="Legal Entity Name"
+                  value={editableEnrichment?.legalEntityName || ''}
+                  confidence={editableEnrichment?.confidence?.legalEntityName}
+                />
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <label style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>Industry</label>
-                      {editableEnrichment?.confidence?.industry && (
-                        <ConfidenceBadge confidence={editableEnrichment.confidence.industry} />
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      value={editableEnrichment?.industry || ''}
-                      onChange={(e) => setEditableEnrichment(prev => prev ? { ...prev, industry: e.target.value } : null)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid var(--color-gray-300)',
-                        borderRadius: '8px',
-                        fontSize: '0.9375rem',
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <label style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>Employee Band</label>
-                      {editableEnrichment?.confidence?.employeeBand && (
-                        <ConfidenceBadge confidence={editableEnrichment.confidence.employeeBand} />
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      value={editableEnrichment?.employeeBand || ''}
-                      onChange={(e) => setEditableEnrichment(prev => prev ? { ...prev, employeeBand: e.target.value } : null)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid var(--color-gray-300)',
-                        borderRadius: '8px',
-                        fontSize: '0.9375rem',
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <label style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>HQ Location</label>
-                    {editableEnrichment?.confidence?.hqLocation && (
-                      <ConfidenceBadge confidence={editableEnrichment.confidence.hqLocation} />
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={editableEnrichment?.hqLocation || ''}
-                    onChange={(e) => setEditableEnrichment(prev => prev ? { ...prev, hqLocation: e.target.value } : null)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid var(--color-gray-300)',
-                      borderRadius: '8px',
-                      fontSize: '0.9375rem',
-                    }}
+                  <ReviewField
+                    field="industry"
+                    label="Industry"
+                    value={editableEnrichment?.industry || ''}
+                    confidence={editableEnrichment?.confidence?.industry}
+                  />
+                  <ReviewField
+                    field="employeeBand"
+                    label="Employee Band"
+                    value={editableEnrichment?.employeeBand || ''}
+                    confidence={editableEnrichment?.confidence?.employeeBand}
                   />
                 </div>
 
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <label style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>Website</label>
-                  </div>
-                  <input
-                    type="url"
-                    value={editableEnrichment?.website || ''}
-                    onChange={(e) => setEditableEnrichment(prev => prev ? { ...prev, website: e.target.value } : null)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid var(--color-gray-300)',
-                      borderRadius: '8px',
-                      fontSize: '0.9375rem',
-                    }}
-                  />
-                </div>
+                <ReviewField
+                  field="hqLocation"
+                  label="HQ Location"
+                  value={editableEnrichment?.hqLocation || ''}
+                  confidence={editableEnrichment?.confidence?.hqLocation}
+                />
+
+                <ReviewField
+                  field="website"
+                  label="Website"
+                  value={editableEnrichment?.website || ''}
+                  type="url"
+                />
               </div>
 
               {error && (
