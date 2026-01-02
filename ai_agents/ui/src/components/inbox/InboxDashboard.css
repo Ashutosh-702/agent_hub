@@ -81,14 +81,19 @@
 }
 
 .quick-action-btn--primary {
-  background: var(--text-primary);
-  color: white;
+  background: var(--bg-card);
+  color: var(--text-primary);
   border-color: var(--text-primary);
 }
 
 .quick-action-btn--primary:hover {
-  background: #1f2937;
+  background: #f9fafb;
   border-color: #1f2937;
+}
+
+.quick-action-btn--primary .quick-action-btn__badge {
+  background: var(--text-primary);
+  color: white;
 }
 
 .quick-action-btn--attention {
@@ -149,8 +154,9 @@
 }
 
 .period-selector__btn--active {
-  background: var(--text-primary);
-  color: white;
+  background: #f3f4f6;
+  color: var(--text-primary);
+  font-weight: 700;
 }
 
 /* Metrics Row */

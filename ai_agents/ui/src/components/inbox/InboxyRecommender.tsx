@@ -70,26 +70,21 @@ export const InboxyRecommender = ({ maxItems = 5 }: InboxyRecommenderProps) => {
         >
           <span
             style={{
-              fontSize: '0.8125rem',
+              fontSize: '0.9375rem',
               fontWeight: 600,
-              color: '#374151',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
+              color: '#111827',
             }}
           >
-            AI Insights
+            Inboxy
           </span>
           <span
             style={{
-              fontSize: '0.625rem',
-              fontWeight: 500,
-              padding: '0.125rem 0.375rem',
-              borderRadius: '3px',
-              background: '#f3f4f6',
+              fontSize: '0.75rem',
+              fontWeight: 400,
               color: '#6b7280',
             }}
           >
-            INBOXY
+            — AI Inbox Insights
           </span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -130,26 +125,21 @@ export const InboxyRecommender = ({ maxItems = 5 }: InboxyRecommenderProps) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span
             style={{
-              fontSize: '0.8125rem',
+              fontSize: '0.9375rem',
               fontWeight: 600,
-              color: '#374151',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
+              color: '#111827',
             }}
           >
-            AI Insights
+            Inboxy
           </span>
           <span
             style={{
-              fontSize: '0.625rem',
-              fontWeight: 500,
-              padding: '0.125rem 0.375rem',
-              borderRadius: '3px',
-              background: '#374151',
-              color: '#ffffff',
+              fontSize: '0.75rem',
+              fontWeight: 400,
+              color: '#6b7280',
             }}
           >
-            INBOXY
+            — AI Inbox Insights
           </span>
         </div>
         {recommendations.filter((r) => r.priority === 'high').length > 0 && (
