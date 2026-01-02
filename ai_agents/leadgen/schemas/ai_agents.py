@@ -64,6 +64,18 @@ class CreateCampaignFromProspectingJob(BaseModel):
     prospecting_cycle_status: Optional[str] = "prospecting"
     campaign_type: Optional[str] = None  # Type of campaign: wide_prospecting, import_csv, single_company, etc.
 
+
+class CreateCampaignFromSingleCompany(BaseModel):
+    """Schema for creating a campaign from a single company URL/domain"""
+    company_domain: str  # The domain to search for (e.g., 'fynd.com')
+    product_name: Optional[str] = None
+    hubspot_email: Optional[str] = None
+    business_team: Optional[str] = None
+    user_email: Optional[str] = None
+    campaign_type: Optional[str] = "single_company"
+    prospecting_cycle_status: Optional[str] = "prospecting"
+
+
 class ManualCompanyQualification(BaseModel):
     campaign_id: str
     company_ids: Optional[List[str]] = None

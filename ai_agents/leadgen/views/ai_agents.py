@@ -19,6 +19,7 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CompanyContacts,
     CampaignDetailsWithCompanies,
     CreateCampaignFromProspectingJob,
+    CreateCampaignFromSingleCompany,
     ManualCompanyQualification,
     AiCompanyQualification,
     ApolloContactList,
@@ -286,6 +287,23 @@ async def create_campaign_from_prospecting_job(query_params: CreateCampaignFromP
     }
 
     return response_data.dict()
+
+
+async def create_campaign_from_single_company(query_params: CreateCampaignFromSingleCompany = Body()) -> Dict[str, Any]:
+    """Create a campaign from a single company URL/domain and queue for Apollo search."""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_service = CampaignService()
+
+    response = await campaign_service.create_campaign_from_single_company(query_params)
+    response_data.success = True
+    response_data.data = {
+        "message": "Single company campaign created and queued for Apollo domain search",
+        "campaign_id": response.get("campaign_id"),
+        "request_id": response.get("request_id")
+    }
+
+    return response_data.dict()
+
 
 async def manual_company_qualification(query_params: ManualCompanyQualification = Body()) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)

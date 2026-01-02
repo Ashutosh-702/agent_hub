@@ -31,11 +31,12 @@ from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import(
     LEADGEN_BATCH_PROCESSING, 
     LEADGEN_PROSPECTING_JOB_PROCESSING,
+    LEADGEN_SINGLE_COMPANY_PROCESSING,
     KAFKA_SERVICE_CONFIG_MAPPING, 
     LeadgenServices
 )
 from integrations.lusha.lusha_api import LushaAPIClient
-from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob
+from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob, CreateCampaignFromSingleCompany
 
 
 class CampaignService:
@@ -44,6 +45,7 @@ class CampaignService:
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
         self.prospecting_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_PROSPECTING_JOB_PROCESSING]
+        self.single_company_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_SINGLE_COMPANY_PROCESSING]
 
     async def upload_leadgen_form(self, form_submission: FormSubmission) -> Dict[str, str]:
 
@@ -117,6 +119,186 @@ class CampaignService:
         return {
             "request_id": request_id,
             "campaign_id": str(campaign_id)
+        }
+
+    async def create_campaign_from_single_company(self, query_params: CreateCampaignFromSingleCompany) -> Dict[str, Any]:
+        """
+        Create a campaign from a single company URL/domain.
+        - If company already exists in DB (by identifiers.source_domain): use existing, skip Kafka
+        - Otherwise: create placeholder, emit Kafka for Apollo enrichment
+        """
+        # Initialize DAOs
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        
+        # Check if company already exists by domain
+        existing_company = await companies_dao.get_company_by_source_domain(query_params.company_domain)
+        
+        if existing_company:
+            # Company already exists - skip Kafka, create campaign and mapper directly
+            logger.info(f"✅ Company already exists for domain {query_params.company_domain}, skipping Apollo search")
+            
+            company_id = str(existing_company.get("_id"))
+            company_name = existing_company.get("identifiers", {}).get("name", "")
+            
+            # Create campaign with completed status
+            db_data = self._transform_single_company_to_db_data(query_params)
+            db_data["single_company"]["status"] = "completed"
+            db_data["single_company"]["company_id"] = company_id
+            db_data["single_company"]["company_name"] = company_name
+            db_data["prospecting_cycle"]["status"] = "company_qualification"  # Company is qualified, ready for contact fetching
+            db_data["lifecycle"]["status"] = "company_qualification"
+            
+            campaign_id = await self.campaign_dao.create_campaign(db_data)
+            if not campaign_id:
+                raise ApiException("campaign_id not generated")
+            
+            # Create campaign_company_run with is_relevant=true (already enriched)
+            campaign_company_run = {
+                "campaign_id": str(campaign_id),
+                "company_id": company_id,
+                "company_status": False,
+                "linkedin_contact_status": False,
+                "is_relevant": True,  # Already enriched, mark as relevant
+                "metadata": {
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                    "source": "single_company_flow",
+                    "enrichment_source": "existing_company"
+                }
+            }
+            await campaign_company_runs_dao.create_campaign_company_run(campaign_company_run)
+            
+            logger.info(f"✅ Campaign {campaign_id} created with existing company {company_id}")
+            
+            return {
+                "request_id": None,  # No Kafka event
+                "campaign_id": str(campaign_id),
+                "company_exists": True,
+                "company_id": company_id
+            }
+        
+        # Company doesn't exist - create placeholder and emit Kafka
+        # 1. Create campaign
+        db_data = self._transform_single_company_to_db_data(query_params)
+        campaign_id = await self.campaign_dao.create_campaign(db_data)
+
+        if not campaign_id:
+            raise ApiException("campaign_id not generated")
+
+        # 2. Create placeholder company with domain
+        company_data = {
+            "identifiers": {
+                "name": "",
+                "source_domain": query_params.company_domain,
+                "source_id": "",
+                "website_url": f"https://{query_params.company_domain}"
+            },
+            "source": "single_company_flow",
+            "webhook_sent": False,
+            "metadata": {
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+                "api_response": {}
+            },
+            "location": {
+                "name": "",
+                "type": ""
+            },
+            "profile": {
+                "employee_count": [],
+                "industry": [],
+                "revenue_max": "",
+                "revenue_min": ""
+            }
+        }
+        company_id = await companies_dao.create_company(company_data)
+        
+        # 3. Create campaign_company_run with is_relevant=false (will be set true after Apollo enrichment)
+        campaign_company_run = {
+            "campaign_id": str(campaign_id),
+            "company_id": str(company_id),
+            "company_status": False,
+            "linkedin_contact_status": False,
+            "is_relevant": False,  # Initially false, will be set true after Apollo enrichment
+            "metadata": {
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+                "source": "single_company_flow"
+            }
+        }
+        await campaign_company_runs_dao.create_campaign_company_run(campaign_company_run)
+
+        request_id = str(uuid.uuid4())
+
+        if not self.event_emitter:
+            raise ApiException("EventBridge Producer not initialized")
+
+        # 4. Emit Kafka event with only campaign_id (handler will fetch domain from campaign)
+        event = {
+            "request_id": request_id,
+            "action": "process_single_company",
+            "campaign_id": str(campaign_id),
+            "timestamp": asyncio.get_event_loop().time()
+        }
+
+        await emit_event_helper(
+            event_emitter=self.event_emitter,
+            topics=self.single_company_kafka_config["topics"],
+            partition_value=request_id,
+            event=event,
+            event_meta={"service": "leadgen", "campaign_id": str(campaign_id)}
+        )
+
+        logger.info(f"📤 Single Company Campaign ID {str(campaign_id)} queued for Apollo domain search: {request_id}")
+
+        return {
+            "request_id": request_id,
+            "campaign_id": str(campaign_id),
+            "company_exists": False
+        }
+
+    def _transform_single_company_to_db_data(self, query_params: CreateCampaignFromSingleCompany) -> Dict[str, Any]:
+        """Transform single company request to database format"""
+        return {
+            "prompts": {
+                "web": None,
+                "persona": None
+            },
+            "segmentation": {
+                "industry": [],
+                "keywords": None,
+                "categories": None
+            },
+            "target": {
+                "employee_count": [],
+                "revenue_min": None,
+                "revenue_max": None,
+                "currency": None,
+                "location": {
+                    "type": None,
+                    "names": []
+                }
+            },
+            "ownership": {
+                "hubspot_email": query_params.hubspot_email,
+                "product_name": query_params.product_name,
+                "business_team": query_params.business_team,
+                "user_email": query_params.user_email
+            },
+            "lifecycle": {"status": "active"},
+            "prospecting_cycle": {
+                "status": query_params.prospecting_cycle_status
+            },
+            "campaign_type": query_params.campaign_type,
+            "single_company": {
+                "domain": query_params.company_domain,
+                "status": "pending"  # pending -> processing -> completed -> failed
+            },
+            "metadata": {
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
         }
 
     def _transform_create_campaign_from_prospecting_job_to_db_data(self, query_params: CreateCampaignFromProspectingJob) -> Dict[str, Any]:

@@ -22,6 +22,7 @@ from ai_agents.leadgen.views.ai_agents import (
     get_campaign_details_with_companies,
     company_qualification_progress,
     create_campaign_from_prospecting_job,
+    create_campaign_from_single_company,
     manual_company_qualification,
     ai_company_qualification,
     get_apollo_contact_list,
@@ -169,6 +170,13 @@ router.add_api_route(
     "/create_campaign_from_prospecting_job",
     methods=["POST"],
     endpoint=create_campaign_from_prospecting_job,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/create_campaign_from_single_company",
+    methods=["POST"],
+    endpoint=create_campaign_from_single_company,
     response_model=ResponseData,
 )
 

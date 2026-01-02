@@ -36,6 +36,7 @@ export const Step3ContactQualification = () => {
 
   const campaignId = state.campaignId;
   const [isEnrichPolling, setIsEnrichPolling] = useState(false);
+  const [isWaitingForEnrichment, setIsWaitingForEnrichment] = useState(false); // true when user clicked Continue
   const [enrichApolloContactList] = useEnrichApolloContactListMutation();
   const [updateApolloContactEnrichmentStatus] = useUpdateApolloContactEnrichmentStatusMutation();
   const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
@@ -48,6 +49,45 @@ export const Step3ContactQualification = () => {
   const campaignCycleStatus = contactListData?.data?.campaign?.prospecting_cycle?.status;
   const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
   const apiContacts = contactListData?.data?.contacts || [];
+
+  // Auto-start polling if contacts are being fetched
+  // This handles the Single Company flow where get_apollo_contact_list was queued before entering this step
+  // Status will be 'company_qualification' (companies qualified, contacts being fetched)
+  // Once contacts are fetched, status becomes 'contact_qualification'
+  useEffect(() => {
+    if (!campaignId) return;
+    
+    // If status is company_qualification and we have no contacts, start polling
+    // (contacts are still being fetched from Apollo)
+    if (campaignCycleStatus === 'company_qualification' && apiContacts.length === 0 && !isEnrichPolling) {
+      setLoading(true, 'Fetching contacts from Apollo...');
+      setIsEnrichPolling(true);
+    }
+  }, [campaignId, campaignCycleStatus, apiContacts.length, isEnrichPolling, setLoading]);
+
+  // If we have contacts from API on load (step already completed), populate state
+  useEffect(() => {
+    if (apiContacts.length > 0 && state.qualifiedContacts.length === 0) {
+      const mapped = apiContacts.map((c) => ({
+        id: c.contact_id,
+        companyId: c.company_id,
+        companyName: c.contact_data?.company || undefined,
+        firstName: c.contact_data?.firstname || '',
+        lastName: c.contact_data?.lastname || '',
+        email: (c.contact_data?.email && c.contact_data.email[0]) || '',
+        phone: (c.contact_data?.phone && c.contact_data.phone[0]) || undefined,
+        jobTitle: c.contact_data?.jobtitle || '',
+        linkedinUrl: c.linkedin_data?.linkedin_url || undefined,
+        qualificationStatus: 'pending' as const,
+        syncStatus: 'not_synced' as const,
+        personalization: {
+          messageStatus: 'pending' as const,
+          deckStatus: 'pending' as const,
+        },
+      })) as Contact[];
+      setQualifiedContacts(mapped);
+    }
+  }, [apiContacts, state.qualifiedContacts.length, setQualifiedContacts]);
 
   const contacts = state.qualifiedContacts;
   const qualifiedCount = contacts.filter(c => c.qualificationStatus === 'qualified').length;
@@ -108,16 +148,19 @@ export const Step3ContactQualification = () => {
         await enrichApolloContactList({ campaign_id: campaignId, enrichment_status: true }).unwrap();
         setLoading(true, 'Enriching contacts from Apollo…');
         // 3) Start polling for contact_enriched
+        setIsWaitingForEnrichment(true); // Mark that we're waiting for enrichment, not initial fetch
         setIsEnrichPolling(true);
       } catch (e) {
         setLoading(false);
         setIsEnrichPolling(false);
+        setIsWaitingForEnrichment(false);
       }
     })();
   };
 
-  // Poll get_campaign_contact_list until prospecting_cycle.status is contact_enriched,
-  // then refresh contacts and advance to Step 4.
+  // Poll get_campaign_contact_list until contacts are available
+  // For initial fetch: wait for contact_qualification (contacts fetched from Apollo)
+  // For enrichment: wait for contact_enriched (contacts enriched)
   useEffect(() => {
     if (!campaignId || !isEnrichPolling) return;
 
@@ -128,7 +171,20 @@ export const Step3ContactQualification = () => {
       try {
         const first = await fetchCampaignContactList({ campaign_id: campaignId, page: 1, limit }).unwrap();
         const status = first?.data?.campaign?.prospecting_cycle?.status;
-        if (status !== 'contact_enriched') return;
+        const contactsAvailable = first?.data?.contacts && first.data.contacts.length > 0;
+        
+        // For initial contact fetch: wait for contact_qualification and contacts to be available
+        // For enrichment: wait for contact_enriched ONLY
+        const isContactsFetched = status === 'contact_qualification' && contactsAvailable;
+        const isContactsEnriched = status === 'contact_enriched';
+        
+        // If we're waiting for enrichment (user clicked Continue), only proceed when enriched
+        if (isWaitingForEnrichment) {
+          if (!isContactsEnriched) return; // Keep polling until enriched
+        } else {
+          // Initial fetch - proceed when either condition is met
+          if (!isContactsFetched && !isContactsEnriched) return;
+        }
 
         // Fetch all contacts pages once enriched
         let page = 1;
@@ -170,7 +226,13 @@ export const Step3ContactQualification = () => {
         setQualifiedContacts(mapped);
         setLoading(false);
         setIsEnrichPolling(false);
-        nextStep();
+        
+        // Only advance to next step if contacts are enriched (user clicked Continue)
+        // If just fetched (contact_qualification), stay on this page for user to qualify
+        if (isContactsEnriched) {
+          setIsWaitingForEnrichment(false);
+          nextStep();
+        }
       } catch (e) {
         // ignore transient errors during polling
       }

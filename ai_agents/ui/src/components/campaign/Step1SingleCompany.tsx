@@ -1,42 +1,108 @@
-import React, { useState } from 'react';
-import { useCampaignWizard, type Company, type Contact } from './NewCampaignWizard';
-
-// Generate mock contacts for the company with realistic data
-const generateMockContacts = (companyId: string, companyName: string): Contact[] => {
-  const contacts = [
-    { firstName: 'James', lastName: 'Anderson', title: 'Chief Executive Officer' },
-    { firstName: 'Sarah', lastName: 'Mitchell', title: 'Chief Technology Officer' },
-    { firstName: 'Michael', lastName: 'Chen', title: 'VP of Sales' },
-    { firstName: 'Emily', lastName: 'Rodriguez', title: 'Head of Marketing' },
-    { firstName: 'David', lastName: 'Thompson', title: 'Director of Operations' },
-    { firstName: 'Jennifer', lastName: 'Patel', title: 'Chief Financial Officer' },
-    { firstName: 'Robert', lastName: 'Kim', title: 'VP of Engineering' },
-    { firstName: 'Lisa', lastName: 'Wang', title: 'Head of Product' },
-  ];
-  
-  const numContacts = Math.floor(Math.random() * 4) + 4; // 4-7 contacts
-  const domain = companyName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-  
-  return contacts.slice(0, numContacts).map((contact, i) => ({
-    id: `${companyId}-contact-${i + 1}`,
-    companyId,
-    firstName: contact.firstName,
-    lastName: contact.lastName,
-    email: `${contact.firstName.toLowerCase()}.${contact.lastName.toLowerCase()}@${domain}.com`,
-    phone: `+1-${['415', '650', '408', '510', '925'][Math.floor(Math.random() * 5)]}-${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-    jobTitle: contact.title,
-    linkedinUrl: `https://linkedin.com/in/${contact.firstName.toLowerCase()}${contact.lastName.toLowerCase()}${Math.floor(Math.random() * 100)}`,
-    isSynced: false,
-  }));
-};
+import React, { useState, useEffect } from 'react';
+import { useCampaignWizard, type Company } from './NewCampaignWizard';
+import {
+  useCreateCampaignFromSingleCompanyMutation,
+  useGetCampaignDetailsQuery,
+  useGetApolloContactListMutation,
+} from '../../store';
 
 export const Step1SingleCompany: React.FC = () => {
-  const { setQualifiedCompanies, nextStep, setLoading } = useCampaignWizard();
+  const { state, setCampaignId, setQualifiedCompanies, nextStep, setLoading } = useCampaignWizard();
+  const [createCampaignFromSingleCompany, { isLoading: isCreating }] = useCreateCampaignFromSingleCompanyMutation();
+  const [getApolloContactList] = useGetApolloContactListMutation();
   
   const [companyUrl, setCompanyUrl] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [companyInfo, setCompanyInfo] = useState<Company | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+
+  // Polling for campaign status
+  const { data: campaignDetailsData } = useGetCampaignDetailsQuery(
+    createdCampaignId
+      ? { campaign_id: createdCampaignId, page: 1, limit: 1 }
+      : { campaign_id: '', page: 1, limit: 1 },
+    {
+      skip: !createdCampaignId || !isPolling,
+      pollingInterval: createdCampaignId && isPolling ? 2000 : 0,
+    }
+  );
+
+  // Effect to handle polling result
+  useEffect(() => {
+    if (!createdCampaignId || !isPolling) return;
+
+    const campaign = campaignDetailsData?.data?.campaign;
+    const singleCompanyStatus = campaign?.single_company?.status;
+    const prospectingCycleStatus = campaign?.prospecting_cycle?.status;
+
+    // Check if single company search is completed
+    if (singleCompanyStatus === 'completed' || prospectingCycleStatus === 'contact_qualification') {
+      setIsPolling(false);
+      setLoading(false);
+      setIsValidating(false);
+
+      // Get company data from campaign
+      const companies = campaignDetailsData?.data?.companies || [];
+      if (companies.length > 0) {
+        const companyData = companies[0];
+        // Support both new format (company.identifiers) and legacy format (company_details)
+        const companyDoc = companyData.company || {};
+        const identifiers = companyDoc.identifiers || {};
+        const profile = companyDoc.profile || {};
+        const location = companyDoc.location || {};
+        
+        // Transform to Company type
+        const company: Company = {
+          id: companyData.company_id || companyData._id,
+          name: identifiers.name || campaign?.single_company?.company_name || 'Unknown Company',
+          website: identifiers.website_url || `https://${identifiers.source_domain || campaign?.single_company?.domain || companyUrl}`,
+          industry: Array.isArray(profile.industry) ? profile.industry.join(', ') : String(profile.industry || ''),
+          employeeCount: Array.isArray(profile.employee_count) ? profile.employee_count.join(', ') : (profile.employee_count ? String(profile.employee_count) : 'Unknown'),
+          revenue: profile.revenue_max ? `$${profile.revenue_min || '0'}M - $${profile.revenue_max}M` : 'Unknown',
+          location: location.name || 'Unknown',
+          linkedinUrl: (companyDoc.metadata?.api_response?.linkedin_url as string) || '',
+          isQualified: true,
+          qualificationStatus: 'qualified' as const,
+          contacts: [],
+          syncStatus: 'not_synced' as const,
+          personalization: {
+            messageStatus: 'pending' as const,
+            deckStatus: 'pending' as const,
+          },
+        };
+        
+        setCompanyInfo(company);
+      } else {
+        // Use data from campaign single_company field
+        const company: Company = {
+          id: 'single-company-1',
+          name: campaign?.single_company?.company_name || 'Company',
+          website: `https://${campaign?.single_company?.domain || companyUrl}`,
+          industry: '',
+          employeeCount: 'Unknown',
+          revenue: 'Unknown',
+          location: 'Unknown',
+          linkedinUrl: '',
+          isQualified: true,
+          qualificationStatus: 'qualified' as const,
+          contacts: [],
+          syncStatus: 'not_synced' as const,
+          personalization: {
+            messageStatus: 'pending' as const,
+            deckStatus: 'pending' as const,
+          },
+        };
+        setCompanyInfo(company);
+      }
+    } else if (singleCompanyStatus === 'failed' || singleCompanyStatus === 'not_found') {
+      setIsPolling(false);
+      setLoading(false);
+      setIsValidating(false);
+      setError(campaign?.single_company?.error || 'Failed to find company. Please try a different URL.');
+    }
+  }, [campaignDetailsData, createdCampaignId, isPolling, setLoading, companyUrl]);
 
   const extractDomain = (url: string): string => {
     try {
@@ -55,65 +121,90 @@ export const Step1SingleCompany: React.FC = () => {
 
     setIsValidating(true);
     setError(null);
-    setLoading(true, 'Fetching company information...', 0);
+    setLoading(true, 'Creating campaign & searching for company...', 0);
 
-    // Simulate API call to validate and fetch company info
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const domain = extractDomain(companyUrl);
+      
+      // Use products selected in ProductSelection step
+      const productNames = state.selectedProducts.join(',');
 
-    const domain = extractDomain(companyUrl);
-    const domainName = domain.split('.')[0];
-    const companyName = domainName.charAt(0).toUpperCase() + domainName.slice(1);
+      const payload = {
+        company_domain: domain,
+        product_name: productNames,
+        campaign_type: 'single_company',
+        prospecting_cycle_status: 'prospecting',
+      };
 
-    // Known company data for common domains
-    const knownCompanies: Record<string, Partial<Company>> = {
-      salesforce: { name: 'Salesforce', industry: 'Enterprise Software', employeeCount: '50000+', revenue: '$30B+', location: 'San Francisco, USA' },
-      hubspot: { name: 'HubSpot', industry: 'Marketing Software', employeeCount: '5001-10000', revenue: '$1B+', location: 'Boston, USA' },
-      stripe: { name: 'Stripe', industry: 'FinTech', employeeCount: '5001-10000', revenue: '$10B+', location: 'San Francisco, USA' },
-      shopify: { name: 'Shopify', industry: 'E-commerce Platform', employeeCount: '10000+', revenue: '$5B+', location: 'Ottawa, Canada' },
-      notion: { name: 'Notion', industry: 'Productivity Software', employeeCount: '501-1000', revenue: '$250M+', location: 'San Francisco, USA' },
-      figma: { name: 'Figma', industry: 'Design Software', employeeCount: '1001-5000', revenue: '$500M+', location: 'San Francisco, USA' },
-      slack: { name: 'Slack', industry: 'Collaboration Software', employeeCount: '1001-5000', revenue: '$1B+', location: 'San Francisco, USA' },
-      zoom: { name: 'Zoom', industry: 'Video Communications', employeeCount: '5001-10000', revenue: '$4B+', location: 'San Jose, USA' },
-    };
+      const res = await createCampaignFromSingleCompany(payload).unwrap();
+      const newCampaignId = res?.data?.campaign_id;
+      const companyExists = res?.data?.company_exists;
+      
+      if (!newCampaignId) {
+        throw new Error('campaign_id missing in response');
+      }
 
-    const known = knownCompanies[domainName.toLowerCase()];
-    
-    // Mock company data
-    const company: Company = {
-      id: 'single-company-1',
-      name: known?.name || companyName,
-      website: companyUrl.startsWith('http') ? companyUrl : `https://${companyUrl}`,
-      industry: known?.industry || ['Technology', 'Software', 'E-commerce', 'Healthcare', 'Finance'][Math.floor(Math.random() * 5)],
-      employeeCount: known?.employeeCount || ['51-200', '201-500', '501-1000', '1001-5000'][Math.floor(Math.random() * 4)],
-      revenue: known?.revenue || ['$5M - $10M', '$10M - $25M', '$25M - $50M', '$50M - $100M'][Math.floor(Math.random() * 4)],
-      location: known?.location || ['San Francisco, USA', 'New York, USA', 'London, UK', 'Berlin, Germany', 'Bangalore, India'][Math.floor(Math.random() * 5)],
-      linkedinUrl: `https://linkedin.com/company/${domainName}`,
-      isQualified: true, // Already qualified for single company flow
-      qualificationStatus: 'qualified' as const,
-      contacts: generateMockContacts('single-company-1', known?.name || companyName),
-      syncStatus: 'not_synced' as const,
-      personalization: {
-        messageStatus: 'pending' as const,
-        deckStatus: 'pending' as const,
-      },
-    };
-
-    setCompanyInfo(company);
-    setIsValidating(false);
-    setLoading(false);
+      setCreatedCampaignId(newCampaignId);
+      setCampaignId(newCampaignId);
+      
+      if (companyExists) {
+        // Company already exists in DB - no need to poll, status is already contact_qualification
+        setLoading(true, 'Company found in database! Loading details...');
+        setIsPolling(true); // Still poll once to get company details
+      } else {
+        // New company - need to wait for Apollo search
+        setIsPolling(true);
+        setLoading(true, 'Searching Apollo for company... Please wait...');
+      }
+    } catch (e: unknown) {
+      console.error(e);
+      const errorMessage = e instanceof Error ? e.message : 'Failed to create campaign';
+      setError(errorMessage);
+      setLoading(false);
+      setIsValidating(false);
+    }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!companyInfo) return;
-    setQualifiedCompanies([companyInfo]);
-    nextStep();
+    
+    const campaignId = createdCampaignId || state.campaignId;
+    if (!campaignId) {
+      setError('Campaign ID not found');
+      return;
+    }
+    
+    try {
+      setLoading(true, 'Queueing contact fetch from Apollo...');
+      
+      // Call Apollo contact LIST API (queues contact fetching from Apollo)
+      // This is the same as wide prospecting flow - NOT the enrich API
+      // NOTE: This just queues the job - contacts will be fetched async via Kafka
+      await getApolloContactList({
+        campaign_id: campaignId,
+        enrichment_status: false, // false = just fetch contacts, not enrich
+      }).unwrap();
+      
+      setQualifiedCompanies([companyInfo]);
+      // DON'T clear loading here - Step 3 (Contact Qualification) will poll and show loader
+      // until contacts are actually fetched
+      nextStep();
+    } catch (e) {
+      console.error('Failed to queue contact fetch:', e);
+      setError('Failed to fetch contacts. Please try again.');
+      setLoading(false);
+    }
   };
 
   const handleClear = () => {
     setCompanyUrl('');
     setCompanyInfo(null);
     setError(null);
+    setCreatedCampaignId(null);
+    setIsPolling(false);
   };
+
+  const isProcessing = isValidating || isCreating || isPolling;
 
   return (
     <div className="step-container step-single-company">
@@ -121,6 +212,21 @@ export const Step1SingleCompany: React.FC = () => {
         <h2>Single Company URL</h2>
         <p>Enter the company URL to fetch information and contacts directly</p>
       </div>
+
+      {/* Loading Overlay */}
+      {(state.isLoading || isProcessing) && (
+        <div className="loading-overlay">
+          <div className="loading-card">
+            <div className="loading-animation">
+              <div className="spinner large" />
+            </div>
+            <h3>{state.loadingMessage || 'Processing...'}</h3>
+            {createdCampaignId && (
+              <p style={{ marginTop: 8, opacity: 0.85 }}>Campaign ID: {createdCampaignId}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* URL Input */}
       <div className="single-company-input">
@@ -140,8 +246,8 @@ export const Step1SingleCompany: React.FC = () => {
               placeholder="e.g., acme.com or https://acme.com"
               value={companyUrl}
               onChange={(e) => setCompanyUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleValidateCompany()}
-              disabled={isValidating || !!companyInfo}
+              onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleValidateCompany()}
+              disabled={isProcessing || !!companyInfo}
             />
             {companyInfo && (
               <button className="clear-input-btn" onClick={handleClear}>
@@ -155,26 +261,17 @@ export const Step1SingleCompany: React.FC = () => {
           {error && <span className="input-error">{error}</span>}
         </div>
 
-        {!companyInfo && (
+        {!companyInfo && !isProcessing && (
           <button
             className="btn-primary validate-btn"
             onClick={handleValidateCompany}
-            disabled={isValidating || !companyUrl.trim()}
+            disabled={isProcessing || !companyUrl.trim()}
           >
-            {isValidating ? (
-              <>
-                <span className="spinner-small" />
-                Validating...
-              </>
-            ) : (
-              <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                Fetch Company
-              </>
-            )}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Fetch Company
           </button>
         )}
       </div>
@@ -209,7 +306,7 @@ export const Step1SingleCompany: React.FC = () => {
           <div className="company-details-grid">
             <div className="detail-item">
               <span className="detail-label">Industry</span>
-              <span className="detail-value">{companyInfo.industry}</span>
+              <span className="detail-value">{companyInfo.industry || 'Unknown'}</span>
             </div>
             <div className="detail-item">
               <span className="detail-label">Employees</span>
@@ -225,26 +322,18 @@ export const Step1SingleCompany: React.FC = () => {
             </div>
           </div>
 
-          <div className="company-contacts-preview">
-            <h4>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-              </svg>
-              {companyInfo.contacts.length} Contacts Found
-            </h4>
-            <div className="contacts-preview-list">
-              {companyInfo.contacts.slice(0, 3).map((contact) => (
-                <div key={contact.id} className="contact-preview-item">
-                  <span className="contact-name">{contact.firstName} {contact.lastName}</span>
-                  <span className="contact-title">{contact.jobTitle}</span>
-                </div>
-              ))}
-              {companyInfo.contacts.length > 3 && (
-                <span className="more-contacts">+{companyInfo.contacts.length - 3} more</span>
-              )}
+          {companyInfo.linkedinUrl && (
+            <div className="company-linkedin">
+              <a href={companyInfo.linkedinUrl} target="_blank" rel="noopener noreferrer">
+                View on LinkedIn
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -257,7 +346,7 @@ export const Step1SingleCompany: React.FC = () => {
         </svg>
         <p>
           <strong>Single Company Flow:</strong> This company will skip the Company Qualification step 
-          and proceed directly to Contact Qualification after enrichment.
+          and proceed directly to Contact Qualification.
         </p>
       </div>
 
@@ -266,9 +355,9 @@ export const Step1SingleCompany: React.FC = () => {
         <button
           className="btn-primary btn-large"
           onClick={handleContinue}
-          disabled={!companyInfo}
+          disabled={!companyInfo || isProcessing}
         >
-          Continue to Enrichment
+          Continue to Contact Qualification
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="5" y1="12" x2="19" y2="12"/>
             <polyline points="12 5 19 12 12 19"/>
@@ -280,4 +369,3 @@ export const Step1SingleCompany: React.FC = () => {
 };
 
 export default Step1SingleCompany;
-

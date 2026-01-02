@@ -37,6 +37,14 @@ export interface Campaign {
   prospecting_cycle?: {
     status: string;
   };
+  single_company?: {
+    domain?: string;
+    status?: 'pending' | 'processing' | 'completed' | 'failed' | 'not_found';
+    company_id?: string;
+    company_name?: string;
+    error?: string;
+  };
+  campaign_type?: string;
   metadata: {
     created_at: string;
     updated_at: string;
@@ -137,6 +145,26 @@ export interface CreateCampaignFromProspectingJobResponse {
   errors?: string[];
 }
 
+// Single Company Campaign
+export interface CreateCampaignFromSingleCompanyPayload {
+  company_domain: string;
+  product_name?: string;
+  campaign_type?: string;
+  prospecting_cycle_status?: string;
+}
+
+export interface CreateCampaignFromSingleCompanyResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+    campaign_id?: string;
+    request_id?: string | null;
+    company_exists?: boolean;
+    company_id?: string;
+  };
+  errors?: string[];
+}
+
 // Campaign Details with Companies
 export interface CampaignCompany {
   _id: string;
@@ -150,7 +178,9 @@ export interface CampaignCompany {
     identifiers?: {
       name?: string;
       domain?: string;
+      source_domain?: string;
       source_id?: string;
+      website_url?: string;
     };
     profile?: {
       industry?: string | string[];
@@ -159,10 +189,34 @@ export interface CampaignCompany {
       revenue_max?: string;
     };
     location?: {
+      name?: string;
       type?: string;
-      name?: string | string[];
     };
     source?: string;
+    metadata?: {
+      created_at?: string;
+      updated_at?: string;
+      api_response?: Record<string, unknown>;
+    };
+  };
+  // Company details from Apollo domain search (for single company flow)
+  company_details?: {
+    name?: string;
+    website_url?: string;
+    primary_domain?: string;
+    linkedin_url?: string;
+    phone?: string;
+    industry?: string;
+    employee_count?: number;
+    revenue?: number;
+    revenue_printed?: string;
+    logo_url?: string;
+    location?: {
+      city?: string;
+      state?: string;
+      country?: string;
+    };
+    apollo_id?: string;
   };
   metadata: {
     created_at: string;
@@ -394,6 +448,18 @@ export const campaignApi = baseApi.injectEndpoints({
     >({
       query: (payload) => ({
         url: '/api/v1/create_campaign_from_prospecting_job',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Campaign'],
+    }),
+
+    createCampaignFromSingleCompany: builder.mutation<
+      CreateCampaignFromSingleCompanyResponse,
+      CreateCampaignFromSingleCompanyPayload
+    >({
+      query: (payload) => ({
+        url: '/api/v1/create_campaign_from_single_company',
         method: 'POST',
         body: payload,
       }),
@@ -784,6 +850,7 @@ export const {
   useGetProspectingCampaignsQuery,
   useCreateCampaignMutation,
   useCreateCampaignFromProspectingJobMutation,
+  useCreateCampaignFromSingleCompanyMutation,
   useGetCampaignDetailsQuery,
   useLazyGetCampaignDetailsQuery,
   useManualCompanyQualificationMutation,

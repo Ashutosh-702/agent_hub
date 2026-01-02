@@ -21,6 +21,26 @@ class CompaniesDao(BaseMongoDao):
     async def get_company(self, company_id: str):
         return await self.find_one({"_id": ObjectId(company_id)})
 
+    async def get_company_by_domain(self, domain: str):
+        """Get a company by its domain (checks identifiers.source_domain first, then primary_domain)."""
+        # Try to find by identifiers.source_domain (new format)
+        company = await self.find_one({"identifiers.source_domain": domain})
+        if company:
+            return company
+        
+        # Try to find by primary_domain field (legacy format)
+        company = await self.find_one({"primary_domain": domain})
+        if company:
+            return company
+        
+        # Also try website_url containing the domain
+        company = await self.find_one({"website_url": {"$regex": domain, "$options": "i"}})
+        return company
+    
+    async def get_company_by_source_domain(self, source_domain: str):
+        """Get a company by identifiers.source_domain field."""
+        return await self.find_one({"identifiers.source_domain": source_domain})
+
     async def get_company_by_filters(self, filters: dict = None):
         if filters is None:
             filters = {}

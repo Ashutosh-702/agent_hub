@@ -200,11 +200,12 @@ const getStepsForType = (
       break;
 
     case 'single_company':
-      // Single company skips company qualification entirely
+      // Single company skips both enrichment AND company qualification
+      // Company data comes from Apollo domain search, then goes directly to Contact Qualification
       steps = [
         { id: 'company-input', stepNumber: 1, title: 'Company Input', component: Step1SingleCompany },
-        enrichmentStep,
-        // Skip company qualification for single company
+        // No enrichment step - company data from Apollo
+        // No company qualification - already qualified by user selecting the URL
         ...commonStepsAfterQualification,
       ];
       break;

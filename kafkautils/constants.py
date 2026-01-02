@@ -7,6 +7,7 @@ class LeadgenServices:
 # Topic names
 LEADGEN_BATCH_PROCESSING = "leadgen-batch-processing"
 LEADGEN_PROSPECTING_JOB_PROCESSING = "leadgen-prospecting-job-processing"
+LEADGEN_SINGLE_COMPANY_PROCESSING = "leadgen-single-company-processing"
 LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING = "leadgen-company-qualification-ai-processing"
 LEADGEN_APOLLO_CONTACT_LIST_PROCESSING = "leadgen-apollo-contact-list-processing"
 LEADGEN_HUBSPOT_SYNC_PROCESSING = "leadgen-hubspot-sync-processing"
@@ -22,6 +23,10 @@ KAFKA_SERVICE_CONFIG_MAPPING = {
         LEADGEN_PROSPECTING_JOB_PROCESSING: {
             "topics": ["leadgen_prospecting_job_processing"],  # Use underscores to match EventBridge output
             "description": "Process prospecting job requests"
+        },
+        LEADGEN_SINGLE_COMPANY_PROCESSING: {
+            "topics": ["leadgen_single_company_processing"],  # Use underscores to match EventBridge output
+            "description": "Process single company URL campaign - search by domain via Apollo"
         },
         LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING: {
             "topics": ["leadgen_company_qualification_ai_processing"],  # Use underscores to match EventBridge output

@@ -398,6 +398,62 @@ class ApolloAPIClient:
             response_data['error'] = error_text
             return response_data
 
+    async def apollo_company_search_by_domain_api(
+        self,
+        domain: str
+    ) -> Dict[str, Any]:
+        """
+        Search for companies by domain using Apollo API
+        Args:
+            domain: Domain of the organization to search for (e.g., 'fynd.com')
+        Returns: Response data with status code and results
+        """
+        bind_contextvars(
+            operation="apollo_company_search_by_domain",
+            component="apollo_api_client",
+            event_type="apollo_company_search_by_domain"
+        )
+        logger.info(f"Searching for company by domain: {domain}")
+
+        # Build URL with domain in query params array format
+        # Apollo expects: q_organization_domains_list[]=domain.com
+        url = f"{APOLLO_BASE_URL}/mixed_companies/search?q_organization_domains_list[]={domain}"
+
+        response = await self.http_session.post(
+            url,
+            headers=self.headers,
+            timeout=self.timeout
+        )
+
+        result = await response.json()
+        response_data = {
+            'status_code': response.status
+        }
+
+        if response.status == 200:
+            response_data['results'] = result
+            # Extract organization data if available
+            organizations = result.get('organizations', [])
+            if organizations:
+                response_data['organization'] = organizations[0]
+                logger.info(f"Found company: {organizations[0].get('name', 'Unknown')}")
+            else:
+                logger.warning(f"No company found for domain: {domain}")
+            return response_data
+
+        elif response.status == 429:
+            # Rate limit hit
+            response_headers = dict(response.headers)
+            response_data['rate_limit_info'] = response_headers
+            logger.warning(f"Rate limit exhausted: {response.status}")
+            return response_data
+
+        else:
+            error_text = await response.text()
+            logger.warning(f"Company search by domain API failed: {response.status} - {error_text}")
+            response_data['error'] = error_text
+            return response_data
+
     async def apollo_people_search_api(self) -> Dict[str, Any]:
         """
         Search for people using Apollo API
