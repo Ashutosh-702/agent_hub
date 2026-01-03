@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
 import type { CampaignType } from '../components/campaign';
 
 export interface WizardProgress {
@@ -31,24 +31,26 @@ export const SidebarProvider = ({ children }: { children: ReactNode }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [wizardProgress, setWizardProgressState] = useState<WizardProgress>(defaultWizardProgress);
 
-  const toggleSidebar = () => setIsCollapsed(prev => !prev);
+  const toggleSidebar = useCallback(() => setIsCollapsed(prev => !prev), []);
 
-  const setWizardProgress = (progress: WizardProgress) => {
+  const setWizardProgress = useCallback((progress: WizardProgress) => {
     setWizardProgressState(progress);
-  };
+  }, []);
 
-  const clearWizardProgress = () => {
+  const clearWizardProgress = useCallback(() => {
     setWizardProgressState(defaultWizardProgress);
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    isCollapsed,
+    toggleSidebar,
+    wizardProgress,
+    setWizardProgress,
+    clearWizardProgress,
+  }), [isCollapsed, toggleSidebar, wizardProgress, setWizardProgress, clearWizardProgress]);
 
   return (
-    <SidebarContext.Provider value={{ 
-      isCollapsed, 
-      toggleSidebar, 
-      wizardProgress, 
-      setWizardProgress,
-      clearWizardProgress,
-    }}>
+    <SidebarContext.Provider value={value}>
       {children}
     </SidebarContext.Provider>
   );

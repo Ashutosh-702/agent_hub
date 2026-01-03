@@ -168,6 +168,6 @@ const dynamicBaseQuery: typeof realBaseQuery = async (args, api, extraOptions) =
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: dynamicBaseQuery,
-  tagTypes: ['Campaign', 'Company', 'Contact'],
+  tagTypes: ['Campaign', 'Company', 'Contact', 'Meetings'],
   endpoints: () => ({}),
 });

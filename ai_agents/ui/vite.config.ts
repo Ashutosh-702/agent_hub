@@ -7,5 +7,24 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 80,
+    // Configure HMR WebSocket explicitly for port 80
+    hmr: {
+      host: 'localhost',
+      port: 80,
+      protocol: 'ws',
+    },
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/ws': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        secure: false,
+        ws: true, // Enable WebSocket proxying
+      },
+    },
   },
 })

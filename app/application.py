@@ -64,9 +64,21 @@ def get_app() -> FastAPI:
 
     agent_app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "https://ai-sdr.tmsz0.de"],
+        allow_origins=[
+            "http://localhost",
+            "http://localhost:80",
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://localhost:8080",
+            "http://127.0.0.1",
+            "http://127.0.0.1:80",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:8080",
+            "https://ai-sdr.tmsz0.de",
+        ],
+        allow_credentials=True,
         allow_methods=["*"],
-        allow_headers=["*"]
+        allow_headers=["*"],
     )
 
     agent_app.include_router(api_router)

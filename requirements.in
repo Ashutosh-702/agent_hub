@@ -31,3 +31,7 @@ starlette==0.49.1
 # eventbridge @ git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/fynd-event-bridge@bump_reqs_v2.1.0-alpha.4#egg=eventbridge
 # Additional dependencies for production
 chronos_client@git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/chronos-client@v2.1.5-alpha2#egg=chronos_client
+
+# Client Calls / Meetings Dependencies
+deepgram-sdk>=3.0.0
+websockets>=12.0

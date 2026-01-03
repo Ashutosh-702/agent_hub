@@ -135,7 +135,7 @@ async def run_orchestrated(config: OrchestratedConfig):
 def get_env_config():
     """Return environment configuration as JavaScript"""
     config = {
-        "AGENTHUB_MAIN_DOMAIN": os.getenv("AGENTHUB_MAIN_DOMAIN", "http://0.0.0.0:80"),
+        "AGENTHUB_MAIN_DOMAIN": os.getenv("AGENTHUB_MAIN_DOMAIN", "http://0.0.0.0:8080"),
         "ENVIRONMENT": os.getenv("ENVIRONMENT", "development"),
         "VERSION": "2.0.0",
         "FEATURES": {

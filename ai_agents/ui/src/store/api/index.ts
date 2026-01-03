@@ -73,3 +73,35 @@ export type {
   Pagination,
 } from './companyApi';
 
+// Meetings API
+export {
+  meetingsApi,
+  useCreateMeetingMutation,
+  useGetMeetingsQuery,
+  useGetCompletedMeetingsQuery,
+  useGetMeetingsByCompanyQuery,
+  useGetMeetingQuery,
+  useGetMeetingByUuidQuery,
+  useUpdateMeetingMutation,
+  useDeleteMeetingMutation,
+  useStartMeetingMutation,
+  useGenerateBattlecardMutation,
+  useGetBattlecardQuery,
+  useGenerateReflectionsMutation,
+  useGetReflectionsQuery,
+  useUpdateManualReflectionsMutation,
+} from './meetingsApi';
+export type {
+  Meeting,
+  TranscriptEntry,
+  LiveInsight,
+  ActionItem,
+  Battlecard,
+  AIReflections,
+  ManualReflections,
+  MeetingReflections,
+  CreateMeetingRequest,
+  UpdateMeetingRequest,
+  UpdateManualReflectionsRequest,
+  GetMeetingsParams,
+} from './meetingsApi';

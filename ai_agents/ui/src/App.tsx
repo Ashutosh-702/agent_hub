@@ -12,6 +12,19 @@ import { ProspectingCampaigns } from './components/ProspectingCampaigns';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { HubSpotLayout, CreateCompanyWizard, CreateContactWizard, CreateDealWizard } from './components/hubspot';
 import { InboxDashboard, InboxPage } from './components/inbox';
+import { 
+  ClientCallsPage, 
+  StartMeetingForm, 
+  LiveMeetingScreen, 
+  PostCallSummary,
+  PrepMeetingForm, 
+  BattlecardView, 
+  PostCallReflections,
+  ReflectionsView,
+  PhoneCallPage,
+  StartPhoneCallForm,
+  LogPhoneCallForm,
+} from './components/clientCalls';
 
 function AppContent() {
   const { isCollapsed } = useSidebar();
@@ -26,6 +39,19 @@ function AppContent() {
             <Route path="/inbox" element={<InboxDashboard />} />
             <Route path="/inbox/messages" element={<InboxPage />} />
             <Route path="/inbox/messages/:leadId" element={<InboxPage />} />
+            {/* Client Calls - Live Meeting & Battlecard Prep */}
+            <Route path="/client-calls" element={<ClientCallsPage />} />
+            <Route path="/client-calls/start" element={<StartMeetingForm />} />
+            <Route path="/client-calls/live/:meetingId" element={<LiveMeetingScreen />} />
+            <Route path="/client-calls/summary/:meetingId" element={<PostCallSummary />} />
+            <Route path="/client-calls/prep" element={<PrepMeetingForm />} />
+            <Route path="/client-calls/battlecard/:battlecardId" element={<BattlecardView />} />
+            <Route path="/client-calls/reflections" element={<PostCallReflections />} />
+            <Route path="/client-calls/reflections/:meetingId" element={<ReflectionsView />} />
+            {/* Phone Call Routes */}
+            <Route path="/client-calls/phone" element={<PhoneCallPage />} />
+            <Route path="/client-calls/phone/start" element={<StartPhoneCallForm />} />
+            <Route path="/client-calls/phone/log" element={<LogPhoneCallForm />} />
             {/* Campaign - Top level section */}
             <Route path="/campaign" element={<CampaignList />} />
             <Route path="/campaign/new" element={<NewCampaignWizard />} />

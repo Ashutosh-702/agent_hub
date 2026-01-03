@@ -10,9 +10,9 @@ export const getApiBaseUrl = () => {
 		return window.AGENTHUB_MAIN_DOMAIN;
 	}
 
-	// Third priority: Build-time environment variable
-	if (process.env.AGENTHUB_MAIN_DOMAIN) {
-		return process.env.AGENTHUB_MAIN_DOMAIN;
+	// Third priority: Build-time environment variable (Vite uses import.meta.env)
+	if (import.meta.env.VITE_AGENTHUB_MAIN_DOMAIN) {
+		return import.meta.env.VITE_AGENTHUB_MAIN_DOMAIN;
 	}
 
 	// Fallback: If we're on a deployed site (not localhost), use same origin
@@ -22,8 +22,8 @@ export const getApiBaseUrl = () => {
 		return window.location.origin;
 	}
 
-	// Local development fallback
-	return 'http://0.0.0.0:80';
+	// Local development: Return empty string so relative URLs work with Vite proxy
+	return '';
 };
 
 export const initializeConfig = async () => {

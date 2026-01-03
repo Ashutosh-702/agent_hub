@@ -13,8 +13,8 @@ import * as mockApi from './mockInboxApi';
 const API_BASE = '/api/v1/inbox';
 
 // Check if we should use mock API
-// Default to mock mode unless explicitly set to use real API
-const USE_MOCK = import.meta.env.VITE_USE_REAL_API !== 'true';
+// Default to real API, use mock only if explicitly set or if real API fails
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true';
 const FALLBACK_TO_MOCK = true; // Fall back to mock data if real API fails
 
 // ============ API Functions ============
