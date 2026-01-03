@@ -9,13 +9,13 @@ class Settings:
     # Enable debug/hot reload by default for local development
     debug = os.getenv("DEBUG", "true").lower() in ("true", "1", "yes")
     MODE = os.getenv("MODE", "server")
-    base_url = os.getenv("BASE_URL","http://0.0.0.0:8080")
+    base_url = os.getenv("BASE_URL","http://0.0.0.0:80")
     lusha_api_key = os.getenv("LUSHA_API_KEY")
     apollo_api_key = os.getenv("APOLLO_API_KEY")
     http_session : aiohttp.ClientSession = None
     openai_api_key = os.getenv("OPENAI_API_KEY", "")
     host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("API_PORT", "8080"))
+    port = int(os.getenv("API_PORT", "80"))
     workers = int(os.getenv("API_WORKERS", "1"))
     reload = os.getenv("API_RELOAD", "false").lower() == "true"
     serve_static = os.getenv("SERVE_STATIC", "true").lower() == "true"
