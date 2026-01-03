@@ -1,5 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { useCampaignWizard, type Company, type Contact } from './NewCampaignWizard';
+import React, { useState, useRef, useEffect } from 'react';
+import { useCampaignWizard } from './NewCampaignWizard';
+import {
+  useCreateCampaignFromCSVImportMutation,
+  useGetCampaignDetailsQuery,
+} from '../../store';
 
 interface CSVCompany {
   name: string;
@@ -12,7 +16,7 @@ interface ParseResult {
   errors: string[];
 }
 
-// Sample CSV data for testing
+// Sample CSV data for testing (15 companies)
 const SAMPLE_CSV_DATA = `company_name,domain
 Shopify,shopify.com
 HubSpot,hubspot.com
@@ -30,41 +34,75 @@ Elastic,elastic.co
 Snowflake,snowflake.com
 Confluent,confluent.io`;
 
-// Generate mock contacts for each company with realistic data
-const generateMockContacts = (companyId: string, companyName: string): Contact[] => {
-  const contacts = [
-    { firstName: 'Amanda', lastName: 'Torres', title: 'Chief Executive Officer' },
-    { firstName: 'Ryan', lastName: 'Kowalski', title: 'Chief Technology Officer' },
-    { firstName: 'Michelle', lastName: 'Santos', title: 'VP of Sales' },
-    { firstName: 'Derek', lastName: 'Chang', title: 'Head of Marketing' },
-    { firstName: 'Lauren', lastName: 'Baker', title: 'Director of Operations' },
-    { firstName: 'Nathan', lastName: 'Singh', title: 'VP of Business Development' },
-  ];
-  
-  const numContacts = Math.floor(Math.random() * 3) + 3; // 3-5 contacts
-  const domain = companyName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-  
-  return contacts.slice(0, numContacts).map((contact, i) => ({
-    id: `${companyId}-contact-${i + 1}`,
-    companyId,
-    firstName: contact.firstName,
-    lastName: contact.lastName,
-    email: `${contact.firstName.toLowerCase()}.${contact.lastName.toLowerCase()}@${domain}.com`,
-    phone: `+1-${['415', '212', '312', '617', '303'][Math.floor(Math.random() * 5)]}-${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-    jobTitle: contact.title,
-    linkedinUrl: `https://linkedin.com/in/${contact.firstName.toLowerCase()}${contact.lastName.toLowerCase()}`,
-    isSynced: false,
-  }));
+// Minimal sample CSV for download template (1 example row)
+const SAMPLE_CSV_TEMPLATE = `company_name,domain
+Acme Corp,acme.com`;
+
+// Function to download sample CSV template
+const downloadSampleCSV = () => {
+  const blob = new Blob([SAMPLE_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'company_import_template.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
 export const Step1ImportCSV: React.FC = () => {
-  const { setQualifiedCompanies, nextStep, setLoading } = useCampaignWizard();
+  const { state, setCampaignId, nextStep, setLoading } = useCampaignWizard();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [createCampaignFromCSVImport, { isLoading: isCreating }] = useCreateCampaignFromCSVImportMutation();
+
+  // Poll for campaign status (csv_import.status -> completed)
+  const { data: campaignDetailsData } = useGetCampaignDetailsQuery(
+    createdCampaignId
+      ? { campaign_id: createdCampaignId, page: 1, limit: 1 }
+      : { campaign_id: '', page: 1, limit: 1 },
+    {
+      skip: !createdCampaignId || !isPolling,
+      pollingInterval: createdCampaignId && isPolling ? 3000 : 0,
+    }
+  );
+
+  // Effect to handle polling result
+  useEffect(() => {
+    if (!createdCampaignId || !isPolling) return;
+
+    const campaign = campaignDetailsData?.data?.campaign;
+    // Check for csv_import status or prospecting_cycle status
+    const csvImportStatus = campaign?.csv_import;
+    const prospectingCycleStatus = campaign?.prospecting_cycle?.status;
+
+    // Update progress
+    if (csvImportStatus?.processed_count !== undefined && csvImportStatus?.total_count) {
+      const progress = Math.round((csvImportStatus.processed_count / csvImportStatus.total_count) * 100);
+      setLoading(true, `Processing companies... (${csvImportStatus.processed_count}/${csvImportStatus.total_count})`, progress);
+    }
+
+    // Check if completed
+    if (csvImportStatus?.status === 'completed' || prospectingCycleStatus === 'company_qualification') {
+      setIsPolling(false);
+      setLoading(false);
+      nextStep();
+    } else if (csvImportStatus?.status === 'failed') {
+      setIsPolling(false);
+      setLoading(false);
+      const csvImportError = (csvImportStatus as { error?: string })?.error;
+      setError(csvImportError || 'CSV import failed');
+    }
+  }, [campaignDetailsData, createdCampaignId, isPolling, nextStep, setLoading]);
 
   const parseCSV = (content: string): ParseResult => {
     const lines = content.split('\n').filter((line) => line.trim());
@@ -88,17 +126,22 @@ export const Step1ImportCSV: React.FC = () => {
       // Split by comma, handling quoted values
       const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
       
-      if (!parts || parts.length < 2) {
-        errors.push(`Row ${i + 1}: Invalid format - expected at least 2 columns (name, domain)`);
+      if (!parts || parts.length < 1) {
+        errors.push(`Row ${i + 1}: Invalid format`);
         continue;
       }
 
-      const name = parts[0].replace(/"/g, '').trim();
-      const domain = parts[1].replace(/"/g, '').trim();
-
-      if (!name) {
-        errors.push(`Row ${i + 1}: Company name is required`);
-        continue;
+      // Support both: name,domain OR just domain
+      let name = '';
+      let domain = '';
+      
+      if (parts.length >= 2) {
+        name = parts[0].replace(/"/g, '').trim();
+        domain = parts[1].replace(/"/g, '').trim();
+      } else {
+        // Only domain provided
+        domain = parts[0].replace(/"/g, '').trim();
+        name = domain; // Use domain as name placeholder
       }
 
       if (!domain) {
@@ -106,9 +149,16 @@ export const Step1ImportCSV: React.FC = () => {
         continue;
       }
 
+      // Extract domain from URL if needed
+      let cleanDomain = domain;
+      if (cleanDomain.startsWith('http://')) cleanDomain = cleanDomain.slice(7);
+      if (cleanDomain.startsWith('https://')) cleanDomain = cleanDomain.slice(8);
+      if (cleanDomain.startsWith('www.')) cleanDomain = cleanDomain.slice(4);
+      cleanDomain = cleanDomain.split('/')[0];
+
       companies.push({
-        name,
-        domain,
+        name: name || cleanDomain,
+        domain: cleanDomain,
         rowIndex: i + 1,
       });
     }
@@ -124,12 +174,13 @@ export const Step1ImportCSV: React.FC = () => {
 
     setUploadedFile(file);
     setIsProcessing(true);
+    setError(null);
 
     try {
       const content = await file.text();
       const result = parseCSV(content);
       setParseResult(result);
-    } catch (error) {
+    } catch (err) {
       setParseResult({ companies: [], errors: ['Failed to read file'] });
     } finally {
       setIsProcessing(false);
@@ -161,39 +212,51 @@ export const Step1ImportCSV: React.FC = () => {
   const handleContinue = async () => {
     if (!parseResult || parseResult.companies.length === 0) return;
 
-    setLoading(true, 'Processing companies...', 0);
+    setError(null);
+    setLoading(true, 'Creating campaign and processing companies...', 0);
 
-    // Convert parsed companies to Company objects
-    const companies: Company[] = parseResult.companies.map((csvCompany, index) => ({
-      id: `imported-${index + 1}`,
-      name: csvCompany.name,
-      website: csvCompany.domain.startsWith('http') ? csvCompany.domain : `https://${csvCompany.domain}`,
-      industry: 'Unknown',
-      employeeCount: 'Unknown',
-      revenue: 'Unknown',
-      location: 'Unknown',
-      linkedinUrl: '',
-      isQualified: undefined,
-      qualificationStatus: 'pending' as const,
-      contacts: generateMockContacts(`imported-${index + 1}`, csvCompany.name),
-      syncStatus: 'not_synced' as const,
-      personalization: {
-        messageStatus: 'pending' as const,
-        deckStatus: 'pending' as const,
-      },
-    }));
+    try {
+      // Extract domains from parsed companies
+      const domains = parseResult.companies.map(c => c.domain);
+      
+      // Use products selected in ProductSelection step
+      const productNames = state.selectedProducts.join(',');
 
-    // Simulate processing delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+      const payload = {
+        company_domains: domains,
+        product_name: productNames || undefined,
+        campaign_type: 'import_csv',
+        prospecting_cycle_status: 'prospecting',
+      };
 
-    setQualifiedCompanies(companies);
-    setLoading(false);
-    nextStep();
+      const response = await createCampaignFromCSVImport(payload).unwrap();
+      const newCampaignId = response?.data?.campaign_id;
+      const totalCompanies = response?.data?.total_companies || domains.length;
+
+      if (!newCampaignId) {
+        throw new Error('campaign_id missing in response');
+      }
+
+      setCreatedCampaignId(newCampaignId);
+      setCampaignId(newCampaignId);
+
+      // All processing now happens in Kafka - start polling immediately
+      setLoading(true, `Processing ${totalCompanies} companies... (0/${totalCompanies})`, 0);
+      setIsPolling(true);
+    } catch (e: unknown) {
+      console.error(e);
+      const errorMessage = e instanceof Error ? e.message : 'Failed to create campaign from CSV';
+      setError(errorMessage);
+      setLoading(false);
+    }
   };
 
   const handleRemoveFile = () => {
     setUploadedFile(null);
     setParseResult(null);
+    setError(null);
+    setCreatedCampaignId(null);
+    setIsPolling(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -205,7 +268,10 @@ export const Step1ImportCSV: React.FC = () => {
     setUploadedFile(fakeFile);
     const result = parseCSV(SAMPLE_CSV_DATA);
     setParseResult(result);
+    setError(null);
   };
+
+  const isProcessingCampaign = isCreating || isPolling;
 
   return (
     <div className="step-container step-import-csv">
@@ -213,6 +279,13 @@ export const Step1ImportCSV: React.FC = () => {
         <h2>Import Company List</h2>
         <p>Upload a CSV file with company names and their domains/URLs</p>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="error-banner" style={{ marginBottom: '1rem', padding: '12px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626' }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
 
       {/* Upload Area */}
       {!uploadedFile && (
@@ -242,6 +315,20 @@ export const Step1ImportCSV: React.FC = () => {
           <div className="upload-format-hint">
             Expected format: company_name, domain/url
           </div>
+          <button 
+            className="download-sample-btn"
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent triggering file browse
+              downloadSampleCSV();
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download Sample CSV
+          </button>
         </div>
       )}
       
@@ -280,12 +367,14 @@ export const Step1ImportCSV: React.FC = () => {
             <span className="file-name">{uploadedFile.name}</span>
             <span className="file-size">{(uploadedFile.size / 1024).toFixed(1)} KB</span>
           </div>
-          <button className="remove-file-btn" onClick={handleRemoveFile}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
+          {!isProcessingCampaign && (
+            <button className="remove-file-btn" onClick={handleRemoveFile}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          )}
         </div>
       )}
 
@@ -312,8 +401,8 @@ export const Step1ImportCSV: React.FC = () => {
                 {parseResult.errors.length} Warning{parseResult.errors.length > 1 ? 's' : ''}
               </h4>
               <ul>
-                {parseResult.errors.slice(0, 5).map((error, i) => (
-                  <li key={i}>{error}</li>
+                {parseResult.errors.slice(0, 5).map((err, i) => (
+                  <li key={i}>{err}</li>
                 ))}
                 {parseResult.errors.length > 5 && (
                   <li className="more-errors">+{parseResult.errors.length - 5} more warnings</li>
@@ -333,7 +422,7 @@ export const Step1ImportCSV: React.FC = () => {
               </div>
               <div className="success-info">
                 <h4>{parseResult.companies.length} companies ready to import</h4>
-                <p>These companies will be processed in the next step</p>
+                <p>These companies will be enriched via Apollo and processed in the next step</p>
               </div>
             </div>
           )}
@@ -365,13 +454,22 @@ export const Step1ImportCSV: React.FC = () => {
         <button
           className="btn-primary btn-large"
           onClick={handleContinue}
-          disabled={!parseResult || parseResult.companies.length === 0 || isProcessing}
+          disabled={!parseResult || parseResult.companies.length === 0 || isProcessing || isProcessingCampaign}
         >
-          Continue to Enrichment
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <polyline points="12 5 19 12 12 19"/>
-          </svg>
+          {isProcessingCampaign ? (
+            <>
+              <span className="spinner-small" />
+              Processing...
+            </>
+          ) : (
+            <>
+              Continue to Company Qualification
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -379,4 +477,3 @@ export const Step1ImportCSV: React.FC = () => {
 };
 
 export default Step1ImportCSV;
-

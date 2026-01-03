@@ -1,103 +1,108 @@
-import React, { useState } from 'react';
-import { useCampaignWizard, type Company, type Contact } from './NewCampaignWizard';
+import React, { useState, useEffect } from 'react';
+import { useCampaignWizard } from './NewCampaignWizard';
+import {
+  useCreateCampaignFromCSVImportMutation,
+  useGetCampaignDetailsQuery,
+} from '../../store';
 
-// Generate mock contacts for each company with realistic data
-const generateMockContacts = (companyId: string, companyName: string): Contact[] => {
-  const contacts = [
-    { firstName: 'Jessica', lastName: 'Park', title: 'Chief Executive Officer' },
-    { firstName: 'Kevin', lastName: 'Nguyen', title: 'Chief Technology Officer' },
-    { firstName: 'Rachel', lastName: 'Goldstein', title: 'VP of Sales' },
-    { firstName: 'Amit', lastName: 'Patel', title: 'Head of Marketing' },
-    { firstName: 'Christina', lastName: 'Lee', title: 'Director of Operations' },
-    { firstName: 'Brandon', lastName: 'Williams', title: 'VP of Product' },
-  ];
-  
-  const numContacts = Math.floor(Math.random() * 3) + 3; // 3-5 contacts
-  const domain = companyName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-  
-  return contacts.slice(0, numContacts).map((contact, i) => ({
-    id: `${companyId}-contact-${i + 1}`,
-    companyId,
-    firstName: contact.firstName,
-    lastName: contact.lastName,
-    email: `${contact.firstName.toLowerCase()}.${contact.lastName.toLowerCase()}@${domain}.com`,
-    phone: `+1-${['628', '347', '312', '617', '206'][Math.floor(Math.random() * 5)]}-${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-    jobTitle: contact.title,
-    linkedinUrl: `https://linkedin.com/in/${contact.firstName.toLowerCase()}${contact.lastName.toLowerCase()}`,
-    isSynced: false,
-  }));
-};
-
-// Mock similar companies generator with realistic company names
-const generateSimilarCompanies = (_baseCompanyName: string): Company[] => {
-  const realCompanies = [
-    { name: 'Attentive', industry: 'Marketing Tech', location: 'New York, USA', employees: '501-1000', revenue: '$500M+' },
-    { name: 'Klaviyo', industry: 'E-commerce Marketing', location: 'Boston, USA', employees: '1001-2000', revenue: '$700M+' },
-    { name: 'Braze', industry: 'Customer Engagement', location: 'New York, USA', employees: '1001-2000', revenue: '$400M+' },
-    { name: 'Iterable', industry: 'Marketing Automation', location: 'San Francisco, USA', employees: '501-1000', revenue: '$200M+' },
-    { name: 'Customer.io', industry: 'Marketing Automation', location: 'Portland, USA', employees: '201-500', revenue: '$50M+' },
-    { name: 'Postscript', industry: 'SMS Marketing', location: 'Scottsdale, USA', employees: '201-500', revenue: '$100M+' },
-    { name: 'Yotpo', industry: 'E-commerce Marketing', location: 'New York, USA', employees: '501-1000', revenue: '$200M+' },
-    { name: 'Gorgias', industry: 'Customer Support', location: 'San Francisco, USA', employees: '201-500', revenue: '$50M+' },
-    { name: 'Recharge', industry: 'Subscription Commerce', location: 'Santa Monica, USA', employees: '501-1000', revenue: '$150M+' },
-    { name: 'Sendlane', industry: 'Email Marketing', location: 'San Diego, USA', employees: '51-200', revenue: '$20M+' },
-    { name: 'Omnisend', industry: 'E-commerce Marketing', location: 'London, UK', employees: '201-500', revenue: '$50M+' },
-    { name: 'Drip', industry: 'Marketing Automation', location: 'Minneapolis, USA', employees: '51-200', revenue: '$30M+' },
-    { name: 'Privy', industry: 'E-commerce Conversion', location: 'Boston, USA', employees: '51-200', revenue: '$25M+' },
-    { name: 'Stamped', industry: 'Reviews & UGC', location: 'Toronto, Canada', employees: '51-200', revenue: '$15M+' },
-    { name: 'Smile.io', industry: 'Loyalty & Rewards', location: 'Kitchener, Canada', employees: '51-200', revenue: '$20M+' },
-    { name: 'LoyaltyLion', industry: 'Loyalty Platform', location: 'London, UK', employees: '51-200', revenue: '$15M+' },
-    { name: 'Rebuy', industry: 'Personalization', location: 'Minneapolis, USA', employees: '51-200', revenue: '$25M+' },
-    { name: 'Nosto', industry: 'E-commerce Personalization', location: 'Helsinki, Finland', employees: '201-500', revenue: '$40M+' },
-    { name: 'Dynamic Yield', industry: 'Personalization', location: 'Tel Aviv, Israel', employees: '501-1000', revenue: '$100M+' },
-    { name: 'Bloomreach', industry: 'Commerce Experience', location: 'Mountain View, USA', employees: '501-1000', revenue: '$200M+' },
-    { name: 'Searchspring', industry: 'Site Search', location: 'San Antonio, USA', employees: '201-500', revenue: '$40M+' },
-    { name: 'Algolia', industry: 'Search & Discovery', location: 'San Francisco, USA', employees: '501-1000', revenue: '$150M+' },
-    { name: 'Constructor', industry: 'Product Discovery', location: 'San Francisco, USA', employees: '201-500', revenue: '$50M+' },
-    { name: 'Findify', industry: 'E-commerce Search', location: 'Stockholm, Sweden', employees: '51-200', revenue: '$10M+' },
-    { name: 'Klevu', industry: 'AI Search', location: 'Helsinki, Finland', employees: '51-200', revenue: '$15M+' },
-  ];
-
-  // Shuffle and take 15-25 companies
-  const shuffled = [...realCompanies].sort(() => Math.random() - 0.5);
-  const numCompanies = Math.floor(Math.random() * 10) + 15;
-  
-  return shuffled.slice(0, numCompanies).map((company, i) => {
-    const id = `similar-${i + 1}`;
-    return {
-      id,
-      name: company.name,
-      website: `https://${company.name.toLowerCase().replace(/\./g, '')}.com`,
-      industry: company.industry,
-      employeeCount: company.employees,
-      revenue: company.revenue,
-      location: company.location,
-      linkedinUrl: `https://linkedin.com/company/${company.name.toLowerCase().replace(/\./g, '')}`,
-      isQualified: undefined,
-      qualificationStatus: 'pending' as const,
-      contacts: generateMockContacts(id, company.name),
-      syncStatus: 'not_synced' as const,
-      personalization: {
-        messageStatus: 'pending' as const,
-        deckStatus: 'pending' as const,
-      },
-      similarityScore: Math.floor(Math.random() * 25) + 75, // 75-100 similarity
-    };
-  }).sort((a, b) => (b.similarityScore || 0) - (a.similarityScore || 0));
-};
-
-interface CompanyWithSimilarity extends Company {
-  similarityScore?: number;
+// Mock external API response for similar companies
+// In production, this would be replaced with a real API call
+interface SimilarCompanyResult {
+  domain: string;
+  name: string;
+  similarityScore: number;
+  industry?: string;
+  location?: string;
+  employeeCount?: string;
 }
 
+// Mock function simulating external "Similar Companies" API
+const fetchSimilarCompaniesFromExternalAPI = async (
+  _sourceDomain: string
+): Promise<SimilarCompanyResult[]> => {
+  // Simulate API delay
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+
+  // Mock response data - in production, this would be a real API call
+  const mockSimilarCompanies: SimilarCompanyResult[] = [
+    { domain: 'attentive.com', name: 'Attentive', similarityScore: 95, industry: 'Marketing Tech', location: 'New York, USA', employeeCount: '501-1000' },
+    { domain: 'klaviyo.com', name: 'Klaviyo', similarityScore: 92, industry: 'E-commerce Marketing', location: 'Boston, USA', employeeCount: '1001-2000' },
+    { domain: 'braze.com', name: 'Braze', similarityScore: 89, industry: 'Customer Engagement', location: 'New York, USA', employeeCount: '1001-2000' },
+    { domain: 'iterable.com', name: 'Iterable', similarityScore: 87, industry: 'Marketing Automation', location: 'San Francisco, USA', employeeCount: '501-1000' },
+    { domain: 'customer.io', name: 'Customer.io', similarityScore: 85, industry: 'Marketing Automation', location: 'Portland, USA', employeeCount: '201-500' },
+    { domain: 'postscript.io', name: 'Postscript', similarityScore: 84, industry: 'SMS Marketing', location: 'Scottsdale, USA', employeeCount: '201-500' },
+    { domain: 'yotpo.com', name: 'Yotpo', similarityScore: 82, industry: 'E-commerce Marketing', location: 'New York, USA', employeeCount: '501-1000' },
+    { domain: 'gorgias.com', name: 'Gorgias', similarityScore: 80, industry: 'Customer Support', location: 'San Francisco, USA', employeeCount: '201-500' },
+    { domain: 'rechargepayments.com', name: 'Recharge', similarityScore: 79, industry: 'Subscription Commerce', location: 'Santa Monica, USA', employeeCount: '501-1000' },
+    { domain: 'sendlane.com', name: 'Sendlane', similarityScore: 78, industry: 'Email Marketing', location: 'San Diego, USA', employeeCount: '51-200' },
+    { domain: 'omnisend.com', name: 'Omnisend', similarityScore: 77, industry: 'E-commerce Marketing', location: 'London, UK', employeeCount: '201-500' },
+    { domain: 'drip.com', name: 'Drip', similarityScore: 76, industry: 'Marketing Automation', location: 'Minneapolis, USA', employeeCount: '51-200' },
+    { domain: 'privy.com', name: 'Privy', similarityScore: 75, industry: 'E-commerce Conversion', location: 'Boston, USA', employeeCount: '51-200' },
+    { domain: 'stamped.io', name: 'Stamped', similarityScore: 74, industry: 'Reviews & UGC', location: 'Toronto, Canada', employeeCount: '51-200' },
+    { domain: 'smile.io', name: 'Smile.io', similarityScore: 73, industry: 'Loyalty & Rewards', location: 'Kitchener, Canada', employeeCount: '51-200' },
+    { domain: 'loyaltylion.com', name: 'LoyaltyLion', similarityScore: 72, industry: 'Loyalty Platform', location: 'London, UK', employeeCount: '51-200' },
+    { domain: 'rebuyengine.com', name: 'Rebuy', similarityScore: 71, industry: 'Personalization', location: 'Minneapolis, USA', employeeCount: '51-200' },
+    { domain: 'nosto.com', name: 'Nosto', similarityScore: 70, industry: 'E-commerce Personalization', location: 'Helsinki, Finland', employeeCount: '201-500' },
+    { domain: 'dynamicyield.com', name: 'Dynamic Yield', similarityScore: 69, industry: 'Personalization', location: 'Tel Aviv, Israel', employeeCount: '501-1000' },
+    { domain: 'bloomreach.com', name: 'Bloomreach', similarityScore: 68, industry: 'Commerce Experience', location: 'Mountain View, USA', employeeCount: '501-1000' },
+  ];
+
+  // Shuffle and return random subset (15-20 companies)
+  const shuffled = [...mockSimilarCompanies].sort(() => Math.random() - 0.5);
+  const count = Math.floor(Math.random() * 6) + 15; // 15-20 companies
+  return shuffled.slice(0, count).sort((a, b) => b.similarityScore - a.similarityScore);
+};
+
 export const Step1SimilarCompanies: React.FC = () => {
-  const { setQualifiedCompanies, nextStep, setLoading } = useCampaignWizard();
+  const { state, setCampaignId, nextStep, setLoading } = useCampaignWizard();
   
   const [companyUrl, setCompanyUrl] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [sourceCompany, setSourceCompany] = useState<{ name: string; domain: string } | null>(null);
-  const [similarCompanies, setSimilarCompanies] = useState<CompanyWithSimilarity[]>([]);
+  const [similarCompanies, setSimilarCompanies] = useState<SimilarCompanyResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
+  // Backend API integration
+  const [createCampaignFromCSVImport, { isLoading: isCreating }] = useCreateCampaignFromCSVImportMutation();
+  const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+
+  // Poll for campaign status
+  const { data: campaignDetailsData } = useGetCampaignDetailsQuery(
+    createdCampaignId
+      ? { campaign_id: createdCampaignId, page: 1, limit: 1 }
+      : { campaign_id: '', page: 1, limit: 1 },
+    {
+      skip: !createdCampaignId || !isPolling,
+      pollingInterval: createdCampaignId && isPolling ? 3000 : 0,
+    }
+  );
+
+  // Handle polling result
+  useEffect(() => {
+    if (!createdCampaignId || !isPolling) return;
+
+    const campaign = campaignDetailsData?.data?.campaign;
+    const csvImportStatus = campaign?.csv_import;
+    const prospectingCycleStatus = campaign?.prospecting_cycle?.status;
+
+    // Update progress
+    if (csvImportStatus?.processed_count !== undefined && csvImportStatus?.total_count) {
+      const progress = Math.round((csvImportStatus.processed_count / csvImportStatus.total_count) * 100);
+      setLoading(true, `Enriching companies... (${csvImportStatus.processed_count}/${csvImportStatus.total_count})`, progress);
+    }
+
+    // Check if completed
+    if (csvImportStatus?.status === 'completed' || prospectingCycleStatus === 'company_qualification') {
+      setIsPolling(false);
+      setLoading(false);
+      nextStep();
+    } else if (csvImportStatus?.status === 'failed') {
+      setIsPolling(false);
+      setLoading(false);
+      setError(csvImportStatus?.error || 'Failed to process similar companies');
+    }
+  }, [campaignDetailsData, createdCampaignId, isPolling, nextStep, setLoading]);
 
   const extractDomain = (url: string): string => {
     try {
@@ -119,28 +124,66 @@ export const Step1SimilarCompanies: React.FC = () => {
     setSimilarCompanies([]);
     setLoading(true, 'Finding similar companies...', 0);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const domain = extractDomain(companyUrl);
+      const companyName = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
 
-    const domain = extractDomain(companyUrl);
-    const companyName = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
+      setSourceCompany({ name: companyName, domain });
 
-    setSourceCompany({ name: companyName, domain });
-
-    // Generate mock similar companies
-    const companies = generateSimilarCompanies(companyName);
-    setSimilarCompanies(companies);
-    
-    setIsSearching(false);
-    setLoading(false);
+      // Call mock external API to get similar companies
+      const companies = await fetchSimilarCompaniesFromExternalAPI(domain);
+      setSimilarCompanies(companies);
+      
+      setIsSearching(false);
+      setLoading(false);
+    } catch (err) {
+      setError('Failed to find similar companies. Please try again.');
+      setIsSearching(false);
+      setLoading(false);
+    }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (similarCompanies.length === 0) return;
-    // Remove similarityScore before setting (it's not part of the Company type)
-    const companiesWithoutScore = similarCompanies.map(({ similarityScore, ...company }) => company);
-    setQualifiedCompanies(companiesWithoutScore);
-    nextStep();
+
+    setError(null);
+    setLoading(true, 'Creating campaign and processing companies...', 0);
+
+    try {
+      // Extract domains from similar companies
+      const domains = similarCompanies.map(c => c.domain);
+      
+      // Use products selected in ProductSelection step
+      const productNames = state.selectedProducts.join(',');
+
+      // Use same API as CSV import, but with different campaign_type
+      const payload = {
+        company_domains: domains,
+        product_name: productNames || undefined,
+        campaign_type: 'similar_companies',  // Different campaign type
+        prospecting_cycle_status: 'prospecting',
+      };
+
+      const response = await createCampaignFromCSVImport(payload).unwrap();
+      const newCampaignId = response?.data?.campaign_id;
+      const totalCompanies = response?.data?.total_companies || domains.length;
+
+      if (!newCampaignId) {
+        throw new Error('campaign_id missing in response');
+      }
+
+      setCreatedCampaignId(newCampaignId);
+      setCampaignId(newCampaignId);
+
+      // Start polling for processing completion
+      setLoading(true, `Processing ${totalCompanies} similar companies... (0/${totalCompanies})`, 0);
+      setIsPolling(true);
+    } catch (e: unknown) {
+      console.error(e);
+      const errorMessage = e instanceof Error ? e.message : 'Failed to create campaign';
+      setError(errorMessage);
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
@@ -148,7 +191,11 @@ export const Step1SimilarCompanies: React.FC = () => {
     setSourceCompany(null);
     setSimilarCompanies([]);
     setError(null);
+    setCreatedCampaignId(null);
+    setIsPolling(false);
   };
+
+  const isProcessing = isCreating || isPolling;
 
   return (
     <div className="step-container step-similar-companies">
@@ -156,6 +203,13 @@ export const Step1SimilarCompanies: React.FC = () => {
         <h2>Similar Companies Search</h2>
         <p>Enter a company URL to find similar companies you can target</p>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="error-banner" style={{ marginBottom: '1rem', padding: '12px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626' }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
 
       {/* URL Input */}
       <div className="similar-company-input">
@@ -175,10 +229,10 @@ export const Step1SimilarCompanies: React.FC = () => {
               placeholder="e.g., salesforce.com or https://hubspot.com"
               value={companyUrl}
               onChange={(e) => setCompanyUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleFindSimilar()}
-              disabled={isSearching || similarCompanies.length > 0}
+              onKeyDown={(e) => e.key === 'Enter' && !isSearching && !isProcessing && handleFindSimilar()}
+              disabled={isSearching || similarCompanies.length > 0 || isProcessing}
             />
-            {similarCompanies.length > 0 && (
+            {similarCompanies.length > 0 && !isProcessing && (
               <button className="clear-input-btn" onClick={handleReset}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"/>
@@ -187,10 +241,9 @@ export const Step1SimilarCompanies: React.FC = () => {
               </button>
             )}
           </div>
-          {error && <span className="input-error">{error}</span>}
         </div>
 
-        {similarCompanies.length === 0 && (
+        {similarCompanies.length === 0 && !isProcessing && (
           <button
             className="btn-primary search-btn"
             onClick={handleFindSimilar}
@@ -248,7 +301,7 @@ export const Step1SimilarCompanies: React.FC = () => {
           <div className="similar-companies-list">
             {similarCompanies.slice(0, 10).map((company, index) => (
               <div 
-                key={company.id} 
+                key={company.domain} 
                 className="similar-company-card"
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
@@ -262,9 +315,7 @@ export const Step1SimilarCompanies: React.FC = () => {
                     <span className="tag">{company.location}</span>
                     <span className="tag">{company.employeeCount}</span>
                   </div>
-                </div>
-                <div className="company-contacts">
-                  <span>{company.contacts.length} contacts</span>
+                  <span className="domain-text">{company.domain}</span>
                 </div>
               </div>
             ))}
@@ -279,7 +330,7 @@ export const Step1SimilarCompanies: React.FC = () => {
 
       {/* Actions */}
       <div className="step-actions">
-        {similarCompanies.length > 0 && (
+        {similarCompanies.length > 0 && !isProcessing && (
           <button className="btn-secondary" onClick={handleReset}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M2.5 2v6h6"/>
@@ -293,13 +344,22 @@ export const Step1SimilarCompanies: React.FC = () => {
         <button
           className="btn-primary btn-large"
           onClick={handleContinue}
-          disabled={similarCompanies.length === 0}
+          disabled={similarCompanies.length === 0 || isProcessing}
         >
-          Continue to Enrichment
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <polyline points="12 5 19 12 12 19"/>
-          </svg>
+          {isProcessing ? (
+            <>
+              <span className="spinner-small" />
+              Processing...
+            </>
+          ) : (
+            <>
+              Continue to Company Qualification
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -307,4 +367,3 @@ export const Step1SimilarCompanies: React.FC = () => {
 };
 
 export default Step1SimilarCompanies;
-

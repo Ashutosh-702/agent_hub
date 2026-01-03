@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext, useCallback, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useLazyGetCampaignDetailsQuery } from '../../store';
 import './CampaignWizard.css';
 import { useSidebar } from '../../context/SidebarContext';
@@ -10,7 +10,8 @@ import { Step1ImportCSV } from './Step1ImportCSV';
 import { Step1SingleCompany } from './Step1SingleCompany';
 import { Step1SimilarCompanies } from './Step1SimilarCompanies';
 import { Step1NLFilter } from './Step1NLFilter';
-import { StepCompanyEnrichment } from './StepCompanyEnrichment';
+// StepCompanyEnrichment is no longer used - enrichment happens in Kafka during backend processing
+// import { StepCompanyEnrichment } from './StepCompanyEnrichment';
 import { Step2CompanyQualification } from './Step2CompanyQualification';
 import { Step3ContactQualification } from './Step3ContactQualification';
 import { Step4SyncHubspot } from './Step4SyncHubspot';
@@ -173,12 +174,7 @@ const getStepsForType = (
     { id: 'enroll-outreach', stepNumber: 0, title: 'Enroll for Outreach', component: Step6EnrollOutreach },
   ];
 
-  const enrichmentStep: StepConfig = {
-    id: 'enrichment',
-    stepNumber: 0,
-    title: 'Company Enrichment',
-    component: StepCompanyEnrichment,
-  };
+  // enrichmentStep removed - all campaign types now do enrichment in Kafka backend
 
   const companyQualStep: StepConfig = {
     id: 'company-qualification',
@@ -191,47 +187,51 @@ const getStepsForType = (
 
   switch (campaignType) {
     case 'import_csv':
+      // CSV import skips enrichment step - Apollo enrichment is done in Kafka handler during import
       steps = [
         { id: 'import', stepNumber: 1, title: 'Import Companies', component: Step1ImportCSV },
-        enrichmentStep,
+        // No enrichment step - companies are enriched via Apollo during import
         ...(skipCompanyQual ? [] : [companyQualStep]),
         ...commonStepsAfterQualification,
       ];
       break;
 
     case 'single_company':
-      // Single company skips company qualification entirely
+      // Single company skips both enrichment AND company qualification
+      // Company data comes from Apollo domain search, then goes directly to Contact Qualification
       steps = [
         { id: 'company-input', stepNumber: 1, title: 'Company Input', component: Step1SingleCompany },
-        enrichmentStep,
-        // Skip company qualification for single company
+        // No enrichment step - company data from Apollo
+        // No company qualification - already qualified by user selecting the URL
         ...commonStepsAfterQualification,
       ];
       break;
 
     case 'wide_prospecting':
+      // Wide prospecting does NOT need enrichment step - companies come pre-enriched from Apollo
       steps = [
         { id: 'prospecting', stepNumber: 1, title: 'Lead Generation', component: Step1Prospecting },
-        enrichmentStep,
         companyQualStep,
         ...commonStepsAfterQualification,
       ];
       break;
 
     case 'similar_companies':
+      // Similar companies skips enrichment step - Apollo enrichment is done in Kafka handler (same as CSV import)
       steps = [
         { id: 'similar-search', stepNumber: 1, title: 'Find Similar', component: Step1SimilarCompanies },
-        enrichmentStep,
-        companyQualStep,
+        // No enrichment step - companies are enriched via Apollo during backend processing
+        ...(skipCompanyQual ? [] : [companyQualStep]),
         ...commonStepsAfterQualification,
       ];
       break;
 
     case 'nl_filter':
+      // NL Filter skips enrichment step - Apollo enrichment is done in Kafka handler (same as CSV import)
       steps = [
         { id: 'nl-search', stepNumber: 1, title: 'Natural Language Search', component: Step1NLFilter },
-        enrichmentStep,
-        companyQualStep,
+        // No enrichment step - companies are enriched via Apollo during backend processing
+        ...(skipCompanyQual ? [] : [companyQualStep]),
         ...commonStepsAfterQualification,
       ];
       break;
@@ -287,7 +287,6 @@ const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
 };
 
 export const NewCampaignWizard = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   const [fetchCampaignDetails] = useLazyGetCampaignDetailsQuery();
   
@@ -392,9 +391,20 @@ export const NewCampaignWizard = () => {
         const cycleStatus = campaign?.prospecting_cycle?.status;
         const derivedStep = deriveStepFromCycleStatus(cycleStatus);
         
+        // Derive campaign type from campaign data
+        // If campaign has prospecting_cycle.status, it's a wide_prospecting campaign
+        // We can infer this from the presence of prospecting_cycle status or other indicators
+        let derivedCampaignType: CampaignType = 'wide_prospecting'; // Default for prospecting campaigns
+        
+        // Check if campaign has indicators of other types
+        // For now, assume all resuming campaigns with prospecting_cycle are wide_prospecting
+        // This can be enhanced later if campaign stores its type explicitly
+        
         setState((prev) => ({
           ...prev,
           campaignId: urlCampaignId,
+          campaignType: derivedCampaignType,
+          wizardPhase: 'steps', // IMPORTANT: Set to 'steps' so wizard renders the actual steps
           currentStep: derivedStep,
           maxStepReached: Math.max(prev.maxStepReached, derivedStep),
         }));
@@ -404,6 +414,8 @@ export const NewCampaignWizard = () => {
           setState((prev) => ({
             ...prev,
             campaignId: urlCampaignId,
+            campaignType: 'wide_prospecting',
+            wizardPhase: 'steps',
           }));
         }
       }
@@ -923,11 +935,16 @@ export const NewCampaignWizard = () => {
   }
 
   // Render campaign type selection
+  // Force navigation with page reload to ensure clean state
+  const handleBackToCampaigns = () => {
+    window.location.href = '/campaign';
+  };
+
   if (state.wizardPhase === 'type_selection') {
     return (
       <div className="new-campaign-wizard">
         <div className="wizard-header">
-          <button className="back-btn" onClick={() => navigate('/campaign')}>
+          <button type="button" className="back-btn" onClick={handleBackToCampaigns}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="19" y1="12" x2="5" y2="12"/>
               <polyline points="12 19 5 12 12 5"/>
@@ -982,7 +999,7 @@ export const NewCampaignWizard = () => {
       <div className="new-campaign-wizard">
         {/* Header with back button */}
         <div className="wizard-header">
-          <button className="back-btn" onClick={() => navigate('/campaign')}>
+          <button type="button" className="back-btn" onClick={handleBackToCampaigns}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="19" y1="12" x2="5" y2="12"/>
               <polyline points="12 19 5 12 12 5"/>

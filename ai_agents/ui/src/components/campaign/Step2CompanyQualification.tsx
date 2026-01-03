@@ -501,8 +501,8 @@ export const Step2CompanyQualification = () => {
 
               <div className="companies-cards-grid">
                 {companies.filter(c => c.is_relevant).map((c) => {
-                  const companyName = c.company?.identifiers?.name || c.company?.identifiers?.domain || c.company_id;
-                  const companyDomain = c.company?.identifiers?.domain;
+                  const companyName = c.company?.identifiers?.name || c.company?.identifiers?.source_domain || c.company?.identifiers?.domain || c.company_id;
+                  const companyDomain = c.company?.identifiers?.source_domain || c.company?.identifiers?.domain;
                   const industry = toLabel(c.company?.profile?.industry);
                   const employeeCount = toLabel(c.company?.profile?.employee_count);
                   return (
@@ -1109,8 +1109,8 @@ export const Step2CompanyQualification = () => {
 
               <div className="companies-cards-grid">
                 {companies.map((c) => {
-                  const companyName = c.company?.identifiers?.name || c.company?.identifiers?.domain || c.company_id;
-                  const companyDomain = c.company?.identifiers?.domain;
+                  const companyName = c.company?.identifiers?.name || c.company?.identifiers?.source_domain || c.company?.identifiers?.domain || c.company_id;
+                  const companyDomain = c.company?.identifiers?.source_domain || c.company?.identifiers?.domain;
                   const industry = toLabel(c.company?.profile?.industry);
                   const employeeCount = toLabel(c.company?.profile?.employee_count);
                   const location = toLabel(c.company?.location?.name);

@@ -37,6 +37,26 @@ export interface Campaign {
   prospecting_cycle?: {
     status: string;
   };
+  single_company?: {
+    domain?: string;
+    status?: 'pending' | 'processing' | 'completed' | 'failed' | 'not_found';
+    company_id?: string;
+    company_name?: string;
+    error?: string;
+  };
+  csv_import?: {
+    domains?: string[];
+    total_count?: number;
+    processed_count?: number;
+    existing_count?: number;
+    already_enriched_count?: number;  // Companies that already had Apollo data (skipped Apollo search)
+    new_count?: number;
+    success_count?: number;
+    failed_count?: number;
+    status?: 'pending' | 'processing' | 'completed' | 'failed';
+    error?: string;
+  };
+  campaign_type?: string;
   metadata: {
     created_at: string;
     updated_at: string;
@@ -124,6 +144,7 @@ export interface CreateCampaignFromProspectingJobPayload {
   location: string;
   currency: string;
   product_name?: string;
+  campaign_type?: string; // Type of campaign (wide_prospecting, import_csv, etc.)
   prospecting_cycle_status: string;
 }
 
@@ -132,6 +153,48 @@ export interface CreateCampaignFromProspectingJobResponse {
   data?: {
     message?: string;
     campaign_id?: string;
+  };
+  errors?: string[];
+}
+
+// Single Company Campaign
+export interface CreateCampaignFromSingleCompanyPayload {
+  company_domain: string;
+  product_name?: string;
+  campaign_type?: string;
+  prospecting_cycle_status?: string;
+}
+
+export interface CreateCampaignFromSingleCompanyResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+    campaign_id?: string;
+    request_id?: string | null;
+    company_exists?: boolean;
+    company_id?: string;
+  };
+  errors?: string[];
+}
+
+// CSV Import Campaign
+export interface CreateCampaignFromCSVImportPayload {
+  company_domains: string[];
+  product_name?: string;
+  campaign_type?: string;
+  prospecting_cycle_status?: string;
+}
+
+export interface CreateCampaignFromCSVImportResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+    campaign_id?: string;
+    request_id?: string | null;
+    total_companies?: number;
+    // These are now populated asynchronously via Kafka and available in campaign details
+    existing_companies?: number;
+    new_companies?: number;
   };
   errors?: string[];
 }
@@ -149,7 +212,9 @@ export interface CampaignCompany {
     identifiers?: {
       name?: string;
       domain?: string;
+      source_domain?: string;
       source_id?: string;
+      website_url?: string;
     };
     profile?: {
       industry?: string | string[];
@@ -158,10 +223,34 @@ export interface CampaignCompany {
       revenue_max?: string;
     };
     location?: {
+      name?: string;
       type?: string;
-      name?: string | string[];
     };
     source?: string;
+    metadata?: {
+      created_at?: string;
+      updated_at?: string;
+      api_response?: Record<string, unknown>;
+    };
+  };
+  // Company details from Apollo domain search (for single company flow)
+  company_details?: {
+    name?: string;
+    website_url?: string;
+    primary_domain?: string;
+    linkedin_url?: string;
+    phone?: string;
+    industry?: string;
+    employee_count?: number;
+    revenue?: number;
+    revenue_printed?: string;
+    logo_url?: string;
+    location?: {
+      city?: string;
+      state?: string;
+      country?: string;
+    };
+    apollo_id?: string;
   };
   metadata: {
     created_at: string;
@@ -393,6 +482,30 @@ export const campaignApi = baseApi.injectEndpoints({
     >({
       query: (payload) => ({
         url: '/api/v1/create_campaign_from_prospecting_job',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Campaign'],
+    }),
+
+    createCampaignFromSingleCompany: builder.mutation<
+      CreateCampaignFromSingleCompanyResponse,
+      CreateCampaignFromSingleCompanyPayload
+    >({
+      query: (payload) => ({
+        url: '/api/v1/create_campaign_from_single_company',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Campaign'],
+    }),
+
+    createCampaignFromCSVImport: builder.mutation<
+      CreateCampaignFromCSVImportResponse,
+      CreateCampaignFromCSVImportPayload
+    >({
+      query: (payload) => ({
+        url: '/api/v1/create_campaign_from_csv_import',
         method: 'POST',
         body: payload,
       }),
@@ -783,6 +896,8 @@ export const {
   useGetProspectingCampaignsQuery,
   useCreateCampaignMutation,
   useCreateCampaignFromProspectingJobMutation,
+  useCreateCampaignFromSingleCompanyMutation,
+  useCreateCampaignFromCSVImportMutation,
   useGetCampaignDetailsQuery,
   useLazyGetCampaignDetailsQuery,
   useManualCompanyQualificationMutation,
