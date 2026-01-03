@@ -198,7 +198,7 @@ export const meetingsApi = baseApi.injectEndpoints({
     // Get a specific meeting by ID
     getMeeting: builder.query<ApiResponse<Meeting>, string>({
       query: (meetingId) => `/meetings/${meetingId}`,
-      providesTags: (result, error, id) => [{ type: 'Meetings', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Meetings', id }],
     }),
 
     // Get a meeting by UUID
@@ -214,7 +214,7 @@ export const meetingsApi = baseApi.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { meetingId }) => [{ type: 'Meetings', id: meetingId }],
+      invalidatesTags: (_result, _error, { meetingId }) => [{ type: 'Meetings', id: meetingId }],
     }),
 
     // Delete a meeting
@@ -240,13 +240,13 @@ export const meetingsApi = baseApi.injectEndpoints({
         url: `/meetings/${meetingId}/battlecard`,
         method: 'POST',
       }),
-      invalidatesTags: (result, error, meetingId) => [{ type: 'Meetings', id: meetingId }],
+      invalidatesTags: (_result, _error, meetingId) => [{ type: 'Meetings', id: meetingId }],
     }),
 
     // Get battlecard for a meeting
     getBattlecard: builder.query<ApiResponse<Battlecard>, string>({
       query: (meetingId) => `/meetings/${meetingId}/battlecard`,
-      providesTags: (result, error, id) => [{ type: 'Meetings', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Meetings', id }],
     }),
 
     // Generate AI reflections for a meeting
@@ -255,13 +255,13 @@ export const meetingsApi = baseApi.injectEndpoints({
         url: `/meetings/${meetingId}/reflections/generate`,
         method: 'POST',
       }),
-      invalidatesTags: (result, error, meetingId) => [{ type: 'Meetings', id: meetingId }],
+      invalidatesTags: (_result, _error, meetingId) => [{ type: 'Meetings', id: meetingId }],
     }),
 
     // Get reflections for a meeting
     getReflections: builder.query<ApiResponse<MeetingReflections | null>, string>({
       query: (meetingId) => `/meetings/${meetingId}/reflections`,
-      providesTags: (result, error, id) => [{ type: 'Meetings', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Meetings', id }],
     }),
 
     // Update manual reflections
@@ -271,13 +271,13 @@ export const meetingsApi = baseApi.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (result, error, { meetingId }) => [{ type: 'Meetings', id: meetingId }],
+      invalidatesTags: (_result, _error, { meetingId }) => [{ type: 'Meetings', id: meetingId }],
     }),
 
     // Get meeting context for a live call
     getMeetingContext: builder.query<ApiResponse<MeetingContext>, string>({
       query: (meetingId) => `/meetings/${meetingId}/context`,
-      providesTags: (result, error, id) => [{ type: 'Meetings', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Meetings', id }],
     }),
 
     // Generate post-call summary
@@ -286,13 +286,13 @@ export const meetingsApi = baseApi.injectEndpoints({
         url: `/meetings/${meetingId}/summary`,
         method: 'POST',
       }),
-      invalidatesTags: (result, error, meetingId) => [{ type: 'Meetings', id: meetingId }],
+      invalidatesTags: (_result, _error, meetingId) => [{ type: 'Meetings', id: meetingId }],
     }),
 
     // Get meeting summary
     getMeetingSummary: builder.query<ApiResponse<MeetingSummary>, string>({
       query: (meetingId) => `/meetings/${meetingId}/summary`,
-      providesTags: (result, error, id) => [{ type: 'Meetings', id }],
+      providesTags: (_result, _error, id) => [{ type: 'Meetings', id }],
     }),
   }),
 });

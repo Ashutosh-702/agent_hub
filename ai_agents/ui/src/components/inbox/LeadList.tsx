@@ -1,6 +1,5 @@
 import { LeadRow } from './LeadRow';
 import { Loader } from '../shared/Loader';
-import { EmptyState } from '../shared/EmptyState';
 import type { LeadSummary } from '../../types/inbox';
 
 interface LeadListProps {

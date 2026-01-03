@@ -34,7 +34,7 @@ export const PrepMeetingForm = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
   
-  const companies = companiesResponse?.data?.companies || [];
+  const companies = companiesResponse?.data || [];
   
   useEffect(() => {
     if (selectedCompany) {
