@@ -812,10 +812,15 @@ class CampaignsHelper:
         if not campaign:
             raise ApiException("Campaign not found")
         
-        # Get all campaign_contact_runs with personalization approved
+        # Get all campaign_contact_runs with personalization approved AND not already enrolled
         filter_query = {
             "campaign_id": ObjectId(campaign_id),
-            "personalization_status": "approved"
+            "personalization_status": "approved",
+            # Exclude contacts that are already enrolled in a Lemlist sequence
+            "$or": [
+                {"sequence_enrollment": {"$exists": False}},
+                {"sequence_enrollment.status": {"$ne": "enrolled"}}
+            ]
         }
         
         campaign_contact_runs, pagination_info = await self.campaign_contact_runs_dao.get_campaign_contact_runs_paginated(
@@ -954,16 +959,23 @@ class CampaignsHelper:
         
         # Update each contact run with enrollment status and Lemlist lead_id
         enrolled_leads = lemlist_response.get("enrolled_leads", [])
-        enrolled_leads_map = {lead.get("email"): lead.get("lead_id") for lead in enrolled_leads}
+        enrolled_leads_map = {lead.get("email"): lead for lead in enrolled_leads}
+        failed_emails = [e.get("email") for e in lemlist_response.get("errors", [])]
         
         enrolled_contacts = []
         for contact in contacts_to_enroll:
             email = contact.get("email")
-            lemlist_lead_id = enrolled_leads_map.get(email)
+            lead_info = enrolled_leads_map.get(email, {})
+            lemlist_lead_id = lead_info.get("lead_id")  # May be None for alreadyExists
             
-            # Determine enrollment status
-            enrollment_status = "enrolled" if lemlist_lead_id else "failed"
-            if email in [e.get("email") for e in lemlist_response.get("errors", [])]:
+            # Determine enrollment status:
+            # - "enrolled" if email is in enrolled_leads (includes newly added AND already existing)
+            # - "failed" if email is in errors list
+            if email in failed_emails:
+                enrollment_status = "failed"
+            elif email in enrolled_leads_map:
+                enrollment_status = "enrolled"  # Success even if lead_id is None (alreadyExists case)
+            else:
                 enrollment_status = "failed"
             
             # Update contact run with enrollment info
