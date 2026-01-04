@@ -4,6 +4,7 @@ import { PageHeader, BackButton, Loader } from '../shared';
 
 // Mock battlecard data (kept for reference, not used in production)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+// @ts-ignore - Kept for reference only
 const MOCK_BATTLECARD = {
   id: 'bc-1',
   company: {

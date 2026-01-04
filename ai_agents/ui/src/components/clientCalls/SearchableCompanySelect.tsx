@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useGetCompaniesQuery } from '../../store';
 import { SearchableSelect } from '../hubspot/ui/SearchableSelect';
-import type { Company } from '../../store/api/companyApi';
 
 interface SearchableCompanySelectProps {
   value: string;
