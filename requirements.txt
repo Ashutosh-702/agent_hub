@@ -71,6 +71,8 @@ confluent-kafka==2.3.0
     #   eventbridge
 crontab==1.0.1
     # via chronos-client
+deepgram-sdk==5.3.0
+    # via -r requirements.in
 distro==1.9.0
     # via openai
 dnspython==2.7.0
@@ -107,6 +109,7 @@ httplib2==0.22.0
 httpx==0.28.1
     # via
     #   -r requirements.in
+    #   deepgram-sdk
     #   langgraph-sdk
     #   langsmith
     #   mcp
@@ -222,6 +225,7 @@ pyasn1-modules==0.4.2
 pydantic==2.11.7
     # via
     #   -r requirements.in
+    #   deepgram-sdk
     #   fastapi
     #   langchain-core
     #   langgraph
@@ -231,7 +235,9 @@ pydantic==2.11.7
     #   openai-agents
     #   pydantic-settings
 pydantic-core==2.33.2
-    # via pydantic
+    # via
+    #   deepgram-sdk
+    #   pydantic
 pydantic-settings==2.10.1
     # via mcp
 pymongo==4.14.1
@@ -312,6 +318,7 @@ typing-extensions==4.15.0
     #   aiosignal
     #   anyio
     #   chronos-client
+    #   deepgram-sdk
     #   fastapi
     #   langchain-core
     #   openai
@@ -337,6 +344,10 @@ uvicorn==0.35.0
     # via
     #   -r requirements.in
     #   mcp
+websockets==15.0.1
+    # via
+    #   -r requirements.in
+    #   deepgram-sdk
 xxhash==3.5.0
     # via langgraph
 yarl==1.20.1
