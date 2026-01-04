@@ -16,49 +16,61 @@ from ai_agents.meetings.models import (
     MeetingRecord,
     LiveInsight,
     InsightType,
+    ProductCompanyScore,
+    RedFlag,
 )
+from ai_agents.meetings.red_flag_detector import RedFlagDetector
+from ai_agents.meetings.product_fit_scorer import ProductFitScorer
+from ai_agents.meetings.product_knowledge_service import ProductKnowledgeService
 
 logger = logging.getLogger(__name__)
 
 
 REFLECTIONS_SYSTEM_PROMPT = """You are a sales performance coach analyzing a completed sales call. Generate thoughtful, actionable post-call reflections to help the sales rep improve and close the deal.
 
-Based on the call transcript, insights detected, and context provided, generate reflections covering:
+Based on the call transcript, insights detected, red flags, product scores, and context provided, generate reflections covering:
 
 1. What Went Well - Identify 2-4 positive moments: good rapport building, effective objection handling, clear explanations, strong discovery questions
 
 2. Areas for Improvement - Identify 2-4 opportunities: missed questions, unclear explanations, unaddressed concerns, better ways to handle objections
 
-3. Key Learnings - New information discovered: company priorities, decision process, budget cycle, stakeholders, technical requirements
+3. What Can Be Improved - Specific recommendations for future meetings with this company or similar situations
 
-4. Relationship Status - Assess the buyer-seller relationship:
+4. Key Learnings - New information discovered: company priorities, decision process, budget cycle, stakeholders, technical requirements
+
+5. Relationship Status - Assess the buyer-seller relationship:
    - "cold": No engagement, skeptical
    - "warming": Some interest, still evaluating
    - "engaged": Active interest, asking good questions
    - "champion": Enthusiastic, advocating internally
 
-5. Deal Health Score - 0-100 score based on:
+6. Deal Health Score - 0-100 score based on:
    - Buying signals vs red flags
    - Decision timeline clarity
    - Budget alignment
    - Stakeholder access
    - Product fit
 
-6. Recommended Follow-ups - Prioritized actions with timelines:
+7. Recommended Follow-ups - Prioritized actions with timelines:
    - High: Do within 24 hours
    - Medium: Do within the week
    - Low: Nice to have
 
-7. Competitive Positioning - If competitors were mentioned, assess our position
+8. Competitive Positioning - If competitors were mentioned, assess our position
 
-8. Stakeholder Analysis - Who else needs to be involved, who's the decision maker
+9. Stakeholder Analysis - Who else needs to be involved, who's the decision maker
 
-9. Risk Assessment - Potential deal blockers
+10. Risk Assessment - Potential deal blockers
+
+11. Recommendations - What to do with this company: pursue aggressively, nurture, qualify further, or deprioritize
+
+12. Worth Pursuing - Boolean assessment: Is this company worth pursuing? Provide reasoning.
 
 Return a JSON object with this structure:
 {
   "what_went_well": ["point 1", "point 2"],
   "areas_for_improvement": ["point 1", "point 2"],
+  "what_can_be_improved": ["improvement 1", "improvement 2"],
   "key_learnings": ["learning 1", "learning 2"],
   "relationship_status": "cold|warming|engaged|champion",
   "deal_health_score": 0-100,
@@ -67,7 +79,10 @@ Return a JSON object with this structure:
   ],
   "competitive_positioning": "summary of competitive position",
   "stakeholder_analysis": "analysis of stakeholders and decision makers",
-  "risk_assessment": ["risk 1", "risk 2"]
+  "risk_assessment": ["risk 1", "risk 2"],
+  "recommendations": ["recommendation 1", "recommendation 2"],
+  "worth_pursuing": true,
+  "worth_pursuing_reasoning": "Detailed reasoning for the worth_pursuing assessment"
 }
 """
 
@@ -85,7 +100,13 @@ class ReflectionsGenerator:
     
     def __init__(self):
         """Initialize the reflections generator."""
-        self._openai_client = AsyncOpenAI(api_key=loaded_config.openai_api_key)
+        api_key = loaded_config.openai_api_key
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not found in environment variables. AI reflections will fail.")
+        self._openai_client = AsyncOpenAI(api_key=api_key) if api_key else None
+        self._red_flag_detector = RedFlagDetector()
+        self._product_fit_scorer = ProductFitScorer()
+        self._product_knowledge_service = ProductKnowledgeService()
     
     def _format_transcript(self, transcript: List[Dict[str, Any]]) -> str:
         """Format transcript for the prompt."""
@@ -190,12 +211,74 @@ class ReflectionsGenerator:
             insights = insights or [i.model_dump() for i in meeting.live_insights]
             products = products or meeting.product_ids
         
+        # Detect red flags
+        red_flags_detected = []
+        if transcript:
+            red_flags_raw = await self._red_flag_detector.detect_red_flags(transcript)
+            red_flags_detected = [
+                RedFlag(
+                    flag_name=rf.get("flag_name", ""),
+                    evidence=rf.get("evidence", ""),
+                    confidence=rf.get("confidence", 0.0),
+                    context=rf.get("context"),
+                )
+                for rf in red_flags_raw
+            ]
+        
+        # Score products
+        product_scores = []
+        if transcript and products:
+            # Get product info
+            product_info_dict = {}
+            for pid in products:
+                prod_info = self._product_knowledge_service.get_product_info(pid)
+                if prod_info:
+                    product_info_dict[pid] = prod_info
+            
+            if product_info_dict:
+                scores_raw = await self._product_fit_scorer.score_products(
+                    transcript=transcript,
+                    product_ids=products,
+                    product_info=product_info_dict,
+                    company_data=company_data,
+                    red_flags=red_flags_raw if red_flags_detected else None,
+                )
+                product_scores = [
+                    ProductCompanyScore(
+                        product_id=ps.get("product_id", ""),
+                        product_name=ps.get("product_name", ""),
+                        score=ps.get("score", 50),
+                        reasoning=ps.get("reasoning", ""),
+                        key_strengths=ps.get("key_strengths", []),
+                        key_concerns=ps.get("key_concerns", []),
+                    )
+                    for ps in scores_raw
+                ]
+        
         # Format inputs for prompt
         transcript_text = self._format_transcript(transcript or [])
         insights_text = self._format_insights(insights or [])
         context_text = self._format_context(
             company_data, contact_data, products, previous_meetings
         )
+        
+        # Format red flags for prompt
+        red_flags_text = ""
+        if red_flags_detected:
+            flags_list = [
+                f"- {rf.flag_name}: {rf.evidence} (confidence: {rf.confidence:.0%})"
+                for rf in red_flags_detected
+            ]
+            red_flags_text = "\n".join(flags_list)
+        
+        # Format product scores for prompt
+        product_scores_text = ""
+        if product_scores:
+            scores_list = [
+                f"- {ps.product_name}: {ps.score}/100 - {ps.reasoning}"
+                for ps in product_scores
+            ]
+            product_scores_text = "\n".join(scores_list)
         
         user_prompt = f"""## Call Context
 {context_text}
@@ -206,7 +289,11 @@ class ReflectionsGenerator:
 ## Insights Detected During Call
 {insights_text}
 
-Generate comprehensive post-call reflections to help the sales rep improve and close this deal."""
+{f'## Red Flags Detected{chr(10)}{red_flags_text}' if red_flags_text else ''}
+
+{f'## Product-Company Fit Scores{chr(10)}{product_scores_text}' if product_scores_text else ''}
+
+Generate comprehensive post-call reflections to help the sales rep improve and close this deal. Consider the red flags and product scores in your assessment."""
         
         try:
             response = await self._openai_client.chat.completions.create(
@@ -247,6 +334,7 @@ Generate comprehensive post-call reflections to help the sales rep improve and c
                 generated_at=datetime.utcnow(),
                 what_went_well=result.get("what_went_well", []),
                 areas_for_improvement=result.get("areas_for_improvement", []),
+                what_can_be_improved=result.get("what_can_be_improved", []),
                 key_learnings=result.get("key_learnings", []),
                 relationship_status=relationship_status,
                 deal_health_score=result.get("deal_health_score"),
@@ -254,6 +342,11 @@ Generate comprehensive post-call reflections to help the sales rep improve and c
                 competitive_positioning=result.get("competitive_positioning"),
                 stakeholder_analysis=result.get("stakeholder_analysis"),
                 risk_assessment=result.get("risk_assessment", []),
+                product_company_scores=product_scores,
+                red_flags_detected=red_flags_detected,
+                recommendations=result.get("recommendations", []),
+                worth_pursuing=result.get("worth_pursuing"),
+                worth_pursuing_reasoning=result.get("worth_pursuing_reasoning"),
             )
             
         except Exception as e:
@@ -262,8 +355,12 @@ Generate comprehensive post-call reflections to help the sales rep improve and c
                 generated_at=datetime.utcnow(),
                 what_went_well=[],
                 areas_for_improvement=["Error generating reflections - please regenerate"],
+                what_can_be_improved=[],
                 key_learnings=[],
                 risk_assessment=[f"Generation error: {str(e)}"],
+                product_company_scores=product_scores,
+                red_flags_detected=red_flags_detected,
+                recommendations=[],
             )
     
     async def regenerate_reflections(

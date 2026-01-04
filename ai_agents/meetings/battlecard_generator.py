@@ -12,6 +12,8 @@ from ai_agents.meetings.models import (
     Battlecard,
     BattlecardSection,
 )
+from ai_agents.meetings.deep_research_service import DeepResearchService
+from ai_agents.meetings.product_knowledge_service import ProductKnowledgeService
 
 logger = logging.getLogger(__name__)
 
@@ -129,29 +131,37 @@ class BattlecardGenerator:
     
     def __init__(self):
         """Initialize the battlecard generator."""
-        self._openai_client = AsyncOpenAI(api_key=loaded_config.openai_api_key)
+        api_key = loaded_config.openai_api_key
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not found in environment variables. Battlecard generation will fail.")
+        self._openai_client = AsyncOpenAI(api_key=api_key) if api_key else None
+        self._deep_research_service = DeepResearchService()
+        self._product_knowledge_service = ProductKnowledgeService()
     
     def _get_product_context(self, product_ids: List[str]) -> str:
-        """Build product context from product IDs."""
-        products_info = []
-        for pid in product_ids:
-            if pid in PRODUCT_INFO:
-                p = PRODUCT_INFO[pid]
-                info = f"""
-**{p['name']}**
-{p['description']}
-- Key Features: {', '.join(p['key_features'])}
-- Differentiators: {', '.join(p['differentiators'])}
-- Common Objections: {json.dumps(p['common_objections'])}
-"""
-                products_info.append(info)
-            else:
-                products_info.append(f"- {pid}")
+        """Build product context from product IDs using ProductKnowledgeService."""
+        if not product_ids:
+            return "No specific products selected"
         
-        return "\n".join(products_info) if products_info else "No specific products selected"
+        # Get product info from knowledge service
+        products_dict = self._product_knowledge_service.get_products_by_ids(product_ids)
+        
+        # Fallback to old PRODUCT_INFO if not in knowledge service
+        for pid in product_ids:
+            if pid not in products_dict and pid in PRODUCT_INFO:
+                products_dict[pid] = PRODUCT_INFO[pid]
+        
+        if not products_dict:
+            return "No product information available"
+        
+        # Use product knowledge service to format for AI
+        return self._product_knowledge_service.get_product_context_for_ai(
+            list(products_dict.keys()),
+            include_competitors=True
+        )
     
-    def _format_company_research(self, company_data: Dict[str, Any]) -> str:
-        """Format company research data."""
+    def _format_company_research(self, company_data: Dict[str, Any], deep_research: Optional[Dict[str, Any]] = None) -> str:
+        """Format company research data, prioritizing deep research if available."""
         if not company_data:
             return "No company data available"
         
@@ -161,18 +171,36 @@ class BattlecardGenerator:
             f"Industry: {company_data.get('industry', 'N/A')}",
         ]
         
-        # Include enriched data if available
-        enriched = company_data.get('enriched_data', {})
-        if enriched:
-            web_analysis = enriched.get('web_search_analysis', {})
-            if web_analysis:
-                summary = web_analysis.get('research_summary', {})
-                if summary:
-                    parts.append(f"\nResearch Summary: {json.dumps(summary, indent=2)}")
-                
-                relevance = web_analysis.get('relevance_assessment', {})
-                if relevance:
-                    parts.append(f"\nRelevance: {relevance.get('relevance_reason', 'N/A')}")
+        # Use deep research if available (more recent and comprehensive)
+        if deep_research:
+            data = deep_research.get('data', {}) if isinstance(deep_research, dict) and 'data' in deep_research else deep_research
+            
+            if data.get('company_overview'):
+                parts.append(f"\nCompany Overview: {data['company_overview']}")
+            
+            if data.get('recent_news'):
+                parts.append("\nRecent News & Signals:")
+                for news in data['recent_news'][:5]:  # Top 5
+                    parts.append(f"- {news.get('title', 'N/A')} ({news.get('date', 'N/A')})")
+                    parts.append(f"  Implication: {news.get('implication', 'N/A')}")
+            
+            if data.get('key_initiatives'):
+                parts.append(f"\nKey Initiatives: {', '.join(data['key_initiatives'])}")
+            
+            if data.get('inferred_pain_points'):
+                parts.append(f"\nInferred Pain Points: {', '.join(data['inferred_pain_points'])}")
+            
+            if data.get('tech_stack'):
+                parts.append(f"\nTech Stack: {', '.join(data['tech_stack'])}")
+        else:
+            # Fallback to enriched data if deep research not available
+            enriched = company_data.get('enriched_data', {})
+            if enriched:
+                web_analysis = enriched.get('web_search_analysis', {})
+                if web_analysis:
+                    summary = web_analysis.get('research_summary', {})
+                    if summary:
+                        parts.append(f"\nResearch Summary: {json.dumps(summary, indent=2)}")
         
         return "\n".join(parts)
     
@@ -233,6 +261,8 @@ Next Steps Agreed: {', '.join(next_steps) if next_steps else 'N/A'}
         product_ids: Optional[List[str]] = None,
         previous_meetings: Optional[List[Dict[str, Any]]] = None,
         meeting_notes: Optional[str] = None,
+        use_deep_research: bool = True,
+        deep_research: Optional[Dict[str, Any]] = None,
     ) -> Battlecard:
         """
         Generate a comprehensive battlecard for meeting preparation.
@@ -243,12 +273,33 @@ Next Steps Agreed: {', '.join(next_steps) if next_steps else 'N/A'}
             product_ids: List of product IDs to discuss
             previous_meetings: Previous meeting records
             meeting_notes: Optional notes from the user
+            use_deep_research: Whether to use/trigger deep research
+            deep_research: Pre-fetched deep research data (optional)
             
         Returns:
             Battlecard object
         """
+        # Get or trigger deep research if needed
+        research_data = deep_research
+        if use_deep_research and not research_data and company_data:
+            # Check if we have cached deep research
+            deep_research_cached = company_data.get('deep_research')
+            if deep_research_cached:
+                research_data = deep_research_cached.get('data')
+            
+            # If no cached research or it's old (>7 days), trigger new research
+            if not research_data:
+                logger.info(f"Triggering deep research for {company_data.get('name', 'Unknown')}")
+                research_result = await self._deep_research_service.conduct_research(
+                    company_name=company_data.get('name', ''),
+                    company_website=company_data.get('domain') or company_data.get('website_url'),
+                    company_industry=company_data.get('industry'),
+                    company_location=company_data.get('location'),
+                )
+                research_data = research_result.to_dict()
+        
         # Build context
-        company_context = self._format_company_research(company_data)
+        company_context = self._format_company_research(company_data, research_data)
         contact_context = self._format_contact_info(contact_data)
         product_context = self._get_product_context(product_ids or [])
         meetings_context = self._format_previous_meetings(previous_meetings or [])
@@ -359,6 +410,13 @@ Generate a comprehensive battlecard to prepare for this meeting."""
             )
             previous_meetings = previous
         
+        # Get deep research if available
+        deep_research = None
+        if company_data:
+            deep_research_cached = company_data.get('deep_research')
+            if deep_research_cached:
+                deep_research = deep_research_cached.get('data')
+        
         # Generate battlecard
         battlecard = await self.generate_battlecard(
             company_data=company_data,
@@ -366,6 +424,8 @@ Generate a comprehensive battlecard to prepare for this meeting."""
             product_ids=meeting_data.get("product_ids", []),
             previous_meetings=previous_meetings,
             meeting_notes=meeting_data.get("notes"),
+            use_deep_research=True,
+            deep_research=deep_research,
         )
         
         # Save to meeting

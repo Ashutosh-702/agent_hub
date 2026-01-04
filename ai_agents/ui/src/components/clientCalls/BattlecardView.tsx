@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PageHeader, BackButton, Loader } from '../shared';
 
-// Mock battlecard data
+// Mock battlecard data (kept for reference, not used in production)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const MOCK_BATTLECARD = {
   id: 'bc-1',
   company: {
@@ -146,19 +147,58 @@ const SectionIcons: Record<string, string> = {
 export const BattlecardView = () => {
   const { battlecardId } = useParams<{ battlecardId: string }>();
   const navigate = useNavigate();
-  const [battlecard, setBattlecard] = useState<typeof MOCK_BATTLECARD | null>(null);
+  const [battlecard, setBattlecard] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   
   useEffect(() => {
     const loadBattlecard = async () => {
+      if (!battlecardId) return;
+      
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      setBattlecard(MOCK_BATTLECARD);
-      setIsLoading(false);
+      try {
+        // Fetch meeting to get battlecard
+        const res = await fetch(`/api/v1/meetings/${battlecardId}`);
+        const data = await res.json();
+        
+        if (data.success) {
+          const meeting = data.data;
+          if (meeting.battlecard) {
+            setBattlecard(meeting.battlecard);
+          } else {
+            // Generate battlecard if not exists
+            await generateBattlecard();
+          }
+        }
+      } catch (error) {
+        console.error('Error loading battlecard:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
     loadBattlecard();
   }, [battlecardId]);
+  
+  const generateBattlecard = async () => {
+    if (!battlecardId) return;
+    
+    setIsGenerating(true);
+    try {
+      const res = await fetch(`/api/v1/meetings/${battlecardId}/battlecard`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setBattlecard(data.data);
+      }
+    } catch (error) {
+      console.error('Error generating battlecard:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
   
   const copySection = (sectionName: string, content: string) => {
     navigator.clipboard.writeText(content);
@@ -166,12 +206,22 @@ export const BattlecardView = () => {
     setTimeout(() => setCopiedSection(null), 2000);
   };
   
-  if (isLoading) {
-    return <Loader text="Generating battlecard..." />;
+  if (isLoading || isGenerating) {
+    return <Loader text={isGenerating ? "Generating battlecard..." : "Loading battlecard..."} />;
   }
   
   if (!battlecard) {
-    return <div className="form-error">Battlecard not found</div>;
+    return (
+      <div className="battlecard-container">
+        <BackButton to="/client-calls/prep" label="Back to Prep" />
+        <div className="form-error" style={{ margin: '2rem' }}>
+          <p>Battlecard not found</p>
+          <button className="btn-primary" onClick={generateBattlecard} style={{ marginTop: '1rem' }}>
+            Generate Battlecard
+          </button>
+        </div>
+      </div>
+    );
   }
   
   return (
@@ -181,14 +231,19 @@ export const BattlecardView = () => {
       <div className="battlecard-header">
         <div>
           <PageHeader
-            title={`Battlecard: ${battlecard.company.name}`}
-            subtitle={`${battlecard.meetingType.charAt(0).toUpperCase() + battlecard.meetingType.slice(1)} Meeting • Generated ${new Date(battlecard.createdAt).toLocaleDateString()}`}
+            title={`Battlecard: ${battlecard.company_snapshot?.title || 'Meeting Preparation'}`}
+            subtitle={`Generated ${battlecard.generated_at ? new Date(battlecard.generated_at).toLocaleDateString() : 'Just now'}`}
             variant="inline"
           />
         </div>
-        <button className="btn-primary" onClick={() => navigate('/client-calls/start')}>
-          Start Meeting
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className="btn-secondary" onClick={generateBattlecard} disabled={isGenerating}>
+            {isGenerating ? 'Regenerating...' : '⟳ Regenerate'}
+          </button>
+          <button className="btn-primary" onClick={() => navigate('/client-calls/start')}>
+            Start Meeting
+          </button>
+        </div>
       </div>
       
       <div className="battlecard-grid">
@@ -199,10 +254,20 @@ export const BattlecardView = () => {
             <h3>Company Overview</h3>
           </div>
           <div className="battlecard-section-body">
-            <p><strong>{battlecard.company.name}</strong></p>
-            <p>{battlecard.company.industry} • {battlecard.company.size}</p>
-            <p>HQ: {battlecard.company.headquarters}</p>
-            <p>Revenue: {battlecard.company.annualRevenue}</p>
+            {battlecard.company_snapshot ? (
+              <>
+                <div dangerouslySetInnerHTML={{ __html: battlecard.company_snapshot.content?.replace(/\n/g, '<br/>') || '' }} />
+                {battlecard.company_snapshot.bullet_points && battlecard.company_snapshot.bullet_points.length > 0 && (
+                  <ul style={{ marginTop: '0.5rem' }}>
+                    {battlecard.company_snapshot.bullet_points.map((point: string, idx: number) => (
+                      <li key={idx}>{point}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p>Company overview will be generated from deep research</p>
+            )}
           </div>
         </div>
         
@@ -213,17 +278,22 @@ export const BattlecardView = () => {
             <h3>Meeting Attendees</h3>
           </div>
           <div className="battlecard-section-body">
-            {battlecard.contacts.map((contact, idx) => (
-              <div key={idx} style={{ marginBottom: '1rem' }}>
-                <p style={{ margin: 0 }}><strong>{contact.name}</strong> - {contact.title}</p>
-                <p style={{ margin: '0.25rem 0', fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
-                  {contact.persona}
-                </p>
-                <p style={{ margin: 0, fontSize: '0.875rem' }}>
-                  <em>Style:</em> {contact.communicationStyle}
-                </p>
-              </div>
-            ))}
+            {battlecard.contact_snapshot ? (
+              <>
+                <div dangerouslySetInnerHTML={{ __html: battlecard.contact_snapshot.content?.replace(/\n/g, '<br/>') || '' }} />
+                {battlecard.contact_snapshot.bullet_points && battlecard.contact_snapshot.bullet_points.length > 0 && (
+                  <ul style={{ marginTop: '0.5rem' }}>
+                    {battlecard.contact_snapshot.bullet_points.map((point: string, idx: number) => (
+                      <li key={idx}>{point}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
+                Contact information will be generated from contact data
+              </p>
+            )}
           </div>
         </div>
         
@@ -234,19 +304,22 @@ export const BattlecardView = () => {
             <h3>Company Research</h3>
           </div>
           <div className="battlecard-section-body">
-            <p><strong>Recent News:</strong></p>
-            <ul>
-              {battlecard.companyResearch.recentNews.map((item, idx) => (
-                <li key={idx}>{item}</li>
-              ))}
-            </ul>
-            <p><strong>Known Challenges:</strong></p>
-            <ul>
-              {battlecard.companyResearch.knownChallenges.map((item, idx) => (
-                <li key={idx} style={{ color: 'var(--color-warning)' }}>{item}</li>
-              ))}
-            </ul>
-            <p><strong>Tech Stack:</strong> {battlecard.companyResearch.techStack.join(', ')}</p>
+            {battlecard.company_snapshot ? (
+              <>
+                <p><strong>Recent News & Signals:</strong></p>
+                <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-600)' }}>
+                  Recent news and important signals will appear here from deep research
+                </p>
+                <p><strong>Key Initiatives:</strong></p>
+                <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-600)' }}>
+                  Key initiatives will be extracted from company research
+                </p>
+              </>
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
+                Company research will be generated from deep research pipeline
+              </p>
+            )}
           </div>
         </div>
         
@@ -257,19 +330,22 @@ export const BattlecardView = () => {
             <h3>Product Fit</h3>
           </div>
           <div className="battlecard-section-body">
-            {Object.entries(battlecard.productFit).map(([product, fit]) => (
-              <div key={product} style={{ marginBottom: '1rem' }}>
-                <p><strong>{product}</strong> - <span style={{ color: 'var(--color-success)' }}>High Fit</span></p>
-                <ul>
-                  {fit.keyFeatures.map((feature, idx) => (
-                    <li key={idx}>{feature}</li>
-                  ))}
-                </ul>
-                <p style={{ fontSize: '0.875rem', color: 'var(--color-primary)', fontWeight: 500 }}>
-                  💡 {fit.competitiveAdvantage}
-                </p>
-              </div>
-            ))}
+            {battlecard.why_now_product_fit ? (
+              <>
+                <div dangerouslySetInnerHTML={{ __html: battlecard.why_now_product_fit.content?.replace(/\n/g, '<br/>') || '' }} />
+                {battlecard.why_now_product_fit.bullet_points && battlecard.why_now_product_fit.bullet_points.length > 0 && (
+                  <ul style={{ marginTop: '0.5rem' }}>
+                    {battlecard.why_now_product_fit.bullet_points.map((point: string, idx: number) => (
+                      <li key={idx}>{point}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
+                Product fit analysis will be generated based on company research and product knowledge
+              </p>
+            )}
           </div>
         </div>
         
@@ -280,47 +356,25 @@ export const BattlecardView = () => {
             <h3>Talking Points</h3>
           </div>
           <div className="battlecard-section-body">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
-              <div>
-                <p style={{ fontWeight: 600, color: 'var(--color-success)' }}>🎯 Opening</p>
+            {battlecard.talking_points && battlecard.talking_points.length > 0 ? (
+              <>
                 <ul>
-                  {battlecard.talkingPoints.opening.map((point, idx) => (
+                  {battlecard.talking_points.map((point: string, idx: number) => (
                     <li key={idx}>{point}</li>
                   ))}
                 </ul>
-              </div>
-              <div>
-                <p style={{ fontWeight: 600, color: 'var(--color-info)' }}>❓ Discovery Questions</p>
-                <ul>
-                  {battlecard.talkingPoints.discovery.map((point, idx) => (
-                    <li key={idx}>{point}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p style={{ fontWeight: 600, color: 'var(--color-primary)' }}>✨ Value Props</p>
-                <ul>
-                  {battlecard.talkingPoints.valueProps.map((point, idx) => (
-                    <li key={idx}>{point}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            <button
-              className="copy-section-btn"
-              onClick={() => copySection('talking', [
-                'OPENING:',
-                ...battlecard.talkingPoints.opening,
-                '',
-                'DISCOVERY QUESTIONS:',
-                ...battlecard.talkingPoints.discovery,
-                '',
-                'VALUE PROPS:',
-                ...battlecard.talkingPoints.valueProps,
-              ].join('\n'))}
-            >
-              {copiedSection === 'talking' ? '✓ Copied!' : '📋 Copy All Talking Points'}
-            </button>
+                <button
+                  className="copy-section-btn"
+                  onClick={() => copySection('talking', battlecard.talking_points.join('\n'))}
+                >
+                  {copiedSection === 'talking' ? '✓ Copied!' : '📋 Copy All Talking Points'}
+                </button>
+              </>
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
+                Talking points will be AI-generated based on company research and products
+              </p>
+            )}
           </div>
         </div>
         
@@ -331,25 +385,30 @@ export const BattlecardView = () => {
             <h3>Objection Handlers</h3>
           </div>
           <div className="battlecard-section-body">
-            {battlecard.objectionHandlers.map((handler, idx) => (
-              <div key={idx} className="objection-item">
-                <p className="objection-text">"{handler.objection}"</p>
-                <p className="objection-response">
-                  <strong>Response:</strong> {handler.response}
-                </p>
-                <p style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', margin: '0.5rem 0 0' }}>
-                  📊 Evidence: {handler.evidence}
-                </p>
-              </div>
-            ))}
-            <button
-              className="copy-section-btn"
-              onClick={() => copySection('objections', battlecard.objectionHandlers.map(h =>
-                `Q: ${h.objection}\nA: ${h.response}\nEvidence: ${h.evidence}`
-              ).join('\n\n'))}
-            >
-              {copiedSection === 'objections' ? '✓ Copied!' : '📋 Copy All Objection Handlers'}
-            </button>
+            {battlecard.likely_objections && battlecard.likely_objections.length > 0 ? (
+              <>
+                {battlecard.likely_objections.map((handler: any, idx: number) => (
+                  <div key={idx} className="objection-item">
+                    <p className="objection-text">"{handler.objection || handler.objection_text}"</p>
+                    <p className="objection-response">
+                      <strong>Response:</strong> {handler.response || handler.suggested_response}
+                    </p>
+                  </div>
+                ))}
+                <button
+                  className="copy-section-btn"
+                  onClick={() => copySection('objections', battlecard.likely_objections.map((h: any) =>
+                    `Q: ${h.objection || h.objection_text}\nA: ${h.response || h.suggested_response}`
+                  ).join('\n\n'))}
+                >
+                  {copiedSection === 'objections' ? '✓ Copied!' : '📋 Copy All Objection Handlers'}
+                </button>
+              </>
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
+                Objection handlers will be AI-generated based on company situation and product knowledge
+              </p>
+            )}
           </div>
         </div>
         
@@ -360,20 +419,20 @@ export const BattlecardView = () => {
             <h3>Competitor Intel</h3>
           </div>
           <div className="battlecard-section-body">
-            {Object.entries(battlecard.competitorComparison).map(([competitor, intel]) => (
-              <div key={competitor} style={{ marginBottom: '1rem' }}>
-                <p><strong>{competitor}</strong></p>
-                <p style={{ fontSize: '0.875rem', color: 'var(--color-error)' }}>
-                  Their strength: {intel.theirStrength}
-                </p>
-                <p style={{ fontSize: '0.875rem', color: 'var(--color-success)' }}>
-                  Our advantage: {intel.ourAdvantage}
-                </p>
-                <p style={{ fontSize: '0.875rem', color: 'var(--color-primary)' }}>
-                  💡 {intel.counterPoint}
-                </p>
-              </div>
-            ))}
+            {battlecard.key_risks && battlecard.key_risks.length > 0 ? (
+              <>
+                <p><strong>Competitive Intelligence:</strong></p>
+                <ul>
+                  {battlecard.key_risks.map((risk: string, idx: number) => (
+                    <li key={idx}>{risk}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
+                Competitor intelligence will be generated based on detected competitors and product knowledge
+              </p>
+            )}
           </div>
         </div>
         
@@ -384,11 +443,17 @@ export const BattlecardView = () => {
             <h3>Suggested Next Steps</h3>
           </div>
           <div className="battlecard-section-body">
-            <ol>
-              {battlecard.nextSteps.map((step, idx) => (
-                <li key={idx}>{step}</li>
-              ))}
-            </ol>
+            {battlecard.suggested_next_steps && battlecard.suggested_next_steps.length > 0 ? (
+              <ol>
+                {battlecard.suggested_next_steps.map((step: string, idx: number) => (
+                  <li key={idx}>{step}</li>
+                ))}
+              </ol>
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
+                Next steps will be AI-generated based on deal stage and signals
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -61,6 +61,7 @@ class TranscriptEntry(BaseModel):
     """A single entry in the meeting transcript."""
     timestamp: float = Field(..., description="Timestamp in seconds from meeting start")
     speaker: str = Field(..., description="Speaker identifier: 'user' or 'other'")
+    source: str = Field(default="mic", description="Audio source: 'mic' or 'system_audio'")
     text: str = Field(..., description="The transcribed text")
     is_final: bool = Field(default=True, description="Whether this is a final or interim transcript")
 
@@ -144,11 +145,30 @@ class RecommendedFollowUp(BaseModel):
     suggested_timeline: Optional[str] = Field(None, description="When to do this")
 
 
+class ProductCompanyScore(BaseModel):
+    """Product-company fit score."""
+    product_id: str = Field(..., description="Product ID")
+    product_name: str = Field(..., description="Product name")
+    score: float = Field(..., ge=0, le=100, description="Fit score 0-100")
+    reasoning: str = Field(..., description="Reasoning for the score")
+    key_strengths: List[str] = Field(default_factory=list, description="What aligns well")
+    key_concerns: List[str] = Field(default_factory=list, description="What doesn't align or red flags")
+
+
+class RedFlag(BaseModel):
+    """A detected red flag."""
+    flag_name: str = Field(..., description="Name of the red flag")
+    evidence: str = Field(..., description="Quote from transcript")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence level")
+    context: Optional[str] = Field(None, description="Context explaining why this is concerning")
+
+
 class AIReflections(BaseModel):
     """AI-generated post-call reflections."""
     generated_at: Optional[datetime] = None
     what_went_well: List[str] = Field(default_factory=list)
     areas_for_improvement: List[str] = Field(default_factory=list)
+    what_can_be_improved: List[str] = Field(default_factory=list, description="What can be improved in future meetings")
     key_learnings: List[str] = Field(default_factory=list)
     relationship_status: Optional[RelationshipStatus] = None
     deal_health_score: Optional[float] = Field(None, ge=0, le=100, description="0-100 score")
@@ -156,6 +176,11 @@ class AIReflections(BaseModel):
     competitive_positioning: Optional[str] = None
     stakeholder_analysis: Optional[str] = None
     risk_assessment: List[str] = Field(default_factory=list)
+    product_company_scores: List[ProductCompanyScore] = Field(default_factory=list, description="Product x Company fit scores")
+    red_flags_detected: List[RedFlag] = Field(default_factory=list, description="Red flags detected in the meeting")
+    recommendations: List[str] = Field(default_factory=list, description="What to do with this company")
+    worth_pursuing: Optional[bool] = Field(None, description="Whether this company is worth pursuing")
+    worth_pursuing_reasoning: Optional[str] = Field(None, description="Reasoning for worth_pursuing assessment")
 
 
 class ManualReflections(BaseModel):

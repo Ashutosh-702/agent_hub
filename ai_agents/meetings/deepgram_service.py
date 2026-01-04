@@ -41,7 +41,7 @@ class DeepgramTranscriptionService:
         Initialize the Deepgram transcription service.
         
         Args:
-            on_transcript_interim: Callback for interim transcripts (text, timestamp)
+            on_transcript_interim: Callback for interim transcripts (text, timestamp) or (text, timestamp, speaker)
             on_transcript_final: Callback for final transcripts (text, speaker, timestamp)
             on_error: Callback for errors (message)
         """
@@ -334,11 +334,17 @@ class DeepgramTranscriptionService:
                 else:
                     logger.error("❌ on_transcript_final callback is None!")
             else:
-                logger.info(f"🔄 INTERIM transcript: '{transcript[:50]}...' (timestamp: {timestamp:.2f}s)")
+                logger.info(f"🔄 INTERIM transcript: '{transcript[:50]}...' (speaker: {speaker}, timestamp: {timestamp:.2f}s)")
                 if self.on_transcript_interim:
                     logger.debug("📞 Calling on_transcript_interim callback...")
                     try:
-                        self.on_transcript_interim(transcript, timestamp)
+                        # Pass speaker to interim callback if it accepts 3 args, otherwise use 2 args for backward compatibility
+                        import inspect
+                        sig = inspect.signature(self.on_transcript_interim)
+                        if len(sig.parameters) >= 3:
+                            self.on_transcript_interim(transcript, timestamp, speaker)
+                        else:
+                            self.on_transcript_interim(transcript, timestamp)
                         logger.debug("✅ on_transcript_interim callback completed")
                     except Exception as callback_error:
                         logger.error(f"❌ Error in on_transcript_interim callback: {callback_error}", exc_info=True)

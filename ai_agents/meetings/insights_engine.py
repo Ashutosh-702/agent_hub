@@ -116,7 +116,10 @@ class InsightsEngine:
             context: Pre-loaded context for insight generation
         """
         self.context = context or InsightGenerationContext()
-        self._openai_client = AsyncOpenAI(api_key=loaded_config.openai_api_key)
+        api_key = loaded_config.openai_api_key
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not found in environment variables. Insights generation will fail.")
+        self._openai_client = AsyncOpenAI(api_key=api_key) if api_key else None
         self._transcript_buffer: List[TranscriptEntry] = []
         self._last_insight_time: float = 0
         self._generated_insights: List[LiveInsight] = []

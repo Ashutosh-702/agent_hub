@@ -1,6 +1,19 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from database.connection_manager import ConnectionManager
 import aiohttp
+
+# Load .env file before reading environment variables
+# Find the .env file relative to this file's location
+env_path = Path(__file__).parent.parent / '.env'
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path, override=True)
+else:
+    # Fallback: try loading from current directory
+    import logging
+    logging.warning(f".env file not found at {env_path}, trying current directory")
+    load_dotenv(override=True)
 
 
 class Settings:
@@ -13,7 +26,7 @@ class Settings:
     lusha_api_key = os.getenv("LUSHA_API_KEY")
     apollo_api_key = os.getenv("APOLLO_API_KEY")
     http_session : aiohttp.ClientSession = None
-    openai_api_key = os.getenv("OPENAI_API_KEY", "")
+    openai_api_key = os.getenv("OPENAI_API_KEY", "").strip('"').strip("'")  # Strip quotes if present
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("API_PORT", "80"))
     workers = int(os.getenv("API_WORKERS", "1"))

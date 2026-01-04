@@ -1,19 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, BackButton, Loader } from '../shared';
-import { useGetCompaniesQuery } from '../../store';
+import { PageHeader, BackButton } from '../shared';
 import { 
   PRODUCTS, 
-  MOCK_COMPANIES, 
   getContactsForCompany, 
   type MockContact 
 } from './mockData';
+import { SearchableCompanySelect } from './SearchableCompanySelect';
 
 interface Contact extends MockContact {}
 
 export const LogPhoneCallForm = () => {
   const navigate = useNavigate();
-  const { data: companiesResponse, isLoading: companiesLoading } = useGetCompaniesQuery({ page: 1, limit: 100 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [selectedCompany, setSelectedCompany] = useState<string>('');
@@ -26,10 +24,6 @@ export const LogPhoneCallForm = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
-  
-  // Use API companies if available, otherwise fall back to mock data
-  const apiCompanies = companiesResponse?.data || [];
-  const companies = apiCompanies.length > 0 ? apiCompanies : MOCK_COMPANIES;
   
   // Fetch contacts when company changes
   useEffect(() => {
@@ -144,10 +138,6 @@ export const LogPhoneCallForm = () => {
     }
   };
   
-  if (companiesLoading) {
-    return <Loader text="Loading companies..." />;
-  }
-  
   return (
     <div className="meeting-form-container">
       <BackButton to="/client-calls/phone" label="Back to Phone Call" />
@@ -237,21 +227,13 @@ export const LogPhoneCallForm = () => {
         
         {/* Company Selection */}
         <div className="meeting-form-section">
-          <label className="meeting-form-label">
-            Company <span className="required">*</span>
-          </label>
-          <select
-            className="meeting-form-select"
+          <SearchableCompanySelect
             value={selectedCompany}
-            onChange={(e) => setSelectedCompany(e.target.value)}
-          >
-            <option value="">Select a company...</option>
-            {companies.map((company: any) => (
-              <option key={company.id || company._id} value={company.id || company._id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedCompany}
+            label="Company"
+            placeholder="Select a company..."
+            required
+          />
         </div>
         
         {/* Contact Selection */}

@@ -26,6 +26,8 @@ from ai_agents.meetings.models import (
 from ai_agents.meetings.deepgram_service import create_transcription_service
 from ai_agents.meetings.insights_engine import InsightsEngine
 from ai_agents.meetings.reflections_generator import ReflectionsGenerator
+from ai_agents.meetings.post_call_analyzer import PostCallAnalyzer
+from ai_agents.meetings.red_flag_detector import RedFlagDetector
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,8 @@ class MeetingWebSocketHandler:
         self._transcription_service = None
         self._insights_engine: Optional[InsightsEngine] = None
         self._reflections_generator = ReflectionsGenerator()
+        self._post_call_analyzer = PostCallAnalyzer()
+        self._red_flag_detector = RedFlagDetector()
         
         # State
         self._transcript: list = []
@@ -90,11 +94,11 @@ class MeetingWebSocketHandler:
             except Exception as e:
                 logger.error(f"Error sending message: {e}")
     
-    def _on_transcript_interim_sync(self, text: str, timestamp: float):
+    def _on_transcript_interim_sync(self, text: str, timestamp: float, speaker: str = "user"):
         """Sync wrapper for interim transcript callback (called from Deepgram thread)."""
         if self._event_loop:
             asyncio.run_coroutine_threadsafe(
-                self._on_transcript_interim(text, timestamp),
+                self._on_transcript_interim(text, timestamp, speaker),
                 self._event_loop
             )
     
@@ -114,23 +118,31 @@ class MeetingWebSocketHandler:
                 self._event_loop
             )
     
-    async def _on_transcript_interim(self, text: str, timestamp: float):
+    async def _on_transcript_interim(self, text: str, timestamp: float, speaker: str = "user"):
         """Handle interim transcript from Deepgram."""
-        logger.info(f"Received interim transcript: {text[:100]}...")
+        logger.info(f"Received interim transcript: {text[:100]}... (speaker: {speaker})")
+        # Determine source: 'user' speaker = mic, 'client' speaker = system_audio
+        source = "mic" if speaker == "user" else "system_audio"
         await self._send_json({
             "type": "transcript_interim",
             "text": text,
             "timestamp": timestamp,
+            "speaker": speaker,
+            "source": source,
         })
     
     async def _on_transcript_final(self, text: str, speaker: str, timestamp: float):
         """Handle final transcript from Deepgram."""
         logger.info(f"Received final transcript: {text[:100]}... (speaker: {speaker})")
         
+        # Determine source: 'user' speaker = mic, 'client' speaker = system_audio
+        source = "mic" if speaker == "user" else "system_audio"
+        
         # Create transcript entry
         entry = TranscriptEntry(
             timestamp=timestamp,
             speaker=speaker,
+            source=source,
             text=text,
             is_final=True,
         )
@@ -155,6 +167,7 @@ class MeetingWebSocketHandler:
             "text": text,
             "speaker": speaker,
             "timestamp": timestamp,
+            "source": source,
         })
         logger.debug("Sent transcript_final message to client")
         
@@ -461,9 +474,54 @@ class MeetingWebSocketHandler:
         if self._transcription_service:
             await self._transcription_service.close()
         
-        # Generate post-call summary
+        # Generate comprehensive post-call analysis using PostCallAnalyzer
         summary_data = {}
-        if self._insights_engine:
+        if self._transcript:
+            # Get company and contact data for analysis
+            company_data = None
+            contact_data = None
+            if self._meeting_data.get("company_id") and self.companies_dao:
+                company_data = await self.companies_dao.get_company(str(self._meeting_data["company_id"]))
+            if self._meeting_data.get("contact_ids") and self.contacts_dao:
+                contact_id = str(self._meeting_data["contact_ids"][0])
+                contact_data = await self.contacts_dao.get_contact(contact_id)
+            
+            # Get previous meetings
+            previous_meetings = []
+            if self._meeting_data.get("company_id"):
+                previous = await self.meetings_dao.get_previous_meetings(
+                    company_id=str(self._meeting_data["company_id"]),
+                    exclude_meeting_id=self._db_meeting_id,
+                )
+                previous_meetings = previous[:3]
+            
+            company_name = company_data.get("name", "") if company_data else ""
+            
+            # Analyze meeting
+            analysis = await self._post_call_analyzer.analyze_meeting(
+                transcript=self._transcript,
+                company_data=company_data,
+                contact_data=contact_data,
+                products=self._meeting_data.get("product_ids", []),
+                previous_meetings=previous_meetings,
+                company_name=company_name,
+            )
+            summary_data = analysis
+            
+            # Detect and save red flags
+            if self._transcript:
+                red_flags_raw = await self._red_flag_detector.detect_red_flags(self._transcript)
+                if red_flags_raw and self._meeting_data.get("company_id"):
+                    # Save red flags to company
+                    await self.companies_dao.add_red_flags(
+                        company_id=str(self._meeting_data["company_id"]),
+                        meeting_id=self._db_meeting_id,
+                        flags=red_flags_raw,
+                        transcript_excerpts={rf.get("flag_name"): rf.get("evidence") for rf in red_flags_raw},
+                    )
+        
+        # Fallback to insights engine if no transcript
+        if not summary_data and self._insights_engine:
             summary_data = await self._insights_engine.generate_post_call_summary()
         
         # Finalize meeting in database

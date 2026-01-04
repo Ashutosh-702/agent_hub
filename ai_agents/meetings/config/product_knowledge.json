@@ -1,0 +1,347 @@
+{
+  "GaaS": {
+    "name": "Fynd Platform (GaaS)",
+    "tagline": "Complete e-commerce platform for enterprise brands",
+    "description": "A comprehensive e-commerce platform that provides headless commerce capabilities, multi-channel selling, and real-time inventory management for enterprise brands looking to scale their online presence.",
+    "key_features": [
+      "Headless commerce architecture",
+      "Multi-channel selling (marketplace, D2C, social commerce)",
+      "Real-time inventory synchronization",
+      "API-first design for easy integrations",
+      "Built-in payment gateway integration",
+      "Mobile-first storefront builder"
+    ],
+    "differentiators": [
+      "Built specifically for the Indian market with local payment and logistics integrations",
+      "Faster implementation compared to global platforms (4-6 weeks vs 3-6 months)",
+      "Integrated ecosystem (OMS, WMS, Storefront) reducing vendor complexity",
+      "Pay-as-you-grow pricing model",
+      "Dedicated support team in India"
+    ],
+    "ideal_customer_profile": {
+      "industries": ["retail", "fashion", "electronics", "beauty", "furniture", "home_decor"],
+      "company_size": "100-5000 employees",
+      "revenue_range": "₹50Cr - ₹1000Cr+",
+      "pain_points": [
+        "Fragmented inventory across channels",
+        "Slow website performance",
+        "Complex multi-vendor marketplace management",
+        "Limited customization on existing platform",
+        "High platform fees eating into margins",
+        "Poor mobile experience",
+        "Integration challenges with existing systems"
+      ],
+      "tech_requirements": [
+        "API-first architecture",
+        "Headless/frontend flexibility",
+        "Multi-channel inventory sync",
+        "Scalable infrastructure",
+        "Mobile optimization"
+      ]
+    },
+    "common_objections": {
+      "integration": "Pre-built connectors for 50+ platforms including Shopify, Magento, WooCommerce, SAP, Oracle",
+      "cost": "Pay-as-you-grow model, ROI typically seen in 3-6 months through reduced platform fees and increased conversion",
+      "migration": "Zero-downtime migration with parallel running, dedicated migration team",
+      "customization": "Headless architecture allows full frontend control while maintaining backend stability",
+      "support": "Dedicated account manager and 24/7 technical support"
+    },
+    "case_studies": [
+      "Fashion Retail Co: 40% reduction in order cancellations, 3x faster page load",
+      "Electronics Brand: Unified 5 marketplaces into single platform, 60% cost reduction",
+      "Home Decor Chain: Launched D2C in 4 weeks, 2x conversion rate improvement"
+    ],
+    "competitors": {
+      "Shopify Plus": {
+        "their_strength": "Global brand recognition, extensive app marketplace",
+        "our_advantage": "Built for India, faster implementation, integrated OMS/WMS, lower total cost"
+      },
+      "Magento": {
+        "their_strength": "Open source flexibility, enterprise features",
+        "our_advantage": "Easier to use, faster setup, better mobile performance, local support"
+      },
+      "Custom Build": {
+        "their_strength": "Full control, no vendor lock-in",
+        "our_advantage": "Faster time to market, proven platform, ongoing updates, lower maintenance"
+      }
+    },
+    "pricing_guidance": "Starts at ₹2L/month for mid-market, scales with GMV. Enterprise pricing custom. Typical ROI in 3-6 months.",
+    "implementation_timeline": "4-6 weeks for standard setup, 8-12 weeks for complex integrations"
+  },
+  "OMS": {
+    "name": "Fynd OMS",
+    "tagline": "Omnichannel order management and fulfillment",
+    "description": "Intelligent order management system that provides real-time inventory synchronization across all channels, intelligent order routing, split shipping, and comprehensive returns management for omnichannel retailers.",
+    "key_features": [
+      "Real-time inventory sync across all channels",
+      "Intelligent order routing (ship-from-store, warehouse, vendor)",
+      "Split shipping for multi-item orders",
+      "Returns management and reverse logistics",
+      "BOPIS (Buy Online Pickup In Store)",
+      "Pre-built integrations with 50+ marketplaces and channels"
+    ],
+    "differentiators": [
+      "Native integration with Fynd WMS for unified warehouse operations",
+      "AI-powered order allocation for optimal fulfillment",
+      "Only solution with true omnichannel capabilities (not just multi-channel)",
+      "Built for Indian logistics ecosystem (local carriers, COD, etc.)",
+      "Real-time inventory accuracy reducing cancellations by 30-40%"
+    ],
+    "ideal_customer_profile": {
+      "industries": ["retail", "fashion", "electronics", "beauty", "furniture"],
+      "company_size": "50-5000 employees",
+      "revenue_range": "₹20Cr - ₹500Cr+",
+      "pain_points": [
+        "Inventory discrepancies causing order cancellations",
+        "Manual order processing leading to delays",
+        "No visibility across channels",
+        "Can't fulfill from store inventory",
+        "Returns processing is manual and slow",
+        "Split shipping not possible",
+        "Legacy OMS can't handle omnichannel"
+      ],
+      "tech_requirements": [
+        "Real-time inventory sync",
+        "API integrations with marketplaces",
+        "Integration with existing ERP/WMS",
+        "Multi-location inventory management",
+        "Returns processing automation"
+      ]
+    },
+    "common_objections": {
+      "complexity": "Simplified setup with guided onboarding, pre-built connectors reduce integration time",
+      "existing_systems": "Works alongside existing ERP/WMS, API-first design for easy integration",
+      "migration": "Phased migration approach, can run in parallel with existing system",
+      "cost": "ROI typically in 3-6 months through reduced cancellations and faster fulfillment",
+      "training": "Intuitive UI, comprehensive training provided, dedicated support"
+    },
+    "case_studies": [
+      "Fashion Retailer: 40% reduction in order cancellations, 50% faster fulfillment",
+      "Electronics Brand: Enabled ship-from-store, 30% cost reduction in logistics",
+      "Multi-brand Retailer: Unified 3 legacy systems, 60% reduction in manual work"
+    ],
+    "competitors": {
+      "Unicommerce": {
+        "their_strength": "Strong marketplace integrations, established in India",
+        "our_advantage": "Native WMS integration, better omnichannel capabilities, AI-powered allocation"
+      },
+      "Increff": {
+        "their_strength": "Good inventory planning features",
+        "our_advantage": "End-to-end fulfillment (not just planning), real-time sync, omnichannel"
+      },
+      "Vinculum": {
+        "their_strength": "Marketplace focus, good integrations",
+        "our_advantage": "Unified OMS+WMS, better store fulfillment, modern architecture"
+      }
+    },
+    "pricing_guidance": "Starts at ₹1.5L/month for mid-market, scales with order volume. Enterprise custom pricing.",
+    "implementation_timeline": "3-4 weeks for standard setup, 6-8 weeks with complex integrations"
+  },
+  "WMS": {
+    "name": "Fynd WMS",
+    "tagline": "AI-powered warehouse management system",
+    "description": "Modern warehouse management system with AI-powered pick path optimization, real-time inventory tracking, labor management, and seamless integration with OMS for end-to-end fulfillment operations.",
+    "key_features": [
+      "AI-powered pick path optimization",
+      "Real-time inventory tracking",
+      "Zone-based picking",
+      "Labor management and productivity tracking",
+      "Mobile-first interface for warehouse staff",
+      "Integration with OMS for seamless order fulfillment"
+    ],
+    "differentiators": [
+      "Mobile-first design - works on any Android device",
+      "Quick deployment - 2-3 weeks vs 3-6 months for traditional WMS",
+      "AI recommendations for optimal picking and putaway",
+      "Native integration with Fynd OMS (unified platform)",
+      "No hardware lock-in - works with existing scanners"
+    ],
+    "ideal_customer_profile": {
+      "industries": ["retail", "fashion", "electronics", "ecommerce", "3PL"],
+      "company_size": "20-2000 employees",
+      "revenue_range": "₹10Cr - ₹500Cr+",
+      "pain_points": [
+        "Manual warehouse processes causing errors",
+        "No real-time visibility into inventory",
+        "Inefficient picking paths wasting time",
+        "Can't track labor productivity",
+        "Legacy WMS is slow and hard to use",
+        "Integration issues with OMS/ERP",
+        "High training time for new staff"
+      ],
+      "tech_requirements": [
+        "Mobile accessibility",
+        "Real-time inventory updates",
+        "Integration with OMS/ERP",
+        "Barcode/QR scanning support",
+        "Reporting and analytics"
+      ]
+    },
+    "common_objections": {
+      "hardware": "Works with existing scanners and devices, no new hardware required",
+      "training": "Intuitive UI, minimal training needed (1-2 days vs weeks)",
+      "migration": "Phased rollout, can run parallel with existing system",
+      "cost": "Lower TCO than traditional WMS, ROI in 4-6 months through efficiency gains",
+      "complexity": "Simplified workflows, guided setup, dedicated implementation team"
+    },
+    "case_studies": [
+      "E-commerce Brand: 30% faster picking, 50% reduction in errors",
+      "Fashion Retailer: Enabled same-day delivery, 40% productivity improvement",
+      "3PL Provider: Handles 10x more SKUs, 60% faster onboarding of new clients"
+    ],
+    "competitors": {
+      "SAP WM": {
+        "their_strength": "Enterprise-grade, part of SAP ecosystem",
+        "our_advantage": "Easier to use, faster deployment, mobile-first, lower cost"
+      },
+      "Oracle WMS": {
+        "their_strength": "Enterprise features, Oracle integration",
+        "our_advantage": "Simpler setup, better mobile experience, AI-powered optimization"
+      },
+      "Manhattan Associates": {
+        "their_strength": "Advanced features, global presence",
+        "our_advantage": "Built for India, faster implementation, integrated with OMS, lower cost"
+      }
+    },
+    "pricing_guidance": "Starts at ₹1L/month for mid-market, scales with warehouse size and users. Enterprise custom pricing.",
+    "implementation_timeline": "2-3 weeks for standard setup, 4-6 weeks for complex warehouses"
+  },
+  "Storefront": {
+    "name": "Fynd Storefront",
+    "tagline": "Headless commerce storefront builder",
+    "description": "Lightning-fast headless commerce storefront builder with no-code customization, built-in SEO optimization, and mobile-first design for brands wanting full control over their customer experience.",
+    "key_features": [
+      "No-code storefront builder",
+      "Mobile optimization out of the box",
+      "Built-in SEO optimization",
+      "Headless architecture for full frontend control",
+      "Integrated checkout with multiple payment options",
+      "Customizable themes and components"
+    ],
+    "differentiators": [
+      "Lightning fast - sub-2 second page loads",
+      "Fully customizable without coding",
+      "Integrated with Fynd Platform for seamless backend",
+      "Mobile-first design (60%+ traffic is mobile)",
+      "Built-in performance optimization"
+    ],
+    "ideal_customer_profile": {
+      "industries": ["retail", "fashion", "electronics", "beauty", "D2C brands"],
+      "company_size": "10-1000 employees",
+      "revenue_range": "₹5Cr - ₹200Cr+",
+      "pain_points": [
+        "Slow website performance hurting conversions",
+        "Limited customization on current platform",
+        "Poor mobile experience",
+        "SEO issues affecting organic traffic",
+        "High platform fees",
+        "Want headless but don't have dev resources"
+      ],
+      "tech_requirements": [
+        "Fast page load times",
+        "Mobile optimization",
+        "SEO capabilities",
+        "Customization flexibility",
+        "Easy content management"
+      ]
+    },
+    "common_objections": {
+      "customization": "Full flexibility with headless architecture, no-code builder for non-technical users",
+      "migration": "Zero-downtime migration support, dedicated migration team",
+      "cost": "Lower than custom development, includes hosting and CDN",
+      "performance": "Sub-2 second load times, built-in CDN and optimization",
+      "support": "Dedicated support, regular updates, comprehensive documentation"
+    },
+    "case_studies": [
+      "Fashion Brand: 2x conversion rate, 50% faster page loads",
+      "Electronics D2C: Launched in 3 weeks, 3x organic traffic growth",
+      "Beauty Brand: Mobile conversions up 80%, zero downtime migration"
+    ],
+    "competitors": {
+      "Shopify": {
+        "their_strength": "Ease of use, app marketplace",
+        "our_advantage": "Faster performance, better mobile, more customization, lower fees"
+      },
+      "WooCommerce": {
+        "their_strength": "WordPress integration, open source",
+        "our_advantage": "Better performance, easier management, built-in optimization"
+      },
+      "Custom React/Next.js": {
+        "their_strength": "Full control, modern stack",
+        "our_advantage": "Faster to market, no-code builder, managed infrastructure"
+      }
+    },
+    "pricing_guidance": "Starts at ₹50K/month for small brands, scales with traffic. Enterprise custom pricing.",
+    "implementation_timeline": "2-3 weeks for standard setup, 4-6 weeks for custom designs"
+  },
+  "StoreOS": {
+    "name": "Fynd StoreOS",
+    "tagline": "Point-of-sale and retail store management",
+    "description": "Modern point-of-sale system with unified inventory, endless aisle capabilities, staff management, and offline mode for retail stores wanting to bridge online and offline experiences.",
+    "key_features": [
+      "Unified inventory across online and offline",
+      "Endless aisle (sell online inventory from store)",
+      "Staff management and performance tracking",
+      "Offline mode for connectivity issues",
+      "Integrated payments (cards, UPI, cash)",
+      "Customer management and loyalty programs"
+    ],
+    "differentiators": [
+      "Offline capability - no sales lost during internet issues",
+      "Works on any Android device - no expensive hardware needed",
+      "Quick training - intuitive UI, staff productive in 1 day",
+      "Unified inventory with online channels",
+      "Endless aisle increases store sales by 20-30%"
+    ],
+    "ideal_customer_profile": {
+      "industries": ["retail", "fashion", "electronics", "beauty", "furniture"],
+      "company_size": "5-500 employees",
+      "revenue_range": "₹2Cr - ₹100Cr+",
+      "pain_points": [
+        "Separate inventory for online and offline",
+        "Can't sell online inventory from store",
+        "Expensive POS hardware",
+        "Internet connectivity issues causing downtime",
+        "No visibility into store performance",
+        "Manual inventory reconciliation",
+        "Staff training is time-consuming"
+      ],
+      "tech_requirements": [
+        "Offline capability",
+        "Mobile/tablet support",
+        "Inventory sync with online",
+        "Payment processing",
+        "Reporting and analytics"
+      ]
+    },
+    "common_objections": {
+      "hardware": "Works on any Android device, no expensive hardware needed",
+      "downtime": "Offline mode ensures no sales lost during connectivity issues",
+      "training": "Intuitive UI, staff productive in 1 day vs weeks",
+      "integration": "Pre-built integration with Fynd Platform, easy API integration with others",
+      "cost": "Lower than traditional POS, ROI through increased sales and reduced errors"
+    },
+    "case_studies": [
+      "Fashion Retail Chain: 25% increase in store sales through endless aisle",
+      "Electronics Store: Zero downtime during internet outages, 30% faster checkout",
+      "Multi-store Brand: Unified inventory, 50% reduction in stockouts"
+    ],
+    "competitors": {
+      "Square": {
+        "their_strength": "Simple setup, good payment processing",
+        "our_advantage": "Better offline mode, unified inventory, endless aisle, built for India"
+      },
+      "Lightspeed": {
+        "their_strength": "Feature-rich, good reporting",
+        "our_advantage": "Lower cost, better offline, unified with online, mobile-first"
+      },
+      "Traditional POS": {
+        "their_strength": "Familiar, established",
+        "our_advantage": "Modern, mobile, unified inventory, lower cost, better features"
+      }
+    },
+    "pricing_guidance": "Starts at ₹30K/month per store, scales with stores. Enterprise pricing available.",
+    "implementation_timeline": "1-2 weeks per store, can roll out to multiple stores in parallel"
+  }
+}
+

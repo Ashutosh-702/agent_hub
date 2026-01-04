@@ -1,6 +1,6 @@
 from database.base_dao import BaseMongoDao
 from motor.motor_asyncio import AsyncIOMotorClient
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from bson import ObjectId
 
 
@@ -62,3 +62,46 @@ class CompaniesDao(BaseMongoDao):
         query = self._process_query_objectids(query)
         response, pagination_info = await self.get_paginated_response(query, page_size=limit, page_number=page)
         return response, pagination_info
+    
+    async def add_red_flags(self, company_id: str, meeting_id: str, flags: List[Dict[str, Any]], transcript_excerpts: Dict[str, Any] = None):
+        """Add red flags detected in a meeting to company's red flags history."""
+        from datetime import datetime
+        
+        red_flag_entry = {
+            "meeting_id": meeting_id,
+            "date": datetime.utcnow(),
+            "flags": flags,
+            "transcript_excerpts": transcript_excerpts or {},
+        }
+        
+        return await self.update_one(
+            {"_id": ObjectId(company_id)},
+            {"$push": {"red_flags_history": red_flag_entry}}
+        )
+    
+    async def get_red_flags_history(self, company_id: str) -> List[Dict[str, Any]]:
+        """Get cumulative red flags history for a company."""
+        company = await self.get_company(company_id)
+        if not company:
+            return []
+        return company.get("red_flags_history", [])
+    
+    async def set_deep_research(self, company_id: str, research_data: Dict[str, Any]):
+        """Set or update deep research data for a company."""
+        from datetime import datetime
+        
+        update_data = {
+            "deep_research": {
+                "last_updated": datetime.utcnow(),
+                "data": research_data,
+            }
+        }
+        
+        return await self.update_company(company_id, update_data)
+    
+    async def get_deep_research(self, company_id: str) -> Optional[Dict[str, Any]]:
+        """Get deep research data for a company."""
+        company = await self.get_company(company_id)
+        if not company:
+            return None
+        return company.get("deep_research")

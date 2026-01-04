@@ -21,6 +21,8 @@ from ai_agents.meetings.models import (
 )
 from ai_agents.meetings.battlecard_generator import BattlecardGenerator
 from ai_agents.meetings.reflections_generator import ReflectionsGenerator
+from ai_agents.meetings.post_call_analyzer import PostCallAnalyzer
+from ai_agents.meetings.red_flag_detector import RedFlagDetector
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,8 @@ class MeetingService:
         self._contacts_dao: Optional[ContactsDao] = None
         self._battlecard_generator = BattlecardGenerator()
         self._reflections_generator = ReflectionsGenerator()
+        self._post_call_analyzer = PostCallAnalyzer()
+        self._red_flag_detector = RedFlagDetector()
     
     def _get_meetings_dao(self) -> MeetingsDao:
         """Get or create MeetingsDao instance."""
@@ -128,19 +132,56 @@ class MeetingService:
         created = await meetings_dao.get_meeting(meeting_id)
         return self._serialize_meeting(created)
     
-    async def get_meeting(self, meeting_id: str) -> Optional[Dict[str, Any]]:
+    async def _get_meeting_by_id_or_uuid(self, meeting_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get a meeting by ID.
+        Helper to get meeting by either ObjectId or UUID.
         
         Args:
-            meeting_id: Meeting ID (MongoDB ObjectId string)
+            meeting_id: Meeting ID (ObjectId or UUID)
+            
+        Returns:
+            Meeting data or None
+        """
+        import re
+        uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+        objectid_pattern = re.compile(r'^[0-9a-f]{24}$', re.IGNORECASE)
+        
+        if uuid_pattern.match(meeting_id):
+            return await self.get_meeting_by_uuid(meeting_id)
+        elif objectid_pattern.match(meeting_id):
+            return await self.get_meeting(meeting_id)
+        else:
+            # Try ObjectId first, then UUID
+            try:
+                return await self.get_meeting(meeting_id)
+            except:
+                return await self.get_meeting_by_uuid(meeting_id)
+    
+    async def get_meeting(self, meeting_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a meeting by ID (supports both ObjectId and UUID).
+        
+        Args:
+            meeting_id: Meeting ID (MongoDB ObjectId string or UUID)
             
         Returns:
             Meeting data or None
         """
         meetings_dao = self._get_meetings_dao()
-        meeting = await meetings_dao.get_meeting(meeting_id)
-        return self._serialize_meeting(meeting)
+        # Try ObjectId first
+        try:
+            from bson import ObjectId
+            # Validate if it's a valid ObjectId format
+            ObjectId(meeting_id)
+            meeting = await meetings_dao.get_meeting(meeting_id)
+            return self._serialize_meeting(meeting)
+        except (ValueError, Exception):
+            # If ObjectId conversion fails, try UUID
+            try:
+                meeting = await meetings_dao.get_meeting_by_uuid(meeting_id)
+                return self._serialize_meeting(meeting)
+            except Exception:
+                return None
     
     async def get_meeting_by_uuid(self, meeting_uuid: str) -> Optional[Dict[str, Any]]:
         """
@@ -540,6 +581,127 @@ class MeetingService:
         logger.info(f"Transcribed audio file for meeting {meeting_id}: {len(transcript_entries)} entries")
         
         return transcript_entries
+    
+    async def analyze_meeting(self, meeting_id: str) -> Dict[str, Any]:
+        """
+        Analyze a completed meeting and generate comprehensive post-call summary.
+        
+        Args:
+            meeting_id: Meeting ID (ObjectId or UUID)
+            
+        Returns:
+            Analysis with summary, key points, objections, action items, next steps, follow-up draft
+        """
+        meetings_dao = self._get_meetings_dao()
+        companies_dao = self._get_companies_dao()
+        contacts_dao = self._get_contacts_dao()
+        
+        # Get raw meeting data (not serialized) for internal operations
+        # This preserves _id which we need for updates
+        import re
+        uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+        if uuid_pattern.match(meeting_id):
+            meeting = await meetings_dao.get_meeting_by_uuid(meeting_id)
+        else:
+            meeting = await meetings_dao.get_meeting(meeting_id)
+        
+        if not meeting:
+            raise ValueError(f"Meeting {meeting_id} not found")
+        
+        # Get transcript
+        transcript = meeting.get("transcript", [])
+        if not transcript:
+            raise ValueError(f"Meeting {meeting_id} has no transcript to analyze")
+        
+        # Get company data
+        company_data = None
+        company_id = meeting.get("company_id")
+        if company_id:
+            company_data = await companies_dao.get_company(str(company_id))
+        
+        # Get contact data
+        contact_data = None
+        contact_ids = meeting.get("contact_ids", [])
+        if contact_ids:
+            contact_data = await contacts_dao.get_contact(str(contact_ids[0]))
+        
+        # Get previous meetings
+        previous_meetings = []
+        if company_id:
+            # Get the actual meeting _id for exclusion (using raw meeting, so _id is available)
+            meeting_obj_id = meeting.get("_id")
+            previous = await meetings_dao.get_previous_meetings(
+                company_id=str(company_id),
+                exclude_meeting_id=str(meeting_obj_id) if meeting_obj_id else None,
+            )
+            previous_meetings = previous[:3]
+        
+        # Get company name
+        company_name = company_data.get("name", "") if company_data else ""
+        
+        # Log API key status for debugging
+        api_key = loaded_config.openai_api_key
+        logger.info(f"Analyzing meeting {meeting_id}. OpenAI API key present: {bool(api_key)}, length: {len(api_key) if api_key else 0}")
+        
+        # Analyze meeting
+        analysis = await self._post_call_analyzer.analyze_meeting(
+            transcript=transcript,
+            company_data=company_data,
+            contact_data=contact_data,
+            products=meeting.get("product_ids", []),
+            previous_meetings=previous_meetings,
+            company_name=company_name,
+        )
+        
+        # Save to meeting - use the actual _id from the raw meeting document
+        meeting_obj_id = meeting.get("_id")
+        if meeting_obj_id:
+            update_data = {
+                "summary": analysis.get("summary"),
+                "key_discussion_points": analysis.get("key_discussion_points", []),
+                "action_items": analysis.get("action_items", []),
+                "next_steps": analysis.get("next_steps", []),
+                "objections_resolutions": analysis.get("objections_resolutions", []),
+            }
+            await meetings_dao.update_meeting(str(meeting_obj_id), update_data)
+        
+        logger.info(f"Analyzed meeting {meeting_id}")
+        return analysis
+    
+    async def get_follow_up_draft(self, meeting_id: str) -> Dict[str, Any]:
+        """
+        Get the follow-up email draft for a meeting.
+        
+        Args:
+            meeting_id: Meeting ID (ObjectId or UUID)
+            
+        Returns:
+            Follow-up message with subject and body
+        """
+        meetings_dao = self._get_meetings_dao()
+        
+        # Get meeting (handles both UUID and ObjectId)
+        meeting = await self._get_meeting_by_id_or_uuid(meeting_id)
+        if not meeting:
+            raise ValueError(f"Meeting {meeting_id} not found")
+        
+        # Check if we have a summary with follow-up message
+        summary = meeting.get("summary")
+        if not summary:
+            # Generate analysis if not done
+            analysis = await self.analyze_meeting(meeting_id)
+            return analysis.get("follow_up_message", {
+                "subject": "Meeting Follow-up",
+                "body": "Thank you for your time today."
+            })
+        
+        # Try to get from stored analysis or generate
+        # For now, we'll regenerate to ensure we have the draft
+        analysis = await self.analyze_meeting(meeting_id)
+        return analysis.get("follow_up_message", {
+            "subject": "Meeting Follow-up",
+            "body": "Thank you for your time today."
+        })
 
 
 # Singleton instance

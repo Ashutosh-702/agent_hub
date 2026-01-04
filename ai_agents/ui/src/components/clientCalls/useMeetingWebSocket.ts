@@ -4,6 +4,7 @@ import { wsLogger as logger } from '../../utils/logger';
 export interface TranscriptEntry {
   id: string;
   speaker: 'user' | 'client';
+  source?: 'mic' | 'system_audio';
   text: string;
   timestamp: number;
   isFinal: boolean;
@@ -91,6 +92,8 @@ export const useMeetingWebSocket = () => {
             const timestamp = message.timestamp || Date.now() / 1000;
             const speaker = (message.speaker === 'client' ? 'client' : 'user') as 'user' | 'client';
             const isFinal = message.type === 'transcript_final';
+            // Determine source: 'user' speaker = mic, 'client' speaker = system_audio
+            const source = speaker === 'user' ? 'mic' : 'system_audio';
             
             // Skip empty transcripts
             if (!transcriptText.trim()) {
@@ -98,32 +101,37 @@ export const useMeetingWebSocket = () => {
             }
             
             if (message.data) {
-              // If data is provided, use it directly
+              // If data is provided, use it directly but ensure source is set
               setTranscript(prev => {
                 // For interim transcripts, replace the last interim entry if it exists
                 if (!isFinal) {
                   const lastEntry = prev[prev.length - 1];
                   if (lastEntry && !lastEntry.isFinal && lastEntry.speaker === speaker) {
                     // Update the last interim entry
-                    return [...prev.slice(0, -1), { ...lastEntry, text: transcriptText, timestamp }];
+                    return [...prev.slice(0, -1), { ...lastEntry, text: transcriptText, timestamp, source }];
                   }
                 }
                 // For final transcripts or if no interim entry exists, add new entry
-                return [...prev, { ...message.data, isFinal }];
+                const entryData = { ...message.data, isFinal, source: message.data.source || source };
+                return [...prev, entryData];
               });
             } else {
-              // Handle direct transcript data
+              // Handle direct transcript data - preserve full history
               setTranscript(prev => {
-                // For interim transcripts, replace the last interim entry if it exists
+                // For interim transcripts, replace the last interim entry if it exists (same speaker, recent)
                 if (!isFinal) {
                   const lastEntry = prev[prev.length - 1];
                   if (lastEntry && !lastEntry.isFinal && lastEntry.speaker === speaker) {
-                    // Update the last interim entry instead of adding a new one
-                    return [...prev.slice(0, -1), {
-                      ...lastEntry,
-                      text: transcriptText,
-                      timestamp,
-                    }];
+                    const timeDiff = Math.abs(timestamp - lastEntry.timestamp);
+                    // Only replace if within 2 seconds (likely an update)
+                    if (timeDiff < 2.0) {
+                      return [...prev.slice(0, -1), {
+                        ...lastEntry,
+                        text: transcriptText,
+                        timestamp,
+                        source,
+                      }];
+                    }
                   }
                 }
                 
@@ -131,24 +139,30 @@ export const useMeetingWebSocket = () => {
                 if (isFinal) {
                   const lastEntry = prev[prev.length - 1];
                   if (lastEntry && !lastEntry.isFinal && lastEntry.speaker === speaker) {
-                    // Replace interim with final
-                    return [...prev.slice(0, -1), {
-                      id: lastEntry.id || `transcript-${Date.now()}`,
-                      speaker,
-                      text: transcriptText,
-                      timestamp,
-                      isFinal: true,
-                    }];
+                    const timeDiff = Math.abs(timestamp - lastEntry.timestamp);
+                    // Only replace if within 3 seconds (likely the finalization)
+                    if (timeDiff < 3.0) {
+                      // Replace interim with final - this is the only case where we replace
+                      return [...prev.slice(0, -1), {
+                        id: lastEntry.id || `transcript-${Date.now()}`,
+                        speaker,
+                        text: transcriptText,
+                        timestamp,
+                        isFinal: true,
+                        source,
+                      }];
+                    }
                   }
                 }
                 
-                // Add new entry
+                // Add new entry - preserve all final transcripts and distinct interim ones
                 return [...prev, {
                   id: `transcript-${Date.now()}-${Math.random()}`,
                   speaker,
                   text: transcriptText,
                   timestamp,
                   isFinal,
+                  source,
                 }];
               });
             }

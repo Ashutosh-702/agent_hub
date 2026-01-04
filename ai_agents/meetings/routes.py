@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, Query, WebSocket, UploadFile, File
 from fastapi.responses import ORJSONResponse
 from typing import Optional
+import re
 
 from app.routing import CustomRequestRoute
 from ai_agents.meetings.models import (
@@ -12,6 +13,20 @@ from ai_agents.meetings.models import (
 )
 from ai_agents.meetings.service import meeting_service
 from ai_agents.meetings.websocket import meeting_websocket_endpoint
+from config.loaded_config import loaded_config
+from database.collection_dao.companies import CompaniesDao
+
+
+def _is_uuid(meeting_id: str) -> bool:
+    """Check if a string is a UUID format."""
+    uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+    return bool(uuid_pattern.match(meeting_id))
+
+
+def _is_objectid(meeting_id: str) -> bool:
+    """Check if a string is a MongoDB ObjectId format."""
+    objectid_pattern = re.compile(r'^[0-9a-f]{24}$', re.IGNORECASE)
+    return bool(objectid_pattern.match(meeting_id))
 
 # REST API Router
 router = APIRouter(
@@ -81,9 +96,22 @@ async def get_meetings_by_company(company_id: str):
 
 @router.get("/{meeting_id}")
 async def get_meeting(meeting_id: str):
-    """Get a specific meeting by ID."""
+    """Get a specific meeting by ID (supports both ObjectId and UUID)."""
     try:
-        meeting = await meeting_service.get_meeting(meeting_id)
+        # Check if it's a UUID or ObjectId
+        if _is_uuid(meeting_id):
+            # It's a UUID, use the UUID endpoint
+            meeting = await meeting_service.get_meeting_by_uuid(meeting_id)
+        elif _is_objectid(meeting_id):
+            # It's an ObjectId, use the regular endpoint
+            meeting = await meeting_service.get_meeting(meeting_id)
+        else:
+            # Try ObjectId first, then UUID
+            try:
+                meeting = await meeting_service.get_meeting(meeting_id)
+            except:
+                meeting = await meeting_service.get_meeting_by_uuid(meeting_id)
+        
         if not meeting:
             raise HTTPException(status_code=404, detail="Meeting not found")
         return ORJSONResponse(content={"success": True, "data": meeting})
@@ -330,6 +358,110 @@ async def get_meeting_summary(meeting_id: str):
         return ORJSONResponse(content={"success": True, "data": summary_data})
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{meeting_id}/analyze")
+async def analyze_meeting(meeting_id: str):
+    """
+    Trigger comprehensive post-call analysis for a meeting.
+    
+    Generates:
+    - Summary
+    - Key discussion points
+    - Objections & resolutions
+    - Action items
+    - Next steps
+    - Follow-up message draft
+    """
+    try:
+        analysis = await meeting_service.analyze_meeting(meeting_id)
+        return ORJSONResponse(content={"success": True, "data": analysis})
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{meeting_id}/follow-up-draft")
+async def get_follow_up_draft(meeting_id: str):
+    """
+    Get the follow-up email draft for a meeting.
+    """
+    try:
+        draft = await meeting_service.get_follow_up_draft(meeting_id)
+        return ORJSONResponse(content={"success": True, "data": draft})
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============ WebSocket ============
+
+# ============ Company Research & Red Flags ============
+
+@router.post("/companies/{company_id}/deep-research")
+async def trigger_deep_research(company_id: str):
+    """
+    Trigger deep research for a company.
+    
+    This will conduct comprehensive web research and news analysis.
+    """
+    try:
+        from ai_agents.meetings.deep_research_service import DeepResearchService
+        from database.collection_dao.companies import CompaniesDao
+        
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        company = await companies_dao.get_company(company_id)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+        
+        research_service = DeepResearchService()
+        research_result = await research_service.conduct_research(
+            company_name=company.get('name', ''),
+            company_website=company.get('domain') or company.get('website_url'),
+            company_industry=company.get('industry'),
+            company_location=company.get('location'),
+        )
+        
+        # Save to company
+        await companies_dao.set_deep_research(company_id, research_result.to_dict())
+        
+        return ORJSONResponse(content={"success": True, "data": research_result.to_dict()})
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/companies/{company_id}/research")
+async def get_company_research(company_id: str):
+    """
+    Get the latest deep research for a company.
+    """
+    try:
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        research = await companies_dao.get_deep_research(company_id)
+        if not research:
+            raise HTTPException(status_code=404, detail="Research not found. Trigger research first.")
+        return ORJSONResponse(content={"success": True, "data": research})
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/companies/{company_id}/red-flags")
+async def get_company_red_flags(company_id: str):
+    """
+    Get cumulative red flags history for a company.
+    """
+    try:
+        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        red_flags = await companies_dao.get_red_flags_history(company_id)
+        return ORJSONResponse(content={"success": True, "data": red_flags})
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

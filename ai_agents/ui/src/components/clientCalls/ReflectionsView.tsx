@@ -8,10 +8,27 @@ interface RecommendedFollowUp {
   suggested_timeline?: string;
 }
 
+interface ProductCompanyScore {
+  product_id: string;
+  product_name: string;
+  score: number;
+  reasoning: string;
+  key_strengths: string[];
+  key_concerns: string[];
+}
+
+interface RedFlag {
+  flag_name: string;
+  evidence: string;
+  confidence: number;
+  context?: string;
+}
+
 interface AIReflections {
   generated_at?: string;
   what_went_well: string[];
   areas_for_improvement: string[];
+  what_can_be_improved?: string[];
   key_learnings: string[];
   relationship_status?: string;
   deal_health_score?: number;
@@ -19,6 +36,11 @@ interface AIReflections {
   competitive_positioning?: string;
   stakeholder_analysis?: string;
   risk_assessment: string[];
+  product_company_scores?: ProductCompanyScore[];
+  red_flags_detected?: RedFlag[];
+  recommendations?: string[];
+  worth_pursuing?: boolean;
+  worth_pursuing_reasoning?: string;
 }
 
 interface ManualReflections {
@@ -264,6 +286,130 @@ export const ReflectionsView = () => {
                     <ul>
                       {ai.risk_assessment.map((risk, idx) => (
                         <li key={idx}>{risk}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {/* Product x Company Scores */}
+                {ai.product_company_scores && ai.product_company_scores.length > 0 && (
+                  <div className="reflection-section">
+                    <h4 className="reflection-section-title" style={{ color: 'var(--color-primary)' }}>
+                      📊 Product x Company Fit Scores
+                    </h4>
+                    <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                      {ai.product_company_scores.map((score, idx) => {
+                        const scoreClass = score.score >= 70 ? 'high' : score.score >= 50 ? 'medium' : 'low';
+                        return (
+                          <div key={idx} style={{
+                            padding: '1rem',
+                            border: '1px solid var(--color-gray-200)',
+                            borderRadius: 'var(--border-radius-md)',
+                            background: 'var(--color-gray-50)',
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                              <strong>{score.product_name}</strong>
+                              <span className={`reflection-stat-value ${scoreClass}`} style={{ fontSize: '1.25rem' }}>
+                                {score.score}/100
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-600)', marginBottom: '0.5rem' }}>
+                              {score.reasoning}
+                            </p>
+                            {score.key_strengths.length > 0 && (
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <strong style={{ fontSize: '0.875rem', color: 'var(--color-success)' }}>Strengths:</strong>
+                                <ul style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                                  {score.key_strengths.map((s, i) => (
+                                    <li key={i}>{s}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {score.key_concerns.length > 0 && (
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <strong style={{ fontSize: '0.875rem', color: 'var(--color-warning)' }}>Concerns:</strong>
+                                <ul style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                                  {score.key_concerns.map((c, i) => (
+                                    <li key={i}>{c}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Red Flags Detected */}
+                {ai.red_flags_detected && ai.red_flags_detected.length > 0 && (
+                  <div className="reflection-section">
+                    <h4 className="reflection-section-title error">🚩 Red Flags Detected</h4>
+                    <div style={{ display: 'grid', gap: '0.75rem' }}>
+                      {ai.red_flags_detected.map((flag, idx) => (
+                        <div key={idx} style={{
+                          padding: '0.75rem',
+                          background: 'var(--color-error-light)',
+                          borderRadius: 'var(--border-radius-md)',
+                          border: '1px solid var(--color-error)',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                            <strong style={{ color: 'var(--color-error-dark)' }}>{flag.flag_name}</strong>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-600)' }}>
+                              {Math.round(flag.confidence * 100)}% confidence
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '0.875rem', fontStyle: 'italic', marginBottom: '0.25rem' }}>
+                            "{flag.evidence}"
+                          </p>
+                          {flag.context && (
+                            <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-600)' }}>
+                              {flag.context}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Recommendations */}
+                {ai.recommendations && ai.recommendations.length > 0 && (
+                  <div className="reflection-section">
+                    <h4 className="reflection-section-title" style={{ color: 'var(--color-primary)' }}>
+                      💡 Recommendations
+                    </h4>
+                    <ul>
+                      {ai.recommendations.map((rec, idx) => (
+                        <li key={idx}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {/* Worth Pursuing */}
+                {ai.worth_pursuing !== undefined && (
+                  <div className="reflection-section">
+                    <h4 className="reflection-section-title" style={{ color: ai.worth_pursuing ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                      {ai.worth_pursuing ? '✅ Worth Pursuing' : '⚠️ Consider Deprioritizing'}
+                    </h4>
+                    {ai.worth_pursuing_reasoning && (
+                      <p style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>
+                        {ai.worth_pursuing_reasoning}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {/* What Can Be Improved */}
+                {ai.what_can_be_improved && ai.what_can_be_improved.length > 0 && (
+                  <div className="reflection-section">
+                    <h4 className="reflection-section-title warning">🔧 What Can Be Improved</h4>
+                    <ul>
+                      {ai.what_can_be_improved.map((item, idx) => (
+                        <li key={idx}>{item}</li>
                       ))}
                     </ul>
                   </div>

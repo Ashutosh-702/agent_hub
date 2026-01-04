@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, BackButton, Loader } from '../shared';
-import { useGetCompaniesQuery } from '../../store';
+import { PageHeader, BackButton } from '../shared';
 import { PRODUCTS } from './StartMeetingForm';
+import { SearchableCompanySelect } from './SearchableCompanySelect';
 
 // Mock contacts
 const MOCK_CONTACTS = [
@@ -21,7 +21,6 @@ interface Contact {
 
 export const PrepMeetingForm = () => {
   const navigate = useNavigate();
-  const { data: companiesResponse, isLoading: companiesLoading } = useGetCompaniesQuery({ page: 1, limit: 100 });
   
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
@@ -33,8 +32,6 @@ export const PrepMeetingForm = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
-  
-  const companies = companiesResponse?.data || [];
   
   useEffect(() => {
     if (selectedCompany) {
@@ -103,10 +100,6 @@ export const PrepMeetingForm = () => {
     }
   };
   
-  if (companiesLoading) {
-    return <Loader text="Loading..." />;
-  }
-  
   return (
     <div className="meeting-form-container">
       <BackButton to="/client-calls" label="Back to Client Calls" />
@@ -120,21 +113,13 @@ export const PrepMeetingForm = () => {
       <div className="meeting-form">
         {/* Company Selection */}
         <div className="meeting-form-section">
-          <label className="meeting-form-label">
-            Company <span className="required">*</span>
-          </label>
-          <select
-            className="meeting-form-select"
+          <SearchableCompanySelect
             value={selectedCompany}
-            onChange={(e) => setSelectedCompany(e.target.value)}
-          >
-            <option value="">Select a company...</option>
-            {companies.map((company: any) => (
-              <option key={company.id || company._id} value={company.id || company._id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedCompany}
+            label="Company"
+            placeholder="Select a company..."
+            required
+          />
         </div>
         
         {/* Contact Selection */}
