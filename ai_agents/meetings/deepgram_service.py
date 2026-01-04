@@ -527,6 +527,13 @@ class MockDeepgramService:
         
         return True
     
+    def send_keepalive(self) -> bool:
+        """Mock keepalive - just return True if connected."""
+        if not self._is_connected:
+            return False
+        # Mock service doesn't need actual keepalive, just return success
+        return True
+    
     async def close(self):
         """Simulate closing connection."""
         self._is_connected = False
