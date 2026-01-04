@@ -2676,6 +2676,31 @@ button:focus:not(:focus-visible) {
   gap: var(--space-2);
 }
 
+/* Scrollable contact selection - show ~3 contacts */
+.selection-grid.contacts-grid {
+  max-height: 240px; /* Approximately 3 contact items */
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.selection-grid.contacts-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.selection-grid.contacts-grid::-webkit-scrollbar-track {
+  background: var(--color-gray-100);
+  border-radius: 3px;
+}
+
+.selection-grid.contacts-grid::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: 3px;
+}
+
+.selection-grid.contacts-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+
 .selection-item {
   display: flex;
   align-items: center;

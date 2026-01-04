@@ -155,7 +155,7 @@ export const StartMeetingForm = () => {
           ) : contacts.length === 0 ? (
             <p className="context-subtitle">No contacts found for this company</p>
           ) : (
-            <div className="selection-grid">
+            <div className="selection-grid contacts-grid">
               {contacts.map((contact) => (
                 <label
                   key={contact.id}
