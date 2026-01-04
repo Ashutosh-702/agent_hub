@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader, BackButton } from '../shared';
-import { 
-  PRODUCTS, 
-  getContactsForCompany, 
-  type MockContact 
-} from './mockData';
+import { PRODUCTS } from './mockData';
 import { SearchableCompanySelect } from './SearchableCompanySelect';
+import { useLazyGetCompanyDetailsQuery } from '../../store/api/companyApi';
 
 // Re-export PRODUCTS for backward compatibility
 export { PRODUCTS };
 
-interface Contact extends MockContact {}
+interface Contact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  jobTitle: string;
+  email?: string;
+}
 
 export const StartMeetingForm = () => {
   const navigate = useNavigate();
@@ -26,16 +29,34 @@ export const StartMeetingForm = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
   
+  // Use real API to fetch contacts
+  const [fetchCompanyDetails, { isLoading: isLoadingContacts }] = useLazyGetCompanyDetailsQuery();
+  
   // Fetch contacts when company changes
   useEffect(() => {
     if (selectedCompany) {
-      // Get contacts from shared mock data
-      setContacts(getContactsForCompany(selectedCompany));
-      setSelectedContacts([]);
+      fetchCompanyDetails({ company_id: selectedCompany, page: 1, limit: 100 })
+        .unwrap()
+        .then((response) => {
+          // Transform API contacts to component format
+          const transformedContacts: Contact[] = response.data.contacts.map((c) => ({
+            id: c._id,
+            firstName: c.contact_data?.firstname || '',
+            lastName: c.contact_data?.lastname || '',
+            jobTitle: c.contact_data?.jobtitle || '',
+            email: c.contact_data?.email?.[0] || '',
+          }));
+          setContacts(transformedContacts);
+          setSelectedContacts([]);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch contacts:', err);
+          setContacts([]);
+        });
     } else {
       setContacts([]);
     }
-  }, [selectedCompany]);
+  }, [selectedCompany, fetchCompanyDetails]);
   
   const handleContactToggle = (contactId: string) => {
     setSelectedContacts(prev => 
@@ -129,6 +150,8 @@ export const StartMeetingForm = () => {
           </label>
           {!selectedCompany ? (
             <p className="context-subtitle">Select a company first to see contacts</p>
+          ) : isLoadingContacts ? (
+            <p className="context-subtitle">Loading contacts...</p>
           ) : contacts.length === 0 ? (
             <p className="context-subtitle">No contacts found for this company</p>
           ) : (
