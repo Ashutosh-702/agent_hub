@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { PageHeader, BackButton, Loader } from '../shared';
 
 // Mock battlecard data (kept for reference, not used in production)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-// @ts-ignore - Kept for reference only
-const MOCK_BATTLECARD = {
+// This is kept for documentation purposes and may be used for testing
+void function _reference() {
+const _MOCK_BATTLECARD = {
   id: 'bc-1',
   company: {
     name: 'Acme Retail Ltd',
@@ -131,6 +131,8 @@ const MOCK_BATTLECARD = {
     'Propose pilot program scope and timeline',
   ],
   createdAt: new Date().toISOString(),
+};
+  return _MOCK_BATTLECARD;
 };
 
 // Section icons

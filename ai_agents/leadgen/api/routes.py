@@ -37,6 +37,7 @@ from ai_agents.leadgen.views.ai_agents import (
     bulk_save_contact_personalization,
     get_enrollment_contacts,
     enroll_contacts_to_sequence,
+    get_lemlist_campaigns,
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -276,5 +277,12 @@ router.add_api_route(
     "/enroll_contacts_to_sequence",
     methods=["POST"],
     endpoint=enroll_contacts_to_sequence,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/lemlist_campaigns",
+    methods=["GET"],
+    endpoint=get_lemlist_campaigns,
     response_model=ResponseData,
 )

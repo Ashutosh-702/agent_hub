@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useCampaignWizard } from './NewCampaignWizard';
-import { useLazyGetEnrollmentContactsQuery, useEnrollContactsToSequenceMutation } from '../../store';
-
-import { MOCK_LEMLIST_SEQUENCES as MOCK_SEQUENCES } from '../../store/api/wizardMockData';
+import { useLazyGetEnrollmentContactsQuery, useEnrollContactsToSequenceMutation, useGetLemlistCampaignsQuery } from '../../store';
 
 interface EnrollmentContact {
   campaign_contact_run_id: string;
@@ -43,6 +41,16 @@ interface EnrollmentContact {
   } | null;
 }
 
+interface LemlistCampaign {
+  id: string;
+  name: string;
+  labels: string[];
+  status: string;
+  steps: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export const Step6EnrollOutreach = () => {
   const {
     state,
@@ -56,13 +64,15 @@ export const Step6EnrollOutreach = () => {
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [enrollmentContacts, setEnrollmentContacts] = useState<EnrollmentContact[]>([]);
   const [enrolledContactsData, setEnrolledContactsData] = useState<unknown[]>([]);
+  const [lemlistCampaigns, setLemlistCampaigns] = useState<LemlistCampaign[]>([]);
 
   const campaignId = state.campaignId || '';
-  const selectedSequence = MOCK_SEQUENCES.find(s => s.id === state.selectedSequence);
+  const selectedSequence = lemlistCampaigns.find(s => s.id === state.selectedSequence);
 
   // RTK Query hooks
   const [fetchEnrollmentContacts] = useLazyGetEnrollmentContactsQuery();
   const [enrollContactsToSequence] = useEnrollContactsToSequenceMutation();
+  const { data: lemlistCampaignsData, isLoading: isLoadingCampaigns, error: campaignsError } = useGetLemlistCampaignsQuery();
 
   // Fetch contacts on mount
   useEffect(() => {
@@ -88,6 +98,21 @@ export const Step6EnrollOutreach = () => {
     loadContacts();
   }, [campaignId, fetchEnrollmentContacts]);
 
+  // Set Lemlist campaigns when fetched
+  useEffect(() => {
+    if (lemlistCampaignsData?.success && lemlistCampaignsData.data?.campaigns) {
+      setLemlistCampaigns(lemlistCampaignsData.data.campaigns);
+    }
+  }, [lemlistCampaignsData]);
+
+  // Handle campaigns fetch error
+  useEffect(() => {
+    if (campaignsError) {
+      console.error('Failed to fetch Lemlist campaigns:', campaignsError);
+      setEnrollmentError('Failed to load Lemlist campaigns. Please try again.');
+    }
+  }, [campaignsError]);
+
   // Get company name for a contact
   const getCompanyName = (contact: EnrollmentContact) => {
     return contact.company_data?.name || contact.contact_data?.company || 'Unknown Company';
@@ -96,7 +121,7 @@ export const Step6EnrollOutreach = () => {
   const handleEnroll = async () => {
     if (!state.selectedSequence || !campaignId) return;
     
-    const sequence = MOCK_SEQUENCES.find(s => s.id === state.selectedSequence);
+    const sequence = lemlistCampaigns.find(s => s.id === state.selectedSequence);
     if (!sequence) return;
 
     setIsEnrolling(true);
@@ -127,7 +152,7 @@ export const Step6EnrollOutreach = () => {
   };
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || isLoadingCampaigns) {
     return (
       <div className="step-container step-enroll-outreach">
         <div className="loading-overlay">
@@ -135,7 +160,7 @@ export const Step6EnrollOutreach = () => {
             <div className="loading-animation">
               <div className="spinner large" />
             </div>
-            <h3>Loading contacts for enrollment...</h3>
+            <h3>{isLoadingCampaigns ? 'Loading Lemlist campaigns...' : 'Loading contacts for enrollment...'}</h3>
           </div>
         </div>
       </div>
@@ -162,13 +187,15 @@ export const Step6EnrollOutreach = () => {
               <span className="value">{enrollmentContacts.length}</span>
             </div>
             <div className="summary-card">
-              <h4>Sequence</h4>
-              <span className="value">{selectedSequence?.name}</span>
+              <h4>Campaign</h4>
+              <span className="value">{selectedSequence?.name || 'Selected Campaign'}</span>
             </div>
-            <div className="summary-card">
-              <h4>Expected Steps</h4>
-              <span className="value">{selectedSequence?.steps}</span>
-            </div>
+            {selectedSequence?.steps && (
+              <div className="summary-card">
+                <h4>Expected Steps</h4>
+                <span className="value">{selectedSequence.steps}</span>
+              </div>
+            )}
           </div>
 
           {/* Enrolled Contacts Data Preview */}
@@ -243,6 +270,38 @@ export const Step6EnrollOutreach = () => {
               <line x1="12" y1="8" x2="12.01" y2="8"/>
             </svg>
             <span>You can track the outreach progress and manage responses in your Lemlist dashboard</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // All contacts already enrolled
+  if (enrollmentContacts.length === 0 && !isLoading && !isLoadingCampaigns) {
+    return (
+      <div className="step-container step-enroll-outreach">
+        <div className="enrollment-success">
+          <div className="success-icon">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
+          <h2>All Contacts Already Enrolled!</h2>
+          <p>All approved contacts from this campaign have already been enrolled to a Lemlist sequence.</p>
+          
+          <div className="success-actions">
+            <button className="btn-primary btn-large" onClick={handleViewInLemlist}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              View in Lemlist
+            </button>
+            <button className="btn-secondary" onClick={() => window.location.href = '/prospecting/campaigns'}>
+              Back to Campaigns
+            </button>
           </div>
         </div>
       </div>
@@ -341,79 +400,106 @@ export const Step6EnrollOutreach = () => {
 
       {/* Sequence Selection */}
       <div className="sequence-selection">
-        <h3>Select Lemlist Sequence</h3>
-        <div className="sequence-list">
-          {MOCK_SEQUENCES.map((seq) => (
-            <div
-              key={seq.id}
-              className={`sequence-card ${state.selectedSequence === seq.id ? 'selected' : ''}`}
-              onClick={() => setSelectedSequence(seq.id)}
-            >
-              <div className="sequence-radio">
-                <div className={`radio-circle ${state.selectedSequence === seq.id ? 'checked' : ''}`}>
-                  {state.selectedSequence === seq.id && (
-                    <div className="radio-dot" />
-                  )}
+        <h3>Select Lemlist Campaign</h3>
+        {lemlistCampaigns.length === 0 ? (
+          <div className="no-campaigns-message">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p>No Lemlist campaigns found. Please create a campaign in Lemlist first.</p>
+            <a href="https://app.lemlist.com/campaigns" target="_blank" rel="noopener noreferrer" className="btn-link">
+              Open Lemlist Dashboard
+            </a>
+          </div>
+        ) : (
+          <div className="sequence-list">
+            {lemlistCampaigns.map((seq) => (
+              <div
+                key={seq.id}
+                className={`sequence-card ${state.selectedSequence === seq.id ? 'selected' : ''}`}
+                onClick={() => setSelectedSequence(seq.id)}
+              >
+                <div className="sequence-radio">
+                  <div className={`radio-circle ${state.selectedSequence === seq.id ? 'checked' : ''}`}>
+                    {state.selectedSequence === seq.id && (
+                      <div className="radio-dot" />
+                    )}
+                  </div>
+                </div>
+                <div className="sequence-info">
+                  <h4>{seq.name}</h4>
+                  <div className="sequence-labels">
+                    {seq.labels.slice(0, 3).map((label, idx) => (
+                      <span key={idx} className="sequence-label">{label}</span>
+                    ))}
+                    {seq.status && (
+                      <span className={`sequence-status ${seq.status.toLowerCase()}`}>{seq.status}</span>
+                    )}
+                  </div>
+                  <div className="sequence-stats">
+                    {seq.steps && (
+                      <span className="stat">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        {seq.steps} steps
+                      </span>
+                    )}
+                    {seq.created_at && (
+                      <span className="stat">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        Created {new Date(seq.created_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="sequence-info">
-                <h4>{seq.name}</h4>
-                <p>{seq.description}</p>
-                <div className="sequence-stats">
-                  <span className="stat">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                    {seq.steps} steps
-                  </span>
-                  <span className="stat">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                      <polyline points="22,6 12,13 2,6"/>
-                    </svg>
-                    {seq.avgOpenRate}% open rate
-                  </span>
-                  <span className="stat">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-                    </svg>
-                    {seq.avgReplyRate}% reply rate
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Selected Sequence Details */}
       {selectedSequence && (
         <div className="selected-sequence-details">
-          <h3>Sequence Details</h3>
+          <h3>Campaign Details</h3>
           <div className="sequence-detail-card">
             <div className="detail-header">
               <h4>{selectedSequence.name}</h4>
               <span className="selected-badge">Selected</span>
             </div>
-            <p>{selectedSequence.description}</p>
+            <div className="sequence-labels">
+              {selectedSequence.labels.map((label, idx) => (
+                <span key={idx} className="sequence-label">{label}</span>
+              ))}
+            </div>
             <div className="detail-stats">
+              {selectedSequence.steps && (
+                <div className="detail-stat">
+                  <span className="label">Total Steps</span>
+                  <span className="value">{selectedSequence.steps}</span>
+                </div>
+              )}
               <div className="detail-stat">
-                <span className="label">Total Steps</span>
-                <span className="value">{selectedSequence.steps}</span>
-              </div>
-              <div className="detail-stat">
-                <span className="label">Avg. Open Rate</span>
-                <span className="value">{selectedSequence.avgOpenRate}%</span>
-              </div>
-              <div className="detail-stat">
-                <span className="label">Avg. Reply Rate</span>
-                <span className="value">{selectedSequence.avgReplyRate}%</span>
+                <span className="label">Status</span>
+                <span className="value">{selectedSequence.status || 'Active'}</span>
               </div>
               <div className="detail-stat">
                 <span className="label">Contacts to Enroll</span>
                 <span className="value">{enrollmentContacts.length}</span>
               </div>
+              {selectedSequence.created_at && (
+                <div className="detail-stat">
+                  <span className="label">Created</span>
+                  <span className="value">{new Date(selectedSequence.created_at).toLocaleDateString()}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -29,6 +29,7 @@ export {
   useGetEnrollmentContactsQuery,
   useLazyGetEnrollmentContactsQuery,
   useEnrollContactsToSequenceMutation,
+  useGetLemlistCampaignsQuery,
 } from './campaignApi';
 export type { 
   Campaign, 

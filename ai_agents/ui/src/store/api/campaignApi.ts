@@ -840,6 +840,32 @@ export const campaignApi = baseApi.injectEndpoints({
       providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
     }),
 
+    // Fetch available Lemlist campaigns/sequences
+    getLemlistCampaigns: builder.query<
+      {
+        success: boolean;
+        data: {
+          campaigns: Array<{
+            id: string;
+            name: string;
+            labels: string[];
+            status: string;
+            steps: number | null;
+            created_at: string | null;
+            updated_at: string | null;
+          }>;
+          total: number;
+        };
+      },
+      void
+    >({
+      query: () => ({
+        url: '/api/v1/lemlist_campaigns',
+        method: 'GET',
+      }),
+      providesTags: ['Campaign'],
+    }),
+
     // Enroll contacts to a Lemlist sequence
     enrollContactsToSequence: builder.mutation<
       {
@@ -919,5 +945,6 @@ export const {
   useGetEnrollmentContactsQuery,
   useLazyGetEnrollmentContactsQuery,
   useEnrollContactsToSequenceMutation,
+  useGetLemlistCampaignsQuery,
 } = campaignApi;
 

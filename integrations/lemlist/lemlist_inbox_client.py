@@ -498,3 +498,276 @@ class LemlistInboxClient:
 
         return all_messages
 
+    # ==================== Campaign Lead Enrollment APIs ====================
+    
+    async def get_campaigns(self) -> List[Dict[str, Any]]:
+        """
+        Fetch all campaigns from Lemlist
+        
+        GET /api/campaigns
+        
+        Returns a list of campaigns:
+        [
+            {
+                "_id": "cam_abc123",
+                "name": "Enterprise Outreach Q1",
+                "labels": ["outreach", "enterprise"],
+                ...
+            }
+        ]
+        """
+        url = f"{LEMLIST_BASE_URL}/campaigns"
+        
+        try:
+            logger.info("Fetching Lemlist campaigns")
+            
+            response = await self.http_session.get(
+                url,
+                headers=self.headers,
+                timeout=self.timeout
+            )
+
+            if response.status == 200:
+                result = await response.json()
+                logger.info(
+                    f"Fetched Lemlist campaigns successfully",
+                    count=len(result) if isinstance(result, list) else 0
+                )
+                return result if isinstance(result, list) else []
+            elif response.status == 401:
+                logger.error("Lemlist API authentication failed")
+                raise Exception("Lemlist API authentication failed. Check API key.")
+            elif response.status == 429:
+                logger.warning("Lemlist API rate limit hit")
+                return []
+            else:
+                error_text = await response.text()
+                logger.error(f"Lemlist API error: {response.status} - {error_text}")
+                raise Exception(f"Lemlist API error: {response.status}")
+
+        except Exception as e:
+            logger.exception(f"Error fetching Lemlist campaigns: {str(e)}")
+            raise
+
+    async def get_campaign(self, campaign_id: str) -> Dict[str, Any]:
+        """
+        Fetch a single campaign from Lemlist
+        
+        GET /api/campaigns/{campaignId}
+        """
+        url = f"{LEMLIST_BASE_URL}/campaigns/{campaign_id}"
+        
+        try:
+            logger.info(f"Fetching Lemlist campaign", campaign_id=campaign_id)
+            
+            response = await self.http_session.get(
+                url,
+                headers=self.headers,
+                timeout=self.timeout
+            )
+
+            if response.status == 200:
+                result = await response.json()
+                logger.info(f"Fetched Lemlist campaign successfully", campaign_id=campaign_id)
+                return result
+            elif response.status == 404:
+                logger.warning(f"Lemlist campaign not found: {campaign_id}")
+                return {}
+            elif response.status == 401:
+                logger.error("Lemlist API authentication failed")
+                raise Exception("Lemlist API authentication failed. Check API key.")
+            else:
+                error_text = await response.text()
+                logger.error(f"Lemlist API error: {response.status} - {error_text}")
+                raise Exception(f"Lemlist API error: {response.status}")
+
+        except Exception as e:
+            logger.exception(f"Error fetching Lemlist campaign: {str(e)}")
+            raise
+
+    async def add_lead_to_campaign(
+        self,
+        campaign_id: str,
+        email: str,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        company_name: Optional[str] = None,
+        personalised_deck_link: Optional[str] = None,
+        personalised_message: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Add a lead to a Lemlist campaign
+        
+        POST /api/campaigns/{campaignId}/leads/?version=v2
+        
+        Args:
+            campaign_id: The Lemlist campaign ID
+            email: Lead's email address
+            first_name: Lead's first name
+            last_name: Lead's last name
+            company_name: Lead's company name
+            personalised_deck_link: URL of the personalized deck PDF
+            personalised_message: Content of the personalized message
+            
+        Returns:
+            Lemlist API response with created lead info
+        """
+        url = f"{LEMLIST_BASE_URL}/campaigns/{campaign_id}/leads/?version=v2"
+        
+        # Build payload - exact format as per Lemlist API v2
+        payload: Dict[str, Any] = {
+            "email": email
+        }
+        
+        if first_name:
+            payload["firstName"] = first_name
+        if last_name:
+            payload["lastName"] = last_name
+        if company_name:
+            payload["companyName"] = company_name
+        if personalised_deck_link:
+            payload["personalised_deck_link"] = personalised_deck_link
+        if personalised_message:
+            payload["personalised_message"] = personalised_message
+        
+        try:
+            logger.info(
+                f"Adding lead to Lemlist campaign",
+                campaign_id=campaign_id,
+                email=email
+            )
+            
+            response = await self.http_session.post(
+                url,
+                headers=self.headers,
+                json=payload,
+                timeout=self.timeout
+            )
+
+            if response.status in [200, 201]:
+                result = await response.json()
+                logger.info(
+                    f"Lead added to Lemlist campaign successfully",
+                    campaign_id=campaign_id,
+                    email=email,
+                    lead_id=result.get("_id")
+                )
+                return {"success": True, "data": result}
+            elif response.status == 409:
+                # Lead already exists in campaign
+                logger.warning(
+                    f"Lead already exists in Lemlist campaign",
+                    campaign_id=campaign_id,
+                    email=email
+                )
+                return {"success": True, "data": {"alreadyExists": True, "email": email}}
+            elif response.status == 401:
+                logger.error("Lemlist API authentication failed")
+                return {"success": False, "error": "Authentication failed"}
+            elif response.status == 429:
+                logger.warning("Lemlist API rate limit hit")
+                return {"success": False, "error": "Rate limit exceeded", "retry": True}
+            else:
+                error_text = await response.text()
+                logger.error(
+                    f"Lemlist add lead error: {response.status} - {error_text}",
+                    campaign_id=campaign_id,
+                    email=email
+                )
+                return {"success": False, "error": f"API error: {response.status}"}
+
+        except Exception as e:
+            logger.exception(f"Error adding lead to Lemlist campaign: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def add_leads_to_campaign_batch(
+        self,
+        campaign_id: str,
+        leads: List[Dict[str, Any]],
+        rate_limit_delay: float = 0.2
+    ) -> Dict[str, Any]:
+        """
+        Add multiple leads to a Lemlist campaign with rate limiting
+        
+        Args:
+            campaign_id: The Lemlist campaign ID
+            leads: List of lead data dictionaries, each containing:
+                - email (required)
+                - first_name, last_name, company_name (optional)
+                - personalised_deck_link, personalised_message (optional)
+            rate_limit_delay: Delay between API calls in seconds
+            
+        Returns:
+            Summary of enrollment results
+        """
+        import asyncio
+        
+        results = {
+            "total": len(leads),
+            "success": 0,
+            "failed": 0,
+            "already_exists": 0,
+            "rate_limited": 0,
+            "errors": [],
+            "enrolled_leads": []
+        }
+        
+        for i, lead in enumerate(leads):
+            email = lead.get("email")
+            if not email:
+                results["failed"] += 1
+                results["errors"].append({"index": i, "error": "Missing email"})
+                continue
+            
+            response = await self.add_lead_to_campaign(
+                campaign_id=campaign_id,
+                email=email,
+                first_name=lead.get("first_name"),
+                last_name=lead.get("last_name"),
+                company_name=lead.get("company_name"),
+                personalised_deck_link=lead.get("personalised_deck_link"),
+                personalised_message=lead.get("personalised_message")
+            )
+            
+            if response.get("success"):
+                lead_id = response.get("data", {}).get("_id")
+                if response.get("data", {}).get("alreadyExists"):
+                    results["already_exists"] += 1
+                    # Also add already existing leads to enrolled_leads so we can track them
+                    results["enrolled_leads"].append({
+                        "email": email,
+                        "lead_id": lead_id,
+                        "already_existed": True
+                    })
+                else:
+                    results["success"] += 1
+                    results["enrolled_leads"].append({
+                        "email": email,
+                        "lead_id": lead_id
+                    })
+            else:
+                if response.get("retry"):
+                    results["rate_limited"] += 1
+                    # Could implement exponential backoff here
+                else:
+                    results["failed"] += 1
+                    results["errors"].append({
+                        "email": email,
+                        "error": response.get("error")
+                    })
+            
+            # Rate limiting delay between calls
+            if i < len(leads) - 1:
+                await asyncio.sleep(rate_limit_delay)
+        
+        logger.info(
+            f"Batch lead enrollment complete",
+            campaign_id=campaign_id,
+            total=results["total"],
+            success=results["success"],
+            failed=results["failed"],
+            already_exists=results["already_exists"]
+        )
+        
+        return results
+

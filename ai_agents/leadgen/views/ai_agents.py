@@ -493,3 +493,39 @@ async def enroll_contacts_to_sequence(query_params: EnrollContactsToSequence) ->
     response_data.data = response
 
     return response_data.dict()
+
+
+async def get_lemlist_campaigns() -> Dict[str, Any]:
+    """Fetch all available Lemlist campaigns/sequences for enrollment"""
+    from integrations.lemlist.lemlist_inbox_client import LemlistInboxClient
+    
+    response_data = ResponseData.model_construct(data={}, success=False)
+    
+    try:
+        lemlist_client = LemlistInboxClient()
+        campaigns = await lemlist_client.get_campaigns()
+        
+        # Transform to a consistent format for the frontend
+        formatted_campaigns = []
+        for campaign in campaigns:
+            formatted_campaigns.append({
+                "id": campaign.get("_id"),
+                "name": campaign.get("name", "Unnamed Campaign"),
+                "labels": campaign.get("labels", []),
+                "status": campaign.get("status", "unknown"),
+                # Add computed stats if available
+                "steps": len(campaign.get("sequences", [])) if campaign.get("sequences") else None,
+                "created_at": campaign.get("createdAt"),
+                "updated_at": campaign.get("updatedAt"),
+            })
+        
+        response_data.success = True
+        response_data.data = {
+            "campaigns": formatted_campaigns,
+            "total": len(formatted_campaigns)
+        }
+    except Exception as e:
+        response_data.success = False
+        response_data.errors = [str(e)]
+
+    return response_data.dict()
