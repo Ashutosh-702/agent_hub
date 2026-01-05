@@ -12,6 +12,7 @@ import { ProspectingCampaigns } from './components/ProspectingCampaigns';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { HubSpotLayout, CreateCompanyWizard, CreateContactWizard, CreateDealWizard } from './components/hubspot';
 import { InboxDashboard, InboxPage } from './components/inbox';
+import { LoginPage, ProtectedRoute } from './components/auth';
 import { 
   ClientCallsPage, 
   StartMeetingForm, 
@@ -80,12 +81,26 @@ function AppContent() {
   );
 }
 
-function App() {
+function ProtectedApp() {
   return (
-    <BrowserRouter>
+    <ProtectedRoute>
       <SidebarProvider>
         <AppContent />
       </SidebarProvider>
+    </ProtectedRoute>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public route - Login page */}
+        <Route path="/login" element={<LoginPage />} />
+        
+        {/* All other routes are protected */}
+        <Route path="/*" element={<ProtectedApp />} />
+      </Routes>
     </BrowserRouter>
   );
 }

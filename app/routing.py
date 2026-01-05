@@ -9,11 +9,99 @@ from fastapi.exceptions import HTTPException, RequestValidationError, ResponseVa
 from fastapi.responses import ORJSONResponse
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_500_INTERNAL_SERVER_ERROR
 
 from ai_agents.leadgen.schemas.ai_agents import ResponseData
 from config.logging import logger
 from global_utils.exceptions import ApiException
+
+
+# Public routes that don't require authentication
+PUBLIC_ROUTES = [
+    "/api/v1/auth/login",
+    "/api/v1/auth/register",
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/env-config",  # Frontend config endpoint
+]
+
+# Route prefixes that are public (e.g., static files, websockets)
+PUBLIC_PREFIXES = [
+    "/ws/",  # WebSocket routes
+]
+
+
+async def validate_auth_token(request: Request, url_path: str) -> None:
+    """
+    Validate authentication token for protected routes.
+    
+    Args:
+        request: FastAPI request object
+        url_path: Request URL path
+        
+    Raises:
+        HTTPException: If token is invalid, missing, or expired
+    """
+    # Skip auth for public routes
+    if any(url_path.startswith(route) for route in PUBLIC_ROUTES):
+        return
+    
+    # Skip auth for public prefixes
+    if any(url_path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
+        return
+    
+    # Get authorization header
+    auth_header = request.headers.get("authorization")
+    
+    logger.debug(f"Auth validation for {url_path}: auth_header={'present' if auth_header else 'missing'}")
+    
+    if not auth_header:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED, 
+            detail="Missing authorization header"
+        )
+    
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED, 
+            detail="Invalid authorization header format. Expected 'Bearer <token>'"
+        )
+    
+    token = auth_header.split(" ", 1)[1]
+    
+    if not token:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED, 
+            detail="Missing token"
+        )
+    
+    logger.debug(f"Token received: {token[:8]}...{token[-4:]} (length: {len(token)})")
+    
+    # Import here to avoid circular imports
+    from ai_agents.auth.service import AuthService
+    from config.loaded_config import loaded_config
+    
+    # Get mongo client from loaded config
+    if not loaded_config.connection_manager:
+        raise HTTPException(
+            status_code=503, 
+            detail="Database connection not initialized"
+        )
+    mongo_client = loaded_config.connection_manager.mongo_client
+    
+    # Validate token and get user
+    auth_service = AuthService(mongo_client)
+    try:
+        user = await auth_service.validate_token_and_get_user(token)
+        logger.debug(f"Token validated successfully for user: {user.get('email')}")
+    except HTTPException as e:
+        logger.warning(f"Token validation failed: {e.detail} (token: {token[:8]}...)")
+        raise
+    
+    # Attach user to request state for route handlers
+    request.state.user = user
 
 
 class CustomRequestRoute(APIRoute):
@@ -25,6 +113,11 @@ class CustomRequestRoute(APIRoute):
             start_time = time.perf_counter()
 
             try:
+                # === AUTH VALIDATION ===
+                url_path = request_data['url_path']
+                await validate_auth_token(request, url_path)
+                # === END AUTH VALIDATION ===
+                
                 content_type = request.headers.get("content-type")
                 request_data['request_body'] = orjson.loads(request_data['request_body']) \
                     if request_data['request_body'] and not content_type.startswith("multipart/form-data") else {}

@@ -52,6 +52,8 @@ attrs==25.3.0
     #   chronos-client
     #   jsonschema
     #   referencing
+bcrypt==5.0.0
+    # via -r requirements.in
 cachetools==5.5.2
     # via google-auth
 certifi==2025.8.3

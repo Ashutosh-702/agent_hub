@@ -1,9 +1,21 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
 import { API_BASE_URL } from '../../config/api.js';
 import { mockCampaigns, mockCampaignCompanies, mockCompanies, mockContacts } from './mockData';
 
 // Enable mock mode when backend is not available
 export const USE_MOCK_DATA = false;
+
+// Helper to clear auth data and redirect to login
+const handleUnauthorized = () => {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+  
+  // Redirect to login if not already there
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+};
 
 // Mock query function that returns mock data based on the endpoint
 const mockBaseQuery = async (args: string | { url: string }) => {
@@ -146,28 +158,54 @@ const mockBaseQuery = async (args: string | { url: string }) => {
   };
 };
 
+// Auth token key in localStorage
+const AUTH_TOKEN_KEY = 'auth_token';
+
 // Real fetch query
 const realBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,
   prepareHeaders: (headers) => {
     headers.set('accept', 'application/json');
     headers.set('Content-Type', 'application/json');
+    
+    // Add authorization header if token exists
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    
     return headers;
   },
 });
 
-// Combined query that uses mock or real based on flag
-const dynamicBaseQuery: typeof realBaseQuery = async (args, api, extraOptions) => {
+// Combined query that uses mock or real based on flag, with 401 handling
+const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (args, api, extraOptions) => {
   if (USE_MOCK_DATA) {
     return mockBaseQuery(args as string | { url: string });
   }
-  return realBaseQuery(args, api, extraOptions);
+  
+  const result = await realBaseQuery(args, api, extraOptions);
+  
+  // Handle 401 Unauthorized - clear auth and redirect to login
+  if (result.error && result.error.status === 401) {
+    // Skip redirect for login/register endpoints (they should handle their own errors)
+    const url = typeof args === 'string' ? args : args.url;
+    if (!url.includes('/auth/login') && !url.includes('/auth/register')) {
+      console.warn('Unauthorized - redirecting to login');
+      handleUnauthorized();
+    }
+  }
+  
+  return result;
 };
 
 // Base API with common configuration
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: dynamicBaseQuery,
-  tagTypes: ['Campaign', 'Company', 'Contact', 'Meetings'],
+  tagTypes: ['Campaign', 'Company', 'Contact', 'Meetings', 'Auth'],
   endpoints: () => ({}),
 });
+
+// Export auth token key for use in other files
+export { AUTH_TOKEN_KEY };

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useSidebar } from '../context/SidebarContext';
+import { useLogoutMutation, getStoredUser } from '../store/api';
 
 // Force page reload navigation - needed when leaving the wizard to ensure clean state
 const forceNavigate = (path: string, event: React.MouseEvent) => {
@@ -128,6 +129,19 @@ const Icons = {
       <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
     </svg>
   ),
+  logout: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+      <polyline points="16 17 21 12 16 7"/>
+      <line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+  ),
+  user: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  ),
 };
 
 interface MenuItem {
@@ -215,8 +229,20 @@ export const Sidebar = () => {
   const { isCollapsed, toggleSidebar, wizardProgress } = useSidebar();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const location = useLocation();
-
+  const navigate = useNavigate();
+  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
+  
+  const currentUser = getStoredUser();
   const isInWizard = location.pathname.includes('/campaign/new');
+
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap();
+    } catch {
+      // Even if logout fails, clear local storage and redirect
+    }
+    navigate('/login', { replace: true });
+  };
 
   const toggleExpand = (path: string) => {
     setExpandedItems(prev => 
@@ -395,6 +421,28 @@ export const Sidebar = () => {
           </div>
         ))}
       </nav>
+
+      {/* User section at bottom */}
+      <div className="sidebar-footer">
+        {!isCollapsed && currentUser && (
+          <div className="sidebar-user-info">
+            <span className="sidebar-icon">{Icons.user}</span>
+            <div className="sidebar-user-details">
+              <span className="sidebar-user-name">{currentUser.name}</span>
+              <span className="sidebar-user-email">{currentUser.email}</span>
+            </div>
+          </div>
+        )}
+        <button
+          className="sidebar-logout-btn"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          title={isCollapsed ? 'Logout' : undefined}
+        >
+          <span className="sidebar-icon">{Icons.logout}</span>
+          {!isCollapsed && <span className="sidebar-label">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>}
+        </button>
+      </div>
     </aside>
   );
 };

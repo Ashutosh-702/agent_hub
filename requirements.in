@@ -35,3 +35,6 @@ chronos_client@git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/chrono
 # Client Calls / Meetings Dependencies
 deepgram-sdk>=3.0.0,<4.0.0
 websockets>=12.0
+
+# Authentication Dependencies
+bcrypt>=4.0.0

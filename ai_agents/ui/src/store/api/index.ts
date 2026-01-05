@@ -1,5 +1,29 @@
 // API exports
-export { baseApi } from './baseApi';
+export { baseApi, AUTH_TOKEN_KEY } from './baseApi';
+
+// Auth API
+export {
+  authApi,
+  useLoginMutation,
+  useRegisterMutation,
+  useGetMeQuery,
+  useLazyGetMeQuery,
+  useLogoutMutation,
+  useLogoutAllMutation,
+  getStoredToken,
+  getStoredUser,
+  isAuthenticated,
+  clearAuthData,
+} from './authApi';
+export type {
+  User,
+  AuthData,
+  AuthResponse,
+  MeResponse,
+  LogoutResponse,
+  LoginRequest,
+  RegisterRequest,
+} from './authApi';
 export { 
   campaignApi, 
   useGetCampaignsQuery,
