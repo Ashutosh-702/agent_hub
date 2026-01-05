@@ -20,6 +20,7 @@ from global_utils.exceptions import ApiException
 PUBLIC_ROUTES = [
     "/api/v1/auth/login",
     "/api/v1/auth/register",
+    "/api/v1/meetings",  # Meetings API (temporarily public for testing)
     "/health",
     "/docs",
     "/openapi.json",
