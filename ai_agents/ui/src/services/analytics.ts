@@ -8,6 +8,14 @@
 
 import { getAnalyticsConfig, isProduction } from '../config/analytics';
 
+// Usersnap API type
+interface UsersnapAPI {
+  init: (config?: { apiKey?: string; email?: string; custom?: Record<string, unknown> }) => void;
+  on: (event: string, callback: (data: unknown) => void) => void;
+  show: (projectKey: string) => void;
+  hide: () => void;
+}
+
 // Declare global types for analytics SDKs
 declare global {
   interface Window {
@@ -16,13 +24,8 @@ declare global {
       identify: (userId: string, userInfo: Record<string, string>) => void;
       getCurrentSessionURL: () => string | null;
     };
-    Usersnap?: {
-      init: (config: { apiKey: string; email?: string; custom?: Record<string, unknown> }) => void;
-      on: (event: string, callback: (data: unknown) => void) => void;
-      show: (projectKey: string) => void;
-      hide: () => void;
-    };
-    onUsersnapCXLoad?: (api: typeof window.Usersnap) => void;
+    Usersnap?: UsersnapAPI;
+    onUsersnapLoad?: (api: UsersnapAPI) => void;
   }
 }
 
@@ -74,23 +77,24 @@ const loadUsersnap = (projectKey: string): Promise<void> => {
       return;
     }
 
-    // Set up callback before loading script
-    window.onUsersnapCXLoad = (api) => {
+    // Set up callback before loading script (matches Usersnap's exact code)
+    window.onUsersnapLoad = (api: UsersnapAPI) => {
+      api.init();
       window.Usersnap = api;
       console.log('✅ Usersnap SDK loaded');
       resolve();
     };
 
     const script = document.createElement('script');
-    script.src = `https://widget.usersnap.com/global/load/${projectKey}?onload=onUsersnapCXLoad`;
-    script.async = true;
+    script.defer = true;
+    script.src = `https://widget.usersnap.com/global/load/${projectKey}?onload=onUsersnapLoad`;
     
     script.onerror = () => {
       console.warn('⚠️ Failed to load Usersnap SDK');
       reject(new Error('Failed to load Usersnap SDK'));
     };
     
-    document.head.appendChild(script);
+    document.getElementsByTagName('head')[0].appendChild(script);
   });
 };
 

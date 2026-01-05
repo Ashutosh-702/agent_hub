@@ -89,7 +89,10 @@ distro==1.9.0
 dnspython==2.7.0
     # via
     #   chronos-client
+    #   email-validator
     #   pymongo
+email-validator==2.2.0
+    # via -r requirements.in
 eventbridge @ git+ssh://git@ssh.dev.azure.com/v3/GoFynd/SupplyChainGroup/fynd-event-bridge@bump_reqs_v2.1.0-alpha.5
     # via chronos-client
 fastapi==0.120.1
@@ -133,6 +136,7 @@ idna==3.10
     # via
     #   anyio
     #   chronos-client
+    #   email-validator
     #   httpx
     #   requests
     #   yarl

@@ -19,7 +19,7 @@ declare global {
 
 // Default project keys (can be overridden via env variables)
 const DEFAULT_ZIPY_KEY = '53a1f38c';
-const DEFAULT_USERSNAP_KEY = ''; // Add your Usersnap key here
+const DEFAULT_USERSNAP_KEY = '41299298-9c0f-4c23-951b-2f61d7cd25a1';
 
 /**
  * Get analytics configuration from environment
