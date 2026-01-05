@@ -39,6 +39,6 @@ class Settings:
     lemlist_webhook_secret = os.getenv("LEMLIST_WEBHOOK_SECRET", "")
     
     # Client Calls / Meetings - Deepgram for transcription
-    deepgram_api_key = os.getenv("DEEPGRAM_API_KEY", "")
+    deepgram_api_key = os.getenv("DEEPGRAM_API_KEY", "9be8d4f2be2830be27ba2710784c76d8d0a724a7")
     
 loaded_config = Settings()
