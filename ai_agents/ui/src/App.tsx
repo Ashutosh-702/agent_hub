@@ -1,4 +1,5 @@
 import './App.css';
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Form } from './components/FormNew';
@@ -13,6 +14,8 @@ import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { HubSpotLayout, CreateCompanyWizard, CreateContactWizard, CreateDealWizard } from './components/hubspot';
 import { InboxDashboard, InboxPage } from './components/inbox';
 import { LoginPage, ProtectedRoute } from './components/auth';
+import { getStoredUser } from './store/api';
+import { identifyUser } from './services/analytics';
 import { 
   ClientCallsPage, 
   StartMeetingForm, 
@@ -82,6 +85,18 @@ function AppContent() {
 }
 
 function ProtectedApp() {
+  // Identify user for analytics on app load if already authenticated
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user) {
+      identifyUser({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      });
+    }
+  }, []);
+
   return (
     <ProtectedRoute>
       <SidebarProvider>

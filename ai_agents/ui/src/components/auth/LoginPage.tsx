@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLoginMutation, useRegisterMutation, isAuthenticated, AUTH_TOKEN_KEY } from '../../store/api';
+import { identifyUser } from '../../services/analytics';
 import './LoginPage.css';
 
 type AuthMode = 'login' | 'register';
@@ -40,6 +41,13 @@ export const LoginPage = () => {
           localStorage.setItem(AUTH_TOKEN_KEY, result.data.token);
           localStorage.setItem('auth_user', JSON.stringify(result.data.user));
           
+          // Identify user for analytics (Zipy session recording, Usersnap feedback)
+          identifyUser({
+            id: result.data.user.id,
+            email: result.data.user.email,
+            name: result.data.user.name,
+          });
+          
           const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
           navigate(from, { replace: true });
         }
@@ -49,6 +57,13 @@ export const LoginPage = () => {
           // Store token immediately before navigation to avoid race condition
           localStorage.setItem(AUTH_TOKEN_KEY, result.data.token);
           localStorage.setItem('auth_user', JSON.stringify(result.data.user));
+          
+          // Identify user for analytics (Zipy session recording, Usersnap feedback)
+          identifyUser({
+            id: result.data.user.id,
+            email: result.data.user.email,
+            name: result.data.user.name,
+          });
           
           navigate('/', { replace: true });
         }

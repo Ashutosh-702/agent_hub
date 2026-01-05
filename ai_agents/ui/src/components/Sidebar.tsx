@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useSidebar } from '../context/SidebarContext';
 import { useLogoutMutation, getStoredUser } from '../store/api';
+import { clearUserIdentity } from '../services/analytics';
 
 // Force page reload navigation - needed when leaving the wizard to ensure clean state
 const forceNavigate = (path: string, event: React.MouseEvent) => {
@@ -241,6 +242,8 @@ export const Sidebar = () => {
     } catch {
       // Even if logout fails, clear local storage and redirect
     }
+    // Clear user identity from analytics (Zipy, Usersnap)
+    clearUserIdentity();
     navigate('/login', { replace: true });
   };
 
