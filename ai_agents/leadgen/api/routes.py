@@ -26,6 +26,8 @@ from ai_agents.leadgen.views.ai_agents import (
     create_campaign_from_csv_import,
     manual_company_qualification,
     ai_company_qualification,
+    ai_contact_qualification,
+    contact_qualification_progress,
     get_apollo_contact_list,
     enrich_apollo_contact_list,
     update_apollo_contact_enrichment_status,
@@ -200,6 +202,20 @@ router.add_api_route(
     "/ai_company_qualification",
     methods=["POST"],
     endpoint=ai_company_qualification,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/ai_contact_qualification",
+    methods=["POST"],
+    endpoint=ai_contact_qualification,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/contact_qualification_progress",
+    methods=["GET"],
+    endpoint=contact_qualification_progress,
     response_model=ResponseData,
 )
 

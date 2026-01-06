@@ -179,6 +179,13 @@ class AiCompanyQualification(BaseModel):
     campaign_id: str
     web_prompt: Optional[str] = None
 
+
+class AiContactQualification(BaseModel):
+    """Schema for AI-based contact qualification"""
+    campaign_id: str
+    contact_prompt: Optional[str] = None  # AI prompt for contact relevance criteria
+
+
 class ApolloContactList(BaseModel):
     campaign_id: str
     enrichment_status: Optional[bool] = False

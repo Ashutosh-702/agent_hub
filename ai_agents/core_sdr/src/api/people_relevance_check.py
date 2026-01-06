@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 import orjson
 from openai import AsyncOpenAI
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig, PEOPLE_SYSTEM_PROMPT, PEOPLE_ASSESSMENT_TEMPLATE
+from ai_agents.core_sdr.src.api.product_prompts import get_product_prompts, has_product_prompts
 from config.loaded_config import loaded_config
 from config.logging import logger
 
@@ -21,7 +22,7 @@ class PeopleRelevanceCheck:
         custom_prompts = config.get('prompts', {})
         self.prompts = PromptsConfig(custom_prompts)
 
-    async def web_search_analysis(self, person_data: Dict[str, Any], retry_count: int = 0, previous_context: str = "") -> Dict[str, Any]:
+    async def web_search_analysis(self, person_data: Dict[str, Any], product_name: str = None, retry_count: int = 0, previous_context: str = "") -> Dict[str, Any]:
         # Extract person information - safely handle None values
         person_name = person_data.get('name', '') or (person_data.get('first_name', '') + ' ' + person_data.get('last_name', '')).strip() or 'Unknown - MUST FIND'
         person_title = person_data.get('title', None) or 'Unknown - MUST DETERMINE'
@@ -39,21 +40,39 @@ class PeopleRelevanceCheck:
         if retry_count > 0:
             print(f"  Retry Attempt: {retry_count + 1}/4")
 
-        # Get system prompt - check custom prompts first, then use default
-        custom_system_prompt = self.config.get('prompts', {}).get('people_enricher_system_prompt')
-        system_prompt = custom_system_prompt if custom_system_prompt else PEOPLE_SYSTEM_PROMPT
+        # Check if product-specific prompts are available
+        product_prompts = get_product_prompts(product_name) if product_name else None
+        using_product_prompts = product_prompts is not None
+        
+        if using_product_prompts:
+            print(f"  Using product-specific prompts for: {product_name}")
+        else:
+            print(f"  Using default prompts (no product-specific prompts for: {product_name})")
+
+        # Get system prompt - priority: product prompts > custom prompts > default
+        if product_prompts:
+            system_prompt = product_prompts.get('system_prompt', PEOPLE_SYSTEM_PROMPT)
+        else:
+            custom_system_prompt = self.config.get('prompts', {}).get('people_enricher_system_prompt')
+            system_prompt = custom_system_prompt if custom_system_prompt else PEOPLE_SYSTEM_PROMPT
 
         apollo_data_formatted = "\n".join([
             f"  - {k}: {v}" for k, v in person_data.items()
             if v and v != "" and k not in ['id', 'person_id', 'source_organization_id']
         ])
 
-        # Get user prompt template - check custom prompts first, then use default
-        custom_user_prompt = self.config.get('prompts', {}).get('people_enricher_user_prompt')
-        base_user_prompt_template = custom_user_prompt if custom_user_prompt else PEOPLE_ASSESSMENT_TEMPLATE
+        # Get user prompt template - priority: product prompts > custom prompts > default
+        if product_prompts:
+            base_user_prompt_template = product_prompts.get('assessment_template', PEOPLE_ASSESSMENT_TEMPLATE)
+        else:
+            custom_user_prompt = self.config.get('prompts', {}).get('people_enricher_user_prompt')
+            base_user_prompt_template = custom_user_prompt if custom_user_prompt else PEOPLE_ASSESSMENT_TEMPLATE
 
-        # Get relevance criteria using the proper method
-        relevance_criteria = self.prompts.get_relevance_criteria()
+        # Get relevance criteria - priority: product prompts > custom prompts > default
+        if product_prompts:
+            relevance_criteria = product_prompts.get('relevance_criteria', self.prompts.get_relevance_criteria())
+        else:
+            relevance_criteria = self.prompts.get_relevance_criteria()
 
         # Format the user prompt with variables (similar to system prompt)
         try:
@@ -83,9 +102,8 @@ Please try a different search approach or be more thorough in your analysis.
             user_prompt = base_user_prompt
             
 
-        # Get output format prompt - check custom prompts first, then use default
-        custom_output_format = self.config.get('prompts', {}).get('people_enricher_output_format')
-        output_format_prompt = custom_output_format if custom_output_format else """CRITICAL: You MUST respond with ONLY valid JSON in this exact format, 
+        # Get output format prompt - priority: product prompts > custom prompts > default
+        default_output_format = """CRITICAL: You MUST respond with ONLY valid JSON in this exact format, 
 Return ONLY the JSON object—do NOT include any markdown or ``` before/after.:
 
 {
@@ -94,6 +112,12 @@ Return ONLY the JSON object—do NOT include any markdown or ``` before/after.:
         "reason": "Detailed explanation of why person is or isn't relevant based on criteria"
     }
 }"""
+        
+        if product_prompts:
+            output_format_prompt = product_prompts.get('output_format', default_output_format)
+        else:
+            custom_output_format = self.config.get('prompts', {}).get('people_enricher_output_format')
+            output_format_prompt = custom_output_format if custom_output_format else default_output_format
 
         try:
             model = "gpt-4o"
@@ -175,7 +199,7 @@ Return ONLY the JSON object—do NOT include any markdown or ``` before/after.:
                         print(
                             f"Web search data validation failed for {person_name} (attempt {retry_count + 1}). Retrying...", "warning")
                         context = f"Previous attempt returned incomplete data. Analysis content preview: {str(analysis_data)[:200]}..."
-                        return await self.web_search_analysis(person_data, retry_count + 1, context)
+                        return await self.web_search_analysis(person_data, product_name, retry_count + 1, context)
                     else:
                         print(
                             f"Web search validation failed: {person_name}", "error")
@@ -189,7 +213,7 @@ Return ONLY the JSON object—do NOT include any markdown or ``` before/after.:
                     print(
                         f"Web search JSON parse error for {person_name} (attempt {retry_count + 1}): {json_error}. Retrying...", "warning")
                     context = f"Previous attempt failed with JSON parse error. Raw response preview: {analysis_content[:200]}..."
-                    return await self.web_search_analysis(person_data, retry_count + 1, context)
+                    return await self.web_search_analysis(person_data, product_name, retry_count + 1, context)
                 else:
                     print(
                         model, f"JSON parse error after {retry_count + 1} attempts: {json_error}", f"Web search for {person_name}")
@@ -201,7 +225,7 @@ Return ONLY the JSON object—do NOT include any markdown or ``` before/after.:
                 print(
                     f"Web search analysis error for {person_name} (attempt {retry_count + 1}): {e}. Retrying...", "warning")
                 context = f"Previous attempt failed with error: {str(e)}"
-                return await self.web_search_analysis(person_data, retry_count + 1, context)
+                return await self.web_search_analysis(person_data, product_name, retry_count + 1, context)
             else:
                 print(
                     "gpt-4o", f"Web search failed after {retry_count + 1} attempts: {e}", f"Web search for {person_name}")

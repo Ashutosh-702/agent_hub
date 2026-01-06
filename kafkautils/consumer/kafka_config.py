@@ -8,6 +8,7 @@ from kafkautils.constants import (
     LEADGEN_SINGLE_COMPANY_PROCESSING,
     LEADGEN_CSV_IMPORT_PROCESSING,
     LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING,
+    LEADGEN_CONTACT_QUALIFICATION_AI_PROCESSING,
     LEADGEN_APOLLO_CONTACT_LIST_PROCESSING,
     LEADGEN_HUBSPOT_SYNC_PROCESSING,
     KAFKA_SERVICE_CONFIG_MAPPING,
@@ -22,6 +23,7 @@ from kafkautils.handlers import (
     leadgen_single_company_processing_handler,
     leadgen_csv_import_processing_handler,
     leadgen_company_qualification_ai_processing_handler,
+    leadgen_contact_qualification_ai_processing_handler,
     leadgen_apollo_contact_list_processing_handler,
     leadgen_hubspot_sync_processing_handler,
 )
@@ -69,6 +71,9 @@ KAFKA_CONSUMER_SETTINGS = {
                 },
                 KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING]["topics"][0]: {
                     "tasks": [leadgen_company_qualification_ai_processing_handler]
+                },
+                KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_CONTACT_QUALIFICATION_AI_PROCESSING]["topics"][0]: {
+                    "tasks": [leadgen_contact_qualification_ai_processing_handler]
                 },
                 KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_APOLLO_CONTACT_LIST_PROCESSING]["topics"][0]: {
                     "tasks": [leadgen_apollo_contact_list_processing_handler]

@@ -10,6 +10,7 @@ LEADGEN_PROSPECTING_JOB_PROCESSING = "leadgen-prospecting-job-processing"
 LEADGEN_SINGLE_COMPANY_PROCESSING = "leadgen-single-company-processing"
 LEADGEN_CSV_IMPORT_PROCESSING = "leadgen-csv-import-processing"
 LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING = "leadgen-company-qualification-ai-processing"
+LEADGEN_CONTACT_QUALIFICATION_AI_PROCESSING = "leadgen-contact-qualification-ai-processing"
 LEADGEN_APOLLO_CONTACT_LIST_PROCESSING = "leadgen-apollo-contact-list-processing"
 LEADGEN_HUBSPOT_SYNC_PROCESSING = "leadgen-hubspot-sync-processing"
 LUSHA_COMPANY_COLLECTION = "lusha-company-collection"
@@ -36,6 +37,10 @@ KAFKA_SERVICE_CONFIG_MAPPING = {
         LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING: {
             "topics": ["leadgen_company_qualification_ai_processing"],  # Use underscores to match EventBridge output
             "description": "Process AI company qualification requests"
+        },
+        LEADGEN_CONTACT_QUALIFICATION_AI_PROCESSING: {
+            "topics": ["leadgen_contact_qualification_ai_processing"],  # Use underscores to match EventBridge output
+            "description": "Process AI contact qualification requests"
         },
         LEADGEN_APOLLO_CONTACT_LIST_PROCESSING: {
             "topics": ["leadgen_apollo_contact_list_processing"],  # Use underscores to match EventBridge output

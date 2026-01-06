@@ -564,6 +564,102 @@ async def leadgen_company_qualification_ai_processing_handler(message: Any):
         raise
 
 
+async def leadgen_contact_qualification_ai_processing_handler(message: Any):
+    """Handler for AI contact qualification events."""
+    try:
+        payload = None
+
+        if isinstance(message, dict) and 'payload' in message:
+            payload = message['payload']
+        else:
+            logger.error("🔍 payload missing")
+            return
+
+        request_id = payload.get('request_id', 'unknown') if isinstance(payload, dict) else 'unknown'
+        logger.info(f"📨 Received AI contact qualification message: {request_id}")
+
+        if not isinstance(payload, dict) or not payload:
+            logger.error("❌ Invalid message payload")
+            return
+
+        request_id = payload.get("request_id")
+        action = payload.get("action")
+        campaign_id = payload.get("campaign_id")
+
+        if not request_id or not campaign_id:
+            logger.error("❌ Missing request_id or campaign_id in message")
+            return
+
+        if action != "process_contact_qualification_ai":
+            logger.error(f"❌ Unknown action: {action}")
+            return
+
+        logger.info(f"🔄 Processing AI contact qualification: {request_id}")
+        await ai_contact_qualification(request_id, campaign_id)
+        
+    except Exception as e:
+        logger.error(f"❌ Error handling AI contact qualification message: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+async def ai_contact_qualification(request_id: str, campaign_id: str):
+    """
+    AI contact qualification processing.
+    This function will be implemented by the user with the actual AI logic.
+    For now, it sets up the basic structure and updates campaign status.
+    """
+    try:
+        logger.info(f"🔍 Processing AI contact qualification request: {request_id}")
+        logger.info(f"📋 Campaign ID: {campaign_id}")
+
+        await initialize_consumer_connections()
+
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaign_data = await campaigns_dao.get_campaign(campaign_id)
+
+        if not campaign_data:
+            logger.error(f"❌ Campaign not found: {campaign_id}")
+            return
+
+        # Update status to running
+        await campaigns_dao.update_campaign(campaign_id, {
+            "prospecting_cycle.contact_qualification_ai.status": "running",
+            "prospecting_cycle.contact_qualification_ai.updated_at": datetime.utcnow()
+        })
+
+        # TODO: User will implement the actual AI contact qualification logic here
+        # This is a placeholder that the user will extend with their custom logic
+        # The function receives campaign_id and can access campaign data, contacts, etc.
+        orchestrator = IntegrationOrchestrator(campaign_data)
+        product_name = campaign_data.get("ownership", {}).get("product_name")
+        await orchestrator.contact_qualification("GlamAR", request_id=request_id)
+        
+        logger.info(f"✅ AI contact qualification placeholder completed for campaign: {campaign_id}")
+        logger.info(f"📝 User should implement actual AI logic in ai_contact_qualification function")
+
+        # Update status to completed
+        await campaigns_dao.update_campaign(campaign_id, {
+            "prospecting_cycle.contact_qualification_ai.status": "completed",
+            "prospecting_cycle.contact_qualification_ai.updated_at": datetime.utcnow(),
+            "prospecting_cycle.status": "contact_enriched"
+        })
+
+        logger.info(f"✅ Completed AI contact qualification: {request_id}")
+
+    except Exception as e:
+        logger.error(f"❌ Error processing AI contact qualification {request_id}: {e}")
+        # Update status to failed
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        await campaigns_dao.update_campaign(campaign_id, {
+            "prospecting_cycle.contact_qualification_ai.status": "failed",
+            "prospecting_cycle.contact_qualification_ai.error": str(e),
+            "prospecting_cycle.contact_qualification_ai.updated_at": datetime.utcnow()
+        })
+        raise
+
+
 async def leadgen_apollo_contact_list_processing_handler(message: Any):
     """
     Handler for get_apollo_contact_list events.

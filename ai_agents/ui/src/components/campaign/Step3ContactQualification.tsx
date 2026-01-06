@@ -5,6 +5,8 @@ import {
   useLazyGetCampaignContactListQuery,
   useUpdateApolloContactEnrichmentStatusMutation,
   useGetCampaignContactListQuery,
+  useAiContactQualificationMutation,
+  useContactQualificationProgressQuery,
   type CampaignContactListItem,
 } from '../../store';
 import { skipToken } from '@reduxjs/toolkit/query';
@@ -40,6 +42,33 @@ export const Step3ContactQualification = () => {
   const [enrichApolloContactList] = useEnrichApolloContactListMutation();
   const [updateApolloContactEnrichmentStatus] = useUpdateApolloContactEnrichmentStatusMutation();
   const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
+  
+  // AI Contact Qualification
+  const [aiContactQualification] = useAiContactQualificationMutation();
+  const [aiStopPolling, setAiStopPolling] = useState(false);
+  
+  // Poll AI job progress when AI mode is selected
+  const shouldPollAiProgress = Boolean(campaignId && state.contactQualificationMode === 'ai');
+  const { data: aiProgressData } = useContactQualificationProgressQuery(
+    { campaign_id: campaignId || '' },
+    {
+      pollingInterval: shouldPollAiProgress && !aiStopPolling ? 15000 : 0,
+      skip: !shouldPollAiProgress,
+    }
+  );
+
+  // Stop polling once AI job reaches terminal state
+  useEffect(() => {
+    const status = aiProgressData?.data?.status;
+    if (status === 'completed' || status === 'failed') {
+      setAiStopPolling(true);
+      // When AI completes, advance to next step
+      if (status === 'completed') {
+        setLoading(false);
+        nextStep();
+      }
+    }
+  }, [aiProgressData?.data?.status, nextStep, setLoading]);
 
   // Query to check campaign status for detecting if step is already completed
   const { data: contactListData } = useGetCampaignContactListQuery(
@@ -302,7 +331,8 @@ export const Step3ContactQualification = () => {
               <span className="mode-tag">Full Control</span>
             </div>
             <div 
-              className="mode-card disabled"
+              className="mode-card"
+              onClick={() => setContactQualificationMode('ai')}
             >
               <div className="mode-icon ai">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -315,8 +345,8 @@ export const Step3ContactQualification = () => {
                 </svg>
               </div>
               <h4>AI Qualification</h4>
-              <p>Coming soon.</p>
-              <span className="mode-tag ai">Soon</span>
+              <p>Let AI qualify contacts based on criteria</p>
+              <span className="mode-tag ai">AI Powered</span>
             </div>
           </div>
         </div>
@@ -483,17 +513,87 @@ export const Step3ContactQualification = () => {
         </div>
       )}
 
-      {/* AI Qualification (Coming soon) */}
+      {/* AI Qualification */}
       {state.contactQualificationMode === 'ai' && (
         <div className="manual-qualification">
-          <div className="empty-state">
-            <h3>AI Contact Qualification</h3>
-            <p>Coming soon. Please use Manual Qualification for now.</p>
-            <div className="wizard-navigation">
-              <button className="btn secondary" onClick={() => setContactQualificationMode('manual')}>
-                Switch to Manual
-              </button>
+          <div className="ai-qualification-setup">
+            <div className="ai-setup-header">
+              <h3>AI Contact Qualification</h3>
+              <p>AI will qualify contacts based on campaign criteria. Click Start to begin.</p>
             </div>
+
+            {/* Show progress if AI job exists */}
+            {aiProgressData?.data && aiProgressData.data.status !== 'not_started' ? (
+              <div style={{ marginTop: 16, padding: 12, borderRadius: 12, border: '1px solid #e4e7ed', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                  <div style={{ fontWeight: 700, color: '#111827' }}>
+                    AI Qualification: {aiProgressData.data.status}{' '}
+                    {!aiStopPolling &&
+                    (aiProgressData.data.status === 'queued' || aiProgressData.data.status === 'running') ? (
+                      <span className="ai-progress-spinner" aria-label="Loading" />
+                    ) : null}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>
+                    Relevant: {aiProgressData.data.progress.relevant} / {aiProgressData.data.progress.total} (Processed: {aiProgressData.data.progress.processed})
+                  </div>
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ height: 8, borderRadius: 999, background: '#e5e7eb', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        height: '100%',
+                        width:
+                          aiProgressData.data.progress.total > 0
+                            ? `${Math.min(
+                                100,
+                                Math.round((aiProgressData.data.progress.processed / aiProgressData.data.progress.total) * 100)
+                              )}%`
+                            : '0%',
+                        background: 'rgba(46, 49, 190, 0.9)',
+                      }}
+                    />
+                  </div>
+                </div>
+                {aiProgressData.data.error ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626' }}>{aiProgressData.data.error}</div>
+                ) : null}
+                {aiProgressData.data.status === 'completed' ? (
+                  <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button className="btn primary" onClick={nextStep}>
+                      Continue to Sync to HubSpot
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="ai-setup-actions" style={{ marginTop: 24 }}>
+                <button
+                  className="btn secondary"
+                  onClick={() => setContactQualificationMode(null)}
+                >
+                  Back
+                </button>
+                <div style={{ flex: 1 }} />
+                <button
+                  className="btn primary"
+                  onClick={() => {
+                    if (!campaignId) return;
+                    setLoading(true, 'Starting AI contact qualification…');
+                    void (async () => {
+                      try {
+                        await aiContactQualification({ campaign_id: campaignId }).unwrap();
+                        setLoading(true, 'AI is qualifying contacts…');
+                        setAiStopPolling(false); // Enable polling
+                      } catch (e) {
+                        setLoading(false);
+                      }
+                    })();
+                  }}
+                >
+                  Start AI Qualification
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

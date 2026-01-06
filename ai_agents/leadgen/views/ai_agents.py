@@ -23,6 +23,7 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CreateCampaignFromCSVImport,
     ManualCompanyQualification,
     AiCompanyQualification,
+    AiContactQualification,
     ApolloContactList,
     UpdateApolloContactEnrichmentStatus,
     GetCampaignContactList,
@@ -344,6 +345,31 @@ async def ai_company_qualification(query_params: AiCompanyQualification = Body()
     response_data.data = response
 
     return response_data.dict()
+
+
+async def ai_contact_qualification(query_params: AiContactQualification = Body()) -> Dict[str, Any]:
+    """Queue AI contact qualification job via Kafka."""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.ai_contact_qualification(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+
+async def contact_qualification_progress(campaign_id: str) -> Dict[str, Any]:
+    """Get progress of AI contact qualification job."""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.get_contact_qualification_progress(campaign_id)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
 
 async def get_apollo_contact_list(query_params: ApolloContactList = Depends()) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)

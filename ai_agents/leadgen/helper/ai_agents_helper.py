@@ -20,6 +20,7 @@ from kafkautils.constants import (
     LeadgenServices,
     CONTACTS_ENRICHMENT,
     LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING,
+    LEADGEN_CONTACT_QUALIFICATION_AI_PROCESSING,
     LEADGEN_APOLLO_CONTACT_LIST_PROCESSING,
     LEADGEN_HUBSPOT_SYNC_PROCESSING,
 )
@@ -31,7 +32,7 @@ from ai_agents.leadgen.services.ai_agents_service import CampaignService
 from ai_agents.leadgen.utils import serialize_objectid
 from ai_agents.leadgen.schemas.ai_agents import CampaignDetailsWithCompanies
 from database.collection_dao.campaigns import CampaignsDao
-from ai_agents.leadgen.schemas.ai_agents import AiCompanyQualification, ApolloContactList, UpdateApolloContactEnrichmentStatus, GetCampaignContactList, CampaignContactList
+from ai_agents.leadgen.schemas.ai_agents import AiCompanyQualification, AiContactQualification, ApolloContactList, UpdateApolloContactEnrichmentStatus, GetCampaignContactList, CampaignContactList
 class LushaContactEnrichmentHelper:
 
     def __init__(self):
@@ -380,6 +381,7 @@ class CampaignsHelper:
         self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.company_qualification_ai_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING]
+        self.contact_qualification_ai_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_CONTACT_QUALIFICATION_AI_PROCESSING]
         self.apollo_contact_list_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_APOLLO_CONTACT_LIST_PROCESSING]
         self.hubspot_sync_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_HUBSPOT_SYNC_PROCESSING]
 
@@ -568,6 +570,106 @@ class CampaignsHelper:
         if not update_campaign:
             raise ApiException("Campaign not found")
         return {"message": "Campaign updated", "campaign_id": campaign_id}
+
+    async def ai_contact_qualification(self, query_params: AiContactQualification):
+        """
+        Queue AI contact qualification job via Kafka.
+        Similar pattern to ai_company_qualification but for contacts.
+        """
+        campaign_id = query_params.campaign_id
+        contact_prompt = query_params.contact_prompt
+
+        request_id = str(uuid.uuid4())
+
+        # Get current contact counts for progress tracking
+        total = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count({"campaign_id": campaign_id})
+        remaining = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
+            {"campaign_id": campaign_id, "$or": [{"is_relevant":False }, {"is_relevant": {"$exists": False}}] }
+        )
+        relevant = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
+            {"campaign_id": campaign_id, "is_relevant": True}
+        )
+        processed = max(total - remaining, 0)
+
+        # Update campaign with AI contact qualification job info
+        update_campaign = await self.campaign_dao.update_campaign(
+            campaign_id,
+            {
+                "prompts.contact": contact_prompt,
+                "metadata.updated_at": datetime.utcnow(),
+                "prospecting_cycle.contact_qualification_ai": {
+                    "status": "queued",
+                    "request_id": request_id,
+                    "started_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                    "error": None,
+                    "progress": {
+                        "total": int(total),
+                        "processed": int(processed),
+                        "relevant": int(relevant),
+                    },
+                },
+            },
+        )
+
+        if not self.event_emitter:
+            raise ApiException("EventBridge Producer not initialized")
+
+        event = {
+            "request_id": request_id,
+            "action": "process_contact_qualification_ai",
+            "campaign_id": campaign_id,
+            "contact_prompt": contact_prompt,
+            "timestamp": asyncio.get_event_loop().time()
+        }
+
+        await emit_event_helper(
+            event_emitter=self.event_emitter,
+            topics=self.contact_qualification_ai_kafka_config["topics"],
+            partition_value=request_id,
+            event=event,
+            event_meta={"service": "leadgen", "campaign_id": campaign_id, "contact_prompt": contact_prompt},
+        )
+
+        if not update_campaign:
+            raise ApiException("Campaign not found")
+        return {"message": "AI contact qualification queued", "campaign_id": campaign_id, "request_id": request_id}
+
+    async def get_contact_qualification_progress(self, campaign_id: str):
+        """
+        Lightweight progress info for long-running AI contact qualification.
+        Falls back to computing counts from campaign_contact_runs if progress isn't present.
+        """
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException("Campaign not found")
+
+        job = campaign.get("prospecting_cycle", {}).get("contact_qualification_ai") or {}
+
+        total = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count({"campaign_id": campaign_id})
+        remaining = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
+            {"campaign_id": campaign_id, "is_relevant": {"$exists": False}}
+        )
+        relevant = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
+            {"campaign_id": campaign_id, "is_relevant": True}
+        )
+        processed = max(total - remaining, 0)
+
+        # Merge computed progress with stored job info
+        progress = (job.get("progress") or {}).copy()
+        progress["total"] = int(progress.get("total") or total)
+        progress["processed"] = int(progress.get("processed") or processed)
+        progress["relevant"] = int(progress.get("relevant") or relevant)
+
+        return {
+            "campaign_id": str(campaign.get("_id")),
+            "status": job.get("status") or "not_started",
+            "request_id": job.get("request_id"),
+            "started_at": job.get("started_at"),
+            "updated_at": job.get("updated_at"),
+            "error": job.get("error"),
+            "progress": progress,
+        }
 
     async def get_apollo_contact_list(self, query_params: ApolloContactList):
         enrichment_status = query_params.enrichment_status

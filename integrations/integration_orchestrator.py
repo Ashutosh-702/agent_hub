@@ -11,6 +11,7 @@ from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 from config.loaded_config import loaded_config
 from ai_agents.core_sdr.src.api.company_relevance_check import CompanyRelevanceCheck
+from ai_agents.core_sdr.src.api.people_relevance_check import PeopleRelevanceCheck
 from integrations.lusha.lusha_helper import LushaHelper
 from integrations.coresignal.coresignal_api_client import CoresignalAPIClient
 from integrations.lusha.lusha_contact_handler import LushaContactHandler
@@ -35,6 +36,8 @@ class IntegrationOrchestrator:
         self.CampaignContactRunsDao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
         self.ContactsDao = ContactsDao(loaded_config.connection_manager.mongo_client)
         self.relevance_check = CompanyRelevanceCheck(self.config)
+        self.people_relevance_check = PeopleRelevanceCheck(self.config)
+
         self.campaign_id = self.config.get('_id')
         self.lusha_contact_handler = LushaContactHandler()
         self.apollo_helper = ApolloHelper()
@@ -318,3 +321,26 @@ class IntegrationOrchestrator:
             logger.error(f"❌ Error processing company mappings: {e}")
             raise
             
+    async def contact_qualification(self, product_name: str, request_id: str):
+        try:
+            campaign_id = self.campaign_id
+            logger.info(f"📋 Campaign ID: {campaign_id}")
+            logger.info(f"📋 Request ID: {request_id}")
+            contacts = await self.CampaignContactRunsDao.get_campaign_contact_runs({"campaign_id": campaign_id, "$or": [{"is_relevant": False}, {"is_relevant": {"$exists": False}}]})
+
+            for contact in contacts:
+                contact_id = contact.get("contact_id")
+                contact_data = await self.ContactsDao.get_contact(contact_id)
+                person_data = contact_data.get("metadata", {}).get("raw_data", {}).get("person", {})
+                relevance_result = await self.people_relevance_check.web_search_analysis(person_data, product_name)
+                relevance_assessment = relevance_result.get('relevance_assessment', {})
+                is_relevant = relevance_assessment.get('is_relevant', False)
+                await self.CampaignContactRunsDao.update_campaign_contact_run({"campaign_id": campaign_id, "contact_id": contact_id}, {"$set": {"is_relevant": is_relevant}})
+                await self.ContactsDao.update_contact(contact_id, {"$set": {"is_relevant": is_relevant}})
+            return {
+                "contact_qualification": True,
+                "request_id": request_id
+            }
+        except Exception as e:
+            logger.error(f"Error while processing contact qualification for campaign {campaign_id}: {str(e)}")
+            raise

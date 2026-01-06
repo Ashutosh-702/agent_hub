@@ -337,6 +337,41 @@ export interface AiCompanyQualificationResponse {
   errors?: string[];
 }
 
+export interface AiContactQualificationPayload {
+  campaign_id: string;
+  contact_prompt?: string;
+}
+
+export interface AiContactQualificationResponse {
+  success: boolean;
+  data?: {
+    message?: string;
+    campaign_id?: string;
+    request_id?: string;
+  };
+  errors?: string[];
+}
+
+export interface ContactQualificationProgressData {
+  campaign_id: string;
+  status: 'not_started' | 'queued' | 'running' | 'completed' | 'failed';
+  request_id?: string | null;
+  started_at?: string | null;
+  updated_at?: string | null;
+  error?: string | null;
+  progress: {
+    total: number;
+    processed: number;
+    relevant: number;
+  };
+}
+
+export interface ContactQualificationProgressResponse {
+  success: boolean;
+  data?: ContactQualificationProgressData;
+  errors?: string[];
+}
+
 export interface CompanyQualificationProgressData {
   campaign_id: string;
   status: 'not_started' | 'queued' | 'running' | 'completed' | 'failed';
@@ -605,6 +640,26 @@ export const campaignApi = baseApi.injectEndpoints({
         const params = new URLSearchParams({ campaign_id });
         return {
           url: `/api/v1/company_qualification_progress?${params}`,
+          method: 'GET',
+        };
+      },
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    aiContactQualification: builder.mutation<AiContactQualificationResponse, AiContactQualificationPayload>({
+      query: (payload) => ({
+        url: '/api/v1/ai_contact_qualification',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    contactQualificationProgress: builder.query<ContactQualificationProgressResponse, { campaign_id: string }>({
+      query: ({ campaign_id }) => {
+        const params = new URLSearchParams({ campaign_id });
+        return {
+          url: `/api/v1/contact_qualification_progress?${params}`,
           method: 'GET',
         };
       },
@@ -932,6 +987,8 @@ export const {
   useUpdateApolloContactEnrichmentStatusMutation,
   useAiCompanyQualificationMutation,
   useCompanyQualificationProgressQuery,
+  useAiContactQualificationMutation,
+  useContactQualificationProgressQuery,
   useGetCampaignContactListQuery,
   useLazyGetCampaignContactListQuery,
   useGetHubspotSyncCandidatesQuery,
