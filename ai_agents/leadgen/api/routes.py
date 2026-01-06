@@ -40,6 +40,7 @@ from ai_agents.leadgen.views.ai_agents import (
     get_enrollment_contacts,
     enroll_contacts_to_sequence,
     get_lemlist_campaigns,
+    webhook_from_deepsearch_research,
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -300,5 +301,12 @@ router.add_api_route(
     "/lemlist_campaigns",
     methods=["GET"],
     endpoint=get_lemlist_campaigns,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/webhook_from_deepsearch_research",
+    methods=["POST"],
+    endpoint=webhook_from_deepsearch_research,
     response_model=ResponseData,
 )

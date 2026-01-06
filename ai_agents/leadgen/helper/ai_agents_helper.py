@@ -1214,6 +1214,34 @@ class CampaignsHelper:
             }
 
 
+    async def webhook_from_deepsearch_research(self, query_params: Dict[str, Any]):
+        """
+        Webhook from Deepsearch Research.
+        """
+        webhook_data = query_params.get("webhook_data")
+        campaign_id = webhook_data.get("campaign_id")
+        company_id = webhook_data.get("company_id")
+        deepsearch_research_data = webhook_data.get("deepsearch_research_data", {})
+        if not company_id or not campaign_id or not deepsearch_research_data:
+            raise ApiException("Company ID, campaign ID and deepsearch research data are required")
+        #here store whole query_params in metadata.deepsearch_research_data
+        json_query_data = json.dumps(webhook_data)
+        update_campaign_company_run = {
+            "deep_research": deepsearch_research_data,
+            "metadata.updated_at": datetime.utcnow(),
+            "metadata.deepsearch_research_data": json_query_data
+        }
+        await self.campaign_company_runs_dao.update_campaign_company_run({"company_id": ObjectId(company_id), "campaign_id": ObjectId(campaign_id)}, {"$set": update_campaign_company_run})
+        update_campaign = {
+            "metadata.updated_at": datetime.utcnow(),
+        }
+        await self.campaign_dao.update_campaign(campaign_id, update_campaign)
+        return {
+            "message": "deepsearch research data stored",
+            "company_id": company_id,
+            "campaign_id": campaign_id
+        }
+
 class CompaniesHelper:
 
     def __init__(self):
