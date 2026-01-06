@@ -230,3 +230,4 @@ class ProductKnowledgeService:
         
         return product_info.get("common_objections", {})
 
+

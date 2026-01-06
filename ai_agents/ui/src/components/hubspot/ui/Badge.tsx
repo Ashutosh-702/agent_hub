@@ -58,3 +58,4 @@ export const ConfidenceBadge = ({ confidence }: { confidence: 'high' | 'medium' 
   );
 };
 
+

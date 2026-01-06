@@ -14,6 +14,7 @@ from config.loaded_config import loaded_config
 from database.collection_dao.meetings import MeetingsDao
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.contacts import ContactsDao
+from database.collection_dao.products import ProductsDao
 from ai_agents.meetings.models import (
     TranscriptEntry,
     LiveInsight,
@@ -85,6 +86,8 @@ class MeetingWebSocketHandler:
         # State
         self._transcript: list = []
         self._insights: list = []
+        self._insights_task: Optional[asyncio.Task] = None  # Periodic insights generation task
+        self._meeting_start_time: float = 0  # Track meeting start time (Unix timestamp) for relative time calculation
         
     async def _send_json(self, data: Dict[str, Any]):
         """Send JSON message to client."""
@@ -120,60 +123,104 @@ class MeetingWebSocketHandler:
     
     async def _on_transcript_interim(self, text: str, timestamp: float, speaker: str = "user"):
         """Handle interim transcript from Deepgram."""
-        logger.info(f"Received interim transcript: {text[:100]}... (speaker: {speaker})")
-        # Determine source: 'user' speaker = mic, 'client' speaker = system_audio
-        source = "mic" if speaker == "user" else "system_audio"
-        await self._send_json({
-            "type": "transcript_interim",
-            "text": text,
-            "timestamp": timestamp,
-            "speaker": speaker,
-            "source": source,
-        })
+        try:
+            # Skip empty transcripts
+            if not text or not text.strip():
+                logger.debug(f"⏭️ Skipping empty interim transcript from {speaker}")
+                return
+                
+            logger.info(f"📝 Received interim transcript: {text[:100]}... (speaker: {speaker})")
+            # Determine source: 'user' speaker = mic, 'client' speaker = system_audio
+            source = "mic" if speaker == "user" else "system_audio"
+            await self._send_json({
+                "type": "transcript_interim",
+                "text": text,
+                "timestamp": timestamp,
+                "speaker": speaker,
+                "source": source,
+            })
+            logger.debug(f"✅ Sent interim transcript to client: '{text[:50]}...'")
+        except Exception as e:
+            logger.error(f"❌ Error handling interim transcript: {e}", exc_info=True)
     
     async def _on_transcript_final(self, text: str, speaker: str, timestamp: float):
         """Handle final transcript from Deepgram."""
-        logger.info(f"Received final transcript: {text[:100]}... (speaker: {speaker})")
-        
-        # Determine source: 'user' speaker = mic, 'client' speaker = system_audio
-        source = "mic" if speaker == "user" else "system_audio"
-        
-        # Create transcript entry
-        entry = TranscriptEntry(
-            timestamp=timestamp,
-            speaker=speaker,
-            source=source,
-            text=text,
-            is_final=True,
-        )
-        
-        # Add to local buffer
-        self._transcript.append(entry.model_dump())
-        
-        # Add to insights engine
-        if self._insights_engine:
-            self._insights_engine.add_transcript_entry(entry)
-        
-        # Save to database
-        if self._db_meeting_id:
-            await self.meetings_dao.append_transcript(
-                self._db_meeting_id,
-                entry.model_dump()
+        try:
+            logger.info(f"📝 Received final transcript: {text[:100] if text else '(empty)'}... (speaker: {speaker})")
+            
+            # Skip empty transcripts (silence or no speech detected)
+            if not text or not text.strip():
+                logger.debug(f"⏭️ Skipping empty transcript from {speaker}")
+                return
+            
+            # Determine source: 'user' speaker = mic, 'client' speaker = system_audio
+            source = "mic" if speaker == "user" else "system_audio"
+            
+            # Create transcript entry
+            entry = TranscriptEntry(
+                timestamp=timestamp,
+                speaker=speaker,
+                source=source,
+                text=text,
+                is_final=True,
             )
-        
-        # Send to client
-        await self._send_json({
-            "type": "transcript_final",
-            "text": text,
-            "speaker": speaker,
-            "timestamp": timestamp,
-            "source": source,
-        })
-        logger.debug("Sent transcript_final message to client")
-        
-        # Check if we should generate insights
-        if self._insights_engine and self._insights_engine.should_generate_insights(timestamp, text):
-            asyncio.create_task(self._generate_and_send_insights(timestamp))
+            
+            # Add to local buffer
+            self._transcript.append(entry.model_dump())
+            
+            # Add to insights engine (don't let this block transcript sending)
+            try:
+                if self._insights_engine:
+                    self._insights_engine.add_transcript_entry(entry)
+                    buffer_size = len(self._insights_engine._transcript_buffer)
+                    logger.debug(f"📊 Transcript added to insights engine - buffer size: {buffer_size}")
+                else:
+                    logger.warning("⚠️ Insights engine not initialized - transcript not added to insights buffer")
+            except Exception as insights_error:
+                logger.error(f"❌ Error adding transcript to insights engine: {insights_error}", exc_info=True)
+            
+            # Save to database (don't let this block transcript sending)
+            try:
+                if self._db_meeting_id:
+                    await self.meetings_dao.append_transcript(
+                        self._db_meeting_id,
+                        entry.model_dump()
+                    )
+            except Exception as db_error:
+                logger.error(f"❌ Error saving transcript to database: {db_error}", exc_info=True)
+            
+            # Send to client - THIS IS CRITICAL, must not fail
+            try:
+                await self._send_json({
+                    "type": "transcript_final",
+                    "text": text,
+                    "speaker": speaker,
+                    "timestamp": timestamp,
+                    "source": source,
+                })
+                logger.info(f"✅ Sent transcript_final message to client: '{text[:50]}...' (speaker: {speaker})")
+            except Exception as send_error:
+                logger.error(f"❌ CRITICAL: Failed to send transcript to client: {send_error}", exc_info=True)
+                raise  # Re-raise this as it's critical
+            
+            # Check if we should generate insights (non-blocking, fire and forget)
+            try:
+                if self._insights_engine and self._insights_engine.should_generate_insights(timestamp, text):
+                    asyncio.create_task(self._generate_and_send_insights(timestamp))
+            except Exception as insights_gen_error:
+                logger.error(f"❌ Error triggering insights generation: {insights_gen_error}", exc_info=True)
+                # Don't re-raise - insights generation failure shouldn't block transcripts
+                
+        except Exception as e:
+            logger.error(f"❌ CRITICAL ERROR in _on_transcript_final: {e}", exc_info=True)
+            # Try to send error to client
+            try:
+                await self._send_json({
+                    "type": "error",
+                    "message": f"Error processing transcript: {str(e)}",
+                })
+            except:
+                pass  # If we can't even send errors, something is very wrong
     
     async def _on_transcription_error(self, message: str):
         """Handle transcription error."""
@@ -185,30 +232,208 @@ class MeetingWebSocketHandler:
     async def _generate_and_send_insights(self, current_time: float):
         """Generate insights and send to client."""
         if not self._insights_engine:
+            logger.warning("⚠️ Insights engine not initialized, cannot generate insights")
             return
         
         try:
+            buffer_size = len(self._insights_engine._transcript_buffer)
+            logger.info(f"🔍 GENERATING INSIGHTS - time: {current_time:.1f}s, transcript buffer: {buffer_size} entries")
+            
             new_insights = await self._insights_engine.generate_insights(current_time)
             
+            logger.info(f"📊 INSIGHT GENERATION RESULT - Generated {len(new_insights)} new insights at {current_time:.1f}s")
+            
+            if not new_insights:
+                logger.warning(f"⚠️ No insights generated at {current_time:.1f}s - may be due to low confidence, duplicates, empty transcript, or API returned empty")
+                logger.debug(f"   Buffer size: {buffer_size}, Last insight time: {self._insights_engine._last_insight_time}")
+            
             for insight in new_insights:
-                # Save to database
-                if self._db_meeting_id:
-                    await self.meetings_dao.append_insight(
-                        self._db_meeting_id,
-                        insight.model_dump()
-                    )
-                
-                # Add to local buffer
-                self._insights.append(insight.model_dump())
-                
-                # Send to client
-                await self._send_json({
-                    "type": "insight",
-                    "insight": insight.model_dump(),
-                })
+                try:
+                    # Convert to dict with proper serialization (use mode='json' to ensure enum values are strings)
+                    insight_dict = insight.model_dump(mode='json')
+                    # Ensure type is a string (not enum) - double check
+                    if 'type' in insight_dict:
+                        if hasattr(insight_dict['type'], 'value'):
+                            insight_dict['type'] = insight_dict['type'].value
+                        elif isinstance(insight_dict['type'], str):
+                            # Already a string, ensure it's lowercase
+                            insight_dict['type'] = insight_dict['type'].lower()
+                        else:
+                            insight_dict['type'] = str(insight_dict['type']).lower()
+                    
+                    logger.info(f"📤 Sending insight: type={insight_dict.get('type')}, message={insight_dict.get('message', '')[:50]}...")
+                    
+                    # Save to database
+                    if self._db_meeting_id:
+                        try:
+                            await self.meetings_dao.append_insight(
+                                self._db_meeting_id,
+                                insight_dict
+                            )
+                        except Exception as db_error:
+                            logger.error(f"❌ Error saving insight to database: {db_error}", exc_info=True)
+                    
+                    # Add to local buffer
+                    self._insights.append(insight_dict)
+                    
+                    # Send to client
+                    await self._send_json({
+                        "type": "insight",
+                        "insight": insight_dict,
+                    })
+                    logger.info(f"✅ Successfully sent insight to client: {insight_dict.get('id')} (type: {insight_dict.get('type')})")
+                except Exception as insight_error:
+                    logger.error(f"❌ Error processing/sending insight: {insight_error}", exc_info=True)
+                    continue
                 
         except Exception as e:
-            logger.error(f"Error generating insights: {e}")
+            logger.error(f"Error generating insights: {e}", exc_info=True)
+    
+    async def _periodic_insights_generation(self):
+        """
+        Periodic task that generates insights every 20 seconds.
+        
+        This ensures insights are generated even if there are no new transcripts,
+        as long as there's some transcript content available.
+        """
+        import time
+        
+        # Wait a bit for initial transcript to accumulate (skip test insight at 5s)
+        await asyncio.sleep(25)  # Wait 25 seconds before first generation
+        
+        # Track when we last generated insights (for this periodic task)
+        last_periodic_generation = 0
+        
+        while self._is_running:
+            try:
+                # Check if we have transcript content
+                if not self._insights_engine:
+                    logger.warning("⚠️ Insights engine not initialized - skipping periodic generation")
+                    await asyncio.sleep(20)
+                    continue
+                
+                # Check buffer directly (more reliable than get_recent_transcript)
+                buffer_size = len(self._insights_engine._transcript_buffer)
+                recent_transcript = self._insights_engine.get_recent_transcript()
+                transcript_count = len(recent_transcript)
+                
+                # Calculate relative time from meeting start (matching transcript timestamps)
+                current_relative_time = time.time() - self._meeting_start_time
+                
+                if buffer_size == 0:
+                    logger.debug(f"⏳ No transcript buffer yet - waiting... (meeting time: {current_relative_time:.1f}s)")
+                    await asyncio.sleep(20)
+                    continue
+                
+                # For periodic task, always generate if 20+ seconds have passed since last periodic generation
+                # This ensures we generate every 20 seconds regardless of other factors
+                time_since_last_periodic = current_relative_time - last_periodic_generation
+                
+                if time_since_last_periodic >= self._insights_engine.time_trigger_seconds:
+                    logger.info(f"🔄 PERIODIC INSIGHTS TRIGGERED - buffer: {buffer_size} entries, recent: {transcript_count} entries, meeting: {current_relative_time:.1f}s, last periodic: {last_periodic_generation:.1f}s ago ({time_since_last_periodic:.1f}s gap)")
+                    try:
+                        await self._generate_and_send_insights(current_relative_time)
+                        last_periodic_generation = current_relative_time
+                        logger.info(f"✅ Periodic insights generation completed at {current_relative_time:.1f}s")
+                    except Exception as gen_error:
+                        logger.error(f"❌ Error during periodic insights generation: {gen_error}", exc_info=True)
+                        # Don't update last_periodic_generation on error, so we retry sooner
+                else:
+                    logger.debug(f"⏸️ Too soon - last periodic {time_since_last_periodic:.1f}s ago, need {self._insights_engine.time_trigger_seconds}s (buffer: {buffer_size}, meeting: {current_relative_time:.1f}s)")
+                
+                # Wait 20 seconds before next check
+                await asyncio.sleep(20)
+                
+            except asyncio.CancelledError:
+                logger.info("Periodic insights task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"❌ Unexpected error in periodic insights loop: {e}", exc_info=True)
+                await asyncio.sleep(5)  # Wait before retrying
+    
+    async def _load_product_context(
+        self,
+        context: InsightGenerationContext,
+        product_ids: list,
+    ) -> None:
+        """
+        Load product context from MongoDB with JSON fallback.
+        
+        Args:
+            context: InsightGenerationContext to populate
+            product_ids: List of product IDs to load
+        """
+        if not product_ids:
+            return
+        
+        products_loaded = False
+        
+        # Try MongoDB first
+        try:
+            products_dao = ProductsDao(loaded_config.connection_manager.mongo_client)
+            db_products = await products_dao.get_products_for_insights(product_ids)
+            
+            if db_products:
+                for pid, p in db_products.items():
+                    # Extract feature titles for key_features list
+                    key_features = []
+                    for f in p.get("key_features", []):
+                        if isinstance(f, dict):
+                            key_features.append(f.get("title", ""))
+                        else:
+                            key_features.append(str(f))
+                    
+                    context.products.append(ProductContext(
+                        name=p.get("name", pid),
+                        key_features=key_features or p.get("benefits", []),
+                        differentiators=p.get("differentiators", []),
+                        common_objections=p.get("common_objections", {}),
+                        case_studies=[logo for logo in p.get("customer_logos", [])[:5]],
+                    ))
+                products_loaded = True
+                logger.info(f"Loaded {len(db_products)} products from MongoDB")
+                
+        except Exception as e:
+            logger.warning(f"Could not load products from MongoDB: {e}")
+        
+        # Fallback to JSON file
+        if not products_loaded:
+            try:
+                from ai_agents.meetings.product_knowledge_service import ProductKnowledgeService
+                
+                service = ProductKnowledgeService()
+                json_products = service.get_products_by_ids(product_ids)
+                
+                for pid, p in json_products.items():
+                    context.products.append(ProductContext(
+                        name=p.get("name", pid),
+                        key_features=p.get("key_features", []),
+                        differentiators=p.get("differentiators", []),
+                        common_objections=p.get("common_objections", {}),
+                        case_studies=p.get("case_studies", []),
+                    ))
+                
+                if json_products:
+                    logger.info(f"Loaded {len(json_products)} products from JSON fallback")
+                    
+            except Exception as e:
+                logger.warning(f"Could not load products from JSON fallback: {e}")
+                
+                # Final fallback to battlecard PRODUCT_INFO
+                try:
+                    from ai_agents.meetings.battlecard_generator import PRODUCT_INFO
+                    for pid in product_ids:
+                        if pid in PRODUCT_INFO:
+                            p = PRODUCT_INFO[pid]
+                            context.products.append(ProductContext(
+                                name=p["name"],
+                                key_features=p["key_features"],
+                                differentiators=p["differentiators"],
+                                common_objections=p["common_objections"],
+                            ))
+                    logger.info(f"Loaded products from PRODUCT_INFO fallback")
+                except Exception as e2:
+                    logger.error(f"All product loading methods failed: {e2}")
     
     async def _load_meeting_context(self) -> InsightGenerationContext:
         """Load context for the meeting from database."""
@@ -238,18 +463,9 @@ class MeetingWebSocketHandler:
             except Exception as e:
                 logger.error(f"Error loading company context: {e}")
         
-        # Load product context
+        # Load product context from MongoDB with JSON fallback
         product_ids = self._meeting_data.get("product_ids", [])
-        from ai_agents.meetings.battlecard_generator import PRODUCT_INFO
-        for pid in product_ids:
-            if pid in PRODUCT_INFO:
-                p = PRODUCT_INFO[pid]
-                context.products.append(ProductContext(
-                    name=p["name"],
-                    key_features=p["key_features"],
-                    differentiators=p["differentiators"],
-                    common_objections=p["common_objections"],
-                ))
+        await self._load_product_context(context, product_ids)
         
         # Load contact context
         contact_ids = self._meeting_data.get("contact_ids", [])
@@ -325,6 +541,8 @@ class MeetingWebSocketHandler:
             
             # Initialize insights engine
             self._insights_engine = InsightsEngine(context)
+            logger.info(f"✅ InsightsEngine initialized - OpenAI client: {'✅ Present' if self._insights_engine._openai_client else '❌ Missing (API key not configured)'}")
+            logger.info(f"   Context loaded - Company: {bool(context.company_research)}, Products: {len(context.products)}, Contact: {bool(context.contact)}")
             
             # Initialize transcription service with sync wrappers
             use_mock = not getattr(loaded_config, 'deepgram_api_key', None)
@@ -345,21 +563,57 @@ class MeetingWebSocketHandler:
                 return False
             
             self._start_time = datetime.utcnow()
+            import time
+            self._meeting_start_time = time.time()  # Store Unix timestamp for relative calculations
             self._is_running = True
             
             # Start keepalive task to prevent Deepgram timeout
             asyncio.create_task(self._deepgram_keepalive())
             
+            # Start periodic insights generation task
+            self._insights_task = asyncio.create_task(self._periodic_insights_generation())
+            logger.info(f"✅ Started periodic insights generation task (will start after 25s, then every 20s)")
+            
+            # Send a test insight after 5 seconds to verify frontend can receive insights
+            asyncio.create_task(self._send_test_insight())
+            logger.info(f"✅ Started test insight task (will send after 5s)")
+            
             logger.info(f"Meeting {self.meeting_id} initialized successfully")
             return True
             
         except Exception as e:
-            logger.error(f"Error initializing meeting: {e}")
+            logger.error(f"Error initializing meeting: {e}", exc_info=True)
             await self._send_json({
                 "type": "error",
                 "message": f"Initialization error: {str(e)}",
             })
             return False
+    
+    async def _send_test_insight(self):
+        """Send a test insight to verify frontend connectivity."""
+        await asyncio.sleep(5)  # Wait 5 seconds after initialization
+        
+        if not self._is_running:
+            return
+        
+        test_insight = {
+            "id": "test-insight-1",
+            "type": "discovery_question",
+            "message": "Test: Ask about their current order cancellation rate",
+            "suggested_response": "You mentioned inventory issues - what's the impact on your order cancellation rate?",
+            "timestamp": 5.0,
+            "confidence": 0.9,
+            "evidence": "Test insight to verify connectivity",
+        }
+        
+        logger.info("🧪 Sending test insight to verify frontend connectivity")
+        await self._send_json({
+            "type": "insight",
+            "insight": test_insight,
+        })
+        
+        # Note: We don't update _last_insight_time for test insight to avoid interfering
+        # with the periodic task's timing
     
     async def handle_audio_chunk(self, audio_data: bytes):
         """Handle incoming audio chunk."""
@@ -469,6 +723,14 @@ class MeetingWebSocketHandler:
         """
         self._is_running = False
         ended_at = datetime.utcnow()
+        
+        # Cancel periodic insights generation task
+        if self._insights_task and not self._insights_task.done():
+            self._insights_task.cancel()
+            try:
+                await self._insights_task
+            except asyncio.CancelledError:
+                pass
         
         # Close transcription service
         if self._transcription_service:
