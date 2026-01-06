@@ -22,6 +22,7 @@ from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
 from config.logging import logger
 from datetime import datetime, timezone
 from bson import ObjectId
+from time import sleep
 
 
 class IntegrationOrchestrator:
@@ -327,16 +328,47 @@ class IntegrationOrchestrator:
             logger.info(f"📋 Campaign ID: {campaign_id}")
             logger.info(f"📋 Request ID: {request_id}")
             contacts = await self.CampaignContactRunsDao.get_campaign_contact_runs({"campaign_id": campaign_id, "$or": [{"is_relevant": False}, {"is_relevant": {"$exists": False}}]})
-
+            toggle = True
             for contact in contacts:
                 contact_id = contact.get("contact_id")
                 contact_data = await self.ContactsDao.get_contact(contact_id)
-                person_data = contact_data.get("metadata", {}).get("raw_data", {}).get("person", {})
-                relevance_result = await self.people_relevance_check.web_search_analysis(person_data, product_name)
-                relevance_assessment = relevance_result.get('relevance_assessment', {})
-                is_relevant = relevance_assessment.get('is_relevant', False)
-                await self.CampaignContactRunsDao.update_campaign_contact_run({"campaign_id": campaign_id, "contact_id": contact_id}, {"$set": {"is_relevant": is_relevant}})
+                
+                # Skip if contact data is not found
+                if contact_data is None:
+                    logger.warning(f"⚠️ Contact data not found for contact_id: {contact_id}, skipping...")
+                    continue
+
+                person_data = None
+                if contact_data.get("metadata", {}).get("raw_data", {}).get("person"):
+                    person_data = contact_data.get("metadata", {}).get("raw_data", {}).get("person", {})
+                
+                # relevance_result = await self.people_relevance_check.web_search_analysis(person_data, product_name)
+                # relevance_assessment = relevance_result.get('relevance_assessment', {})
+                if toggle:
+                    toggle = False
+                else:
+                    toggle = True
+                    
+                mock_relevance_assessment = {
+                    "is_relevant": toggle,
+                    "reason": "Contact is relevant - matches target persona criteria" if toggle else "Contact is not relevant - role does not match target ICP"
+                }
+                is_relevant = mock_relevance_assessment.get('is_relevant', False)
+                relevance_reason = mock_relevance_assessment.get('reason', '')
+
+                if is_relevant:
+                    logger.info(f"Contact {contact_id} is relevant")
+                
+                
+                await self.CampaignContactRunsDao.update_campaign_contact_run(
+                    {"campaign_id": campaign_id, "contact_id": contact_id}, 
+                    {"$set": {
+                        "is_relevant": is_relevant,
+                        "relevance_reason": relevance_reason
+                    }}
+                )
                 await self.ContactsDao.update_contact(contact_id, {"$set": {"is_relevant": is_relevant}})
+                
             return {
                 "contact_qualification": True,
                 "request_id": request_id

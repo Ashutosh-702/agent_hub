@@ -638,7 +638,7 @@ class CampaignsHelper:
     async def get_contact_qualification_progress(self, campaign_id: str):
         """
         Lightweight progress info for long-running AI contact qualification.
-        Falls back to computing counts from campaign_contact_runs if progress isn't present.
+        Uses relevance_reason field to determine if contact has been processed.
         """
         campaign = await self.campaign_dao.get_campaign(campaign_id)
         if not campaign:
@@ -646,14 +646,18 @@ class CampaignsHelper:
 
         job = campaign.get("prospecting_cycle", {}).get("contact_qualification_ai") or {}
 
+        # Total contacts in this campaign
         total = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count({"campaign_id": campaign_id})
-        remaining = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
-            {"campaign_id": campaign_id, "is_relevant": {"$exists": False}}
+        
+        # Processed = contacts that have relevance_reason field (AI qualification done)
+        processed = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
+            {"campaign_id": campaign_id, "relevance_reason": {"$exists": True}}
         )
+        
+        # Relevant = contacts marked as relevant by AI
         relevant = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
             {"campaign_id": campaign_id, "is_relevant": True}
         )
-        processed = max(total - remaining, 0)
 
         # Merge computed progress with stored job info
         progress = (job.get("progress") or {}).copy()
@@ -706,16 +710,22 @@ class CampaignsHelper:
         contact_ids = query_params.contact_ids  if query_params.contact_ids else []
         is_relevant = query_params.is_relevant
         selection_type = query_params.selection_type
+        relevance_reason = query_params.relevance_reason
+
+        # Build update data
+        update_data = {"is_relevant": is_relevant}
+        if relevance_reason is not None:
+            update_data["relevance_reason"] = relevance_reason
 
         if selection_type == "all":
-            await self.campaign_contact_runs_dao.update_campaign_contact_runs({"campaign_id": campaign_id}, {"$set": {"is_relevant": is_relevant}})
+            await self.campaign_contact_runs_dao.update_campaign_contact_runs({"campaign_id": campaign_id}, {"$set": update_data})
         else:
             chunk_size = 500
             for i in range(0, len(contact_ids), chunk_size):
                 chunk = contact_ids[i:i + chunk_size]
                 await self.campaign_contact_runs_dao.update_campaign_contact_runs(
                     {"campaign_id": campaign_id, "contact_id": {"$in": chunk}},
-                    {"$set": {"is_relevant": is_relevant}}
+                    {"$set": update_data}
                 )
         return {"message": "Contact relevance updated"}
 

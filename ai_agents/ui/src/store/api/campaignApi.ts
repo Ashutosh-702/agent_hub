@@ -313,6 +313,7 @@ export interface UpdateApolloContactEnrichmentStatusParams {
   selection_type: 'all' | 'selected';
   is_relevant: boolean;
   contact_ids: string[];
+  relevance_reason?: string;
 }
 
 export interface UpdateApolloContactEnrichmentStatusResponse {
@@ -426,6 +427,7 @@ export interface CampaignContactListItem {
   company_id: string;
   contact_id: string;
   is_relevant: boolean;
+  relevance_reason?: string;
   enrichment_status?: boolean;
   // Personalization fields (populated after Step 5 saves)
   personalization_status?: 'pending' | 'approved' | 'rejected';
@@ -611,12 +613,15 @@ export const campaignApi = baseApi.injectEndpoints({
       UpdateApolloContactEnrichmentStatusResponse,
       UpdateApolloContactEnrichmentStatusParams
     >({
-      query: ({ campaign_id, selection_type, is_relevant, contact_ids }) => {
+      query: ({ campaign_id, selection_type, is_relevant, contact_ids, relevance_reason }) => {
         const params = new URLSearchParams({
           campaign_id,
           selection_type,
           is_relevant: String(is_relevant),
         });
+        if (relevance_reason) {
+          params.append('relevance_reason', relevance_reason);
+        }
         return {
           url: `/api/v1/update_apollo_contact_enrichment_status?${params}`,
           method: 'POST',

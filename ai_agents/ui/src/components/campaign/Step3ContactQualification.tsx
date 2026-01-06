@@ -46,34 +46,40 @@ export const Step3ContactQualification = () => {
   // AI Contact Qualification
   const [aiContactQualification] = useAiContactQualificationMutation();
   const [aiStopPolling, setAiStopPolling] = useState(false);
+  const [isAiContinueLoading, setIsAiContinueLoading] = useState(false);
   
   // Poll AI job progress when AI mode is selected
   const shouldPollAiProgress = Boolean(campaignId && state.contactQualificationMode === 'ai');
   const { data: aiProgressData } = useContactQualificationProgressQuery(
     { campaign_id: campaignId || '' },
     {
-      pollingInterval: shouldPollAiProgress && !aiStopPolling ? 15000 : 0,
+      pollingInterval: shouldPollAiProgress && !aiStopPolling ? 3000 : 0, // Poll every 3 seconds for real-time progress
       skip: !shouldPollAiProgress,
     }
   );
 
-  // Stop polling once AI job reaches terminal state
+  // Query to check campaign status for detecting if step is already completed
+  // Poll while AI qualification is running or just completed to show live updates
+  const aiStatus = aiProgressData?.data?.status;
+  const shouldPollContactList = Boolean(
+    campaignId && 
+    state.contactQualificationMode === 'ai' && 
+    (aiStatus === 'running' || aiStatus === 'queued')
+  );
+  const { data: contactListData, refetch: refetchContactList } = useGetCampaignContactListQuery(
+    campaignId ? { campaign_id: campaignId, page: 1, limit: 100 } : skipToken,
+    { pollingInterval: shouldPollContactList ? 5000 : 0 }
+  );
+
+  // Stop polling once AI job reaches terminal state and refetch contact list
   useEffect(() => {
     const status = aiProgressData?.data?.status;
     if (status === 'completed' || status === 'failed') {
       setAiStopPolling(true);
-      // When AI completes, advance to next step
-      if (status === 'completed') {
-        setLoading(false);
-        nextStep();
-      }
+      // Refetch contact list to get updated is_relevant values
+      refetchContactList();
     }
-  }, [aiProgressData?.data?.status, nextStep, setLoading]);
-
-  // Query to check campaign status for detecting if step is already completed
-  const { data: contactListData } = useGetCampaignContactListQuery(
-    campaignId ? { campaign_id: campaignId, page: 1, limit: 100 } : skipToken
-  );
+  }, [aiProgressData?.data?.status, refetchContactList]);
   
   const campaignCycleStatus = contactListData?.data?.campaign?.prospecting_cycle?.status;
   const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
@@ -187,6 +193,50 @@ export const Step3ContactQualification = () => {
     })();
   };
 
+  // Handler for AI qualification flow - uses apiContacts instead of state contacts
+  const handleAiContinue = () => {
+    if (!campaignId) {
+      nextStep();
+      return;
+    }
+
+    // Get relevant contact IDs from API contacts (AI-qualified)
+    const relevantContactIds = apiContacts
+      .filter((c) => c.is_relevant)
+      .map((c) => c.contact_id);
+
+    if (relevantContactIds.length === 0) {
+      return;
+    }
+
+    setIsAiContinueLoading(true);
+    setLoading(true, 'Saving selected contacts…');
+    void (async () => {
+      try {
+        // 1) Persist selected contact ids (is_relevant=true) - same as manual flow
+        await updateApolloContactEnrichmentStatus({
+          campaign_id: campaignId,
+          selection_type: 'selected',
+          is_relevant: true,
+          contact_ids: relevantContactIds,
+        }).unwrap();
+
+        // 2) Queue enrichment job
+        await enrichApolloContactList({ campaign_id: campaignId, enrichment_status: true }).unwrap();
+        setLoading(true, 'Enriching contacts from Apollo…');
+        
+        // 3) Start polling for contact_enriched
+        setIsWaitingForEnrichment(true);
+        setIsEnrichPolling(true);
+      } catch (e) {
+        setLoading(false);
+        setIsEnrichPolling(false);
+        setIsWaitingForEnrichment(false);
+        setIsAiContinueLoading(false);
+      }
+    })();
+  };
+
   // Poll get_campaign_contact_list until contacts are available
   // For initial fetch: wait for contact_qualification (contacts fetched from Apollo)
   // For enrichment: wait for contact_enriched (contacts enriched)
@@ -285,8 +335,8 @@ export const Step3ContactQualification = () => {
         <p>Review and qualify contacts from your qualified companies</p>
       </div>
 
-      {/* Loading Animation */}
-      {state.isLoading && (
+      {/* Loading Animation - Only show when NOT in AI mode or before AI starts */}
+      {state.isLoading && state.contactQualificationMode !== 'ai' && (
         <div className="loading-overlay">
           <div className="loading-card">
             <div className="loading-animation ai-animation">
@@ -519,73 +569,243 @@ export const Step3ContactQualification = () => {
           <div className="ai-qualification-setup">
             <div className="ai-setup-header">
               <h3>AI Contact Qualification</h3>
-              <p>AI will qualify contacts based on campaign criteria. Click Start to begin.</p>
+              <p>AI will qualify contacts based on campaign criteria.</p>
             </div>
 
-            {/* Show progress if AI job exists */}
+            {/* Show progress if AI job is running */}
             {aiProgressData?.data && aiProgressData.data.status !== 'not_started' ? (
-              <div style={{ marginTop: 16, padding: 12, borderRadius: 12, border: '1px solid #e4e7ed', background: '#f8fafc' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-                  <div style={{ fontWeight: 700, color: '#111827' }}>
-                    AI Qualification: {aiProgressData.data.status}{' '}
-                    {!aiStopPolling &&
-                    (aiProgressData.data.status === 'queued' || aiProgressData.data.status === 'running') ? (
-                      <span className="ai-progress-spinner" aria-label="Loading" />
+              <div className="sync-progress-container" style={{ marginTop: 24 }}>
+                <div className="sync-progress-header">
+                  <span className="sync-progress-status">
+                    {(aiProgressData.data.status === 'queued' || aiProgressData.data.status === 'running') && (
+                      <div className="spinner small" />
+                    )}
+                    {aiProgressData.data.status === 'completed' ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                      </svg>
                     ) : null}
+                    {aiProgressData.data.status === 'queued' && 'Starting AI qualification...'}
+                    {aiProgressData.data.status === 'running' && 'AI is qualifying contacts...'}
+                    {aiProgressData.data.status === 'completed' && 'AI qualification completed!'}
+                    {aiProgressData.data.status === 'failed' && 'AI qualification failed'}
+                  </span>
+                  <span className="sync-progress-count">
+                    {aiProgressData.data.progress.processed} / {aiProgressData.data.progress.total} contacts
+                  </span>
+                </div>
+                <div className="sync-progress-bar">
+                  <div 
+                    className={`sync-progress-fill ${aiProgressData.data.progress.total > 0 && aiProgressData.data.progress.processed > 0 ? '' : 'sync-progress-indeterminate'}`}
+                    style={{ 
+                      width: aiProgressData.data.progress.total > 0 
+                        ? `${Math.min(100, Math.round((aiProgressData.data.progress.processed / aiProgressData.data.progress.total) * 100))}%` 
+                        : '0%' 
+                    }}
+                  />
+                </div>
+                
+                {/* Stats below progress bar */}
+                <div className="qualification-stats" style={{ marginTop: 16 }}>
+                  <div className="stat">
+                    <span className="stat-value">{aiProgressData.data.progress.total}</span>
+                    <span className="stat-label">Total Contacts</span>
                   </div>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>
-                    Relevant: {aiProgressData.data.progress.relevant} / {aiProgressData.data.progress.total} (Processed: {aiProgressData.data.progress.processed})
+                  <div className="stat">
+                    <span className="stat-value">{aiProgressData.data.progress.processed}</span>
+                    <span className="stat-label">Processed</span>
+                  </div>
+                  <div className="stat qualified">
+                    <span className="stat-value">{aiProgressData.data.progress.relevant}</span>
+                    <span className="stat-label">Relevant</span>
                   </div>
                 </div>
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ height: 8, borderRadius: 999, background: '#e5e7eb', overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        height: '100%',
-                        width:
-                          aiProgressData.data.progress.total > 0
-                            ? `${Math.min(
-                                100,
-                                Math.round((aiProgressData.data.progress.processed / aiProgressData.data.progress.total) * 100)
-                              )}%`
-                            : '0%',
-                        background: 'rgba(46, 49, 190, 0.9)',
-                      }}
-                    />
-                  </div>
-                </div>
+
                 {aiProgressData.data.error ? (
-                  <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626' }}>{aiProgressData.data.error}</div>
+                  <div className="sync-error-banner" style={{ marginTop: 16 }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="15" y1="9" x2="9" y2="15"/>
+                      <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <span>{aiProgressData.data.error}</span>
+                  </div>
                 ) : null}
-                {aiProgressData.data.status === 'completed' ? (
-                  <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button className="btn primary" onClick={nextStep}>
-                      Continue to Sync to HubSpot
+
+                {/* Show contacts list after AI qualification is completed or running */}
+                {(aiProgressData.data.status === 'completed' || aiProgressData.data.status === 'running') && apiContacts.length > 0 && (
+                  <div className="contacts-qualification-list" style={{ marginTop: 24 }}>
+                    <div className="select-all-header">
+                      <label className="checkbox-container">
+                        <input 
+                          type="checkbox" 
+                          checked={apiContacts.length > 0 && apiContacts.every(c => c.is_relevant)}
+                          ref={(el) => {
+                            if (el) el.indeterminate = apiContacts.some(c => c.is_relevant) && !apiContacts.every(c => c.is_relevant);
+                          }}
+                          onChange={() => {
+                            if (!campaignId) return;
+                            const allSelected = apiContacts.every(c => c.is_relevant);
+                            const allContactIds = apiContacts.map(c => c.contact_id);
+                            void (async () => {
+                              try {
+                                await updateApolloContactEnrichmentStatus({
+                                  campaign_id: campaignId,
+                                  selection_type: 'selected',
+                                  is_relevant: !allSelected,
+                                  contact_ids: allContactIds,
+                                  relevance_reason: !allSelected ? 'Manual selection (Select All)' : 'Manually marked as not relevant (Deselect All)',
+                                }).unwrap();
+                                refetchContactList();
+                              } catch (e) {
+                                console.error('Failed to update all contacts:', e);
+                              }
+                            })();
+                          }}
+                        />
+                        <span className="checkmark"></span>
+                      </label>
+                      <span className="select-all-text">
+                        {apiContacts.every(c => c.is_relevant) ? 'Deselect All' : 'Select All'}
+                        <span className="selected-count">
+                          ({apiContacts.filter(c => c.is_relevant).length} of {apiContacts.length} selected)
+                        </span>
+                      </span>
+                    </div>
+
+                    {apiContacts.map((contact) => {
+                      const isRelevant = contact.is_relevant;
+                      const hasReason = !!contact.relevance_reason;
+                      return (
+                        <div 
+                          key={contact.contact_id} 
+                          className={`contact-qualification-card ${isRelevant ? 'qualified' : ''}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            if (!campaignId) return;
+                            // Toggle relevance and update reason
+                            void (async () => {
+                              try {
+                                await updateApolloContactEnrichmentStatus({
+                                  campaign_id: campaignId,
+                                  selection_type: 'selected',
+                                  is_relevant: !isRelevant,
+                                  contact_ids: [contact.contact_id],
+                                  relevance_reason: !isRelevant ? 'Manual selection' : 'Manually marked as not relevant',
+                                }).unwrap();
+                                // Refetch contact list to show updated status
+                                refetchContactList();
+                              } catch (e) {
+                                console.error('Failed to update contact relevance:', e);
+                              }
+                            })();
+                          }}
+                        >
+                          <div className="contact-select">
+                            <label className="checkbox-container">
+                              <input 
+                                type="checkbox"
+                                checked={isRelevant}
+                                onChange={() => {}}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="checkmark"></span>
+                            </label>
+                          </div>
+                          <div className="contact-avatar">
+                            {contact.contact_data?.firstname?.[0] || '?'}{contact.contact_data?.lastname?.[0] || '?'}
+                          </div>
+                          <div className="contact-info" style={{ flex: 1 }}>
+                            <h4>{contact.contact_data?.firstname || ''} {contact.contact_data?.lastname || ''}</h4>
+                            <div className="contact-meta">
+                              <span className="job-title">{contact.contact_data?.jobtitle || 'N/A'}</span>
+                              <span className="company-name">{contact.contact_data?.company || 'Unknown'}</span>
+                            </div>
+                            <span className="contact-email">{contact.contact_data?.email?.[0] || 'No email'}</span>
+                            {hasReason && (
+                              <div style={{ 
+                                marginTop: 8, 
+                                fontSize: 12, 
+                                color: isRelevant ? '#059669' : '#dc2626',
+                                background: isRelevant ? '#ecfdf5' : '#fef2f2',
+                                padding: '6px 10px',
+                                borderRadius: 6,
+                                lineHeight: 1.4,
+                              }}>
+                                <strong>{isRelevant ? '✓ Relevant:' : '✗ Not Relevant:'}</strong> {contact.relevance_reason}
+                              </div>
+                            )}
+                          </div>
+                          {isRelevant ? (
+                            <div className="qualified-badge">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            </div>
+                          ) : (
+                            <div style={{ 
+                              width: 28, height: 28, borderRadius: '50%', 
+                              background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Continue button when completed */}
+                {aiProgressData.data.status === 'completed' && (
+                  <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
+                    <button 
+                      className="btn-primary" 
+                      onClick={handleAiContinue}
+                      disabled={isAiContinueLoading}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      {isAiContinueLoading ? (
+                        <>
+                          <div className="spinner small" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                          Enriching...
+                        </>
+                      ) : (
+                        <>
+                          Continue with {apiContacts.filter(c => c.is_relevant).length} Contacts
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <polyline points="12 5 19 12 12 19"/>
+                          </svg>
+                        </>
+                      )}
                     </button>
                   </div>
-                ) : null}
+                )}
               </div>
             ) : (
               <div className="ai-setup-actions" style={{ marginTop: 24 }}>
                 <button
-                  className="btn secondary"
+                  className="btn-secondary"
                   onClick={() => setContactQualificationMode(null)}
                 >
                   Back
                 </button>
                 <div style={{ flex: 1 }} />
                 <button
-                  className="btn primary"
+                  className="btn-primary"
                   onClick={() => {
                     if (!campaignId) return;
-                    setLoading(true, 'Starting AI contact qualification…');
                     void (async () => {
                       try {
                         await aiContactQualification({ campaign_id: campaignId }).unwrap();
-                        setLoading(true, 'AI is qualifying contacts…');
                         setAiStopPolling(false); // Enable polling
                       } catch (e) {
-                        setLoading(false);
+                        console.error('Failed to start AI qualification:', e);
                       }
                     })();
                   }}

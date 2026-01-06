@@ -195,6 +195,7 @@ class UpdateApolloContactEnrichmentStatus(BaseModel):
     contact_ids: Optional[List[str]] = None
     selection_type: str = "all"
     is_relevant: bool = True
+    relevance_reason: Optional[str] = None
 
 class GetCampaignContactList(BaseModel):
     campaign_id: str

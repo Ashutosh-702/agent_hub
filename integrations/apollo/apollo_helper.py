@@ -572,7 +572,14 @@ class ApolloHelper:
         
         # Remove duplicates and empty strings
         phones = list(set([p for p in phones if p]))
-        
+
+        raw_data = None
+        if enriched_data:
+            raw_data = enriched_data
+        else:
+            raw_data = {
+                "person": person_data
+            }
         # Build contact document
         contact_doc = {
             "company_id": ObjectId(company_id),
@@ -594,7 +601,7 @@ class ApolloHelper:
             "metadata": {
                 "created_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
-                "raw_data": enriched_data
+                "raw_data": raw_data
             }
         }
         if enriched_data:
@@ -915,8 +922,8 @@ class ApolloHelper:
             if not isinstance(industry_names, list):
                 industry_names = [industry_names]
             
-            # Convert industry names to keyword tags (lowercase, no spaces)
-            keyword_tags = [name.lower().replace(" ", "") for name in industry_names if name]
+            # Keep industry names as-is for keyword tags
+            keyword_tags = [name for name in industry_names if name]
             if keyword_tags:
                 apollo_config["q_organization_keyword_tags"] = keyword_tags
 

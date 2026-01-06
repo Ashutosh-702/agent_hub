@@ -639,11 +639,12 @@ async def ai_contact_qualification(request_id: str, campaign_id: str):
         logger.info(f"✅ AI contact qualification placeholder completed for campaign: {campaign_id}")
         logger.info(f"📝 User should implement actual AI logic in ai_contact_qualification function")
 
-        # Update status to completed
+        # Update status to completed (contacts are qualified, not yet enriched)
+        # Status should be "contact_qualification" so that enrich_apollo_contact_list can proceed
         await campaigns_dao.update_campaign(campaign_id, {
             "prospecting_cycle.contact_qualification_ai.status": "completed",
             "prospecting_cycle.contact_qualification_ai.updated_at": datetime.utcnow(),
-            "prospecting_cycle.status": "contact_enriched"
+            "prospecting_cycle.status": "contact_qualification"
         })
 
         logger.info(f"✅ Completed AI contact qualification: {request_id}")

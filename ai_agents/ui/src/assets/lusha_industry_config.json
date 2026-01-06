@@ -1349,5 +1349,81 @@
         ]
       }
     ]
+  },
+  {
+    "main_industry": "Skincare & Beauty",
+    "main_industry_id": 21,
+    "sub_industries": [
+      {
+        "value": "Skincare Brands",
+        "id": 140,
+        "coresignal": [
+          "Cosmetics",
+          "Personal Care Product Manufacturing",
+          "Personal Care Services"
+        ]
+      },
+      {
+        "value": "Cosmetics & Makeup",
+        "id": 141,
+        "coresignal": [
+          "Cosmetics",
+          "Personal Care Product Manufacturing"
+        ]
+      },
+      {
+        "value": "Beauty Retail",
+        "id": 142,
+        "coresignal": [
+          "Retail",
+          "Consumer Goods"
+        ]
+      },
+      {
+        "value": "Personal Care & Wellness",
+        "id": 143,
+        "coresignal": [
+          "Personal Care Services",
+          "Wellness and Fitness Services",
+          "Health, Wellness & Fitness"
+        ]
+      },
+      {
+        "value": "Luxury Beauty & Fragrances",
+        "id": 144,
+        "coresignal": [
+          "Luxury Goods & Jewelry",
+          "Cosmetics"
+        ]
+      },
+      {
+        "value": "Natural & Clean Beauty",
+        "id": 145,
+        "coresignal": [
+          "Cosmetics",
+          "Personal Care Product Manufacturing"
+        ]
+      },
+      {
+        "value": "Dermatology & Medical Skincare",
+        "id": 146,
+        "coresignal": [
+          "Medical Practices",
+          "Pharmaceuticals"
+        ]
+      },
+      {
+        "value": "Hair Care & Styling",
+        "id": 147,
+        "coresignal": [
+          "Personal Care Product Manufacturing",
+          "Personal Care Services"
+        ]
+      },
+      {
+        "value": "Other (Skincare & Beauty)",
+        "id": 796
+      }
+    ]
   }
 ]
