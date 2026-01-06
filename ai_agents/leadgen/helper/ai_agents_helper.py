@@ -1242,6 +1242,63 @@ class CampaignsHelper:
             "campaign_id": campaign_id
         }
 
+    async def webhook_for_legal_name_and_other_entities(self, query_params: Dict[str, Any]):
+        """
+        Webhook for legal name and other entities.
+        """
+        webhook_data = query_params.get("webhook_data")
+        campaign_id = webhook_data.get("campaign_id")
+        company_id = webhook_data.get("company_id")
+        legal_name_and_other_entities_data = webhook_data.get("legal_name_and_other_entities_data", {})
+        if not company_id or not campaign_id or not legal_name_and_other_entities_data:
+            raise ApiException("Company ID, campaign ID and legal name and other entities data are required")
+        #here store whole query_params in metadata.legal_name_and_other_entities_data
+        json_query_data = json.dumps(webhook_data)
+        update_campaign_company_run = {
+            "legal_name_and_other_entities": legal_name_and_other_entities_data,
+            "metadata.updated_at": datetime.utcnow(),
+            "metadata.legal_name_and_other_entities_data": json_query_data
+        }
+        await self.campaign_company_runs_dao.update_campaign_company_run({"company_id": ObjectId(company_id), "campaign_id": ObjectId(campaign_id)}, {"$set": update_campaign_company_run})
+        update_campaign = {
+            "metadata.updated_at": datetime.utcnow(),
+        }
+        await self.campaign_dao.update_campaign(campaign_id, update_campaign)
+        return {
+            "message": "legal name and other entities data stored",
+            "company_id": company_id,
+            "campaign_id": campaign_id
+        }
+
+    async def webhook_for_personalization(self, query_params: Dict[str, Any]):
+        """
+        Webhook for personalization.
+        """
+        webhook_data = query_params.get("webhook_data")
+        campaign_id = webhook_data.get("campaign_id")
+        company_id = webhook_data.get("company_id")
+        contact_id = webhook_data.get("contact_id")
+        personalization_data = webhook_data.get("personalization_data", {})
+        if not company_id or not campaign_id or not personalization_data or not contact_id:
+            raise ApiException("Company ID, campaign ID and personalization data are required")
+        #here store whole query_params in metadata.personalization_data
+        json_query_data = json.dumps(webhook_data)
+        update_campaign_contact_run = {
+            "personalization": personalization_data,
+            "metadata.updated_at": datetime.utcnow(),
+            "metadata.personalization_data": json_query_data
+        }
+        await self.campaign_contact_runs_dao.update_campaign_contact_run({"campaign_id": ObjectId(campaign_id), "contact_id": ObjectId(contact_id)}, {"$set": update_campaign_contact_run})
+        update_campaign = {
+            "metadata.updated_at": datetime.utcnow(),
+        }
+        await self.campaign_dao.update_campaign(campaign_id, update_campaign)
+        return {
+            "message": "personalization data stored",
+            "company_id": company_id,
+            "contact_id": contact_id,
+            "campaign_id": campaign_id
+        }
 class CompaniesHelper:
 
     def __init__(self):

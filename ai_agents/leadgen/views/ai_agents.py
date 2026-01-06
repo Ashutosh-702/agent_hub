@@ -565,3 +565,23 @@ async def webhook_from_deepsearch_research(query_params: Dict[str, Any] = Body()
     response_data.data = response
 
     return response_data.dict()
+
+async def webhook_for_legal_name_and_other_entities(query_params: Dict[str, Any] = Body()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.webhook_for_legal_name_and_other_entities(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+async def webhook_for_personalization(query_params: Dict[str, Any] = Body()) -> Dict[str, Any]:
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.webhook_for_personalization(query_params)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()

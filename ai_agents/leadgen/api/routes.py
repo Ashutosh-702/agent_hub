@@ -41,6 +41,8 @@ from ai_agents.leadgen.views.ai_agents import (
     enroll_contacts_to_sequence,
     get_lemlist_campaigns,
     webhook_from_deepsearch_research,
+    webhook_for_legal_name_and_other_entities,
+    webhook_for_personalization,
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -308,5 +310,26 @@ router.add_api_route(
     "/webhook_from_deepsearch_research",
     methods=["POST"],
     endpoint=webhook_from_deepsearch_research,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/webhook_from_deepsearch_research",
+    methods=["POST"],
+    endpoint=webhook_from_deepsearch_research,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/webhook_for_legal_name_and_other_entities",
+    methods=["POST"],
+    endpoint=webhook_for_legal_name_and_other_entities,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/webhook_for_personalization",
+    methods=["POST"],
+    endpoint=webhook_for_personalization,
     response_model=ResponseData,
 )

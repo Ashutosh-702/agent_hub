@@ -26,6 +26,11 @@ PUBLIC_ROUTES = [
     "/openapi.json",
     "/redoc",
     "/env-config",  # Frontend config endpoint
+    # Webhook endpoints (called from external services)
+    "/api/v1/sync_from_hubspot_webhook",
+    "/api/v1/webhook_from_deepsearch_research",
+    "/api/v1/webhook_for_legal_name_and_other_entities",
+    "/api/v1/webhook_for_personalization",
 ]
 
 # Route prefixes that are public (e.g., static files, websockets)
