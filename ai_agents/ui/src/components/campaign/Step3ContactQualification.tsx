@@ -818,37 +818,39 @@ export const Step3ContactQualification = () => {
         </div>
       )}
 
-      {/* Navigation */}
-      <div className="step-navigation">
-        <button className="btn-secondary" onClick={() => {
-          setContactQualificationMode(null);
-          prevStep();
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="19" y1="12" x2="5" y2="12"/>
-            <polyline points="12 19 5 12 12 5"/>
-          </svg>
-          Back
-        </button>
-        
-        {state.contactQualificationMode && (
+      {/* Navigation - only show when step is NOT already completed */}
+      {!stepAlreadyCompleted && (
+        <div className="step-navigation">
           <button className="btn-secondary" onClick={() => {
             setContactQualificationMode(null);
+            prevStep();
           }}>
-            Change Method
-          </button>
-        )}
-
-        {qualifiedCount > 0 && state.contactQualificationMode !== 'ai' && (
-          <button className="btn-primary btn-large" onClick={handleContinue}>
-            Continue with {qualifiedCount} Contacts
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="5" y1="12" x2="19" y2="12"/>
-              <polyline points="12 5 19 12 12 19"/>
+              <line x1="19" y1="12" x2="5" y2="12"/>
+              <polyline points="12 19 5 12 12 5"/>
             </svg>
+            Back
           </button>
-        )}
-      </div>
+          
+          {state.contactQualificationMode && (
+            <button className="btn-secondary" onClick={() => {
+              setContactQualificationMode(null);
+            }}>
+              Change Method
+            </button>
+          )}
+
+          {qualifiedCount > 0 && state.contactQualificationMode !== 'ai' && (
+            <button className="btn-primary btn-large" onClick={handleContinue}>
+              Continue with {qualifiedCount} Contacts
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

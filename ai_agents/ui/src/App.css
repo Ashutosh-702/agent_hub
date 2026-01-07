@@ -945,59 +945,115 @@ button:focus:not(:focus-visible) {
   background: #B91C1C;
 }
 
-/* ===== PAGINATION ===== */
+/* ===== PAGINATION (Campaign List) ===== */
 .pagination-container,
 .pagination-component {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: var(--space-6);
-  padding-top: var(--space-6);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--color-gray-200);
   flex-shrink: 0;
 }
 
-.pagination-info {
+.pagination-component .pagination-info {
   color: var(--color-gray-500);
   font-size: var(--text-sm);
 }
 
-.pagination-controls {
+.pagination-component .pagination-controls {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 16px;
 }
 
-.pagination-btn {
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-white);
-  color: var(--color-gray-700);
-  border: 1px solid var(--color-gray-300);
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-  font-size: var(--text-sm);
+.pagination-component .pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px !important;
+  background: var(--color-white) !important;
+  color: #1f2937 !important;
+  border: 2px solid #6b7280 !important;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  text-align: center;
+  width: auto !important;
+  height: auto !important;
 }
 
-.pagination-btn:hover:not(:disabled) {
-  background: var(--color-gray-50);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+.pagination-component .pagination-btn:hover:not(:disabled) {
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-white) !important;
 }
 
-.pagination-btn:disabled {
-  opacity: 0.4;
+.pagination-component .pagination-btn:disabled {
   cursor: not-allowed;
+  background: #f3f4f6 !important;
+  color: #4b5563 !important;
+  border-color: #9ca3af !important;
+  opacity: 1 !important;
 }
 
-.pagination-current {
-  padding: var(--space-2) var(--space-4);
+.pagination-component .pagination-current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
   background: var(--color-primary);
   color: var(--color-white);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* ===== INDUSTRY CELL (Campaign List) ===== */
+.industry-cell {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
   font-size: var(--text-sm);
+  color: var(--color-gray-700);
+  line-height: 1.4;
+  cursor: default;
+  position: relative;
+}
+
+/* Custom fast tooltip for industry cell */
+.industry-cell::after {
+  content: attr(title);
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 1000;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-gray-900);
+  color: var(--color-white);
+  font-size: var(--text-xs);
+  border-radius: var(--radius-md);
+  white-space: normal;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease, visibility 0.1s ease;
+  pointer-events: none;
+  line-height: 1.5;
+}
+
+.industry-cell:hover::after {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* ===== BACK BUTTON ===== */

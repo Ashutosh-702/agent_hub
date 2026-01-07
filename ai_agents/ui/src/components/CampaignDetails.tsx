@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGetCampaignDetailsQuery } from '../store';
 import type { CampaignCompany } from '../store';
-import { InfoGrid, Loader } from './shared';
+import { InfoGrid, Loader, Pagination } from './shared';
 import type { InfoGridItem } from './shared';
 
 // Polling interval in milliseconds (5 seconds)
@@ -418,30 +418,14 @@ export const CampaignDetails = () => {
 
               {/* Pagination */}
               {pagination && companies.length > 0 && (
-                <div className="pagination-container">
-                  <div className="pagination-info">
-                    Showing page {pagination.page_number} 
-                    {pagination.total_records > 0 && ` of ${Math.ceil(pagination.total_records / limit)}`}
-                    {pagination.total_records > 0 && ` (${pagination.total_records} total)`}
-                  </div>
-                  <div className="pagination-controls">
-                    <button
-                      className="pagination-btn"
-                      onClick={handlePrevPage}
-                      disabled={page === 1}
-                    >
-                      ← Previous
-                    </button>
-                    <span className="pagination-current">Page {page}</span>
-                    <button
-                      className="pagination-btn"
-                      onClick={handleNextPage}
-                      disabled={!pagination.has_next}
-                    >
-                      Next →
-                    </button>
-                  </div>
-                </div>
+                <Pagination
+                  currentPage={pagination.page_number}
+                  totalRecords={pagination.total_records}
+                  pageSize={limit}
+                  hasNext={pagination.has_next}
+                  onPrevious={handlePrevPage}
+                  onNext={handleNextPage}
+                />
               )}
             </div>
           </>

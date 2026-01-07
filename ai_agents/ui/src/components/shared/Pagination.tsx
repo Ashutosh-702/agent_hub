@@ -29,19 +29,20 @@ export const Pagination = ({
           className="pagination-btn"
           onClick={onPrevious}
           disabled={currentPage === 1}
+          aria-label="Previous page"
         >
-          ← Previous
+          Previous
         </button>
         <span className="pagination-current">Page {currentPage}</span>
         <button
           className="pagination-btn"
           onClick={onNext}
           disabled={!hasNext}
+          aria-label="Next page"
         >
-          Next →
+          Next
         </button>
       </div>
     </div>
   );
 };
-

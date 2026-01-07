@@ -138,11 +138,14 @@ export const CampaignList = () => {
     {
       id: 'industry',
       header: 'Industry',
-      cell: (row) => (
-        <span className="product-badge">
-          {(row.campaign.segmentation?.industry || []).join(', ') || 'N/A'}
-        </span>
-      ),
+      cell: (row) => {
+        const industries = (row.campaign.segmentation?.industry || []).join(', ') || 'N/A';
+        return (
+          <span className="industry-cell" title={industries}>
+            {industries}
+          </span>
+        );
+      },
     },
     {
       id: 'status',

@@ -379,8 +379,12 @@ export const Step2CompanyQualification = () => {
           <h2>Company Qualification</h2>
           <p>Missing campaign id. Please go back and start prospecting again.</p>
         </div>
-        <div className="wizard-navigation">
-          <button className="btn secondary" onClick={prevStep}>
+        <div className="step-navigation">
+          <button className="btn-secondary" onClick={prevStep}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="19" y1="12" x2="5" y2="12"/>
+              <polyline points="12 19 5 12 12 5"/>
+            </svg>
             Back
           </button>
         </div>
@@ -603,7 +607,7 @@ export const Step2CompanyQualification = () => {
                 ) : null}
                 {aiProgressData.data.status === 'completed' ? (
                   <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button className="btn secondary" onClick={() => setAiView('verify')}>
+                    <button className="btn-secondary" onClick={() => setAiView('verify')}>
                       Verify Qualified Companies
                     </button>
                     <div style={{ fontSize: 12, color: '#6b7280' }}>
@@ -878,7 +882,7 @@ export const Step2CompanyQualification = () => {
 
             <div className="ai-setup-actions">
               <button
-                className="btn secondary"
+                className="btn-secondary"
                 onClick={() => setCompanyQualificationMode(null)}
               >
                 Back
@@ -886,7 +890,7 @@ export const Step2CompanyQualification = () => {
               <div style={{ flex: 1 }} />
               {aiSetupSaved ? <span className="ai-setup-saved">Saved</span> : null}
               <button
-                className="btn primary"
+                className="btn-primary"
                 onClick={() => {
                   setAiSetupTouched(true);
                   if (!isAiSetupValid) {
@@ -949,7 +953,7 @@ export const Step2CompanyQualification = () => {
                         </span>
                       </span>
                       <div style={{ flex: 1 }} />
-                      <button className="btn secondary" onClick={toggleSelectAllOnPage}>
+                      <button className="btn-secondary" onClick={toggleSelectAllOnPage}>
                         {allSelectedOnPage ? 'Deselect All (Page)' : 'Select All (Page)'}
                       </button>
                     </div>
@@ -1029,19 +1033,27 @@ export const Step2CompanyQualification = () => {
                   </div>
                 )}
 
-                <div className="wizard-navigation">
-                  <button className="btn secondary" onClick={() => setAiView('setup')}>
+                <div className="step-navigation">
+                  <button className="btn-secondary" onClick={() => setAiView('setup')}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="19" y1="12" x2="5" y2="12"/>
+                      <polyline points="12 19 5 12 12 5"/>
+                    </svg>
                     Back to Setup
                   </button>
                   <div style={{ flex: 1 }} />
-                  <button className="btn secondary" onClick={handlePrevPage} disabled={page <= 1 || isFetching}>
+                  <button className="btn-secondary" onClick={handlePrevPage} disabled={page <= 1 || isFetching}>
                     Save & Prev Page
                   </button>
-                  <button className="btn secondary" onClick={handleNextPage} disabled={!pagination?.has_next || isFetching}>
+                  <button className="btn-secondary" onClick={handleNextPage} disabled={!pagination?.has_next || isFetching}>
                     Save & Next Page
                   </button>
-                  <button className="btn primary" onClick={handleAiVerifyContinue} disabled={isFetching}>
+                  <button className="btn-primary" onClick={handleAiVerifyContinue} disabled={isFetching}>
                     Continue to Contacts
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                      <polyline points="12 5 19 12 12 19"/>
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -1069,7 +1081,7 @@ export const Step2CompanyQualification = () => {
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-            <button className="btn secondary" onClick={handleSelectAllCampaign}>
+            <button className="btn-secondary" onClick={handleSelectAllCampaign}>
               Select All (Campaign)
             </button>
             <div style={{ fontSize: 12, color: '#94a3b8' }}>
@@ -1099,7 +1111,7 @@ export const Step2CompanyQualification = () => {
                   </span>
                 </span>
                 <div style={{ flex: 1 }} />
-                <button className="btn secondary" onClick={toggleSelectAllOnPage}>
+                <button className="btn-secondary" onClick={toggleSelectAllOnPage}>
                   {allSelectedOnPage ? 'Deselect All (Page)' : 'Select All (Page)'}
                 </button>
                 {someSelectedOnPage && !allSelectedOnPage ? (
@@ -1182,22 +1194,30 @@ export const Step2CompanyQualification = () => {
             </div>
           )}
 
-          <div className="wizard-navigation">
-            <button className="btn secondary" onClick={prevStep}>
+          <div className="step-navigation">
+            <button className="btn-secondary" onClick={prevStep}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12"/>
+                <polyline points="12 19 5 12 12 5"/>
+              </svg>
               Back
             </button>
 
             <div style={{ flex: 1 }} />
 
-            <button className="btn secondary" onClick={handlePrevPage} disabled={page <= 1 || isFetching}>
+            <button className="btn-secondary" onClick={handlePrevPage} disabled={page <= 1 || isFetching}>
               Save & Prev Page
             </button>
-            <button className="btn secondary" onClick={handleNextPage} disabled={!pagination?.has_next || isFetching}>
+            <button className="btn-secondary" onClick={handleNextPage} disabled={!pagination?.has_next || isFetching}>
               Save & Next Page
             </button>
 
-            <button className="btn primary" onClick={handleContinue} disabled={isFetching}>
+            <button className="btn-primary" onClick={handleContinue} disabled={isFetching}>
               Continue
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
             </button>
           </div>
         </div>
