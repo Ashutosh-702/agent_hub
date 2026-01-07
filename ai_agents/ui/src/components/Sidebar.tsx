@@ -4,9 +4,16 @@ import { useSidebar } from '../context/SidebarContext';
 import { useLogoutMutation, getStoredUser } from '../store/api';
 import { clearUserIdentity } from '../services/analytics';
 
-// Force page reload navigation - needed when leaving the wizard to ensure clean state
+// Force instant navigation - hides UI first for immediate feedback
 const forceNavigate = (path: string, event: React.MouseEvent) => {
   event.preventDefault();
+  event.stopPropagation();
+  
+  // Hide UI immediately for instant visual feedback
+  const root = document.getElementById('root');
+  if (root) root.style.visibility = 'hidden';
+  
+  // Navigate immediately
   window.location.href = path;
 };
 

@@ -4,10 +4,10 @@ import {
   useGetApolloContactListMutation,
   useAiCompanyQualificationMutation,
   useCompanyQualificationProgressQuery,
-  useLazyGetCampaignContactListQuery,
-  useGetCampaignDetailsQuery,
+  useGetCompanyListMinimalQuery,
+  useGetCampaignStatusMinimalQuery,
   useManualCompanyQualificationMutation,
-  type CampaignContactListItem,
+  type CompanyMinimal,
 } from '../../store';
 import { useCampaignWizard } from './NewCampaignWizard';
 import productIcpOptions from '../../assets/product_icp_options.json';
@@ -57,7 +57,7 @@ const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
 };
 
 export const Step2CompanyQualification = () => {
-  const { state, setCompanyQualificationMode, nextStep, prevStep, setLoading, setQualifiedContacts } = useCampaignWizard();
+  const { state, setCompanyQualificationMode, nextStep, prevStep, setLoading } = useCampaignWizard();
   const campaignId = state.campaignId;
   
   // Check if selected product has predefined ICP options
@@ -97,8 +97,13 @@ export const Step2CompanyQualification = () => {
 
   const [manualCompanyQualification] = useManualCompanyQualificationMutation();
   const [queueApolloContactList] = useGetApolloContactListMutation();
-  const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
   const [aiCompanyQualification] = useAiCompanyQualificationMutation();
+  
+  // OPTIMIZED: Use minimal status API for polling (no contact data fetched)
+  const { data: statusPollingData } = useGetCampaignStatusMinimalQuery(
+    campaignId && isContactPolling ? { campaign_id: campaignId } : skipToken,
+    { pollingInterval: isContactPolling ? 3000 : 0 }
+  );
 
   // Always poll AI job progress when AI mode is selected (UI state like aiSetupSaved can reset on refresh),
   // but stop polling once the job reaches a terminal state.
@@ -133,13 +138,14 @@ export const Step2CompanyQualification = () => {
   const queryArgs = campaignId
     ? { campaign_id: campaignId, page, limit: PAGE_SIZE, company_status: companyStatusFilter }
     : skipToken;
-  const { data, isFetching, isError } = useGetCampaignDetailsQuery(queryArgs);
+  // Use optimized minimal API instead of full campaign details
+  const { data, isFetching, isError } = useGetCompanyListMinimalQuery(queryArgs);
 
   // Check if this step was already completed (campaign has progressed past company qualification)
-  const campaignCycleStatus = data?.data?.campaign?.prospecting_cycle?.status;
+  const campaignCycleStatus = data?.data?.campaign_status?.prospecting_cycle?.status;
   const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
 
-  const companies = data?.data?.companies ?? [];
+  const companies: CompanyMinimal[] = data?.data?.companies ?? [];
   const pagination = data?.pagination;
 
   const companyIdsOnPage = useMemo(() => companies.map((c) => c.company_id), [companies]);
@@ -295,82 +301,23 @@ export const Step2CompanyQualification = () => {
     }
   };
 
-  // Poll until campaign moves to contact_qualification, then load contacts and go to Step 3.
+  // OPTIMIZED: Watch status via minimal API - when contacts are ready, just proceed to next step
+  // No more fetching ALL contacts and storing in wizard state!
   useEffect(() => {
     if (!campaignId || !isContactPolling) return;
-
-    let cancelled = false;
+    
     setLoading(true, 'Fetching contacts from Apollo…');
-
-    const poll = async () => {
-      try {
-        // Use a consistent page size for both polling and fetching to avoid pagination mismatches.
-        const limit = 100;
-        const first = await fetchCampaignContactList({ campaign_id: campaignId, page: 1, limit }).unwrap();
-        const status = first?.data?.campaign?.prospecting_cycle?.status;
-
-        // Keep polling until backend sets contact_qualification
-        if (status !== 'contact_qualification') return;
-
-        // Once ready, load contacts (all pages, with a safety cap)
-        let page = 1;
-        let hasNext = first.pagination?.has_next ?? false;
-        const all: CampaignContactListItem[] = [];
-        let pagesFetched = 0;
-        const MAX_PAGES = 50; // safety cap
-
-        // include first page contacts (if any) then continue paging
-        all.push(...(first.data?.contacts || []));
-        while (hasNext && pagesFetched < MAX_PAGES) {
-          pagesFetched += 1;
-          page += 1;
-          const res = await fetchCampaignContactList({ campaign_id: campaignId, page, limit }).unwrap();
-          all.push(...(res.data?.contacts || []));
-          hasNext = res.pagination?.has_next ?? false;
-        }
-
-        if (cancelled) return;
-
-        // Map API contacts into wizard contacts
-        const mapped = all.map((c) => ({
-          id: c.contact_id,
-          companyId: c.company_id,
-          companyName: c.contact_data?.company || undefined,
-          firstName: c.contact_data?.firstname || '',
-          lastName: c.contact_data?.lastname || '',
-          email: (c.contact_data?.email && c.contact_data.email[0]) || '',
-          phone: (c.contact_data?.phone && c.contact_data.phone[0]) || undefined,
-          jobTitle: c.contact_data?.jobtitle || '',
-          linkedinUrl: c.linkedin_data?.linkedin_url || undefined,
-          qualificationStatus: 'pending' as const,
-          syncStatus: 'not_synced' as const,
-          personalization: {
-            messageStatus: 'pending' as const,
-            deckStatus: 'pending' as const,
-          },
-        }));
-
-        setQualifiedContacts(mapped);
-        setIsContactPolling(false);
-        setLoading(false);
-        nextStep();
-      } catch (e) {
-        // ignore transient errors during polling; keep waiting
-      }
-    };
-
-    const interval = window.setInterval(() => {
-      void poll();
-    }, 3000);
-
-    // run immediately too
-    void poll();
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [campaignId, fetchCampaignContactList, isContactPolling, nextStep, setLoading, setQualifiedContacts]);
+    
+    const status = statusPollingData?.data?.prospecting_cycle?.status;
+    
+    // When status becomes contact_qualification, contacts are ready - proceed to Step 3
+    if (status === 'contact_qualification') {
+      setIsContactPolling(false);
+      setLoading(false);
+      // Don't store contacts in wizard state - Step 3 will fetch its own paginated data
+      nextStep();
+    }
+  }, [campaignId, isContactPolling, statusPollingData?.data?.prospecting_cycle?.status, nextStep, setLoading]);
 
   if (!campaignId) {
     return (
@@ -505,10 +452,10 @@ export const Step2CompanyQualification = () => {
 
               <div className="companies-cards-grid">
                 {companies.filter(c => c.is_relevant).map((c) => {
-                  const companyName = c.company?.identifiers?.name || c.company?.identifiers?.source_domain || c.company?.identifiers?.domain || c.company_id;
-                  const companyDomain = c.company?.identifiers?.source_domain || c.company?.identifiers?.domain;
-                  const industry = toLabel(c.company?.profile?.industry);
-                  const employeeCount = toLabel(c.company?.profile?.employee_count);
+                  const companyName = c.name || c.source_domain || c.domain || c.company_id;
+                  const companyDomain = c.source_domain || c.domain;
+                  const industry = toLabel(c.industry);
+                  const employeeCount = toLabel(c.employee_count);
                   return (
                     <div key={c.company_id} className="company-card selected" style={{ cursor: 'default' }}>
                       <div className="company-card-header">
@@ -960,13 +907,13 @@ export const Step2CompanyQualification = () => {
 
                     <div className="companies-cards-grid">
                       {companies.map((c) => {
-                        const companyName = c.company?.identifiers?.name || c.company?.identifiers?.domain || c.company_id;
-                        const companyDomain = c.company?.identifiers?.domain;
-                        const industry = toLabel(c.company?.profile?.industry);
-                        const employeeCount = toLabel(c.company?.profile?.employee_count);
-                        const location = toLabel(c.company?.location?.name);
-                        const revenueMin = toLabel(c.company?.profile?.revenue_min);
-                        const revenueMax = toLabel(c.company?.profile?.revenue_max);
+                        const companyName = c.name || c.domain || c.company_id;
+                        const companyDomain = c.domain;
+                        const industry = toLabel(c.industry);
+                        const employeeCount = toLabel(c.employee_count);
+                        const location = toLabel(c.location);
+                        const revenueMin = toLabel(c.revenue_min);
+                        const revenueMax = toLabel(c.revenue_max);
                         const isSelected = selectedCompanyIds.has(c.company_id);
                         return (
                           <div
@@ -1022,8 +969,8 @@ export const Step2CompanyQualification = () => {
                                   </div>
                                 ) : null}
                               </div>
-                              {c.metadata?.relevance_reason ? (
-                                <div className="company-reason">{c.metadata.relevance_reason}</div>
+                              {c.relevance_reason ? (
+                                <div className="company-reason">{c.relevance_reason}</div>
                               ) : null}
                             </div>
                           </div>
@@ -1121,13 +1068,13 @@ export const Step2CompanyQualification = () => {
 
               <div className="companies-cards-grid">
                 {companies.map((c) => {
-                  const companyName = c.company?.identifiers?.name || c.company?.identifiers?.source_domain || c.company?.identifiers?.domain || c.company_id;
-                  const companyDomain = c.company?.identifiers?.source_domain || c.company?.identifiers?.domain;
-                  const industry = toLabel(c.company?.profile?.industry);
-                  const employeeCount = toLabel(c.company?.profile?.employee_count);
-                  const location = toLabel(c.company?.location?.name);
-                  const revenueMin = toLabel(c.company?.profile?.revenue_min);
-                  const revenueMax = toLabel(c.company?.profile?.revenue_max);
+                  const companyName = c.name || c.source_domain || c.domain || c.company_id;
+                  const companyDomain = c.source_domain || c.domain;
+                  const industry = toLabel(c.industry);
+                  const employeeCount = toLabel(c.employee_count);
+                  const location = toLabel(c.location);
+                  const revenueMin = toLabel(c.revenue_min);
+                  const revenueMax = toLabel(c.revenue_max);
                   const isSelected = selectedCompanyIds.has(c.company_id);
                   return (
                   <div
@@ -1183,8 +1130,8 @@ export const Step2CompanyQualification = () => {
                           </div>
                         ) : null}
                       </div>
-                      {c.metadata?.relevance_reason ? (
-                        <div className="company-reason">{c.metadata.relevance_reason}</div>
+                      {c.relevance_reason ? (
+                        <div className="company-reason">{c.relevance_reason}</div>
                       ) : null}
                     </div>
                   </div>

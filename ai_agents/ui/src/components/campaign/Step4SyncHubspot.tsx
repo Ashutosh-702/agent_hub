@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useCampaignWizard, type Company, type Contact } from './NewCampaignWizard';
-import { useLazyGetCampaignContactListQuery, useLazyGetHubspotSyncCandidatesQuery, useSyncToHubspotMutation, useLazyGetHubspotSyncProgressQuery } from '../../store';
+import { useLazyGetContactListMinimalQuery, useLazyGetHubspotSyncCandidatesQuery, useSyncToHubspotMutation, useLazyGetHubspotSyncProgressQuery } from '../../store';
 
 // Feature flag to enable/disable selection functionality
 const ENABLE_SELECTION = false;
@@ -16,6 +16,11 @@ interface CompanyWithContacts {
   isSyncing: boolean;
 }
 
+// Maximum pages to fetch from backend - limits memory usage
+const MAX_BACKEND_PAGES = 2;
+// Items per page in UI - for pagination display  
+const UI_PAGE_SIZE = 20;
+
 export const Step4SyncHubspot = () => {
   const { state, nextStep, prevStep, setQualifiedCompanies, setQualifiedContacts } = useCampaignWizard();
 
@@ -27,10 +32,14 @@ export const Step4SyncHubspot = () => {
   const [syncError, setSyncError] = useState<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const selectedContactIdsRef = useRef<string[]>([]);
+  
+  // UI Pagination state - to avoid rendering too many items at once
+  const [currentPage, setCurrentPage] = useState(1);
 
   const campaignId = state.campaignId;
   const [fetchHubspotSyncCandidates] = useLazyGetHubspotSyncCandidatesQuery();
-  const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
+  // OPTIMIZED: Use minimal contact list API instead of heavy full contact list
+  const [fetchContactListMinimal] = useLazyGetContactListMinimalQuery();
   const [syncToHubspot] = useSyncToHubspotMutation();
   const [fetchHubspotSyncProgress] = useLazyGetHubspotSyncProgressQuery();
 
@@ -46,8 +55,9 @@ export const Step4SyncHubspot = () => {
 
     const run = async () => {
       try {
-        const fetchRelevantFromCampaignContactList = async () => {
-          const allFromCampaignList: Array<{
+        // OPTIMIZED: Use minimal contact list API - much smaller payload
+        const fetchRelevantFromContactListMinimal = async () => {
+          const allFromContactList: Array<{
             contact_id: string;
             company_id?: string | null;
             company_name: string;
@@ -62,27 +72,29 @@ export const Step4SyncHubspot = () => {
           let p = 1;
           let has = true;
           let fetched = 0;
-          const MAX = 100;
 
-          while (has && fetched < MAX) {
+          // Limit to MAX_BACKEND_PAGES to prevent memory bloat
+          while (has && fetched < MAX_BACKEND_PAGES) {
             fetched += 1;
-            const res = await fetchCampaignContactList({ campaign_id: campaignId, page: p, limit }).unwrap();
+            // Use minimal API - returns only essential fields
+            const res = await fetchContactListMinimal({ campaign_id: campaignId, page: p, limit }).unwrap();
             const contacts = res.data?.contacts ?? [];
 
             // Strictly keep only relevant contacts.
             const relevant = contacts.filter((c) => c.is_relevant === true);
 
-            allFromCampaignList.push(
+            // Map from minimal API structure (flat fields, not nested contact_data)
+            allFromContactList.push(
               ...relevant.map((c) => ({
                 contact_id: c.contact_id,
                 company_id: c.company_id,
-                company_name: c.contact_data?.company || 'Unknown Company',
-                first_name: c.contact_data?.firstname || '',
-                last_name: c.contact_data?.lastname || '',
-                designation: c.contact_data?.jobtitle || '',
+                company_name: c.company || 'Unknown Company',
+                first_name: c.firstname || '',
+                last_name: c.lastname || '',
+                designation: c.jobtitle || '',
                 is_relevant: c.is_relevant,
-                email: (c.contact_data?.email && c.contact_data.email[0]) || null,
-                phone: (c.contact_data?.phone && c.contact_data.phone[0]) || null,
+                email: c.email || null,
+                phone: c.phone || null,
               }))
             );
 
@@ -90,7 +102,7 @@ export const Step4SyncHubspot = () => {
             p += 1;
           }
 
-          return allFromCampaignList;
+          return allFromContactList;
         };
 
         const allContacts: Array<{
@@ -108,10 +120,10 @@ export const Step4SyncHubspot = () => {
         let page = 1;
         let hasNext = true;
         let pagesFetched = 0;
-        const MAX_PAGES = 100; // safety cap
 
         try {
-          while (hasNext && pagesFetched < MAX_PAGES) {
+          // Limit to MAX_BACKEND_PAGES to prevent memory bloat
+          while (hasNext && pagesFetched < MAX_BACKEND_PAGES) {
             pagesFetched += 1;
             const res = await fetchHubspotSyncCandidates({ campaign_id: campaignId, page, limit }).unwrap();
             // Only keep contacts that are relevant (is_relevant=true).
@@ -127,15 +139,15 @@ export const Step4SyncHubspot = () => {
             page += 1;
           }
         } catch {
-          // hubspot_sync_candidates is not implemented (or failed). Fall back to get_campaign_contact_list.
-          const fallback = await fetchRelevantFromCampaignContactList();
+          // hubspot_sync_candidates is not implemented (or failed). Fall back to contact_list_minimal.
+          const fallback = await fetchRelevantFromContactListMinimal();
           allContacts.push(...fallback);
         }
 
         // If the candidates endpoint is missing or returns nothing usable, fall back to
-        // get_campaign_contact_list (which includes is_relevant) and filter is_relevant=true.
+        // contact_list_minimal (which includes is_relevant) and filter is_relevant=true.
         if (allContacts.length === 0) {
-          const fallback = await fetchRelevantFromCampaignContactList();
+          const fallback = await fetchRelevantFromContactListMinimal();
           allContacts.push(...fallback);
         }
 
@@ -210,7 +222,7 @@ export const Step4SyncHubspot = () => {
   }, [
     campaignId,
     didHydrateFromApi,
-    fetchCampaignContactList,
+    fetchContactListMinimal,
     fetchHubspotSyncCandidates,
     setQualifiedCompanies,
     setQualifiedContacts,
@@ -218,14 +230,20 @@ export const Step4SyncHubspot = () => {
     state.qualifiedContacts,
   ]);
 
-  // Group contacts by company
+  // Pre-build company lookup map for O(1) access (avoid O(n²))
+  const companyLookup = useMemo(() => {
+    const map = new Map<string, typeof state.qualifiedCompanies[0]>();
+    state.qualifiedCompanies.forEach(c => map.set(c.id, c));
+    return map;
+  }, [state.qualifiedCompanies]);
+
+  // Group contacts by company - optimized with O(1) lookups
   const companiesWithContacts = useMemo(() => {
     const companyMap = new Map<string, CompanyWithContacts>();
     
     contacts.forEach(contact => {
-      // Step4 used to depend on qualifiedCompanies being populated; if it isn't,
-      // we still want to render by grouping contacts using contact-level companyName/companyId.
-      const companyFromState = state.qualifiedCompanies.find(c => c.id === contact.companyId);
+      // Use O(1) lookup instead of O(n) find
+      const companyFromState = contact.companyId ? companyLookup.get(contact.companyId) : undefined;
       const companyId = companyFromState?.id || contact.companyId || contact.companyName || 'unknown_company';
       const companyName = companyFromState?.name || contact.companyName || 'Unknown Company';
       const companyIndustry = companyFromState?.industry || '';
@@ -258,14 +276,38 @@ export const Step4SyncHubspot = () => {
     });
 
     return Array.from(companyMap.values());
-  }, [contacts, state.qualifiedCompanies]);
+  }, [contacts, companyLookup]);
 
-  const totalCompanies = companiesWithContacts.length;
-  const totalContacts = contacts.length;
-  const selectedCompaniesCount = companiesWithContacts.filter(c => c.isSelected || c.isSynced).length;
-  const selectedContactsCount = contacts.filter(c => c.syncStatus === 'selected' || c.syncStatus === 'synced').length;
-  const syncedCompaniesCount = companiesWithContacts.filter(c => c.isSynced).length;
-  const syncedContactsCount = contacts.filter(c => c.syncStatus === 'synced').length;
+  // Memoize stats to avoid recalculating on every render
+  const { totalCompanies, totalContacts, selectedCompaniesCount, selectedContactsCount, syncedCompaniesCount, syncedContactsCount } = useMemo(() => {
+    let selectedCompanies = 0, syncedCompanies = 0, selectedContacts = 0, syncedContacts = 0;
+    
+    companiesWithContacts.forEach(c => {
+      if (c.isSelected || c.isSynced) selectedCompanies++;
+      if (c.isSynced) syncedCompanies++;
+    });
+    
+    contacts.forEach(c => {
+      if (c.syncStatus === 'selected' || c.syncStatus === 'synced') selectedContacts++;
+      if (c.syncStatus === 'synced') syncedContacts++;
+    });
+    
+    return {
+      totalCompanies: companiesWithContacts.length,
+      totalContacts: contacts.length,
+      selectedCompaniesCount: selectedCompanies,
+      selectedContactsCount: selectedContacts,
+      syncedCompaniesCount: syncedCompanies,
+      syncedContactsCount: syncedContacts,
+    };
+  }, [companiesWithContacts, contacts]);
+
+  // Paginate companies for UI display - prevents rendering too many items
+  const totalPages = Math.ceil(companiesWithContacts.length / UI_PAGE_SIZE);
+  const paginatedCompanies = useMemo(() => {
+    const start = (currentPage - 1) * UI_PAGE_SIZE;
+    return companiesWithContacts.slice(start, start + UI_PAGE_SIZE);
+  }, [companiesWithContacts, currentPage]);
 
   // Toggle company expansion
   const toggleExpandCompany = (companyId: string) => {
@@ -280,19 +322,28 @@ export const Step4SyncHubspot = () => {
     });
   };
 
+  // Pre-build company-with-contacts lookup for O(1) access
+  const companyWithContactsLookup = useMemo(() => {
+    const map = new Map<string, CompanyWithContacts>();
+    companiesWithContacts.forEach(c => map.set(c.id, c));
+    return map;
+  }, [companiesWithContacts]);
+
   // Toggle company selection (selects all contacts in company)
   // Only works when ENABLE_SELECTION is true
   const toggleCompanySelection = (companyId: string) => {
     if (!ENABLE_SELECTION) return;
     
-    const company = companiesWithContacts.find(c => c.id === companyId);
+    // Use O(1) lookup instead of O(n) find
+    const company = companyWithContactsLookup.get(companyId);
     if (!company || company.isSynced) return;
 
-    const contactIds = company.contacts.map(c => c.id);
+    // Use Set for O(1) lookup instead of O(n) includes
+    const contactIdSet = new Set(company.contacts.map(c => c.id));
     const newStatus: Contact['syncStatus'] = company.isSelected ? 'not_synced' : 'selected';
 
     setQualifiedContacts(contacts.map(c => 
-      contactIds.includes(c.id) 
+      contactIdSet.has(c.id) 
         ? { ...c, syncStatus: newStatus }
         : c
     ));
@@ -315,7 +366,14 @@ export const Step4SyncHubspot = () => {
   const allSelected = companiesWithContacts.length > 0 && companiesWithContacts.every(c => c.isSelected || c.isSynced);
   const someSelected = companiesWithContacts.some(c => c.isSelected || c.isSynced) && !allSelected;
 
+  // Track if initial status check has been done to prevent re-running
+  const initialStatusCheckedRef = useRef(false);
+  // Keep current contacts in ref to avoid dependency issues in callbacks
+  const contactsRef = useRef(contacts);
+  contactsRef.current = contacts;
+
   // Poll campaign status to check sync progress
+  // Uses refs to avoid re-creating callback on every contacts change
   const pollCampaignStatus = useCallback(async () => {
     if (!campaignId) return;
 
@@ -336,8 +394,8 @@ export const Step4SyncHubspot = () => {
         setSyncComplete(true);
         setSyncProgress({ total: totalCount, synced: totalCount, status: 'Completed' });
         
-        // Mark all selected contacts as synced
-        setQualifiedContacts(contacts.map(c => 
+        // Mark all selected contacts as synced (use ref for current contacts)
+        setQualifiedContacts(contactsRef.current.map(c => 
           selectedContactIdsRef.current.includes(c.id) 
             ? { ...c, syncStatus: 'synced' as const }
             : c
@@ -352,8 +410,8 @@ export const Step4SyncHubspot = () => {
         setIsSyncing(false);
         setSyncProgress(null);
         
-        // Reset to selected status
-        setQualifiedContacts(contacts.map(c => 
+        // Reset to selected status (use ref for current contacts)
+        setQualifiedContacts(contactsRef.current.map(c => 
           selectedContactIdsRef.current.includes(c.id) 
             ? { ...c, syncStatus: 'selected' as const }
             : c
@@ -370,11 +428,16 @@ export const Step4SyncHubspot = () => {
       console.error('Failed to poll campaign status:', error);
       // Continue polling on error
     }
-  }, [campaignId, contacts, fetchHubspotSyncProgress, setQualifiedContacts, totalCompanies]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignId, fetchHubspotSyncProgress, setQualifiedContacts, totalCompanies]); // Removed contacts from deps
 
   // Check campaign sync status on mount - resume polling if sync is in progress
+  // NOTE: Minimal dependencies to prevent infinite loops
   useEffect(() => {
     if (!campaignId || !didHydrateFromApi) return;
+    // Only run once after hydration
+    if (initialStatusCheckedRef.current) return;
+    initialStatusCheckedRef.current = true;
 
     let cancelled = false;
 
@@ -397,24 +460,23 @@ export const Step4SyncHubspot = () => {
             status: 'Syncing to HubSpot...' 
           });
           
-          // Store all contact IDs as selected for when sync completes
-          selectedContactIdsRef.current = contacts.map(c => c.id);
+          // Store all contact IDs as selected for when sync completes (use ref)
+          selectedContactIdsRef.current = contactsRef.current.map(c => c.id);
           
           // Set contacts to syncing status
-          setQualifiedContacts(contacts.map(c => ({ ...c, syncStatus: 'syncing' as const })));
+          setQualifiedContacts(contactsRef.current.map(c => ({ ...c, syncStatus: 'syncing' as const })));
           
-          // Start polling
-          pollIntervalRef.current = setInterval(() => {
-            pollCampaignStatus();
-          }, 3000);
-          
-          // Also do immediate poll
-          pollCampaignStatus();
+          // Start polling - only if not already polling
+          if (!pollIntervalRef.current) {
+            pollIntervalRef.current = setInterval(() => {
+              pollCampaignStatus();
+            }, 3000);
+          }
         } else if (status === 'hubspot_sync_completed') {
           // Sync already completed
           setSyncComplete(true);
           setSyncProgress({ total: totalCount, synced: totalCount, status: 'Completed' });
-          setQualifiedContacts(contacts.map(c => ({ ...c, syncStatus: 'synced' as const })));
+          setQualifiedContacts(contactsRef.current.map(c => ({ ...c, syncStatus: 'synced' as const })));
         } else if (status === 'hubspot_sync_failed') {
           // Sync failed
           setSyncError('HubSpot sync failed. Please try again.');
@@ -429,7 +491,8 @@ export const Step4SyncHubspot = () => {
     return () => {
       cancelled = true;
     };
-  }, [campaignId, didHydrateFromApi, contacts, fetchHubspotSyncProgress, pollCampaignStatus, setQualifiedContacts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignId, didHydrateFromApi]); // Minimal deps - runs once after hydration
 
   const handleSyncSelected = async () => {
     if (!campaignId || totalCompanies === 0) return;
@@ -590,8 +653,8 @@ export const Step4SyncHubspot = () => {
           </span>
         </div>
 
-        {/* Companies with Contacts */}
-        {companiesWithContacts.map((company) => {
+        {/* Companies with Contacts - paginated for performance */}
+        {paginatedCompanies.map((company) => {
           const isExpanded = expandedCompanies.has(company.id);
           
           return (
@@ -692,6 +755,38 @@ export const Step4SyncHubspot = () => {
             </div>
           );
         })}
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="pagination-controls" style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            gap: '16px', 
+            padding: '16px',
+            marginTop: '16px'
+          }}>
+            <button 
+              className="btn-secondary"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              style={{ minWidth: '100px' }}
+            >
+              Previous
+            </button>
+            <span style={{ color: 'var(--color-gray-600)' }}>
+              Page {currentPage} of {totalPages} ({totalCompanies} companies total)
+            </span>
+            <button 
+              className="btn-secondary"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              style={{ minWidth: '100px' }}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}

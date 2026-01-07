@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCampaignWizard } from './NewCampaignWizard';
 import {
   useCreateCampaignFromCSVImportMutation,
-  useGetCampaignDetailsQuery,
+  useGetCampaignStatusMinimalQuery,
 } from '../../store';
 
 // Mock external NL API response
@@ -79,24 +79,23 @@ export const Step1NLFilter: React.FC = () => {
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
 
-  // Poll for campaign status
-  const { data: campaignDetailsData } = useGetCampaignDetailsQuery(
+  // OPTIMIZED: Use minimal status API instead of heavy campaign_details_with_companies
+  const { data: campaignStatusData } = useGetCampaignStatusMinimalQuery(
     createdCampaignId
-      ? { campaign_id: createdCampaignId, page: 1, limit: 1 }
-      : { campaign_id: '', page: 1, limit: 1 },
+      ? { campaign_id: createdCampaignId }
+      : { campaign_id: '' },
     {
       skip: !createdCampaignId || !isPolling,
       pollingInterval: createdCampaignId && isPolling ? 3000 : 0,
     }
   );
 
-  // Handle polling result
+  // Handle polling result - OPTIMIZED: Read from minimal status API
   useEffect(() => {
     if (!createdCampaignId || !isPolling) return;
 
-    const campaign = campaignDetailsData?.data?.campaign;
-    const csvImportStatus = campaign?.csv_import;
-    const prospectingCycleStatus = campaign?.prospecting_cycle?.status;
+    const csvImportStatus = campaignStatusData?.data?.csv_import;
+    const prospectingCycleStatus = campaignStatusData?.data?.prospecting_cycle?.status;
 
     // Update progress
     if (csvImportStatus?.processed_count !== undefined && csvImportStatus?.total_count) {
@@ -114,7 +113,7 @@ export const Step1NLFilter: React.FC = () => {
       setLoading(false);
       setError(csvImportStatus?.error || 'Failed to process companies');
     }
-  }, [campaignDetailsData, createdCampaignId, isPolling, nextStep, setLoading]);
+  }, [campaignStatusData, createdCampaignId, isPolling, nextStep, setLoading]);
 
   const handleSearch = async () => {
     if (!nlQuery.trim()) {

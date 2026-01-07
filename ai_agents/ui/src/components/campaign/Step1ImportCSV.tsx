@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useCampaignWizard } from './NewCampaignWizard';
 import {
   useCreateCampaignFromCSVImportMutation,
-  useGetCampaignDetailsQuery,
+  useGetCampaignStatusMinimalQuery,
 } from '../../store';
 
 interface CSVCompany {
@@ -65,25 +65,24 @@ export const Step1ImportCSV: React.FC = () => {
 
   const [createCampaignFromCSVImport, { isLoading: isCreating }] = useCreateCampaignFromCSVImportMutation();
 
-  // Poll for campaign status (csv_import.status -> completed)
-  const { data: campaignDetailsData } = useGetCampaignDetailsQuery(
+  // OPTIMIZED: Use minimal status API instead of heavy campaign_details_with_companies
+  const { data: campaignStatusData } = useGetCampaignStatusMinimalQuery(
     createdCampaignId
-      ? { campaign_id: createdCampaignId, page: 1, limit: 1 }
-      : { campaign_id: '', page: 1, limit: 1 },
+      ? { campaign_id: createdCampaignId }
+      : { campaign_id: '' },
     {
       skip: !createdCampaignId || !isPolling,
       pollingInterval: createdCampaignId && isPolling ? 3000 : 0,
     }
   );
 
-  // Effect to handle polling result
+  // Effect to handle polling result - OPTIMIZED: Read from minimal status API
   useEffect(() => {
     if (!createdCampaignId || !isPolling) return;
 
-    const campaign = campaignDetailsData?.data?.campaign;
-    // Check for csv_import status or prospecting_cycle status
-    const csvImportStatus = campaign?.csv_import;
-    const prospectingCycleStatus = campaign?.prospecting_cycle?.status;
+    // Read from minimal status API (not full campaign details)
+    const csvImportStatus = campaignStatusData?.data?.csv_import;
+    const prospectingCycleStatus = campaignStatusData?.data?.prospecting_cycle?.status;
 
     // Update progress
     if (csvImportStatus?.processed_count !== undefined && csvImportStatus?.total_count) {
@@ -99,10 +98,10 @@ export const Step1ImportCSV: React.FC = () => {
     } else if (csvImportStatus?.status === 'failed') {
       setIsPolling(false);
       setLoading(false);
-      const csvImportError = (csvImportStatus as { error?: string })?.error;
+      const csvImportError = csvImportStatus?.error;
       setError(csvImportError || 'CSV import failed');
     }
-  }, [campaignDetailsData, createdCampaignId, isPolling, nextStep, setLoading]);
+  }, [campaignStatusData, createdCampaignId, isPolling, nextStep, setLoading]);
 
   const parseCSV = (content: string): ParseResult => {
     const lines = content.split('\n').filter((line) => line.trim());

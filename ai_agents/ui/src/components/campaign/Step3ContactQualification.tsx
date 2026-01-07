@@ -2,14 +2,18 @@ import { useEffect, useState } from 'react';
 import { useCampaignWizard, type Contact } from './NewCampaignWizard';
 import {
   useEnrichApolloContactListMutation,
-  useLazyGetCampaignContactListQuery,
   useUpdateApolloContactEnrichmentStatusMutation,
-  useGetCampaignContactListQuery,
   useAiContactQualificationMutation,
   useContactQualificationProgressQuery,
-  type CampaignContactListItem,
+  // Optimized APIs - minimal data, less memory
+  useGetContactListMinimalQuery,
+  useGetCampaignStatusMinimalQuery,
+  type ContactMinimal,
 } from '../../store';
 import { skipToken } from '@reduxjs/toolkit/query';
+
+// Pagination config - 10 contacts per page
+const PAGE_SIZE = 10;
 
 // Check if campaign has already completed contact qualification based on prospecting_cycle.status
 const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
@@ -28,12 +32,9 @@ export const Step3ContactQualification = () => {
   const { 
     state, 
     setContactQualificationMode, 
-    qualifyContact, 
-    bulkQualifyContacts, 
     nextStep, 
     prevStep,
     setLoading,
-    setQualifiedContacts,
   } = useCampaignWizard();
 
   const campaignId = state.campaignId;
@@ -41,7 +42,12 @@ export const Step3ContactQualification = () => {
   const [isWaitingForEnrichment, setIsWaitingForEnrichment] = useState(false); // true when user clicked Continue
   const [enrichApolloContactList] = useEnrichApolloContactListMutation();
   const [updateApolloContactEnrichmentStatus] = useUpdateApolloContactEnrichmentStatusMutation();
-  const [fetchCampaignContactList] = useLazyGetCampaignContactListQuery();
+  
+  // Pagination state - 10 items per page
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Track selected contacts by ID (not storing full objects)
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
   
   // AI Contact Qualification
   const [aiContactQualification] = useAiContactQualificationMutation();
@@ -58,17 +64,23 @@ export const Step3ContactQualification = () => {
     }
   );
 
-  // Query to check campaign status for detecting if step is already completed
-  // Poll while AI qualification is running or just completed to show live updates
+  // OPTIMIZED: Use minimal contact list API with pagination
+  // Only fetches 10 contacts at a time - no data accumulation
   const aiStatus = aiProgressData?.data?.status;
   const shouldPollContactList = Boolean(
     campaignId && 
     state.contactQualificationMode === 'ai' && 
     (aiStatus === 'running' || aiStatus === 'queued')
   );
-  const { data: contactListData, refetch: refetchContactList } = useGetCampaignContactListQuery(
-    campaignId ? { campaign_id: campaignId, page: 1, limit: 100 } : skipToken,
+  const { data: contactListData, refetch: refetchContactList } = useGetContactListMinimalQuery(
+    campaignId ? { campaign_id: campaignId, page: currentPage, limit: PAGE_SIZE } : skipToken,
     { pollingInterval: shouldPollContactList ? 5000 : 0 }
+  );
+  
+  // OPTIMIZED: Use minimal status API for polling - no contact data
+  const { data: statusData } = useGetCampaignStatusMinimalQuery(
+    campaignId ? { campaign_id: campaignId } : skipToken,
+    { pollingInterval: isEnrichPolling ? 3000 : 0 }
   );
 
   // Stop polling once AI job reaches terminal state and refetch contact list
@@ -81,9 +93,15 @@ export const Step3ContactQualification = () => {
     }
   }, [aiProgressData?.data?.status, refetchContactList]);
   
-  const campaignCycleStatus = contactListData?.data?.campaign?.prospecting_cycle?.status;
+  // Use status from optimized status API (preferred) or contact list
+  const campaignCycleStatus = statusData?.data?.status || contactListData?.data?.campaign_status?.prospecting_cycle?.status;
   const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
-  const apiContacts = contactListData?.data?.contacts || [];
+  
+  // OPTIMIZED: Contacts from minimal API - only current page, not all
+  const apiContacts: ContactMinimal[] = contactListData?.data?.contacts || [];
+  // Use total_records from pagination (consistent with backend pagination structure)
+  const totalContacts = contactListData?.pagination?.total_records || contactListData?.data?.total_count || 0;
+  const totalPages = Math.ceil(totalContacts / PAGE_SIZE);
 
   // Auto-start polling if contacts are being fetched
   // This handles the Single Company flow where get_apollo_contact_list was queued before entering this step
@@ -100,57 +118,72 @@ export const Step3ContactQualification = () => {
     }
   }, [campaignId, campaignCycleStatus, apiContacts.length, isEnrichPolling, setLoading]);
 
-  // If we have contacts from API on load (step already completed), populate state
-  useEffect(() => {
-    if (apiContacts.length > 0 && state.qualifiedContacts.length === 0) {
-      const mapped = apiContacts.map((c) => ({
-        id: c.contact_id,
-        companyId: c.company_id,
-        companyName: c.contact_data?.company || undefined,
-        firstName: c.contact_data?.firstname || '',
-        lastName: c.contact_data?.lastname || '',
-        email: (c.contact_data?.email && c.contact_data.email[0]) || '',
-        phone: (c.contact_data?.phone && c.contact_data.phone[0]) || undefined,
-        jobTitle: c.contact_data?.jobtitle || '',
-        linkedinUrl: c.linkedin_data?.linkedin_url || undefined,
-        qualificationStatus: 'pending' as const,
-        syncStatus: 'not_synced' as const,
-        personalization: {
-          messageStatus: 'pending' as const,
-          deckStatus: 'pending' as const,
-        },
-      })) as Contact[];
-      setQualifiedContacts(mapped);
-    }
-  }, [apiContacts, state.qualifiedContacts.length, setQualifiedContacts]);
+  // Map minimal contact data to display format - no state storage needed
+  const displayContacts = apiContacts.map((c): Contact => ({
+    id: c.contact_id,
+    companyId: c.company_id,
+    companyName: c.company || undefined,
+    firstName: c.firstname || '',
+    lastName: c.lastname || '',
+    email: c.email || '',
+    phone: c.phone || undefined,
+    jobTitle: c.jobtitle || '',
+    linkedinUrl: c.linkedin_url || undefined,
+    qualificationStatus: selectedContactIds.has(c.contact_id) ? 'qualified' : (c.is_relevant ? 'qualified' : 'pending'),
+    syncStatus: 'not_synced',
+    personalization: {
+      messageStatus: 'pending',
+      deckStatus: 'pending',
+    },
+  }));
 
-  const contacts = state.qualifiedContacts;
-  const qualifiedCount = contacts.filter(c => c.qualificationStatus === 'qualified').length;
+  // Use displayContacts for rendering - no state accumulation
+  const contacts = displayContacts;
+  
+  // Count qualified contacts - includes API is_relevant + manually selected
+  const qualifiedCount = selectedContactIds.size + apiContacts.filter(c => c.is_relevant && !selectedContactIds.has(c.contact_id)).length;
 
   // Get company name for a contact (prefer API-provided name)
   const getCompanyName = (contact: Contact) => {
     if (contact.companyName) return contact.companyName;
-    const company = state.qualifiedCompanies.find(c => c.id === contact.companyId);
-    return company?.name || 'Unknown Company';
+    return 'Unknown Company';
   };
 
   // Toggle single contact qualification via checkbox
   const toggleContactQualification = (contactId: string) => {
-    const contact = contacts.find(c => c.id === contactId);
-    if (contact) {
-      const isCurrentlyQualified = contact.qualificationStatus === 'qualified';
-      qualifyContact(contactId, !isCurrentlyQualified);
+    setSelectedContactIds(prev => {
+      const next = new Set(prev);
+      if (next.has(contactId)) {
+        next.delete(contactId);
+      } else {
+        next.add(contactId);
+      }
+      return next;
+    });
+  };
+
+  // Select/Deselect all contacts on current page
+  const handleSelectAll = () => {
+    const allQualified = displayContacts.every(c => c.qualificationStatus === 'qualified');
+    if (allQualified) {
+      // Deselect all on this page
+      setSelectedContactIds(prev => {
+        const next = new Set(prev);
+        displayContacts.forEach(c => next.delete(c.id));
+        return next;
+      });
+    } else {
+      // Select all on this page
+      setSelectedContactIds(prev => {
+        const next = new Set(prev);
+        displayContacts.forEach(c => next.add(c.id));
+        return next;
+      });
     }
   };
 
-  // Select/Deselect all contacts
-  const handleSelectAll = () => {
-    const allQualified = contacts.every(c => c.qualificationStatus === 'qualified');
-    bulkQualifyContacts(contacts.map(c => c.id), !allQualified);
-  };
-
-  const allSelected = contacts.length > 0 && contacts.every(c => c.qualificationStatus === 'qualified');
-  const someSelected = contacts.some(c => c.qualificationStatus === 'qualified') && !allSelected;
+  const allSelected = displayContacts.length > 0 && displayContacts.every(c => c.qualificationStatus === 'qualified');
+  const someSelected = displayContacts.some(c => c.qualificationStatus === 'qualified') && !allSelected;
 
   const handleContinue = () => {
     // Before going to Step 4, queue contact enrichment and poll until campaign status becomes contact_enriched.
@@ -159,11 +192,16 @@ export const Step3ContactQualification = () => {
       return;
     }
 
-    const selectedContactIds = contacts
-      .filter((c) => c.qualificationStatus === 'qualified')
-      .map((c) => c.id);
+    // Get all selected contact IDs (from selection Set + API is_relevant)
+    const allSelectedIds = Array.from(selectedContactIds);
+    // Also include API contacts that are marked is_relevant but not in our local selection
+    apiContacts.forEach(c => {
+      if (c.is_relevant && !selectedContactIds.has(c.contact_id)) {
+        allSelectedIds.push(c.contact_id);
+      }
+    });
 
-    if (selectedContactIds.length === 0) {
+    if (allSelectedIds.length === 0) {
       // nothing selected; don't start enrichment chain
       return;
     }
@@ -176,7 +214,7 @@ export const Step3ContactQualification = () => {
           campaign_id: campaignId,
           selection_type: 'selected',
           is_relevant: true,
-          contact_ids: selectedContactIds,
+          contact_ids: allSelectedIds,
         }).unwrap();
 
         // 2) Queue enrichment job
@@ -237,96 +275,36 @@ export const Step3ContactQualification = () => {
     })();
   };
 
-  // Poll get_campaign_contact_list until contacts are available
-  // For initial fetch: wait for contact_qualification (contacts fetched from Apollo)
-  // For enrichment: wait for contact_enriched (contacts enriched)
+  // OPTIMIZED: Watch status via minimal API - when enriched, just proceed to next step
+  // No more fetching ALL contacts and storing in wizard state!
   useEffect(() => {
     if (!campaignId || !isEnrichPolling) return;
-
-    let cancelled = false;
-    const limit = 100;
-
-    const poll = async () => {
-      try {
-        const first = await fetchCampaignContactList({ campaign_id: campaignId, page: 1, limit }).unwrap();
-        const status = first?.data?.campaign?.prospecting_cycle?.status;
-        const contactsAvailable = first?.data?.contacts && first.data.contacts.length > 0;
-        
-        // For initial contact fetch: wait for contact_qualification and contacts to be available
-        // For enrichment: wait for contact_enriched ONLY
-        const isContactsFetched = status === 'contact_qualification' && contactsAvailable;
-        const isContactsEnriched = status === 'contact_enriched';
-        
-        // If we're waiting for enrichment (user clicked Continue), only proceed when enriched
-        if (isWaitingForEnrichment) {
-          if (!isContactsEnriched) return; // Keep polling until enriched
-        } else {
-          // Initial fetch - proceed when either condition is met
-          if (!isContactsFetched && !isContactsEnriched) return;
-        }
-
-        // Fetch all contacts pages once enriched
-        let page = 1;
-        let hasNext = first.pagination?.has_next ?? false;
-        const all: CampaignContactListItem[] = [];
-        all.push(...(first.data?.contacts || []));
-
-        let pagesFetched = 0;
-        const MAX_PAGES = 50; // safety cap
-
-        while (hasNext && pagesFetched < MAX_PAGES) {
-          pagesFetched += 1;
-          page += 1;
-          const res = await fetchCampaignContactList({ campaign_id: campaignId, page, limit }).unwrap();
-          all.push(...(res.data?.contacts || []));
-          hasNext = res.pagination?.has_next ?? false;
-        }
-
-        if (cancelled) return;
-
-        const mapped = all.map((c) => ({
-          id: c.contact_id,
-          companyId: c.company_id,
-          companyName: c.contact_data?.company || undefined,
-          firstName: c.contact_data?.firstname || '',
-          lastName: c.contact_data?.lastname || '',
-          email: (c.contact_data?.email && c.contact_data.email[0]) || '',
-          phone: (c.contact_data?.phone && c.contact_data.phone[0]) || undefined,
-          jobTitle: c.contact_data?.jobtitle || '',
-          linkedinUrl: c.linkedin_data?.linkedin_url || undefined,
-          qualificationStatus: 'pending' as const,
-          syncStatus: 'not_synced' as const,
-          personalization: {
-            messageStatus: 'pending' as const,
-            deckStatus: 'pending' as const,
-          },
-        })) as Contact[];
-
-        setQualifiedContacts(mapped);
+    
+    const status = statusData?.data?.prospecting_cycle?.status;
+    const totalContacts = statusData?.data?.total_contacts || 0;
+    
+    // For initial contact fetch: wait for contact_qualification and contacts to be available
+    const isContactsFetched = status === 'contact_qualification' && totalContacts > 0;
+    const isContactsEnriched = status === 'contact_enriched';
+    
+    // If we're waiting for enrichment (user clicked Continue), only proceed when enriched
+    if (isWaitingForEnrichment) {
+      if (isContactsEnriched) {
         setLoading(false);
         setIsEnrichPolling(false);
-        
-        // Only advance to next step if contacts are enriched (user clicked Continue)
-        // If just fetched (contact_qualification), stay on this page for user to qualify
-        if (isContactsEnriched) {
-          setIsWaitingForEnrichment(false);
-          nextStep();
-        }
-      } catch (e) {
-        // ignore transient errors during polling
+        setIsWaitingForEnrichment(false);
+        // Don't store contacts - Step 4 will fetch its own paginated data
+        nextStep();
       }
-    };
-
-    const interval = window.setInterval(() => {
-      void poll();
-    }, 3000);
-    void poll();
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [campaignId, fetchCampaignContactList, isEnrichPolling, nextStep, setLoading, setQualifiedContacts]);
+    } else {
+      // Initial display - stop polling when contacts are available (either fetched or enriched)
+      if (isContactsFetched || isContactsEnriched) {
+        setLoading(false);
+        setIsEnrichPolling(false);
+        // Stay on this page for user to qualify - data displayed via useGetContactListMinimalQuery
+      }
+    }
+  }, [campaignId, isEnrichPolling, isWaitingForEnrichment, statusData?.data, nextStep, setLoading]);
 
   return (
     <div className="step-container step-contact-qualification">
@@ -438,15 +416,15 @@ export const Step3ContactQualification = () => {
               {apiContacts.filter(c => c.is_relevant).slice(0, 10).map((c) => (
                 <div key={c.contact_id} className="contact-qualification-card qualified" style={{ cursor: 'default' }}>
                   <div className="contact-avatar">
-                    {c.contact_data?.firstname?.[0] || '?'}{c.contact_data?.lastname?.[0] || '?'}
+                    {c.firstname?.[0] || '?'}{c.lastname?.[0] || '?'}
                   </div>
                   <div className="contact-info">
-                    <h4>{c.contact_data?.firstname || ''} {c.contact_data?.lastname || ''}</h4>
+                    <h4>{c.firstname || ''} {c.lastname || ''}</h4>
                     <div className="contact-meta">
-                      <span className="job-title">{c.contact_data?.jobtitle || 'N/A'}</span>
-                      <span className="company-name">{c.contact_data?.company || 'Unknown'}</span>
+                      <span className="job-title">{c.jobtitle || 'N/A'}</span>
+                      <span className="company-name">{c.company || 'Unknown'}</span>
                     </div>
-                    <span className="contact-email">{c.contact_data?.email?.[0] || 'No email'}</span>
+                    <span className="contact-email">{c.email || 'No email'}</span>
                   </div>
                   <div className="qualified-badge">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -559,6 +537,39 @@ export const Step3ContactQualification = () => {
                 </div>
               );
             })}
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="pagination-controls" style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                gap: '16px', 
+                padding: '16px',
+                marginTop: '16px',
+                borderTop: '1px solid var(--color-gray-200)'
+              }}>
+                <button 
+                  className="btn-secondary"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{ minWidth: '100px' }}
+                >
+                  Previous
+                </button>
+                <span style={{ color: 'var(--color-gray-600)' }}>
+                  Page {currentPage} of {totalPages} ({totalContacts} contacts)
+                </span>
+                <button 
+                  className="btn-secondary"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{ minWidth: '100px' }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -714,15 +725,15 @@ export const Step3ContactQualification = () => {
                             </label>
                           </div>
                           <div className="contact-avatar">
-                            {contact.contact_data?.firstname?.[0] || '?'}{contact.contact_data?.lastname?.[0] || '?'}
+                            {contact.firstname?.[0] || '?'}{contact.lastname?.[0] || '?'}
                           </div>
                           <div className="contact-info" style={{ flex: 1 }}>
-                            <h4>{contact.contact_data?.firstname || ''} {contact.contact_data?.lastname || ''}</h4>
+                            <h4>{contact.firstname || ''} {contact.lastname || ''}</h4>
                             <div className="contact-meta">
-                              <span className="job-title">{contact.contact_data?.jobtitle || 'N/A'}</span>
-                              <span className="company-name">{contact.contact_data?.company || 'Unknown'}</span>
+                              <span className="job-title">{contact.jobtitle || 'N/A'}</span>
+                              <span className="company-name">{contact.company || 'Unknown'}</span>
                             </div>
-                            <span className="contact-email">{contact.contact_data?.email?.[0] || 'No email'}</span>
+                            <span className="contact-email">{contact.email || 'No email'}</span>
                             {hasReason && (
                               <div style={{ 
                                 marginTop: 8, 

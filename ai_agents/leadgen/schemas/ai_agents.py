@@ -259,6 +259,30 @@ class GetCampaignContactList(BaseModel):
     page: int = 1
     limit: int = 10
 
+
+# ============ OPTIMIZED API SCHEMAS ============
+# These schemas return only the minimal data needed by frontend
+
+class GetContactListMinimal(BaseModel):
+    """Minimal contact list query - returns only fields needed for display"""
+    campaign_id: str
+    page: int = 1
+    limit: int = 10  # Default 10 per page for pagination
+
+
+class GetCampaignStatusMinimal(BaseModel):
+    """Get only campaign status info - no full campaign data"""
+    campaign_id: str
+
+
+class GetCompanyListMinimal(BaseModel):
+    """Minimal company list query - returns only fields needed for Company Qualification UI"""
+    campaign_id: str
+    page: int = 1
+    limit: int = 100
+    company_status: Optional[bool] = None  # Filter by is_relevant
+
+
 class CampaignContactList(BaseModel):
     campaign_id: str
     page: int = 1

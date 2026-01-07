@@ -42,7 +42,7 @@ const COUNTRIES = [
   "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", 
   "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
 ];
-import { useCreateCampaignFromProspectingJobMutation, useGetCampaignDetailsQuery } from '../../store';
+import { useCreateCampaignFromProspectingJobMutation, useGetCampaignStatusMinimalQuery } from '../../store';
 import lushaIndustryConfig from '../../assets/lusha_industry_config.json';
 
 const ITEMS_PER_PAGE = 10;
@@ -74,11 +74,11 @@ export const Step1Prospecting = () => {
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
   const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
 
-  const { data: campaignDetailsData } = useGetCampaignDetailsQuery(
+  // OPTIMIZED: Use minimal status API instead of heavy campaign_details_with_companies
+  const { data: campaignStatusData } = useGetCampaignStatusMinimalQuery(
     createdCampaignId
-      ? { campaign_id: createdCampaignId, page: 1, limit: 10 }
-      : // dummy (skip below)
-        ({ campaign_id: '' as string, page: 1, limit: 10 } as any),
+      ? { campaign_id: createdCampaignId }
+      : { campaign_id: '' },
     {
       skip: !createdCampaignId || !isPolling,
       pollingInterval: createdCampaignId && isPolling ? 2000 : 0,
@@ -209,8 +209,9 @@ export const Step1Prospecting = () => {
   };
 
   useEffect(() => {
-    const lifecycleStatus = campaignDetailsData?.data?.campaign?.lifecycle?.status;
-    const prospectingCycleStatus = campaignDetailsData?.data?.campaign?.prospecting_cycle?.status;
+    // OPTIMIZED: Read from minimal status API (not full campaign details)
+    const lifecycleStatus = campaignStatusData?.data?.lifecycle?.status;
+    const prospectingCycleStatus = campaignStatusData?.data?.prospecting_cycle?.status;
 
     if (!createdCampaignId || !isPolling) return;
 
@@ -221,7 +222,7 @@ export const Step1Prospecting = () => {
       // Move to Step 2; Step 2 will load companies page-wise (100/page) from backend.
       nextStep();
     }
-  }, [campaignDetailsData, createdCampaignId, isPolling, nextStep, setLoading]);
+  }, [campaignStatusData, createdCampaignId, isPolling, nextStep, setLoading]);
 
   const handleRefineSearch = () => {
     setIsRefining(true); // Show filters but keep results visible below

@@ -33,6 +33,9 @@ from ai_agents.leadgen.views.ai_agents import (
     enrich_apollo_contact_list,
     update_apollo_contact_enrichment_status,
     get_campaign_contact_list,
+    get_contact_list_minimal,
+    get_campaign_status_minimal,
+    get_company_list_minimal,
     sync_to_hubspot,
     sync_from_hubspot_webhook,
     get_hubspot_synced_companies,
@@ -255,6 +258,29 @@ router.add_api_route(
     "/get_campaign_contact_list",
     methods=["GET"],
     endpoint=get_campaign_contact_list,
+    response_model=ResponseData,
+)
+
+# ============ OPTIMIZED API ROUTES ============
+
+router.add_api_route(
+    "/contact_list_minimal",
+    methods=["GET"],
+    endpoint=get_contact_list_minimal,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/campaign_status_minimal",
+    methods=["GET"],
+    endpoint=get_campaign_status_minimal,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/company_list_minimal",
+    methods=["GET"],
+    endpoint=get_company_list_minimal,
     response_model=ResponseData,
 )
 

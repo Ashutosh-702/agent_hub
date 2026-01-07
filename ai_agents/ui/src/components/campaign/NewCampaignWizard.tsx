@@ -960,8 +960,16 @@ export const NewCampaignWizard = () => {
   }
 
   // Render campaign type selection
-  // Force navigation with page reload to ensure clean state
-  const handleBackToCampaigns = () => {
+  // Force instant navigation - uses onMouseDown to bypass React's event batching
+  const handleBackToCampaigns = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Hide UI immediately for instant visual feedback
+    const root = document.getElementById('root');
+    if (root) root.style.visibility = 'hidden';
+    
+    // Navigate immediately - page reload clears all state
     window.location.href = '/campaign';
   };
 
@@ -969,7 +977,7 @@ export const NewCampaignWizard = () => {
     return (
       <div className="new-campaign-wizard">
         <div className="wizard-header">
-          <button type="button" className="back-btn" onClick={handleBackToCampaigns}>
+          <button type="button" className="back-btn" onMouseDown={handleBackToCampaigns}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="19" y1="12" x2="5" y2="12"/>
               <polyline points="12 19 5 12 12 5"/>
@@ -1031,9 +1039,9 @@ export const NewCampaignWizard = () => {
   return (
     <CampaignContext.Provider value={contextValue}>
       <div className="new-campaign-wizard">
-        {/* Header with back button */}
+        {/* Header with back button - uses onMouseDown for instant response */}
         <div className="wizard-header">
-          <button type="button" className="back-btn" onClick={handleBackToCampaigns}>
+          <button type="button" className="back-btn" onMouseDown={handleBackToCampaigns}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="19" y1="12" x2="5" y2="12"/>
               <polyline points="12 19 5 12 12 5"/>

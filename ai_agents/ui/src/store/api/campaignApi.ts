@@ -490,6 +490,114 @@ export interface GetCampaignContactListResponse {
   errors: string[];
 }
 
+// ============ OPTIMIZED API TYPES ============
+
+export interface ContactMinimal {
+  contact_id: string;
+  company_id: string;
+  is_relevant: boolean;
+  relevance_reason?: string;
+  firstname: string;
+  lastname: string;
+  email: string | null;
+  phone: string | null;
+  jobtitle: string;
+  company: string;
+  linkedin_url?: string | null;
+}
+
+export interface GetContactListMinimalParams {
+  campaign_id: string;
+  page: number;
+  limit: number;
+}
+
+export interface GetContactListMinimalResponse {
+  success: boolean;
+  data: {
+    campaign_status: {
+      campaign_id: string;
+      prospecting_cycle: {
+        status?: string;
+      };
+    };
+    contacts: ContactMinimal[];
+    pagination: Pagination;
+    total_count: number;
+  };
+  pagination: Pagination | null;
+  errors: string[];
+}
+
+export interface GetCampaignStatusMinimalParams {
+  campaign_id: string;
+}
+
+export interface GetCampaignStatusMinimalResponse {
+  success: boolean;
+  data: {
+    campaign_id: string;
+    status: string;
+    total_contacts: number;
+    relevant_contacts: number;
+    prospecting_cycle: {
+      status?: string;
+    };
+    lifecycle?: {
+      status?: string;
+    };
+    csv_import?: {
+      status?: string;
+      processed_count?: number;
+      total_count?: number;
+      error?: string;
+    };
+    single_company?: {
+      status?: string;
+    };
+  };
+  errors: string[];
+}
+
+// Minimal company for Company Qualification UI
+export interface CompanyMinimal {
+  company_id: string;
+  is_relevant: boolean;
+  name: string;
+  domain?: string;
+  source_domain?: string;
+  industry?: string;
+  employee_count?: string;
+  location?: string;
+  revenue_min?: string;
+  revenue_max?: string;
+  relevance_reason?: string;
+}
+
+export interface GetCompanyListMinimalParams {
+  campaign_id: string;
+  page: number;
+  limit: number;
+  company_status?: boolean;
+}
+
+export interface GetCompanyListMinimalResponse {
+  success: boolean;
+  data: {
+    campaign_status: {
+      campaign_id: string;
+      prospecting_cycle: {
+        status?: string;
+      };
+    };
+    companies: CompanyMinimal[];
+    pagination: Pagination;
+    total_count: number;
+  };
+  pagination: Pagination | null;
+  errors: string[];
+}
+
 export const campaignApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getCampaigns: builder.query<CampaignsResponse, GetCampaignsParams>({
@@ -715,6 +823,55 @@ export const campaignApi = baseApi.injectEndpoints({
         };
       },
       providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    // ============ OPTIMIZED API ENDPOINTS ============
+
+    // Minimal contact list - returns only essential fields for display
+    getContactListMinimal: builder.query<GetContactListMinimalResponse, GetContactListMinimalParams>({
+      query: ({ campaign_id, page, limit }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          page: String(page),
+          limit: String(limit),
+        });
+        return {
+          url: `/api/v1/contact_list_minimal?${params}`,
+          method: 'GET',
+        };
+      },
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    // Campaign status only - for polling without fetching contacts
+    getCampaignStatusMinimal: builder.query<GetCampaignStatusMinimalResponse, GetCampaignStatusMinimalParams>({
+      query: ({ campaign_id }) => ({
+        url: `/api/v1/campaign_status_minimal?campaign_id=${campaign_id}`,
+        method: 'GET',
+      }),
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
+    // OPTIMIZED: Minimal company list for Company Qualification UI
+    getCompanyListMinimal: builder.query<GetCompanyListMinimalResponse, GetCompanyListMinimalParams>({
+      query: ({ campaign_id, page, limit, company_status }) => {
+        const params = new URLSearchParams({
+          campaign_id,
+          page: String(page),
+          limit: String(limit),
+        });
+        if (company_status !== undefined) {
+          params.append('company_status', String(company_status));
+        }
+        return {
+          url: `/api/v1/company_list_minimal?${params.toString()}`,
+          method: 'GET',
+        };
+      },
+      providesTags: (_result, _error, { campaign_id }) => [
+        { type: 'Campaign', id: campaign_id },
+        { type: 'Company', id: `campaign-${campaign_id}` },
+      ],
     }),
 
     getHubspotSyncCandidates: builder.query<GetHubspotSyncCandidatesResponse, GetHubspotSyncCandidatesParams>({
@@ -1028,6 +1185,13 @@ export const {
   useContactQualificationProgressQuery,
   useGetCampaignContactListQuery,
   useLazyGetCampaignContactListQuery,
+  // Optimized APIs
+  useGetContactListMinimalQuery,
+  useLazyGetContactListMinimalQuery,
+  useGetCampaignStatusMinimalQuery,
+  useLazyGetCampaignStatusMinimalQuery,
+  useGetCompanyListMinimalQuery,
+  useLazyGetCompanyListMinimalQuery,
   useGetHubspotSyncCandidatesQuery,
   useLazyGetHubspotSyncCandidatesQuery,
   useSyncToHubspotMutation,

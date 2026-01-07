@@ -753,6 +753,189 @@ class CampaignsHelper:
         }
         return serialized_data
 
+    async def get_contact_list_minimal(self, campaign_id: str, page: int = 1, limit: int = 10):
+        """
+        OPTIMIZED API: Returns only minimal contact data needed for frontend display.
+        Much faster than get_campaign_contact_list as it doesn't fetch full contact documents.
+        
+        Returns only:
+        - contact_id, company_id, is_relevant
+        - Basic display fields: firstname, lastname, email, phone, jobtitle, company
+        - linkedin_url (if available)
+        """
+        # Get campaign status only (minimal fields)
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException(f"Campaign not found: {campaign_id}")
+        
+        campaign_status = {
+            "prospecting_cycle": campaign.get("prospecting_cycle", {}),
+            "campaign_id": str(campaign.get("_id")),
+        }
+        
+        # Get contact runs with pagination
+        contacts, pagination_info = await self.campaign_contact_runs_dao.get_campaign_contact_runs_paginated(
+            {"campaign_id": campaign_id}, page, limit
+        )
+        
+        # Build minimal contact list - only fetch needed fields from contacts collection
+        minimal_contacts = []
+        for contact_run in contacts:
+            contact_id = contact_run.get("contact_id")
+            
+            # Fetch only needed fields from contact document
+            contact_doc = await self.contacts_dao.get_contact(contact_id)
+            if not contact_doc:
+                continue
+                
+            contact_data = contact_doc.get("contact_data", {})
+            linkedin_data = contact_doc.get("linkedin_data", {})
+            
+            # Build minimal response - only fields needed for UI
+            minimal_contact = {
+                "contact_id": str(contact_id),
+                "company_id": str(contact_run.get("company_id", "")),
+                "is_relevant": contact_run.get("is_relevant", False),
+                "relevance_reason": contact_run.get("relevance_reason"),
+                # Only essential display fields
+                "firstname": contact_data.get("firstname", ""),
+                "lastname": contact_data.get("lastname", ""),
+                "email": contact_data.get("email", [None])[0] if contact_data.get("email") else None,
+                "phone": contact_data.get("phone", [None])[0] if contact_data.get("phone") else None,
+                "jobtitle": contact_data.get("jobtitle", ""),
+                "company": contact_data.get("company", ""),
+                "linkedin_url": linkedin_data.get("linkedin_url"),
+            }
+            minimal_contacts.append(minimal_contact)
+        
+        return {
+            "campaign_status": campaign_status,
+            "contacts": minimal_contacts,
+            "pagination": pagination_info,
+            "total_count": pagination_info.get("total_records", 0),
+        }
+
+    async def get_campaign_status_minimal(self, campaign_id: str):
+        """
+        OPTIMIZED API: Returns only campaign status - no contact data.
+        Use this for polling campaign progress (Step1, Step2, Step3).
+        """
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException(f"Campaign not found: {campaign_id}")
+        
+        prospecting_cycle = campaign.get("prospecting_cycle", {})
+        lifecycle = campaign.get("lifecycle", {})
+        csv_import = campaign.get("csv_import", {})
+        single_company = campaign.get("single_company", {})
+        
+        # Count contacts for progress display
+        total_contacts = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
+            {"campaign_id": ObjectId(campaign_id)}
+        )
+        relevant_contacts = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
+            {"campaign_id": ObjectId(campaign_id), "is_relevant": True}
+        )
+        
+        return {
+            "campaign_id": str(campaign.get("_id")),
+            "status": prospecting_cycle.get("status"),
+            "total_contacts": total_contacts,
+            "relevant_contacts": relevant_contacts,
+            "prospecting_cycle": prospecting_cycle,
+            "lifecycle": lifecycle,
+            "csv_import": csv_import,
+            "single_company": single_company,
+        }
+
+    async def get_company_list_minimal(self, campaign_id: str, page: int = 1, limit: int = 100, company_status: bool = None):
+        """
+        OPTIMIZED API: Returns only minimal company data needed for Company Qualification UI.
+        Much faster than get_campaign_details_with_companies as it:
+        1. Only returns essential campaign status (not full campaign)
+        2. Only fetches needed company fields (not full company documents)
+        
+        Returns only:
+        - campaign_status: { campaign_id, prospecting_cycle.status }
+        - companies: [ { company_id, is_relevant, name, domain, industry, employee_count, location, revenue, relevance_reason } ]
+        """
+        # Get campaign status only (minimal fields)
+        campaign = await self.campaign_dao.get_campaign(campaign_id)
+        if not campaign:
+            raise ApiException(f"Campaign not found: {campaign_id}")
+        
+        campaign_status = {
+            "campaign_id": str(campaign.get("_id")),
+            "prospecting_cycle": {
+                "status": campaign.get("prospecting_cycle", {}).get("status"),
+            },
+        }
+        
+        # Build query
+        query = {"campaign_id": campaign_id}
+        if company_status is not None:
+            query["is_relevant"] = company_status
+        
+        # Get company runs with pagination
+        company_runs, pagination_info = await self.campaign_company_runs_dao.get_campaign_company_runs_paginated(
+            query, page, limit
+        )
+        
+        # Get company IDs for bulk fetch
+        company_ids = [c.get("company_id") for c in company_runs if c.get("company_id")]
+        
+        # Fetch only needed company fields (minimal projection)
+        company_map = {}
+        if company_ids:
+            company_docs = await self.companies_dao.find_many(
+                {"_id": {"$in": company_ids}},
+                projection={
+                    "_id": 1,
+                    "identifiers.name": 1,
+                    "identifiers.domain": 1,
+                    "identifiers.source_domain": 1,
+                    "profile.industry": 1,
+                    "profile.employee_count": 1,
+                    "profile.revenue_min": 1,
+                    "profile.revenue_max": 1,
+                    "location.name": 1,
+                },
+            )
+            company_map = {str(doc.get("_id")): doc for doc in company_docs}
+        
+        # Build minimal company list
+        minimal_companies = []
+        for run in company_runs:
+            company_id = str(run.get("company_id", ""))
+            company_doc = company_map.get(company_id, {})
+            identifiers = company_doc.get("identifiers", {})
+            profile = company_doc.get("profile", {})
+            location = company_doc.get("location", {})
+            
+            minimal_company = {
+                "company_id": company_id,
+                "is_relevant": run.get("is_relevant", False),
+                # Essential display fields
+                "name": identifiers.get("name") or identifiers.get("source_domain") or identifiers.get("domain") or company_id,
+                "domain": identifiers.get("domain"),
+                "source_domain": identifiers.get("source_domain"),
+                "industry": profile.get("industry"),
+                "employee_count": profile.get("employee_count"),
+                "location": location.get("name"),
+                "revenue_min": profile.get("revenue_min"),
+                "revenue_max": profile.get("revenue_max"),
+                # AI qualification reason
+                "relevance_reason": run.get("metadata", {}).get("relevance_reason"),
+            }
+            minimal_companies.append(minimal_company)
+        
+        return {
+            "campaign_status": campaign_status,
+            "companies": minimal_companies,
+            "pagination": pagination_info,
+            "total_count": pagination_info.get("total_items", 0),
+        }
+
     async def sync_to_hubspot(self, campaign_id: str):
         """
         Queue contacts for HubSpot sync via Kafka.
@@ -824,6 +1007,10 @@ class CampaignsHelper:
         }
 
     async def get_hubspot_synced_companies(self, campaign_id: str):
+        """
+        OPTIMIZED: Returns only minimal data needed for HubSpot sync progress polling.
+        No longer returns full campaign object - just status and counts.
+        """
         campaign = await self.campaign_dao.get_campaign(campaign_id)
         
         if not campaign:
@@ -831,13 +1018,16 @@ class CampaignsHelper:
         synced_hubspot_companies_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True, "sync_to_hubspot_status": "synced"})
         total_hubspot_companies_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True})
 
-
-        serialized_campaign = serialize_objectid(campaign)
+        # OPTIMIZED: Only return fields needed for UI polling
+        # No longer returning full campaign object (was causing excess data transfer)
         return {
-            "campaign": serialized_campaign,
+            "_id": str(campaign.get("_id")),
+            "campaign_id": campaign_id,
+            "prospecting_cycle": {
+                "status": campaign.get("prospecting_cycle", {}).get("status"),
+            },
             "synced_hubspot_companies_count": synced_hubspot_companies_count,
             "total_hubspot_companies_count": total_hubspot_companies_count,
-            "campaign_id": campaign_id
         }
 
     async def save_contact_personalization(self, campaign_id: str, contact_id: str, email_id: str, personalized_message: str, ai_generated_deck: str):

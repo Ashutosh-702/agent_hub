@@ -445,6 +445,65 @@ async def get_campaign_contact_list(query_params: GetCampaignContactList = Depen
 
     return response_data.dict()
 
+
+# ============ OPTIMIZED API ENDPOINTS ============
+
+async def get_contact_list_minimal(
+    campaign_id: str,
+    page: int = 1,
+    limit: int = 10
+) -> Dict[str, Any]:
+    """
+    OPTIMIZED: Returns only minimal contact data needed for frontend display.
+    Much faster than get_campaign_contact_list.
+    """
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.get_contact_list_minimal(campaign_id, page, limit)
+    response_data.success = True
+    response_data.data = response
+    response_data.pagination = response.get("pagination")
+
+    return response_data.dict()
+
+
+async def get_campaign_status_minimal(campaign_id: str) -> Dict[str, Any]:
+    """
+    OPTIMIZED: Returns only campaign status - no contact data.
+    Use this for polling campaign progress.
+    """
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.get_campaign_status_minimal(campaign_id)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+
+async def get_company_list_minimal(
+    campaign_id: str,
+    page: int = 1,
+    limit: int = 100,
+    company_status: bool = None
+) -> Dict[str, Any]:
+    """
+    OPTIMIZED: Returns only minimal company data needed for Company Qualification UI.
+    Much faster than get_campaign_details_with_companies.
+    """
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_helper = CampaignsHelper()
+
+    response = await campaign_helper.get_company_list_minimal(campaign_id, page, limit, company_status)
+    response_data.success = True
+    response_data.data = response
+    response_data.pagination = response.get("pagination")
+
+    return response_data.dict()
+
+
 async def sync_to_hubspot(query_params: SyncToHubspot = Body()) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)
     campaign_helper = CampaignsHelper()
@@ -466,15 +525,16 @@ async def sync_from_hubspot_webhook(query_params: Dict[str, Any] = Body()) -> Di
     return response_data.dict()
 
 async def get_hubspot_synced_companies(campaign_id: str) -> Dict[str, Any]:
+    """
+    OPTIMIZED: Returns only minimal data needed for HubSpot sync progress polling.
+    """
     response_data = ResponseData.model_construct(data={}, success=False)
     campaign_helper = CampaignsHelper()
 
+    # Response now contains only essential fields (no full campaign object)
     response = await campaign_helper.get_hubspot_synced_companies(campaign_id)
     response_data.success = True
-    response_data.data = response.get("campaign")
-    response_data.data["synced_hubspot_companies_count"] = response.get("synced_hubspot_companies_count")
-    response_data.data["total_hubspot_companies_count"] = response.get("total_hubspot_companies_count")
-    response_data.data["campaign_id"] = response.get("campaign_id")
+    response_data.data = response  # Already contains only: _id, campaign_id, prospecting_cycle, counts
 
     return response_data.dict()
 
