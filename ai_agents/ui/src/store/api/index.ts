@@ -29,6 +29,7 @@ export {
   useGetCampaignsQuery,
   useGetProspectingCampaignsQuery,
   useCreateCampaignMutation,
+  useCheckCampaignNameMutation,
   useCreateCampaignFromProspectingJobMutation,
   useCreateCampaignFromSingleCompanyMutation,
   useCreateCampaignFromCSVImportMutation,

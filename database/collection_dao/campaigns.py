@@ -36,3 +36,24 @@ class CampaignsDao(BaseMongoDao):
         query = self._process_query_objectids(query)
         response, pagination_info = await self.get_paginated_response(query, page_size=limit, page_number=page)
         return response, pagination_info
+
+    async def check_campaign_name_exists(self, campaign_name: str, exclude_campaign_id: str = None) -> bool:
+        """Check if a campaign with the given name already exists.
+        
+        Args:
+            campaign_name: The campaign name to check
+            exclude_campaign_id: Optional campaign ID to exclude from check (for updates)
+            
+        Returns:
+            True if campaign name exists, False otherwise
+        """
+        query = {"name": campaign_name}
+        if exclude_campaign_id:
+            query["_id"] = {"$ne": ObjectId(exclude_campaign_id)}
+        
+        existing = await self.find_one(query)
+        return existing is not None
+    
+    async def get_campaign_by_name(self, campaign_name: str):
+        """Get a campaign by its name."""
+        return await self.find_one({"name": campaign_name})

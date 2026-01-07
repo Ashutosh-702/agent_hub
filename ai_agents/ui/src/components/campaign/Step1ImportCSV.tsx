@@ -223,6 +223,7 @@ export const Step1ImportCSV: React.FC = () => {
       const productNames = state.selectedProducts.join(',');
 
       const payload = {
+        campaign_name: state.campaignName, // Required unique campaign name
         company_domains: domains,
         product_name: productNames || undefined,
         campaign_type: 'import_csv',

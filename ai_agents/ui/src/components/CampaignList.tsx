@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetCampaignsQuery } from '../store';
 import { DataTable, EmptyState, ErrorBanner, Loader, PageHeader, Pagination } from './shared';
@@ -66,13 +66,27 @@ export const CampaignList = () => {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [prospectingCycleFilter, setProspectingCycleFilter] = useState('');
+  const [searchName, setSearchName] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // Local input state for debouncing
   const limit = 10;
+
+  // Debounce search input
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== searchName) {
+        setSearchName(searchInput);
+        setPage(1); // Reset to first page on search
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchInput, searchName]);
 
   // RTK Query hook - handles loading, error, caching automatically
   const { data, isLoading, error, refetch } = useGetCampaignsQuery({ 
     page, 
     limit,
     prospecting_cycle_status: prospectingCycleFilter || undefined,
+    search_name: searchName || undefined,
   });
 
   const campaigns = data?.data || [];
@@ -125,13 +139,28 @@ export const CampaignList = () => {
     navigate(`/campaign/${campaignId}`);
   };
 
+  // Truncate ID to first 4 characters with full ID on hover
+  const truncateId = (id: string) => {
+    if (!id) return 'N/A';
+    return id.length > 4 ? `${id.substring(0, 4)}...` : id;
+  };
+
   const columns: Array<DataTableColumn<CampaignRow>> = [
     {
       id: 'campaignId',
       header: 'Campaign ID',
       cell: (row) => (
-        <span className="campaign-name-cell" title={row.campaign._id}>
-          {row.campaign._id}
+        <span className="campaign-id-cell" title={row.campaign._id}>
+          {truncateId(row.campaign._id)}
+        </span>
+      ),
+    },
+    {
+      id: 'campaignName',
+      header: 'Campaign Name',
+      cell: (row) => (
+        <span className="campaign-name-cell" title={row.campaign.name || 'N/A'}>
+          {row.campaign.name || 'N/A'}
         </span>
       ),
     },
@@ -274,6 +303,43 @@ export const CampaignList = () => {
 
         {/* Filter Section */}
         <div className="campaign-filters">
+          {/* Search by Name */}
+          <div className="filter-group search-group">
+            <label htmlFor="search-name" className="filter-label">
+              Search by Name:
+            </label>
+            <div className="search-input-wrapper">
+              <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                id="search-name"
+                type="text"
+                className="search-input"
+                placeholder="Search campaigns..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+              {searchInput && (
+                <button 
+                  className="search-clear-btn"
+                  onClick={() => {
+                    setSearchInput('');
+                    setSearchName('');
+                  }}
+                  title="Clear search"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter by Stage */}
           <div className="filter-group">
             <label htmlFor="prospecting-cycle-filter" className="filter-label">
               Filter by Prospecting Stage:

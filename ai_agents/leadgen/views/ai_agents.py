@@ -32,7 +32,8 @@ from ai_agents.leadgen.schemas.ai_agents import (
     SaveContactPersonalization,
     BulkSaveContactPersonalization,
     GetEnrollmentContacts,
-    EnrollContactsToSequence
+    EnrollContactsToSequence,
+    CheckCampaignNameRequest
 )
 from ai_agents.leadgen.services.ai_agents_service import (
     CampaignService,
@@ -276,6 +277,30 @@ async def company_qualification_progress(query_params: CompanyQualificationProgr
     response_data.success = True
     response_data.data = response
     return response_data.dict()
+
+
+async def check_campaign_name(query_params: CheckCampaignNameRequest = Body()) -> Dict[str, Any]:
+    """Check if a campaign name already exists in the database."""
+    from config.loaded_config import loaded_config
+    from database.collection_dao.campaigns import CampaignsDao
+    
+    response_data = ResponseData.model_construct(data={}, success=False)
+    
+    campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+    exists = await campaigns_dao.check_campaign_name_exists(
+        query_params.campaign_name,
+        query_params.exclude_campaign_id
+    )
+    
+    response_data.success = True
+    response_data.data = {
+        "exists": exists,
+        "campaign_name": query_params.campaign_name,
+        "message": "Campaign name already exists. Please choose a different name." if exists else "Campaign name is available."
+    }
+    
+    return response_data.dict()
+
 
 async def create_campaign_from_prospecting_job(query_params: CreateCampaignFromProspectingJob = Body()) -> Dict[str, Any]:
     response_data = ResponseData.model_construct(data={}, success=False)

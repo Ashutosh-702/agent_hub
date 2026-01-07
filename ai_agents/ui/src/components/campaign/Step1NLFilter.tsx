@@ -163,6 +163,7 @@ export const Step1NLFilter: React.FC = () => {
 
       // Use same API as CSV import, but with different campaign_type
       const payload = {
+        campaign_name: state.campaignName, // Required unique campaign name
         company_domains: domains,
         product_name: productNames || undefined,
         campaign_type: 'nl_filter',  // NL Filter campaign type

@@ -87,6 +87,9 @@ export interface CampaignState {
   skipCompanyQualification: boolean;
   wizardPhase: 'type_selection' | 'product_selection' | 'steps';
   
+  // Campaign name (required, unique)
+  campaignName: string;
+  
   // Existing fields
   currentStep: number;
   // Highest step reached for this campaign in the wizard UI.
@@ -111,6 +114,7 @@ interface CampaignContextType {
   state: CampaignState;
   setFilters: (filters: CampaignFilters) => void;
   setCampaignId: (campaignId: string | null) => void;
+  setCampaignName: (name: string) => void;
   setProspects: (prospects: Prospect[]) => void;
   setQualifiedCompanies: (companies: Company[]) => void;
   setQualifiedContacts: (contacts: Contact[]) => void;
@@ -294,6 +298,9 @@ export const NewCampaignWizard = () => {
   const urlCampaignId = new URLSearchParams(location.search).get('campaign_id');
   const isResumingCampaign = !!urlCampaignId;
   
+  // Track campaign name validation state
+  const [isCampaignNameValid, setIsCampaignNameValid] = useState(false);
+  
   const { setWizardProgress, clearWizardProgress } = useSidebar();
   const [state, setState] = useState<CampaignState>({
     // New fields
@@ -302,6 +309,9 @@ export const NewCampaignWizard = () => {
     selectedProducts: [],
     skipCompanyQualification: false,
     wizardPhase: 'type_selection',
+    
+    // Campaign name (required, unique)
+    campaignName: '',
     
     // Existing fields
     currentStep: 1,
@@ -480,6 +490,16 @@ export const NewCampaignWizard = () => {
 
   // Handle campaign type selection
   const handleTypeSelect = (type: CampaignType) => {
+    // Only allow type selection if campaign name is valid
+    if (!isCampaignNameValid) {
+      // Just set the type but don't proceed to next phase
+      setState(prev => ({
+        ...prev,
+        campaignType: type,
+      }));
+      return;
+    }
+    
     setState(prev => ({
       ...prev,
       campaignType: type,
@@ -513,6 +533,10 @@ export const NewCampaignWizard = () => {
 
   const setCampaignId = useCallback((campaignId: string | null) => {
     setState(prev => ({ ...prev, campaignId }));
+  }, []);
+
+  const setCampaignName = useCallback((name: string) => {
+    setState(prev => ({ ...prev, campaignName: name }));
   }, []);
 
   const setProspects = useCallback((prospects: Prospect[]) => {
@@ -899,6 +923,7 @@ export const NewCampaignWizard = () => {
     state,
     setFilters,
     setCampaignId,
+    setCampaignName,
     setProspects,
     setQualifiedCompanies,
     setQualifiedContacts,
@@ -957,7 +982,16 @@ export const NewCampaignWizard = () => {
           <CampaignTypeSelection
             onSelect={handleTypeSelect}
             selectedType={state.campaignType}
+            campaignName={state.campaignName}
+            onCampaignNameChange={setCampaignName}
+            onCampaignNameValidated={setIsCampaignNameValid}
           />
+          {/* Show warning if trying to proceed without valid campaign name */}
+          {state.campaignType && !isCampaignNameValid && (
+            <div className="campaign-name-warning">
+              Please enter a valid campaign name before proceeding
+            </div>
+          )}
         </div>
       </div>
     );

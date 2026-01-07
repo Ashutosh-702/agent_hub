@@ -1,6 +1,8 @@
 """AI Agents Service"""
 import uuid
 import asyncio
+import re
+
 from datetime import datetime
 from typing import Dict, Any, List
 
@@ -312,6 +314,7 @@ class CampaignService:
     def _transform_csv_import_to_db_data(self, query_params: CreateCampaignFromCSVImport) -> Dict[str, Any]:
         """Transform CSV import request to database format"""
         return {
+            "name": query_params.campaign_name,  # Unique campaign name
             "prompts": {
                 "web": None,
                 "persona": None
@@ -354,6 +357,7 @@ class CampaignService:
     def _transform_single_company_to_db_data(self, query_params: CreateCampaignFromSingleCompany) -> Dict[str, Any]:
         """Transform single company request to database format"""
         return {
+            "name": query_params.campaign_name,  # Unique campaign name
             "prompts": {
                 "web": None,
                 "persona": None
@@ -396,6 +400,7 @@ class CampaignService:
 
     def _transform_create_campaign_from_prospecting_job_to_db_data(self, query_params: CreateCampaignFromProspectingJob) -> Dict[str, Any]:
         return {
+            "name": query_params.campaign_name,  # Unique campaign name
             "prompts": {
                 "web": query_params.web_prompt,
                 "persona": query_params.persona_prompt
@@ -526,6 +531,9 @@ class CampaignService:
             query["lifecycle.status"] = query_params.status
         if query_params.prospecting_cycle_status:
             query["prospecting_cycle.status"] = query_params.prospecting_cycle_status
+        # Search by campaign name (case-insensitive partial match)
+        if query_params.search_name:
+            query["name"] = {"$regex": re.escape(query_params.search_name), "$options": "i"}
         campaigns, pagination_info = await self.campaign_dao.get_campaigns_paginated(query, query_params.page, query_params.limit)
         serialized_campaigns = serialize_objectid(campaigns)
         return {"campaigns": serialized_campaigns, "pagination_info": pagination_info}

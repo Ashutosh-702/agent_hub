@@ -130,6 +130,7 @@ export const Step1SingleCompany: React.FC = () => {
       const productNames = state.selectedProducts.join(',');
 
       const payload = {
+        campaign_name: state.campaignName, // Required unique campaign name
         company_domain: domain,
         product_name: productNames,
         campaign_type: 'single_company',

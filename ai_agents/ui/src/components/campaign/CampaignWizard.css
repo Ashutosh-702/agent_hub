@@ -4912,6 +4912,110 @@ button:disabled .coming-soon-tag {
   padding: var(--space-4) 0;
 }
 
+/* Campaign Name Input Section */
+.campaign-name-section {
+  margin-bottom: var(--space-6);
+  padding: var(--space-5);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+}
+
+.campaign-name-label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-gray-700);
+  margin-bottom: var(--space-2);
+}
+
+.campaign-name-label .required {
+  color: var(--color-error);
+}
+
+.campaign-name-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.campaign-name-input {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  padding-right: 40px;
+  font-size: var(--text-base);
+  border: 2px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.campaign-name-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.campaign-name-input.error {
+  border-color: var(--color-error);
+}
+
+.campaign-name-input.error:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.campaign-name-input.valid {
+  border-color: var(--color-success);
+}
+
+.campaign-name-input.valid:focus {
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.input-status {
+  position: absolute;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input-status.checking .spinner {
+  animation: spin 1s linear infinite;
+  color: var(--color-gray-400);
+}
+
+.input-status.valid {
+  color: var(--color-success);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.campaign-name-error {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-error);
+}
+
+.campaign-name-hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-gray-500);
+}
+
+.campaign-name-warning {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+  color: #b45309;
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
 .campaign-type-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

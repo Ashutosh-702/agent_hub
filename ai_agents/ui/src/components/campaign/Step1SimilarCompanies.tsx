@@ -158,6 +158,7 @@ export const Step1SimilarCompanies: React.FC = () => {
 
       // Use same API as CSV import, but with different campaign_type
       const payload = {
+        campaign_name: state.campaignName, // Required unique campaign name
         company_domains: domains,
         product_name: productNames || undefined,
         campaign_type: 'similar_companies',  // Different campaign type

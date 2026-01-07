@@ -21,6 +21,7 @@ from ai_agents.leadgen.views.ai_agents import (
     get_company_details_with_contacts,
     get_campaign_details_with_companies,
     company_qualification_progress,
+    check_campaign_name,
     create_campaign_from_prospecting_job,
     create_campaign_from_single_company,
     create_campaign_from_csv_import,
@@ -170,6 +171,13 @@ router.add_api_route(
     "/company_qualification_progress",
     methods=["GET"],
     endpoint=company_qualification_progress,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/check_campaign_name",
+    methods=["POST"],
+    endpoint=check_campaign_name,
     response_model=ResponseData,
 )
 

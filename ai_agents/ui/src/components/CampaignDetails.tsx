@@ -191,7 +191,7 @@ export const CampaignDetails = () => {
               <div className="campaign-details-header">
                 <div>
                   <h1 className="campaign-details-title">
-                    {campaignId}
+                    {campaign.name || 'N/A'}
                   </h1>
                   <p className="campaign-id">ID: {campaignId}</p>
                 </div>

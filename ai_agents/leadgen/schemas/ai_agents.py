@@ -45,6 +45,7 @@ class FormSubmission(BaseModel):
 
 
 class CreateCampaignFromProspectingJob(BaseModel):
+    campaign_name: str  # Required unique campaign name
     web_prompt: Optional[str] = None
     persona_prompt: Optional[str] = None
     industry: str
@@ -64,9 +65,22 @@ class CreateCampaignFromProspectingJob(BaseModel):
     prospecting_cycle_status: Optional[str] = "prospecting"
     campaign_type: Optional[str] = None  # Type of campaign: wide_prospecting, import_csv, single_company, etc.
 
+    @field_validator('campaign_name')
+    @classmethod
+    def validate_campaign_name(cls, name: str):
+        if not name or not name.strip():
+            raise ValueError("Campaign name cannot be empty")
+        name = name.strip()
+        if len(name) < 3:
+            raise ValueError("Campaign name must be at least 3 characters")
+        if len(name) > 100:
+            raise ValueError("Campaign name must be less than 100 characters")
+        return name
+
 
 class CreateCampaignFromSingleCompany(BaseModel):
     """Schema for creating a campaign from a single company URL/domain"""
+    campaign_name: str  # Required unique campaign name
     company_domain: str  # The domain to search for (e.g., 'fynd.com')
     product_name: Optional[str] = None
     hubspot_email: Optional[str] = None
@@ -75,9 +89,22 @@ class CreateCampaignFromSingleCompany(BaseModel):
     campaign_type: Optional[str] = "single_company"
     prospecting_cycle_status: Optional[str] = "prospecting"
 
+    @field_validator('campaign_name')
+    @classmethod
+    def validate_campaign_name(cls, name: str):
+        if not name or not name.strip():
+            raise ValueError("Campaign name cannot be empty")
+        name = name.strip()
+        if len(name) < 3:
+            raise ValueError("Campaign name must be at least 3 characters")
+        if len(name) > 100:
+            raise ValueError("Campaign name must be less than 100 characters")
+        return name
+
 
 class CreateCampaignFromCSVImport(BaseModel):
     """Schema for creating a campaign from CSV import with company domains"""
+    campaign_name: str  # Required unique campaign name
     company_domains: List[str]  # List of domains (e.g., ['fynd.com', 'shopify.com'])
     product_name: Optional[str] = None
     hubspot_email: Optional[str] = None
@@ -85,6 +112,18 @@ class CreateCampaignFromCSVImport(BaseModel):
     user_email: Optional[str] = None
     campaign_type: Optional[str] = "import_csv"
     prospecting_cycle_status: Optional[str] = "prospecting"
+
+    @field_validator('campaign_name')
+    @classmethod
+    def validate_campaign_name(cls, name: str):
+        if not name or not name.strip():
+            raise ValueError("Campaign name cannot be empty")
+        name = name.strip()
+        if len(name) < 3:
+            raise ValueError("Campaign name must be at least 3 characters")
+        if len(name) > 100:
+            raise ValueError("Campaign name must be less than 100 characters")
+        return name
 
     @field_validator('company_domains')
     @classmethod
@@ -118,6 +157,24 @@ class CreateCampaignFromCSVImport(BaseModel):
             raise ValueError("No valid domains found in company_domains")
         
         return normalized
+
+
+class CheckCampaignNameRequest(BaseModel):
+    """Schema for checking if a campaign name already exists"""
+    campaign_name: str
+    exclude_campaign_id: Optional[str] = None  # For updates, exclude current campaign
+
+    @field_validator('campaign_name')
+    @classmethod
+    def validate_campaign_name(cls, name: str):
+        if not name or not name.strip():
+            raise ValueError("Campaign name cannot be empty")
+        name = name.strip()
+        if len(name) < 3:
+            raise ValueError("Campaign name must be at least 3 characters")
+        if len(name) > 100:
+            raise ValueError("Campaign name must be less than 100 characters")
+        return name
 
 
 class ManualCompanyQualification(BaseModel):
@@ -311,6 +368,7 @@ class Campaigns(BaseModel):
     campaign_id: Optional[str] = None
     status: Optional[str] = None
     prospecting_cycle_status: Optional[str] = None
+    search_name: Optional[str] = None  # Search campaigns by name (partial match)
 
 
 class ProspectingCampaigns(BaseModel):

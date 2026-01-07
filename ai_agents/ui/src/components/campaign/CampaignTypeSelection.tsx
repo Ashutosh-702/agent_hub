@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useCheckCampaignNameMutation } from '../../store';
 
 export type CampaignType = 
   | 'import_csv' 
@@ -77,16 +78,130 @@ const campaignTypes: CampaignTypeOption[] = [
 interface CampaignTypeSelectionProps {
   onSelect: (type: CampaignType) => void;
   selectedType: CampaignType | null;
+  campaignName: string;
+  onCampaignNameChange: (name: string) => void;
+  onCampaignNameValidated: (isValid: boolean) => void;
 }
 
 export const CampaignTypeSelection: React.FC<CampaignTypeSelectionProps> = ({
   onSelect,
   selectedType,
+  campaignName,
+  onCampaignNameChange,
+  onCampaignNameValidated,
 }) => {
+  const [checkCampaignName] = useCheckCampaignNameMutation();
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [isNameValid, setIsNameValid] = useState(false);
+
+  // Debounced validation
+  const validateCampaignName = useCallback(async (name: string) => {
+    // Reset states
+    setNameError(null);
+    setIsNameValid(false);
+    
+    // Basic validation
+    if (!name || !name.trim()) {
+      setNameError('Campaign name is required');
+      onCampaignNameValidated(false);
+      return;
+    }
+    
+    const trimmedName = name.trim();
+    if (trimmedName.length < 3) {
+      setNameError('Campaign name must be at least 3 characters');
+      onCampaignNameValidated(false);
+      return;
+    }
+    
+    if (trimmedName.length > 100) {
+      setNameError('Campaign name must be less than 100 characters');
+      onCampaignNameValidated(false);
+      return;
+    }
+
+    // Check uniqueness via API
+    setIsChecking(true);
+    try {
+      const result = await checkCampaignName({ campaign_name: trimmedName }).unwrap();
+      if (result.data?.exists) {
+        setNameError('Campaign name already exists. Please choose a different name.');
+        setIsNameValid(false);
+        onCampaignNameValidated(false);
+      } else {
+        setNameError(null);
+        setIsNameValid(true);
+        onCampaignNameValidated(true);
+      }
+    } catch {
+      setNameError('Failed to validate campaign name. Please try again.');
+      setIsNameValid(false);
+      onCampaignNameValidated(false);
+    } finally {
+      setIsChecking(false);
+    }
+  }, [checkCampaignName, onCampaignNameValidated]);
+
+  // Debounce effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (campaignName) {
+        validateCampaignName(campaignName);
+      } else {
+        setNameError(null);
+        setIsNameValid(false);
+        onCampaignNameValidated(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [campaignName, validateCampaignName, onCampaignNameValidated]);
+
   return (
     <div className="campaign-type-selection">
       <div className="step-header">
-        <h2>Choose Campaign Type</h2>
+        <h2>Create New Campaign</h2>
+        <p>Name your campaign and select how you want to source your target companies</p>
+      </div>
+
+      {/* Campaign Name Input */}
+      <div className="campaign-name-section">
+        <label htmlFor="campaign-name" className="campaign-name-label">
+          Campaign Name <span className="required">*</span>
+        </label>
+        <div className="campaign-name-input-wrapper">
+          <input
+            id="campaign-name"
+            type="text"
+            className={`campaign-name-input ${nameError ? 'error' : ''} ${isNameValid ? 'valid' : ''}`}
+            placeholder="Enter a unique campaign name"
+            value={campaignName}
+            onChange={(e) => onCampaignNameChange(e.target.value)}
+            maxLength={100}
+          />
+          {isChecking && (
+            <span className="input-status checking">
+              <svg className="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+              </svg>
+            </span>
+          )}
+          {!isChecking && isNameValid && (
+            <span className="input-status valid">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </span>
+          )}
+        </div>
+        {nameError && <p className="campaign-name-error">{nameError}</p>}
+        <p className="campaign-name-hint">This name will help you identify your campaign later</p>
+      </div>
+
+      <div className="step-header" style={{ marginTop: '32px' }}>
+        <h3>Choose Campaign Type</h3>
         <p>Select how you want to source your target companies</p>
       </div>
 

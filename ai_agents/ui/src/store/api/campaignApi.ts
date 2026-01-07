@@ -99,6 +99,7 @@ export interface GetCampaignsParams {
   campaign_id?: string;
   status?: string;
   prospecting_cycle_status?: string;
+  search_name?: string;  // Search campaigns by name
 }
 
 export interface GetProspectingCampaignsParams {
@@ -136,6 +137,7 @@ export interface CreateCampaignResponse {
 }
 
 export interface CreateCampaignFromProspectingJobPayload {
+  campaign_name: string;  // Required unique campaign name
   industry: string;
   employee_count: string; // comma-separated
   revenue_min: string;
@@ -159,6 +161,7 @@ export interface CreateCampaignFromProspectingJobResponse {
 
 // Single Company Campaign
 export interface CreateCampaignFromSingleCompanyPayload {
+  campaign_name: string;  // Required unique campaign name
   company_domain: string;
   product_name?: string;
   campaign_type?: string;
@@ -179,10 +182,27 @@ export interface CreateCampaignFromSingleCompanyResponse {
 
 // CSV Import Campaign
 export interface CreateCampaignFromCSVImportPayload {
+  campaign_name: string;  // Required unique campaign name
   company_domains: string[];
   product_name?: string;
   campaign_type?: string;
   prospecting_cycle_status?: string;
+}
+
+// Check Campaign Name
+export interface CheckCampaignNamePayload {
+  campaign_name: string;
+  exclude_campaign_id?: string;
+}
+
+export interface CheckCampaignNameResponse {
+  success: boolean;
+  data?: {
+    exists: boolean;
+    campaign_name: string;
+    message: string;
+  };
+  errors?: string[];
 }
 
 export interface CreateCampaignFromCSVImportResponse {
@@ -511,6 +531,17 @@ export const campaignApi = baseApi.injectEndpoints({
         body: payload,
       }),
       invalidatesTags: ['Campaign'],
+    }),
+
+    checkCampaignName: builder.mutation<
+      CheckCampaignNameResponse,
+      CheckCampaignNamePayload
+    >({
+      query: (payload) => ({
+        url: '/api/v1/check_campaign_name',
+        method: 'POST',
+        body: payload,
+      }),
     }),
 
     createCampaignFromProspectingJob: builder.mutation<
@@ -981,6 +1012,7 @@ export const {
   useGetCampaignsQuery, 
   useGetProspectingCampaignsQuery,
   useCreateCampaignMutation,
+  useCheckCampaignNameMutation,
   useCreateCampaignFromProspectingJobMutation,
   useCreateCampaignFromSingleCompanyMutation,
   useCreateCampaignFromCSVImportMutation,

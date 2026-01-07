@@ -179,6 +179,7 @@ export const Step1Prospecting = () => {
       const productNames = state.selectedProducts.join(',');
       
       const payload = {
+        campaign_name: state.campaignName, // Required unique campaign name
         industry: localFilters.industry[0] || '',
         employee_count: localFilters.employeeCount.join(','),
         revenue_min: localFilters.revenueMin || '0',
