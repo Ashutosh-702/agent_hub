@@ -2,14 +2,12 @@ import './App.css';
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
-import { Form } from './components/FormNew';
 import { Companies } from './components/Companies';
 import { CompanyDetails } from './components/CompanyDetails';
 import { CampaignList } from './components/CampaignList';
 import { CampaignDetails } from './components/CampaignDetails';
 import { ComingSoon } from './components/ComingSoon';
 import { NewCampaignWizard } from './components/campaign';
-import { ProspectingCampaigns } from './components/ProspectingCampaigns';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { HubSpotLayout, CreateCompanyWizard, CreateContactWizard, CreateDealWizard } from './components/hubspot';
 import { InboxDashboard, InboxPage } from './components/inbox';
@@ -38,9 +36,11 @@ function AppContent() {
       <Sidebar />
       <main className={`main-content ${isCollapsed ? 'sidebar-collapsed' : ''}`}>
           <Routes>
-            <Route path="/" element={<Navigate to="/inbox" replace />} />
+            <Route path="/" element={<Navigate to="/campaign" replace />} />
             {/* Inbox - Unified Outreach Inbox */}
             <Route path="/inbox" element={<InboxDashboard />} />
+            <Route path="/inbox/company" element={<InboxPage />} />
+            <Route path="/inbox/company/:companyId" element={<InboxPage />} />
             <Route path="/inbox/messages" element={<InboxPage />} />
             <Route path="/inbox/messages/:leadId" element={<InboxPage />} />
             {/* Client Calls - Live Meeting & Battlecard Prep */}
@@ -65,12 +65,6 @@ function AppContent() {
             <Route path="/master-data/companies" element={<Companies />} />
             <Route path="/master-data/companies/:companyId" element={<CompanyDetails />} />
             <Route path="/master-data/contacts" element={<ComingSoon />} />
-            {/* Prospecting */}
-            <Route path="/prospecting" element={<Navigate to="/prospecting/campaigns" replace />} />
-            <Route path="/prospecting/campaigns" element={<ProspectingCampaigns />} />
-            <Route path="/prospecting/company" element={<ComingSoon />} />
-            <Route path="/prospecting/contact" element={<ComingSoon />} />
-            <Route path="/prospecting/wide" element={<Form />} />
             {/* HubSpot Integration */}
             <Route path="/hubspot" element={<HubSpotLayout />}>
               <Route index element={null} />
