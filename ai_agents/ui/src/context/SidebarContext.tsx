@@ -33,8 +33,8 @@ export const SidebarProvider = ({ children }: { children: ReactNode }) => {
 
   const toggleSidebar = useCallback(() => setIsCollapsed(prev => !prev), []);
 
-  const setWizardProgress = useCallback((progress: WizardProgress) => {
-    setWizardProgressState(progress);
+  const setWizardProgress = useCallback((newProgress: WizardProgress) => {
+    setWizardProgressState(newProgress);
   }, []);
 
   const clearWizardProgress = useCallback(() => {
@@ -47,7 +47,8 @@ export const SidebarProvider = ({ children }: { children: ReactNode }) => {
     wizardProgress,
     setWizardProgress,
     clearWizardProgress,
-  }), [isCollapsed, toggleSidebar, wizardProgress, setWizardProgress, clearWizardProgress]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [isCollapsed, toggleSidebar, clearWizardProgress]); // Intentionally minimal deps to prevent freeze on navigation
 
   return (
     <SidebarContext.Provider value={value}>
