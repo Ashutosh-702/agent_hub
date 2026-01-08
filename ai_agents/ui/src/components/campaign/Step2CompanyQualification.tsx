@@ -105,16 +105,39 @@ export const Step2CompanyQualification = () => {
     { pollingInterval: isContactPolling ? 3000 : 0 }
   );
 
-  // Always poll AI job progress when AI mode is selected (UI state like aiSetupSaved can reset on refresh),
-  // but stop polling once the job reaches a terminal state.
-  const shouldPollAiProgress = Boolean(campaignId && state.companyQualificationMode === 'ai');
+  // ALWAYS fetch AI job progress on mount (for resume support), then poll if AI mode is active
+  // This ensures we detect in-progress/completed AI jobs when resuming a campaign
+  const shouldPollAiProgress = Boolean(campaignId && state.companyQualificationMode === 'ai' && !aiStopPolling);
   const { data: aiProgressData } = useCompanyQualificationProgressQuery(
-    { campaign_id: campaignId || '' },
+    campaignId ? { campaign_id: campaignId } : skipToken,
     {
-      pollingInterval: shouldPollAiProgress && !aiStopPolling ? 15000 : 0,
-      skip: !shouldPollAiProgress,
+      // Always fetch once (for resume), then poll only if AI mode is active
+      pollingInterval: shouldPollAiProgress ? 15000 : 0,
     }
   );
+
+  // AUTO-DETECT AI MODE ON RESUME: If AI job exists (queued/running/completed), set mode to 'ai'
+  // This handles the case where user resumes a campaign with AI qualification in progress
+  useEffect(() => {
+    if (!campaignId || state.companyQualificationMode) return; // Skip if mode already set
+    
+    const status = aiProgressData?.data?.status;
+    if (status && status !== 'not_started') {
+      // AI job exists - set mode to 'ai' and determine the correct view
+      setCompanyQualificationMode('ai');
+      
+      if (status === 'completed') {
+        setAiView('verify'); // Show review view
+        setAiStopPolling(true);
+      } else if (status === 'failed') {
+        setAiView('setup'); // Show setup to retry
+        setAiStopPolling(true);
+      } else {
+        // queued or running - show setup view with progress
+        setAiView('setup');
+      }
+    }
+  }, [campaignId, aiProgressData?.data?.status, state.companyQualificationMode, setCompanyQualificationMode]);
 
   // Once we observe a terminal status, stop polling (prevents continued network spam).
   useEffect(() => {
@@ -142,8 +165,16 @@ export const Step2CompanyQualification = () => {
   const { data, isFetching, isError } = useGetCompanyListMinimalQuery(queryArgs);
 
   // Check if this step was already completed (campaign has progressed past company qualification)
+  // BUT: If there's a completed AI job, we should still show the review view, not "already completed"
   const campaignCycleStatus = data?.data?.campaign_status?.prospecting_cycle?.status;
-  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
+  const aiJobStatus = aiProgressData?.data?.status;
+  const hasCompletedAiJob = aiJobStatus === 'completed';
+  const hasActiveAiJob = aiJobStatus === 'queued' || aiJobStatus === 'running';
+  
+  // Step is "already completed" only if:
+  // 1. Campaign status indicates we've moved past company qualification, AND
+  // 2. There's NO completed AI job pending review (user should review AI results before proceeding)
+  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus) && !hasCompletedAiJob && !hasActiveAiJob;
 
   const companies: CompanyMinimal[] = data?.data?.companies ?? [];
   const pagination = data?.pagination;

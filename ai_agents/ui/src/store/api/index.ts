@@ -41,8 +41,10 @@ export {
   useUpdateApolloContactEnrichmentStatusMutation,
   useAiCompanyQualificationMutation,
   useCompanyQualificationProgressQuery,
+  useLazyCompanyQualificationProgressQuery,
   useAiContactQualificationMutation,
   useContactQualificationProgressQuery,
+  useLazyContactQualificationProgressQuery,
   useGetCampaignContactListQuery,
   useLazyGetCampaignContactListQuery,
   // Optimized APIs

@@ -1181,8 +1181,10 @@ export const {
   useUpdateApolloContactEnrichmentStatusMutation,
   useAiCompanyQualificationMutation,
   useCompanyQualificationProgressQuery,
+  useLazyCompanyQualificationProgressQuery,
   useAiContactQualificationMutation,
   useContactQualificationProgressQuery,
+  useLazyContactQualificationProgressQuery,
   useGetCampaignContactListQuery,
   useLazyGetCampaignContactListQuery,
   // Optimized APIs

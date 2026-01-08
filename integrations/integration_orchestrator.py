@@ -95,9 +95,9 @@ class IntegrationOrchestrator:
                 logger.info(f"No campaign contacts found for campaign_id: {campaign_id}")
                 return
             total_pages = (get_campaign_contact_runs_count + 5 - 1) // 5 if get_campaign_contact_runs_count > 0 else 1
-            total_pages = min(total_pages, 1)
+            # total_pages = min(total_pages, 1)
             for page in range(1, total_pages + 1):
-                campaign_contact_runs, pagination_info = await self.CampaignContactRunsDao.get_campaign_contact_runs_paginated({"campaign_id": campaign_id, "is_relevant": True, "$or": [{"enrichment_status": False}, {"enrichment_status": {"$exists": False}}]}, page, 5)
+                campaign_contact_runs, pagination_info = await self.CampaignContactRunsDao.get_campaign_contact_runs_paginated({"campaign_id": campaign_id, "is_relevant": True, "$or": [{"enrichment_status": False}, {"enrichment_status": {"$exists": False}}]}, 1, 5)
                 if not campaign_contact_runs:
                     logger.info(f"No campaign contacts found for page {page}")
                     continue

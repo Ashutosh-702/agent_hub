@@ -984,6 +984,12 @@ class ApolloHelper:
             )
 
             if enrichment_response.get("status_code") != 200:
+                status_code = enrichment_response.get("status_code")
+                if status_code == 429:
+                    logger.info(f"Rate limit exhausted: {status_code}")
+                else:
+                    logger.info(f"something went wrong: {status_code}")
+                logger.info(f"Enrichment response: {enrichment_response}")
                 return {
                     "status": "error",
                     "message": "Apollo enrichment failed",

@@ -46,23 +46,44 @@ export const Step3ContactQualification = () => {
   // Pagination state - 10 items per page
   const [currentPage, setCurrentPage] = useState(1);
   
-  // Track selected contacts by ID (not storing full objects)
-  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+  // Track selections/deselections for CURRENT PAGE ONLY
+  // pageSelectedIds: contacts newly selected on this page (not yet saved)
+  // pageDeselectedIds: contacts that WERE is_relevant but user wants to deselect
+  const [pageSelectedIds, setPageSelectedIds] = useState<Set<string>>(new Set());
+  const [pageDeselectedIds, setPageDeselectedIds] = useState<Set<string>>(new Set());
+  const [isSavingPage, setIsSavingPage] = useState(false);
   
   // AI Contact Qualification
   const [aiContactQualification] = useAiContactQualificationMutation();
   const [aiStopPolling, setAiStopPolling] = useState(false);
   const [isAiContinueLoading, setIsAiContinueLoading] = useState(false);
   
-  // Poll AI job progress when AI mode is selected
-  const shouldPollAiProgress = Boolean(campaignId && state.contactQualificationMode === 'ai');
+  // ALWAYS fetch AI job progress on mount (for resume support), then poll if AI mode is active
+  // This ensures we detect in-progress/completed AI jobs when resuming a campaign
+  const shouldPollAiProgress = Boolean(campaignId && state.contactQualificationMode === 'ai' && !aiStopPolling);
   const { data: aiProgressData } = useContactQualificationProgressQuery(
-    { campaign_id: campaignId || '' },
+    campaignId ? { campaign_id: campaignId } : skipToken,
     {
-      pollingInterval: shouldPollAiProgress && !aiStopPolling ? 3000 : 0, // Poll every 3 seconds for real-time progress
-      skip: !shouldPollAiProgress,
+      // Always fetch once (for resume), then poll only if AI mode is active
+      pollingInterval: shouldPollAiProgress ? 3000 : 0,
     }
   );
+
+  // AUTO-DETECT AI MODE ON RESUME: If AI job exists (queued/running/completed), set mode to 'ai'
+  // This handles the case where user resumes a campaign with AI contact qualification in progress
+  useEffect(() => {
+    if (!campaignId || state.contactQualificationMode) return; // Skip if mode already set
+    
+    const status = aiProgressData?.data?.status;
+    if (status && status !== 'not_started') {
+      // AI job exists - set mode to 'ai'
+      setContactQualificationMode('ai');
+      
+      if (status === 'completed' || status === 'failed') {
+        setAiStopPolling(true);
+      }
+    }
+  }, [campaignId, aiProgressData?.data?.status, state.contactQualificationMode, setContactQualificationMode]);
 
   // OPTIMIZED: Use minimal contact list API with pagination
   // Only fetches 10 contacts at a time - no data accumulation
@@ -78,24 +99,37 @@ export const Step3ContactQualification = () => {
   );
   
   // OPTIMIZED: Use minimal status API for polling - no contact data
-  const { data: statusData } = useGetCampaignStatusMinimalQuery(
+  // Poll during enrichment OR when AI qualification is running (to get updated relevant_contacts count)
+  const shouldPollStatus = isEnrichPolling || (shouldPollAiProgress && !aiStopPolling);
+  const { data: statusData, refetch: refetchStatus } = useGetCampaignStatusMinimalQuery(
     campaignId ? { campaign_id: campaignId } : skipToken,
-    { pollingInterval: isEnrichPolling ? 3000 : 0 }
+    { pollingInterval: shouldPollStatus ? 3000 : 0 }
   );
 
-  // Stop polling once AI job reaches terminal state and refetch contact list
+  // Stop polling once AI job reaches terminal state and refetch contact list + status
   useEffect(() => {
     const status = aiProgressData?.data?.status;
     if (status === 'completed' || status === 'failed') {
       setAiStopPolling(true);
       // Refetch contact list to get updated is_relevant values
       refetchContactList();
+      // Refetch status to get updated overall counts (relevant_contacts)
+      refetchStatus();
     }
-  }, [aiProgressData?.data?.status, refetchContactList]);
+  }, [aiProgressData?.data?.status, refetchContactList, refetchStatus]);
   
   // Use status from optimized status API (preferred) or contact list
   const campaignCycleStatus = statusData?.data?.status || contactListData?.data?.campaign_status?.prospecting_cycle?.status;
-  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
+  
+  // Check if AI contact qualification has active/completed job
+  const contactAiJobStatus = aiProgressData?.data?.status;
+  const hasCompletedContactAiJob = contactAiJobStatus === 'completed';
+  const hasActiveContactAiJob = contactAiJobStatus === 'queued' || contactAiJobStatus === 'running';
+  
+  // Step is "already completed" only if:
+  // 1. Campaign status indicates we've moved past contact qualification, AND
+  // 2. There's NO completed AI job pending review
+  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus) && !hasCompletedContactAiJob && !hasActiveContactAiJob;
   
   // OPTIMIZED: Contacts from minimal API - only current page, not all
   const apiContacts: ContactMinimal[] = contactListData?.data?.contacts || [];
@@ -119,29 +153,42 @@ export const Step3ContactQualification = () => {
   }, [campaignId, campaignCycleStatus, apiContacts.length, isEnrichPolling, setLoading]);
 
   // Map minimal contact data to display format - no state storage needed
-  const displayContacts = apiContacts.map((c): Contact => ({
-    id: c.contact_id,
-    companyId: c.company_id,
-    companyName: c.company || undefined,
-    firstName: c.firstname || '',
-    lastName: c.lastname || '',
-    email: c.email || '',
-    phone: c.phone || undefined,
-    jobTitle: c.jobtitle || '',
-    linkedinUrl: c.linkedin_url || undefined,
-    qualificationStatus: selectedContactIds.has(c.contact_id) ? 'qualified' : (c.is_relevant ? 'qualified' : 'pending'),
-    syncStatus: 'not_synced',
-    personalization: {
-      messageStatus: 'pending',
-      deckStatus: 'pending',
-    },
-  }));
+  // Contact is qualified if:
+  //   - Newly selected on this page (in pageSelectedIds), OR
+  //   - Already is_relevant in DB AND not deselected on this page
+  const displayContacts = apiContacts.map((c): Contact => {
+    const isNewlySelected = pageSelectedIds.has(c.contact_id);
+    const isDeselected = pageDeselectedIds.has(c.contact_id);
+    const isQualified = isNewlySelected || (c.is_relevant && !isDeselected);
+    
+    return {
+      id: c.contact_id,
+      companyId: c.company_id,
+      companyName: c.company || undefined,
+      firstName: c.firstname || '',
+      lastName: c.lastname || '',
+      email: c.email || '',
+      phone: c.phone || undefined,
+      jobTitle: c.jobtitle || '',
+      linkedinUrl: c.linkedin_url || undefined,
+      qualificationStatus: isQualified ? 'qualified' : 'pending',
+      syncStatus: 'not_synced',
+      personalization: {
+        messageStatus: 'pending',
+        deckStatus: 'pending',
+      },
+    };
+  });
 
   // Use displayContacts for rendering - no state accumulation
   const contacts = displayContacts;
   
-  // Count qualified contacts - includes API is_relevant + manually selected
-  const qualifiedCount = selectedContactIds.size + apiContacts.filter(c => c.is_relevant && !selectedContactIds.has(c.contact_id)).length;
+  // Count for current page only (for "Select All" checkbox state)
+  const currentPageQualifiedCount = apiContacts.filter(c => c.is_relevant || pageSelectedIds.has(c.contact_id)).length;
+  
+  // OVERALL COUNTS from backend (across ALL pages)
+  const overallTotalContacts = statusData?.data?.total_contacts || totalContacts;
+  const overallSelectedContacts = statusData?.data?.relevant_contacts || 0;
 
   // Get company name for a contact (prefer API-provided name)
   const getCompanyName = (contact: Contact) => {
@@ -149,17 +196,32 @@ export const Step3ContactQualification = () => {
     return 'Unknown Company';
   };
 
-  // Toggle single contact qualification via checkbox
+  // Toggle single contact qualification via checkbox (current page only)
   const toggleContactQualification = (contactId: string) => {
-    setSelectedContactIds(prev => {
-      const next = new Set(prev);
-      if (next.has(contactId)) {
+    const contact = apiContacts.find(c => c.contact_id === contactId);
+    if (!contact) return;
+    
+    const isCurrentlyQualified = pageSelectedIds.has(contactId) || (contact.is_relevant && !pageDeselectedIds.has(contactId));
+    
+    if (isCurrentlyQualified) {
+      // DESELECT: Remove from pageSelectedIds, add to pageDeselectedIds if was is_relevant
+      setPageSelectedIds(prev => {
+        const next = new Set(prev);
         next.delete(contactId);
-      } else {
-        next.add(contactId);
+        return next;
+      });
+      if (contact.is_relevant) {
+        setPageDeselectedIds(prev => new Set(prev).add(contactId));
       }
-      return next;
-    });
+    } else {
+      // SELECT: Add to pageSelectedIds, remove from pageDeselectedIds
+      setPageSelectedIds(prev => new Set(prev).add(contactId));
+      setPageDeselectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(contactId);
+        return next;
+      });
+    }
   };
 
   // Select/Deselect all contacts on current page
@@ -167,18 +229,78 @@ export const Step3ContactQualification = () => {
     const allQualified = displayContacts.every(c => c.qualificationStatus === 'qualified');
     if (allQualified) {
       // Deselect all on this page
-      setSelectedContactIds(prev => {
-        const next = new Set(prev);
-        displayContacts.forEach(c => next.delete(c.id));
-        return next;
-      });
+      setPageSelectedIds(new Set());
+      // Mark all is_relevant contacts as deselected
+      setPageDeselectedIds(new Set(apiContacts.filter(c => c.is_relevant).map(c => c.contact_id)));
     } else {
       // Select all on this page
-      setSelectedContactIds(prev => {
-        const next = new Set(prev);
-        displayContacts.forEach(c => next.add(c.id));
-        return next;
-      });
+      setPageSelectedIds(new Set(displayContacts.map(c => c.id)));
+      setPageDeselectedIds(new Set());
+    }
+  };
+
+  // Save current page selections AND deselections to backend before changing page
+  const saveCurrentPageSelections = async (): Promise<boolean> => {
+    if (!campaignId) return true;
+    
+    // NEW selections on this page (not already is_relevant in DB)
+    const newSelectionsOnThisPage = apiContacts
+      .filter(c => pageSelectedIds.has(c.contact_id) && !c.is_relevant)
+      .map(c => c.contact_id);
+    
+    // DESELECTIONS on this page (were is_relevant, now deselected)
+    const deselectedOnThisPage = Array.from(pageDeselectedIds);
+    
+    // If no changes, nothing to save
+    if (newSelectionsOnThisPage.length === 0 && deselectedOnThisPage.length === 0) {
+      return true;
+    }
+    
+    setIsSavingPage(true);
+    try {
+      // Save selected contacts (is_relevant = true)
+      if (newSelectionsOnThisPage.length > 0) {
+        await updateApolloContactEnrichmentStatus({
+          campaign_id: campaignId,
+          selection_type: 'selected',
+          is_relevant: true,
+          contact_ids: newSelectionsOnThisPage,
+        }).unwrap();
+      }
+      
+      // Save deselected contacts (is_relevant = false)
+      if (deselectedOnThisPage.length > 0) {
+        await updateApolloContactEnrichmentStatus({
+          campaign_id: campaignId,
+          selection_type: 'selected',
+          is_relevant: false,
+          contact_ids: deselectedOnThisPage,
+        }).unwrap();
+      }
+      
+      // Refetch status to update overall counts
+      refetchStatus();
+      
+      return true;
+    } catch (e) {
+      console.error('Failed to save page selections:', e);
+      return false;
+    } finally {
+      setIsSavingPage(false);
+    }
+  };
+
+  // Handle page change - save current page first, then change page
+  const handlePageChange = async (newPage: number) => {
+    if (newPage === currentPage || isSavingPage) return;
+    
+    // Save current page selections/deselections before navigating
+    const saved = await saveCurrentPageSelections();
+    if (saved) {
+      // Clear page-specific state (they're now saved to DB)
+      setPageSelectedIds(new Set());
+      setPageDeselectedIds(new Set());
+      setCurrentPage(newPage);
     }
   };
 
@@ -186,41 +308,53 @@ export const Step3ContactQualification = () => {
   const someSelected = displayContacts.some(c => c.qualificationStatus === 'qualified') && !allSelected;
 
   const handleContinue = () => {
-    // Before going to Step 4, queue contact enrichment and poll until campaign status becomes contact_enriched.
+    // Before going to Step 4, save current page, then queue contact enrichment
     if (!campaignId) {
       nextStep();
       return;
     }
 
-    // Get all selected contact IDs (from selection Set + API is_relevant)
-    const allSelectedIds = Array.from(selectedContactIds);
-    // Also include API contacts that are marked is_relevant but not in our local selection
-    apiContacts.forEach(c => {
-      if (c.is_relevant && !selectedContactIds.has(c.contact_id)) {
-        allSelectedIds.push(c.contact_id);
-      }
-    });
-
-    if (allSelectedIds.length === 0) {
-      // nothing selected; don't start enrichment chain
+    // Calculate effective selected count after pending changes
+    const effectiveSelectedCount = overallSelectedContacts 
+      + apiContacts.filter(c => pageSelectedIds.has(c.contact_id) && !c.is_relevant).length
+      - pageDeselectedIds.size;
+    
+    if (effectiveSelectedCount <= 0) {
+      // nothing selected anywhere; don't start enrichment chain
       return;
     }
 
     setLoading(true, 'Saving selected contacts…');
     void (async () => {
       try {
-        // 1) Persist selected contact ids (is_relevant=true)
-        await updateApolloContactEnrichmentStatus({
-          campaign_id: campaignId,
-          selection_type: 'selected',
-          is_relevant: true,
-          contact_ids: allSelectedIds,
-        }).unwrap();
+        // 1) Save current page selections first (NEW selections only)
+        const newSelectionsOnThisPage = apiContacts
+          .filter(c => pageSelectedIds.has(c.contact_id) && !c.is_relevant)
+          .map(c => c.contact_id);
+        
+        if (newSelectionsOnThisPage.length > 0) {
+          await updateApolloContactEnrichmentStatus({
+            campaign_id: campaignId,
+            selection_type: 'selected',
+            is_relevant: true,
+            contact_ids: newSelectionsOnThisPage,
+          }).unwrap();
+        }
+        
+        // 2) Save deselections (is_relevant = false)
+        if (pageDeselectedIds.size > 0) {
+          await updateApolloContactEnrichmentStatus({
+            campaign_id: campaignId,
+            selection_type: 'selected',
+            is_relevant: false,
+            contact_ids: Array.from(pageDeselectedIds),
+          }).unwrap();
+        }
 
-        // 2) Queue enrichment job
+        // 3) Queue enrichment job - backend will enrich all is_relevant contacts
         await enrichApolloContactList({ campaign_id: campaignId, enrichment_status: true }).unwrap();
         setLoading(true, 'Enriching contacts from Apollo…');
-        // 3) Start polling for contact_enriched
+        // 4) Start polling for contact_enriched
         setIsWaitingForEnrichment(true); // Mark that we're waiting for enrichment, not initial fetch
         setIsEnrichPolling(true);
       } catch (e) {
@@ -463,15 +597,22 @@ export const Step3ContactQualification = () => {
       {/* Manual Qualification */}
       {state.contactQualificationMode === 'manual' && (
         <div className="manual-qualification">
-          {/* Stats Bar */}
+          {/* Stats Bar - OVERALL counts across all pages */}
           <div className="qualification-stats">
             <div className="stat">
-              <span className="stat-value">{contacts.length}</span>
-              <span className="stat-label">Total</span>
+              <span className="stat-value">{overallTotalContacts}</span>
+              <span className="stat-label">TOTAL</span>
             </div>
             <div className="stat qualified">
-              <span className="stat-value">{qualifiedCount}</span>
-              <span className="stat-label">Selected</span>
+              <span className="stat-value">
+                {/* Overall selected = backend count + NEW selections - DESELECTIONS on this page */}
+                {Math.max(0, 
+                  overallSelectedContacts 
+                  + apiContacts.filter(c => pageSelectedIds.has(c.contact_id) && !c.is_relevant).length
+                  - pageDeselectedIds.size
+                )}
+              </span>
+              <span className="stat-label">SELECTED</span>
             </div>
           </div>
 
@@ -492,7 +633,7 @@ export const Step3ContactQualification = () => {
               </label>
               <span className="select-all-text">
                 {allSelected ? 'Deselect All' : 'Select All'} 
-                <span className="selected-count">({qualifiedCount} of {contacts.length} selected)</span>
+                <span className="selected-count">({currentPageQualifiedCount} of {contacts.length} selected)</span>
               </span>
             </div>
 
@@ -551,22 +692,22 @@ export const Step3ContactQualification = () => {
               }}>
                 <button 
                   className="btn-secondary"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1 || isSavingPage}
                   style={{ minWidth: '100px' }}
                 >
-                  Previous
+                  {isSavingPage ? 'Saving...' : 'Previous'}
                 </button>
                 <span style={{ color: 'var(--color-gray-600)' }}>
-                  Page {currentPage} of {totalPages} ({totalContacts} contacts)
+                  Page {currentPage} of {totalPages} ({overallTotalContacts} contacts)
                 </span>
                 <button 
                   className="btn-secondary"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages || isSavingPage}
                   style={{ minWidth: '100px' }}
                 >
-                  Next
+                  {isSavingPage ? 'Saving...' : 'Next'}
                 </button>
               </div>
             )}
@@ -617,19 +758,19 @@ export const Step3ContactQualification = () => {
                   />
                 </div>
                 
-                {/* Stats below progress bar */}
+                {/* Stats below progress bar - show OVERALL counts from status API (updates after manual changes) */}
                 <div className="qualification-stats" style={{ marginTop: 16 }}>
                   <div className="stat">
-                    <span className="stat-value">{aiProgressData.data.progress.total}</span>
-                    <span className="stat-label">Total Contacts</span>
+                    <span className="stat-value">{overallTotalContacts || aiProgressData.data.progress.total}</span>
+                    <span className="stat-label">TOTAL</span>
                   </div>
                   <div className="stat">
                     <span className="stat-value">{aiProgressData.data.progress.processed}</span>
-                    <span className="stat-label">Processed</span>
+                    <span className="stat-label">PROCESSED</span>
                   </div>
                   <div className="stat qualified">
-                    <span className="stat-value">{aiProgressData.data.progress.relevant}</span>
-                    <span className="stat-label">Relevant</span>
+                    <span className="stat-value">{overallSelectedContacts || aiProgressData.data.progress.relevant}</span>
+                    <span className="stat-label">SELECTED</span>
                   </div>
                 </div>
 
@@ -669,6 +810,7 @@ export const Step3ContactQualification = () => {
                                   relevance_reason: !allSelected ? 'Manual selection (Select All)' : 'Manually marked as not relevant (Deselect All)',
                                 }).unwrap();
                                 refetchContactList();
+                                refetchStatus(); // Update overall counts
                               } catch (e) {
                                 console.error('Failed to update all contacts:', e);
                               }
@@ -680,7 +822,7 @@ export const Step3ContactQualification = () => {
                       <span className="select-all-text">
                         {apiContacts.every(c => c.is_relevant) ? 'Deselect All' : 'Select All'}
                         <span className="selected-count">
-                          ({apiContacts.filter(c => c.is_relevant).length} of {apiContacts.length} selected)
+                          ({apiContacts.filter(c => c.is_relevant).length} of {apiContacts.length} on this page)
                         </span>
                       </span>
                     </div>
@@ -707,6 +849,7 @@ export const Step3ContactQualification = () => {
                                 }).unwrap();
                                 // Refetch contact list to show updated status
                                 refetchContactList();
+                                refetchStatus(); // Update overall counts
                               } catch (e) {
                                 console.error('Failed to update contact relevance:', e);
                               }
@@ -768,16 +911,49 @@ export const Step3ContactQualification = () => {
                         </div>
                       );
                     })}
+                    
+                    {/* Pagination Controls for AI Mode */}
+                    {totalPages > 1 && (
+                      <div className="pagination-controls" style={{ 
+                        display: 'flex', 
+                        justifyContent: 'center', 
+                        alignItems: 'center', 
+                        gap: '16px', 
+                        padding: '16px',
+                        marginTop: '16px',
+                        borderTop: '1px solid var(--color-gray-200)'
+                      }}>
+                        <button 
+                          className="btn-secondary"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                          style={{ minWidth: '100px' }}
+                        >
+                          Previous
+                        </button>
+                        <span style={{ color: 'var(--color-gray-600)' }}>
+                          Page {currentPage} of {totalPages} ({overallTotalContacts} contacts)
+                        </span>
+                        <button 
+                          className="btn-secondary"
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                          style={{ minWidth: '100px' }}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Continue button when completed */}
+                {/* Continue button when completed - use overall relevant count */}
                 {aiProgressData.data.status === 'completed' && (
                   <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
                     <button 
                       className="btn-primary" 
                       onClick={handleAiContinue}
-                      disabled={isAiContinueLoading}
+                      disabled={isAiContinueLoading || (overallSelectedContacts === 0)}
                       style={{ display: 'flex', alignItems: 'center', gap: 8 }}
                     >
                       {isAiContinueLoading ? (
@@ -787,7 +963,7 @@ export const Step3ContactQualification = () => {
                         </>
                       ) : (
                         <>
-                          Continue with {apiContacts.filter(c => c.is_relevant).length} Contacts
+                          Continue with {overallSelectedContacts} Contacts
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <line x1="5" y1="12" x2="19" y2="12"/>
                             <polyline points="12 5 19 12 12 19"/>
@@ -851,9 +1027,9 @@ export const Step3ContactQualification = () => {
             </button>
           )}
 
-          {qualifiedCount > 0 && state.contactQualificationMode !== 'ai' && (
+          {(overallSelectedContacts > 0 || pageSelectedIds.size > 0) && state.contactQualificationMode !== 'ai' && (
             <button className="btn-primary btn-large" onClick={handleContinue}>
-              Continue with {qualifiedCount} Contacts
+              Continue with {Math.max(0, overallSelectedContacts + apiContacts.filter(c => pageSelectedIds.has(c.contact_id) && !c.is_relevant).length - pageDeselectedIds.size)} Contacts
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="5" y1="12" x2="19" y2="12"/>
                 <polyline points="12 5 19 12 12 19"/>

@@ -1,6 +1,6 @@
 import React, { useState, createContext, useContext, useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useLazyGetCampaignDetailsQuery } from '../../store';
+import { useLazyGetCampaignDetailsQuery, useLazyCompanyQualificationProgressQuery, useLazyContactQualificationProgressQuery } from '../../store';
 import './CampaignWizard.css';
 import { useSidebar } from '../../context/SidebarContext';
 import { CampaignTypeSelection, type CampaignType } from './CampaignTypeSelection';
@@ -293,6 +293,8 @@ const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
 export const NewCampaignWizard = () => {
   const location = useLocation();
   const [fetchCampaignDetails] = useLazyGetCampaignDetailsQuery();
+  const [fetchCompanyQualificationProgress] = useLazyCompanyQualificationProgressQuery();
+  const [fetchContactQualificationProgress] = useLazyContactQualificationProgressQuery();
   
   // Check if we're resuming an existing campaign (has campaign_id in URL)
   const urlCampaignId = new URLSearchParams(location.search).get('campaign_id');
@@ -388,27 +390,57 @@ export const NewCampaignWizard = () => {
   }, [isResumingCampaign, urlCampaignId]);
 
   // When resuming a campaign, fetch its details and derive the correct step from prospecting_cycle.status
+  // ALSO check AI qualification status for both company and contact to avoid skipping review
   useEffect(() => {
     if (!isResumingCampaign || !urlCampaignId) return;
     
     let cancelled = false;
     const fetchAndSetStep = async () => {
       try {
-        const res = await fetchCampaignDetails({ campaign_id: urlCampaignId, page: 1, limit: 1 }).unwrap();
+        // Fetch campaign details and AI qualification progress (both company and contact) in parallel
+        const [campaignRes, companyAiProgressRes, contactAiProgressRes] = await Promise.all([
+          fetchCampaignDetails({ campaign_id: urlCampaignId, page: 1, limit: 1 }).unwrap(),
+          fetchCompanyQualificationProgress({ campaign_id: urlCampaignId }).unwrap().catch(() => null),
+          fetchContactQualificationProgress({ campaign_id: urlCampaignId }).unwrap().catch(() => null),
+        ]);
+        
         if (cancelled) return;
         
-        const campaign = res?.data?.campaign;
+        const campaign = campaignRes?.data?.campaign;
         const cycleStatus = campaign?.prospecting_cycle?.status;
-        const derivedStep = deriveStepFromCycleStatus(cycleStatus);
+        let derivedStep = deriveStepFromCycleStatus(cycleStatus);
+        
+        // Check if AI company qualification has an active/completed job
+        const companyAiJobStatus = companyAiProgressRes?.data?.status;
+        const hasActiveOrCompletedCompanyAiJob = companyAiJobStatus === 'queued' || companyAiJobStatus === 'running' || companyAiJobStatus === 'completed';
+        
+        // Check if AI contact qualification has an active/completed job
+        const contactAiJobStatus = contactAiProgressRes?.data?.status;
+        const hasActiveOrCompletedContactAiJob = contactAiJobStatus === 'queued' || contactAiJobStatus === 'running' || contactAiJobStatus === 'completed';
+        
+        // Adjust step based on AI job status
+        // If AI job is running/queued/completed, FORCE to the correct step
+        if (hasActiveOrCompletedCompanyAiJob) {
+          // AI company qualification exists - ensure we're at Step 2
+          // Either we're behind (Step 1) or ahead (Step 3+) - go to Step 2
+          if (derivedStep < 2 || derivedStep >= 3) {
+            derivedStep = 2;
+          }
+        }
+        if (hasActiveOrCompletedContactAiJob) {
+          // AI contact qualification exists - ensure we're at Step 3
+          // Either we're behind (Step 1-2) or ahead (Step 4+) - go to Step 3
+          if (derivedStep < 3 || derivedStep >= 4) {
+            derivedStep = 3;
+          }
+        }
         
         // Derive campaign type from campaign data
-        // If campaign has prospecting_cycle.status, it's a wide_prospecting campaign
-        // We can infer this from the presence of prospecting_cycle status or other indicators
         let derivedCampaignType: CampaignType = 'wide_prospecting'; // Default for prospecting campaigns
         
-        // Check if campaign has indicators of other types
-        // For now, assume all resuming campaigns with prospecting_cycle are wide_prospecting
-        // This can be enhanced later if campaign stores its type explicitly
+        // Set qualification modes if AI jobs exist
+        const derivedCompanyQualificationMode = hasActiveOrCompletedCompanyAiJob ? 'ai' : null;
+        const derivedContactQualificationMode = hasActiveOrCompletedContactAiJob ? 'ai' : null;
         
         setState((prev) => ({
           ...prev,
@@ -417,6 +449,8 @@ export const NewCampaignWizard = () => {
           wizardPhase: 'steps', // IMPORTANT: Set to 'steps' so wizard renders the actual steps
           currentStep: derivedStep,
           maxStepReached: Math.max(prev.maxStepReached, derivedStep),
+          companyQualificationMode: derivedCompanyQualificationMode,
+          contactQualificationMode: derivedContactQualificationMode,
         }));
       } catch (err) {
         // If fetch fails, still set the campaignId but stay on step 1
@@ -436,7 +470,7 @@ export const NewCampaignWizard = () => {
     return () => {
       cancelled = true;
     };
-  }, [isResumingCampaign, urlCampaignId, fetchCampaignDetails]);
+  }, [isResumingCampaign, urlCampaignId, fetchCampaignDetails, fetchCompanyQualificationProgress, fetchContactQualificationProgress]);
 
   // Persist wizard progress (minimal) so refresh doesn't reset to step 1.
   useEffect(() => {
