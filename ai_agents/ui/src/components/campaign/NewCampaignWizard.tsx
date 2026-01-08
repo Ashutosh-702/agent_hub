@@ -269,16 +269,36 @@ const deriveStepFromCycleStatus = (cycleStatus?: string): number => {
   if (cycleStatus === 'hubspot_sync_failed') return 4;
   if (cycleStatus === 'contact_enriched') return 4;
   
-  // Step 3: Contact Qualification
+  // Step 3: Contact Qualification (all contact_qualification_* statuses)
   if (cycleStatus === 'contact_qualification') return 3;
+  if (cycleStatus === 'contact_qualification_select') return 3;
+  if (cycleStatus === 'contact_qualification_ai_started') return 3;
   
-  // Step 2: Company Qualification
+  // Step 2: Company Qualification (all company_qualification_* statuses)
   if (cycleStatus === 'company_qualification') return 2;
+  if (cycleStatus === 'company_qualification_select') return 2;
+  if (cycleStatus === 'company_qualification_ai_started') return 2;
   
   // Step 1: Prospecting
   if (cycleStatus === 'prospecting') return 1;
   
   return 1; // Default to step 1
+};
+
+// Derive company qualification mode from status
+const deriveCompanyQualificationMode = (cycleStatus?: string): 'manual' | 'ai' | null => {
+  if (cycleStatus === 'company_qualification_select') return null; // Show mode selection
+  if (cycleStatus === 'company_qualification_ai_started') return 'ai'; // AI in progress
+  if (cycleStatus === 'company_qualification') return null; // Could be manual or AI completed - check AI progress
+  return null;
+};
+
+// Derive contact qualification mode from status
+const deriveContactQualificationMode = (cycleStatus?: string): 'manual' | 'ai' | null => {
+  if (cycleStatus === 'contact_qualification_select') return null; // Show mode selection
+  if (cycleStatus === 'contact_qualification_ai_started') return 'ai'; // AI in progress
+  if (cycleStatus === 'contact_qualification') return null; // Could be manual or AI completed - check AI progress
+  return null;
 };
 
 // Campaign type labels for display
@@ -408,39 +428,39 @@ export const NewCampaignWizard = () => {
         
         const campaign = campaignRes?.data?.campaign;
         const cycleStatus = campaign?.prospecting_cycle?.status;
-        let derivedStep = deriveStepFromCycleStatus(cycleStatus);
+        const derivedStep = deriveStepFromCycleStatus(cycleStatus);
         
-        // Check if AI company qualification has an active/completed job
+        // Derive qualification modes from backend status (primary source of truth)
+        let derivedCompanyMode = deriveCompanyQualificationMode(cycleStatus);
+        let derivedContactMode = deriveContactQualificationMode(cycleStatus);
+        
+        // Check AI job status for additional context (for completed AI jobs)
         const companyAiJobStatus = companyAiProgressRes?.data?.status;
-        const hasActiveOrCompletedCompanyAiJob = companyAiJobStatus === 'queued' || companyAiJobStatus === 'running' || companyAiJobStatus === 'completed';
-        
-        // Check if AI contact qualification has an active/completed job
         const contactAiJobStatus = contactAiProgressRes?.data?.status;
-        const hasActiveOrCompletedContactAiJob = contactAiJobStatus === 'queued' || contactAiJobStatus === 'running' || contactAiJobStatus === 'completed';
         
-        // Adjust step based on AI job status
-        // If AI job is running/queued/completed, FORCE to the correct step
-        if (hasActiveOrCompletedCompanyAiJob) {
-          // AI company qualification exists - ensure we're at Step 2
-          // Either we're behind (Step 1) or ahead (Step 3+) - go to Step 2
-          if (derivedStep < 2 || derivedStep >= 3) {
-            derivedStep = 2;
-          }
+        // If status is 'company_qualification' and AI job completed, set AI mode for review
+        if (cycleStatus === 'company_qualification' && companyAiJobStatus === 'completed') {
+          derivedCompanyMode = 'ai';
         }
-        if (hasActiveOrCompletedContactAiJob) {
-          // AI contact qualification exists - ensure we're at Step 3
-          // Either we're behind (Step 1-2) or ahead (Step 4+) - go to Step 3
-          if (derivedStep < 3 || derivedStep >= 4) {
-            derivedStep = 3;
-          }
+        
+        // If status is 'contact_qualification' and AI job completed, set AI mode for review
+        if (cycleStatus === 'contact_qualification' && contactAiJobStatus === 'completed') {
+          derivedContactMode = 'ai';
+        }
+        
+        // If AI is actively running (status shows _ai_started), ensure AI mode
+        if (cycleStatus === 'company_qualification_ai_started') {
+          derivedCompanyMode = 'ai';
+        }
+        if (cycleStatus === 'contact_qualification_ai_started') {
+          derivedContactMode = 'ai';
         }
         
         // Derive campaign type from campaign data
         let derivedCampaignType: CampaignType = 'wide_prospecting'; // Default for prospecting campaigns
         
-        // Set qualification modes if AI jobs exist
-        const derivedCompanyQualificationMode = hasActiveOrCompletedCompanyAiJob ? 'ai' : null;
-        const derivedContactQualificationMode = hasActiveOrCompletedContactAiJob ? 'ai' : null;
+        console.log('[Resume] cycleStatus:', cycleStatus, 'derivedStep:', derivedStep, 
+          'companyMode:', derivedCompanyMode, 'contactMode:', derivedContactMode);
         
         setState((prev) => ({
           ...prev,
@@ -449,8 +469,8 @@ export const NewCampaignWizard = () => {
           wizardPhase: 'steps', // IMPORTANT: Set to 'steps' so wizard renders the actual steps
           currentStep: derivedStep,
           maxStepReached: Math.max(prev.maxStepReached, derivedStep),
-          companyQualificationMode: derivedCompanyQualificationMode,
-          contactQualificationMode: derivedContactQualificationMode,
+          companyQualificationMode: derivedCompanyMode,
+          contactQualificationMode: derivedContactMode,
         }));
       } catch (err) {
         // If fetch fails, still set the campaignId but stay on step 1

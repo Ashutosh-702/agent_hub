@@ -60,7 +60,7 @@ class IntegrationOrchestrator:
                 return
             logger.info("Fetching contacts from apollo...")
             await self.process_apollo_contact_list(self.campaign_id)
-            await self.campaigns_dao.update_campaign(self.campaign_id, {"prospecting_cycle.status": "contact_qualification"})
+            await self.campaigns_dao.update_campaign(self.campaign_id, {"prospecting_cycle.status": "contact_qualification_select"})
             return {
                 "contacts_fetched": True
             }
@@ -157,7 +157,7 @@ class IntegrationOrchestrator:
             logger.info("Fetching companies from apollo...")
             inserted_count = await self.apollo_helper.get_companies_from_apollo(self.config)
             logger.info(f"Found {inserted_count} companies from apollo.")
-            await self.campaigns_dao.update_campaign_status(self.campaign_id,"company_qualification")
+            await self.campaigns_dao.update_campaign(self.campaign_id, {"prospecting_cycle.status": "company_qualification_select"})
             return {
                 "companies_fetched": inserted_count
             }

@@ -552,10 +552,12 @@ async def leadgen_company_qualification_ai_processing_handler(message: Any):
             logger.error(f"❌ Unknown action: {action}")
             return
 
+        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
         logger.info(f"🔄 Processing AI company qualification: {request_id}")
+        await campaigns_dao.update_campaign( campaign_id, {"prospecting_cycle.status":"company_qualification_ai_started"})
         await process_company_qualification_ai(request_id, campaign_id)
         campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-        await campaigns_dao.update_campaign( campaign_id, {"prospecting_cycle.status":"contact_qualification"})
+        await campaigns_dao.update_campaign( campaign_id, {"prospecting_cycle.status":"company_qualification"})
         
     except Exception as e:
         logger.error(f"❌ Error handling leadgen message: {e}")
@@ -625,6 +627,7 @@ async def ai_contact_qualification(request_id: str, campaign_id: str):
 
         # Update status to running
         await campaigns_dao.update_campaign(campaign_id, {
+            "prospecting_cycle.status": "contact_qualification_ai_started",
             "prospecting_cycle.contact_qualification_ai.status": "running",
             "prospecting_cycle.contact_qualification_ai.updated_at": datetime.utcnow()
         })
@@ -745,6 +748,7 @@ async def process_company_qualification_ai(request_id: str, campaign_id: str):
 
         orchestrator = IntegrationOrchestrator(campaign_data)
         # Uses the campaign config (including updated prompts.web) to re-run relevance check.
+        update_campaign_status = await campaigns_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "company_qualification_ai_started"})
         await orchestrator.relevance_check.company_relevance_check(campaign_id, request_id=request_id)
         update_campaign_status = await campaigns_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "company_qualification"})
         if update_campaign_status:
@@ -755,6 +759,7 @@ async def process_company_qualification_ai(request_id: str, campaign_id: str):
 
     except Exception as e:
         logger.error(f"❌ Error processing AI company qualification {request_id}: {e}")
+        update_campaign_status = await campaigns_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "company_qualification_select"})
         raise
 
 async def process_prospecting_job(request_id: str, campaign_id: str):
@@ -781,7 +786,7 @@ async def process_prospecting_job(request_id: str, campaign_id: str):
         # Run the prospecting job pipeline for this campaign
         orchestrator = IntegrationOrchestrator(campaign_data)
         await orchestrator.process_prospecting_job()
-        
+        await campaigns_dao.update_campaign( campaign_id, {"prospecting_cycle.status":"company_qualification_select"})
         logger.info(f"✅ Completed processing: {request_id}")
         # print(f"📝 Result: {result}")
         

@@ -16,6 +16,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 const PAGE_SIZE = 10;
 
 // Check if campaign has already completed contact qualification based on prospecting_cycle.status
+// Step is completed if status has moved past contact_qualification_* to contact_enriched or later
 const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
   const completedStatuses = [
     'contact_enriched',
@@ -26,6 +27,16 @@ const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
     'enrolled_to_sequence',
   ];
   return cycleStatus ? completedStatuses.includes(cycleStatus) : false;
+};
+
+// Check if we should show mode selection (status is contact_qualification_select)
+const shouldShowModeSelection = (cycleStatus?: string): boolean => {
+  return cycleStatus === 'contact_qualification_select';
+};
+
+// Check if AI is actively running (status is contact_qualification_ai_started)
+const isAiInProgress = (cycleStatus?: string): boolean => {
+  return cycleStatus === 'contact_qualification_ai_started';
 };
 
 export const Step3ContactQualification = () => {
@@ -69,22 +80,6 @@ export const Step3ContactQualification = () => {
     }
   );
 
-  // AUTO-DETECT AI MODE ON RESUME: If AI job exists (queued/running/completed), set mode to 'ai'
-  // This handles the case where user resumes a campaign with AI contact qualification in progress
-  useEffect(() => {
-    if (!campaignId || state.contactQualificationMode) return; // Skip if mode already set
-    
-    const status = aiProgressData?.data?.status;
-    if (status && status !== 'not_started') {
-      // AI job exists - set mode to 'ai'
-      setContactQualificationMode('ai');
-      
-      if (status === 'completed' || status === 'failed') {
-        setAiStopPolling(true);
-      }
-    }
-  }, [campaignId, aiProgressData?.data?.status, state.contactQualificationMode, setContactQualificationMode]);
-
   // OPTIMIZED: Use minimal contact list API with pagination
   // Only fetches 10 contacts at a time - no data accumulation
   const aiStatus = aiProgressData?.data?.status;
@@ -117,19 +112,73 @@ export const Step3ContactQualification = () => {
       refetchStatus();
     }
   }, [aiProgressData?.data?.status, refetchContactList, refetchStatus]);
+
+  // Refetch contact list when mode is selected (fixes timing issue where initial fetch returned empty)
+  useEffect(() => {
+    if (state.contactQualificationMode && campaignId) {
+      console.log('[Step3] Mode selected, refetching contact list');
+      refetchContactList();
+      refetchStatus();
+    }
+  }, [state.contactQualificationMode, campaignId, refetchContactList, refetchStatus]);
   
   // Use status from optimized status API (preferred) or contact list
+  // statusData = { success, data: { status, ... } } from GetCampaignStatusMinimalResponse
   const campaignCycleStatus = statusData?.data?.status || contactListData?.data?.campaign_status?.prospecting_cycle?.status;
   
   // Check if AI contact qualification has active/completed job
   const contactAiJobStatus = aiProgressData?.data?.status;
-  const hasCompletedContactAiJob = contactAiJobStatus === 'completed';
-  const hasActiveContactAiJob = contactAiJobStatus === 'queued' || contactAiJobStatus === 'running';
   
-  // Step is "already completed" only if:
-  // 1. Campaign status indicates we've moved past contact qualification, AND
-  // 2. There's NO completed AI job pending review
-  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus) && !hasCompletedContactAiJob && !hasActiveContactAiJob;
+  // Derive state from backend status (source of truth)
+  const showModeSelection = shouldShowModeSelection(campaignCycleStatus) && !state.contactQualificationMode;
+  const aiActiveFromStatus = isAiInProgress(campaignCycleStatus);
+  
+  // Step is "already completed" if campaign has moved past contact qualification
+  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
+  
+  // Log for debugging
+  console.log('[Step3] cycleStatus:', campaignCycleStatus, 'mode:', state.contactQualificationMode, 
+    'showModeSelection:', showModeSelection, 'aiActiveFromStatus:', aiActiveFromStatus, 
+    'stepAlreadyCompleted:', stepAlreadyCompleted, 'aiJobStatus:', contactAiJobStatus);
+
+  // AUTO-DETECT MODE based on backend status - ONLY when resuming a campaign
+  // When status is contact_qualification_select, user MUST choose mode (don't auto-set)
+  useEffect(() => {
+    if (!campaignId) return;
+    
+    // IMPORTANT: When status is contact_qualification_select, user should choose mode
+    // Don't auto-set any mode - let them see the mode selection
+    if (campaignCycleStatus === 'contact_qualification_select') {
+      console.log('[Step3] Status is contact_qualification_select - waiting for user to choose mode');
+      return; // Exit early - don't auto-detect
+    }
+    
+    // If backend status indicates AI is actively running, set AI mode
+    if (campaignCycleStatus === 'contact_qualification_ai_started' && !state.contactQualificationMode) {
+      console.log('[Step3] Auto-detected AI in progress from status');
+      setContactQualificationMode('ai');
+      return;
+    }
+    
+    // If backend status is contact_qualification and AI job completed, set AI mode for review
+    if (campaignCycleStatus === 'contact_qualification' && contactAiJobStatus === 'completed' && !state.contactQualificationMode) {
+      console.log('[Step3] Auto-detected completed AI job for review');
+      setContactQualificationMode('ai');
+      setAiStopPolling(true);
+      return;
+    }
+    
+    // Fallback: only check AI job status when NOT in mode selection state
+    if (!state.contactQualificationMode && contactAiJobStatus && contactAiJobStatus !== 'not_started' &&
+        campaignCycleStatus !== 'contact_qualification_select') {
+      console.log('[Step3] Auto-detected AI mode from job status:', contactAiJobStatus);
+      setContactQualificationMode('ai');
+      
+      if (contactAiJobStatus === 'completed' || contactAiJobStatus === 'failed') {
+        setAiStopPolling(true);
+      }
+    }
+  }, [campaignId, campaignCycleStatus, contactAiJobStatus, state.contactQualificationMode, setContactQualificationMode]);
   
   // OPTIMIZED: Contacts from minimal API - only current page, not all
   const apiContacts: ContactMinimal[] = contactListData?.data?.contacts || [];
@@ -139,18 +188,33 @@ export const Step3ContactQualification = () => {
 
   // Auto-start polling if contacts are being fetched
   // This handles the Single Company flow where get_apollo_contact_list was queued before entering this step
-  // Status will be 'company_qualification' (companies qualified, contacts being fetched)
-  // Once contacts are fetched, status becomes 'contact_qualification'
+  // Poll UNTIL status becomes 'contact_qualification_select' (ready for mode selection)
   useEffect(() => {
     if (!campaignId) return;
     
-    // If status is company_qualification and we have no contacts, start polling
-    // (contacts are still being fetched from Apollo)
-    if (campaignCycleStatus === 'company_qualification' && apiContacts.length === 0 && !isEnrichPolling) {
+    // Get status directly from statusData to ensure fresh value
+    const currentStatus = statusData?.data?.status;
+    
+    console.log('[Step3 Enrich Effect] currentStatus:', currentStatus, 'isEnrichPolling:', isEnrichPolling, 'contacts:', apiContacts.length);
+    
+    // STOP condition: status is contact_qualification_select - ready for mode selection
+    if (currentStatus === 'contact_qualification_select') {
+      if (isEnrichPolling) {
+        console.log('[Step3] Status is contact_qualification_select, stopping enrich polling');
+        setLoading(false);
+        setIsEnrichPolling(false);
+      }
+      return;
+    }
+    
+    // START condition: status is NOT contact_qualification_select and we have no contacts
+    // This means contacts are still being fetched from Apollo
+    if (!isEnrichPolling && apiContacts.length === 0 && currentStatus !== undefined) {
+      console.log('[Step3] Starting enrich polling, current status:', currentStatus);
       setLoading(true, 'Fetching contacts from Apollo...');
       setIsEnrichPolling(true);
     }
-  }, [campaignId, campaignCycleStatus, apiContacts.length, isEnrichPolling, setLoading]);
+  }, [campaignId, statusData?.data?.status, apiContacts.length, isEnrichPolling, setLoading]);
 
   // Map minimal contact data to display format - no state storage needed
   // Contact is qualified if:
@@ -414,11 +478,13 @@ export const Step3ContactQualification = () => {
   useEffect(() => {
     if (!campaignId || !isEnrichPolling) return;
     
-    const status = statusData?.data?.prospecting_cycle?.status;
-    const totalContacts = statusData?.data?.total_contacts || 0;
+    // Use data.status (main status field) - this is the source of truth
+    const status = statusData?.data?.status;
     
-    // For initial contact fetch: wait for contact_qualification and contacts to be available
-    const isContactsFetched = status === 'contact_qualification' && totalContacts > 0;
+    console.log('[Step3 Watch Effect] status:', status, 'isEnrichPolling:', isEnrichPolling, 'isWaitingForEnrichment:', isWaitingForEnrichment);
+    
+    // STOP condition: status reaches 'contact_qualification_select'
+    const isReadyForModeSelection = status === 'contact_qualification_select';
     const isContactsEnriched = status === 'contact_enriched';
     
     // If we're waiting for enrichment (user clicked Continue), only proceed when enriched
@@ -431,14 +497,15 @@ export const Step3ContactQualification = () => {
         nextStep();
       }
     } else {
-      // Initial display - stop polling when contacts are available (either fetched or enriched)
-      if (isContactsFetched || isContactsEnriched) {
+      // Initial display - stop polling when status reaches contact_qualification_select
+      if (isReadyForModeSelection) {
+        console.log('[Step3] Status reached contact_qualification_select, stopping enrich polling');
         setLoading(false);
         setIsEnrichPolling(false);
         // Stay on this page for user to qualify - data displayed via useGetContactListMinimalQuery
       }
     }
-  }, [campaignId, isEnrichPolling, isWaitingForEnrichment, statusData?.data, nextStep, setLoading]);
+  }, [campaignId, isEnrichPolling, isWaitingForEnrichment, statusData?.data?.status, nextStep, setLoading]);
 
   return (
     <div className="step-container step-contact-qualification">
@@ -473,8 +540,8 @@ export const Step3ContactQualification = () => {
         </div>
       )}
 
-      {/* Mode Selection - Show only if step not already completed and no mode selected */}
-      {!state.contactQualificationMode && !stepAlreadyCompleted && (
+      {/* Mode Selection - Show only if step not already completed, mode not selected, and status is contact_qualification_select */}
+      {(showModeSelection || (!state.contactQualificationMode && !stepAlreadyCompleted && !aiActiveFromStatus)) && (
         <div className="qualification-mode-selection">
           <h3>Choose Qualification Method</h3>
           <div className="mode-cards">

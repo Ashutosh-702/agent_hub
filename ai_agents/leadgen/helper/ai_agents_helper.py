@@ -727,6 +727,7 @@ class CampaignsHelper:
                     {"campaign_id": campaign_id, "contact_id": {"$in": chunk}},
                     {"$set": update_data}
                 )
+        await self.campaign_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "contact_qualification"})
         return {"message": "Contact relevance updated"}
 
     async def get_campaign_contact_list(self, query_params: GetCampaignContactList):

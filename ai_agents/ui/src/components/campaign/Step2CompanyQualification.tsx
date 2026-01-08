@@ -43,9 +43,14 @@ const toLabel = (value: unknown): string => {
 };
 
 // Check if campaign has already completed company qualification based on prospecting_cycle.status
+// Step is completed if status has moved past company_qualification_* to contact_qualification_* or later
 const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
   const completedStatuses = [
+    // All contact qualification statuses (means company qualification is done)
+    'contact_qualification_select',
     'contact_qualification',
+    'contact_qualification_ai_started',
+    // Later stages
     'contact_enriched',
     'hubspot_sync_in_progress',
     'hubspot_sync_completed',
@@ -54,6 +59,16 @@ const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
     'enrolled_to_sequence',
   ];
   return cycleStatus ? completedStatuses.includes(cycleStatus) : false;
+};
+
+// Check if we should show mode selection (status is company_qualification_select)
+const shouldShowModeSelection = (cycleStatus?: string): boolean => {
+  return cycleStatus === 'company_qualification_select';
+};
+
+// Check if AI is actively running (status is company_qualification_ai_started)
+const isAiInProgress = (cycleStatus?: string): boolean => {
+  return cycleStatus === 'company_qualification_ai_started';
 };
 
 export const Step2CompanyQualification = () => {
@@ -116,29 +131,6 @@ export const Step2CompanyQualification = () => {
     }
   );
 
-  // AUTO-DETECT AI MODE ON RESUME: If AI job exists (queued/running/completed), set mode to 'ai'
-  // This handles the case where user resumes a campaign with AI qualification in progress
-  useEffect(() => {
-    if (!campaignId || state.companyQualificationMode) return; // Skip if mode already set
-    
-    const status = aiProgressData?.data?.status;
-    if (status && status !== 'not_started') {
-      // AI job exists - set mode to 'ai' and determine the correct view
-      setCompanyQualificationMode('ai');
-      
-      if (status === 'completed') {
-        setAiView('verify'); // Show review view
-        setAiStopPolling(true);
-      } else if (status === 'failed') {
-        setAiView('setup'); // Show setup to retry
-        setAiStopPolling(true);
-      } else {
-        // queued or running - show setup view with progress
-        setAiView('setup');
-      }
-    }
-  }, [campaignId, aiProgressData?.data?.status, state.companyQualificationMode, setCompanyQualificationMode]);
-
   // Once we observe a terminal status, stop polling (prevents continued network spam).
   useEffect(() => {
     const status = aiProgressData?.data?.status;
@@ -164,17 +156,69 @@ export const Step2CompanyQualification = () => {
   // Use optimized minimal API instead of full campaign details
   const { data, isFetching, isError } = useGetCompanyListMinimalQuery(queryArgs);
 
-  // Check if this step was already completed (campaign has progressed past company qualification)
-  // BUT: If there's a completed AI job, we should still show the review view, not "already completed"
+  // Check campaign status to determine what to show
   const campaignCycleStatus = data?.data?.campaign_status?.prospecting_cycle?.status;
   const aiJobStatus = aiProgressData?.data?.status;
-  const hasCompletedAiJob = aiJobStatus === 'completed';
-  const hasActiveAiJob = aiJobStatus === 'queued' || aiJobStatus === 'running';
   
-  // Step is "already completed" only if:
-  // 1. Campaign status indicates we've moved past company qualification, AND
-  // 2. There's NO completed AI job pending review (user should review AI results before proceeding)
-  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus) && !hasCompletedAiJob && !hasActiveAiJob;
+  // Derive state from backend status (source of truth)
+  const showModeSelection = shouldShowModeSelection(campaignCycleStatus) && !state.companyQualificationMode;
+  const aiActiveFromStatus = isAiInProgress(campaignCycleStatus);
+  
+  // Step is "already completed" if campaign has moved past company qualification
+  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
+  
+  // Log for debugging
+  console.log('[Step2] cycleStatus:', campaignCycleStatus, 'mode:', state.companyQualificationMode, 
+    'showModeSelection:', showModeSelection, 'aiActiveFromStatus:', aiActiveFromStatus, 
+    'stepAlreadyCompleted:', stepAlreadyCompleted, 'aiJobStatus:', aiJobStatus);
+
+  // AUTO-DETECT MODE based on backend status - ONLY when resuming a campaign
+  // When status is company_qualification_select, user MUST choose mode (don't auto-set)
+  useEffect(() => {
+    if (!campaignId) return;
+    
+    // IMPORTANT: When status is company_qualification_select, user should choose mode
+    // Don't auto-set any mode - let them see the mode selection
+    if (campaignCycleStatus === 'company_qualification_select') {
+      console.log('[Step2] Status is company_qualification_select - waiting for user to choose mode');
+      return; // Exit early - don't auto-detect
+    }
+    
+    // If backend status indicates AI is actively running, set AI mode
+    if (campaignCycleStatus === 'company_qualification_ai_started' && !state.companyQualificationMode) {
+      console.log('[Step2] Auto-detected AI in progress from status');
+      setCompanyQualificationMode('ai');
+      setAiView('setup');
+      return;
+    }
+    
+    // If backend status is company_qualification and AI job completed, set AI mode for review
+    if (campaignCycleStatus === 'company_qualification' && aiJobStatus === 'completed' && !state.companyQualificationMode) {
+      console.log('[Step2] Auto-detected completed AI job for review');
+      setCompanyQualificationMode('ai');
+      setAiView('verify');
+      setAiStopPolling(true);
+      return;
+    }
+    
+    // Fallback: only check AI job status when NOT in mode selection state
+    // This is for resuming campaigns where AI was started
+    if (!state.companyQualificationMode && aiJobStatus && aiJobStatus !== 'not_started' && 
+        campaignCycleStatus !== 'company_qualification_select') {
+      console.log('[Step2] Auto-detected AI mode from job status:', aiJobStatus);
+      setCompanyQualificationMode('ai');
+      
+      if (aiJobStatus === 'completed') {
+        setAiView('verify');
+        setAiStopPolling(true);
+      } else if (aiJobStatus === 'failed') {
+        setAiView('setup');
+        setAiStopPolling(true);
+      } else {
+        setAiView('setup');
+      }
+    }
+  }, [campaignId, campaignCycleStatus, aiJobStatus, state.companyQualificationMode, setCompanyQualificationMode]);
 
   const companies: CompanyMinimal[] = data?.data?.companies ?? [];
   const pagination = data?.pagination;
@@ -341,8 +385,13 @@ export const Step2CompanyQualification = () => {
     
     const status = statusPollingData?.data?.prospecting_cycle?.status;
     
-    // When status becomes contact_qualification, contacts are ready - proceed to Step 3
-    if (status === 'contact_qualification') {
+    console.log('[Step2 Contact Polling] status:', status, 'isContactPolling:', isContactPolling);
+    
+    // When status becomes contact_qualification_select or contact_qualification, contacts are ready - proceed to Step 3
+    // contact_qualification_select = ready for mode selection (new status)
+    // contact_qualification = manual mode or AI completed
+    if (status === 'contact_qualification_select' || status === 'contact_qualification') {
+      console.log('[Step2] Contacts ready, advancing to Step 3');
       setIsContactPolling(false);
       setLoading(false);
       // Don't store contacts in wizard state - Step 3 will fetch its own paginated data
@@ -409,8 +458,8 @@ export const Step2CompanyQualification = () => {
         </div>
       )}
 
-      {/* Mode Selection - Show only if step not already completed and no mode selected */}
-      {!state.companyQualificationMode && !stepAlreadyCompleted && (
+      {/* Mode Selection - Show only if step not already completed, mode not selected, and status is company_qualification_select */}
+      {(showModeSelection || (!state.companyQualificationMode && !stepAlreadyCompleted && !aiActiveFromStatus)) && (
         <div className="qualification-mode-selection">
           <h3>Choose Qualification Method</h3>
           <div className="mode-cards">
