@@ -531,19 +531,19 @@ export const Step1Prospecting = () => {
             {/* Revenue Range */}
             <div className="filter-group filter-row">
               <div className="input-group">
-                <label>Min Revenue ($)</label>
+                <label>Min Revenue in millions ($)</label>
                 <input
                   type="text"
-                  placeholder="e.g., 1000000"
+                  placeholder="e.g., 1"
                   value={localFilters.revenueMin}
                   onChange={(e) => setLocalFilters(prev => ({ ...prev, revenueMin: e.target.value }))}
                 />
               </div>
               <div className="input-group">
-                <label>Max Revenue ($)</label>
+                <label>Max Revenue in millions ($)</label>
                 <input
                   type="text"
-                  placeholder="e.g., 50000000"
+                  placeholder="e.g., 50"
                   value={localFilters.revenueMax}
                   onChange={(e) => setLocalFilters(prev => ({ ...prev, revenueMax: e.target.value }))}
                 />
