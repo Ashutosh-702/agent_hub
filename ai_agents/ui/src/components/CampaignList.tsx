@@ -284,8 +284,8 @@ export const CampaignList = () => {
         <div className="campaign-list-header">
           <PageHeader
             variant="inline"
-            title="Campaigns"
-            subtitle="View all your outreach campaigns"
+            title="Prospecting + Outreach Campaigns"
+            subtitle="View all your prospecting + outreach campaigns"
             titleClassName="campaign-list-title"
             subtitleClassName="campaign-list-subtitle"
           />

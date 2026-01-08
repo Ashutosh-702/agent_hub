@@ -102,7 +102,7 @@ export const LoginPage = () => {
                 <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <h1 className="login-title">Agent Hub</h1>
+            <h1 className="login-title">Nebula</h1>
             <p className="login-subtitle">
               {mode === 'login' 
                 ? 'Welcome back! Sign in to your account' 
@@ -246,7 +246,7 @@ export const LoginPage = () => {
         </div>
 
         <p className="login-copyright">
-          © {new Date().getFullYear()} Agent Hub. All rights reserved.
+          © {new Date().getFullYear()} Nebula. All rights reserved.
         </p>
       </div>
     </div>

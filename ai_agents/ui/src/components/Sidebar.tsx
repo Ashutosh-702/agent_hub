@@ -160,7 +160,7 @@ const menuItems: MenuItem[] = [
   // 1. Campaign
   { 
     path: '/campaign', 
-    label: 'Campaign', 
+    label: 'Prospecting + Outreach', 
     icon: Icons.campaign,
   },
   // 2. Inbox
@@ -257,7 +257,7 @@ export const Sidebar = () => {
 
       {/* Header */}
       <div className="sidebar-header">
-        <h2>{isCollapsed ? 'AH' : 'Agent Hub'}</h2>
+        <h2>{isCollapsed ? 'NE' : 'Nebula'}</h2>
       </div>
 
       {/* Wizard Progress Section - shown when in campaign wizard */}
