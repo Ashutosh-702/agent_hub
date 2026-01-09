@@ -598,7 +598,7 @@ export const Step3ContactQualification = () => {
   return (
     <div className="step-container step-contact-qualification">
       <div className="step-header">
-        <h2>Contact Qualification</h2>
+        <h2>Qualify Contacts</h2>
         <p>Review and qualify contacts from your qualified companies</p>
       </div>
 

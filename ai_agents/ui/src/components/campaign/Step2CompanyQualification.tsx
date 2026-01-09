@@ -404,7 +404,7 @@ export const Step2CompanyQualification = () => {
     return (
       <div className="step-container step-company-qualification">
         <div className="step-header">
-          <h2>Company Qualification</h2>
+          <h2>Qualify Companies</h2>
           <p>Missing campaign id. Please go back and start prospecting again.</p>
         </div>
         <div className="step-navigation">
@@ -423,7 +423,7 @@ export const Step2CompanyQualification = () => {
   return (
     <div className="step-container step-company-qualification">
       <div className="step-header">
-        <h2>Company Qualification</h2>
+        <h2>Qualify Companies</h2>
         <p>Review companies page-wise (100 per page). Changes are saved before paging.</p>
       </div>
 
