@@ -829,6 +829,9 @@ class CampaignsHelper:
         lifecycle = campaign.get("lifecycle", {})
         csv_import = campaign.get("csv_import", {})
         single_company = campaign.get("single_company", {})
+
+        #count company runs count
+        company_runs_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id)})
         
         # Count contacts for progress display
         total_contacts = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count(
@@ -847,6 +850,7 @@ class CampaignsHelper:
             "lifecycle": lifecycle,
             "csv_import": csv_import,
             "single_company": single_company,
+            "company_runs_count": company_runs_count,
         }
 
     async def get_company_list_minimal(self, campaign_id: str, page: int = 1, limit: int = 100, company_status: bool = None):

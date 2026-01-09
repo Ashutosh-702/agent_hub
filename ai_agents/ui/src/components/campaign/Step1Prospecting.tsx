@@ -249,6 +249,11 @@ export const Step1Prospecting = () => {
               <div className="spinner large" />
             </div>
             <h3>{state.loadingMessage || 'Working…'}</h3>
+            {typeof campaignStatusData?.data?.company_runs_count === 'number' && (
+              <p style={{ marginTop: 8, opacity: 0.85 }}>
+                Companies fetched: {campaignStatusData.data.company_runs_count}
+              </p>
+            )}
             {createdCampaignId && (
               <p style={{ marginTop: 8, opacity: 0.85 }}>Campaign ID: {createdCampaignId}</p>
             )}
@@ -705,4 +710,3 @@ export const Step1Prospecting = () => {
     </div>
   );
 };
-

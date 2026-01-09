@@ -540,6 +540,7 @@ export interface GetCampaignStatusMinimalResponse {
     status: string;
     total_contacts: number;
     relevant_contacts: number;
+    company_runs_count?: number;
     prospecting_cycle: {
       status?: string;
     };
@@ -1207,4 +1208,3 @@ export const {
   useEnrollContactsToSequenceMutation,
   useGetLemlistCampaignsQuery,
 } = campaignApi;
-
