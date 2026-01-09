@@ -50,6 +50,7 @@ const isStepAlreadyCompleted = (cycleStatus?: string): boolean => {
     'contact_qualification_select',
     'contact_qualification',
     'contact_qualification_ai_started',
+    'contact_enrichment_in_progress',
     // Later stages
     'contact_enriched',
     'hubspot_sync_in_progress',
@@ -1252,5 +1253,4 @@ export const Step2CompanyQualification = () => {
     </div>
   );
 };
-
 

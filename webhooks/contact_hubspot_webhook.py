@@ -660,7 +660,9 @@ class ContactHubspotWebhook:
                     self.company_id = company_id
                     await self.send_company_level_webhook(str(company_id))
                     campaign_company_run_id = campaign_company_run.get("_id")
-                    await self.campaign_company_runs_dao.update_campaign_company_run({"_id": campaign_company_run_id}, {"$set": {"sync_to_hubspot_status": "in_progress"}})
+                    campaign_contact_runs = await self.campaign_contact_runs_dao.get_campaign_contact_runs_count({"campaign_id": self.campaign_id, "company_id": ObjectId(company_id), "is_relevant": True})
+                    if campaign_contact_runs > 0:
+                        await self.campaign_company_runs_dao.update_campaign_company_run({"_id": campaign_company_run_id}, {"$set": {"sync_to_hubspot_status": "in_progress"}})
             logger.info(f"✅ Synced to HubSpot for campaign_id: {campaign_id}")
             await self.campaigns_dao.update_campaign(campaign_id, {"prospecting_cycle.status": "hubspot_sync_in_progress"})
             return {

@@ -1,6 +1,11 @@
 import React, { useState, createContext, useContext, useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useLazyGetCampaignDetailsQuery, useLazyCompanyQualificationProgressQuery, useLazyContactQualificationProgressQuery } from '../../store';
+import { 
+  useLazyGetCampaignDetailsQuery, 
+  useLazyCompanyQualificationProgressQuery, 
+  useLazyContactQualificationProgressQuery,
+  useLazyGetCampaignStatusMinimalQuery,
+} from '../../store';
 import './CampaignWizard.css';
 import { useSidebar } from '../../context/SidebarContext';
 import { CampaignTypeSelection, type CampaignType } from './CampaignTypeSelection';
@@ -270,6 +275,7 @@ const deriveStepFromCycleStatus = (cycleStatus?: string): number => {
   if (cycleStatus === 'contact_enriched') return 4;
   
   // Step 3: Contact Qualification (all contact_qualification_* statuses)
+  if (cycleStatus === 'contact_enrichment_in_progress') return 3;
   if (cycleStatus === 'contact_qualification') return 3;
   if (cycleStatus === 'contact_qualification_select') return 3;
   if (cycleStatus === 'contact_qualification_ai_started') return 3;
@@ -313,6 +319,7 @@ const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
 export const NewCampaignWizard = () => {
   const location = useLocation();
   const [fetchCampaignDetails] = useLazyGetCampaignDetailsQuery();
+  const [fetchCampaignStatusMinimal] = useLazyGetCampaignStatusMinimalQuery();
   const [fetchCompanyQualificationProgress] = useLazyCompanyQualificationProgressQuery();
   const [fetchContactQualificationProgress] = useLazyContactQualificationProgressQuery();
   
@@ -417,17 +424,29 @@ export const NewCampaignWizard = () => {
     let cancelled = false;
     const fetchAndSetStep = async () => {
       try {
-        // Fetch campaign details and AI qualification progress (both company and contact) in parallel
-        const [campaignRes, companyAiProgressRes, contactAiProgressRes] = await Promise.all([
+        // Fetch status + campaign details + AI qualification progress in parallel.
+        // Use allSettled to avoid blocking resume when one endpoint fails.
+        const [
+          statusResult,
+          campaignResult,
+          companyAiResult,
+          contactAiResult,
+        ] = await Promise.allSettled([
+          fetchCampaignStatusMinimal({ campaign_id: urlCampaignId }).unwrap(),
           fetchCampaignDetails({ campaign_id: urlCampaignId, page: 1, limit: 1 }).unwrap(),
-          fetchCompanyQualificationProgress({ campaign_id: urlCampaignId }).unwrap().catch(() => null),
-          fetchContactQualificationProgress({ campaign_id: urlCampaignId }).unwrap().catch(() => null),
+          fetchCompanyQualificationProgress({ campaign_id: urlCampaignId }).unwrap(),
+          fetchContactQualificationProgress({ campaign_id: urlCampaignId }).unwrap(),
         ]);
+        
+        const campaignRes = campaignResult.status === 'fulfilled' ? campaignResult.value : null;
+        const companyAiProgressRes = companyAiResult.status === 'fulfilled' ? companyAiResult.value : null;
+        const contactAiProgressRes = contactAiResult.status === 'fulfilled' ? contactAiResult.value : null;
+        const statusRes = statusResult.status === 'fulfilled' ? statusResult.value : null;
         
         if (cancelled) return;
         
         const campaign = campaignRes?.data?.campaign;
-        const cycleStatus = campaign?.prospecting_cycle?.status;
+        const cycleStatus = statusRes?.data?.status || campaign?.prospecting_cycle?.status;
         const derivedStep = deriveStepFromCycleStatus(cycleStatus);
         
         // Derive qualification modes from backend status (primary source of truth)
@@ -458,6 +477,10 @@ export const NewCampaignWizard = () => {
         
         // Derive campaign type from campaign data
         let derivedCampaignType: CampaignType = 'wide_prospecting'; // Default for prospecting campaigns
+        const rawCampaignType = campaign?.campaign_type;
+        if (rawCampaignType && rawCampaignType in CAMPAIGN_TYPE_LABELS) {
+          derivedCampaignType = rawCampaignType as CampaignType;
+        }
         
         console.log('[Resume] cycleStatus:', cycleStatus, 'derivedStep:', derivedStep, 
           'companyMode:', derivedCompanyMode, 'contactMode:', derivedContactMode);

@@ -994,7 +994,7 @@ class CampaignsHelper:
         }
         await self.campaign_company_runs_dao.update_campaign_company_run({"company_id": ObjectId(company_id), "campaign_id": ObjectId(campaign_id)}, {"$set": {"sync_to_hubspot_status": "synced", "metadata.updated_at": datetime.utcnow(),"metadata.sync_hubspot_webhook_received": json_query_data}})
         #total company runs count
-        total_company_runs_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True})
+        total_company_runs_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True, "sync_to_hubspot_status": {"$exists": True}})
         #total company runs count synced
         total_company_runs_count_synced = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True, "sync_to_hubspot_status": "synced"})
 
@@ -1017,7 +1017,7 @@ class CampaignsHelper:
         if not campaign:
             raise ApiException("Campaign not found")
         synced_hubspot_companies_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True, "sync_to_hubspot_status": "synced"})
-        total_hubspot_companies_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True})
+        total_hubspot_companies_count = await self.campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": ObjectId(campaign_id), "is_relevant": True, "sync_to_hubspot_status": {"$exists": True}})
 
         # OPTIMIZED: Only return fields needed for UI polling
         # No longer returning full campaign object (was causing excess data transfer)

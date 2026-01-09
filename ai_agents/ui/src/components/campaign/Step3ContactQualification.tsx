@@ -95,10 +95,9 @@ export const Step3ContactQualification = () => {
   
   // OPTIMIZED: Use minimal status API for polling - no contact data
   // Poll during enrichment OR when AI qualification is running (to get updated relevant_contacts count)
-  const shouldPollStatus = isEnrichPolling || (shouldPollAiProgress && !aiStopPolling);
   const { data: statusData, refetch: refetchStatus } = useGetCampaignStatusMinimalQuery(
     campaignId ? { campaign_id: campaignId } : skipToken,
-    { pollingInterval: shouldPollStatus ? 3000 : 0 }
+    { pollingInterval: 0 }
   );
 
   // Stop polling once AI job reaches terminal state and refetch contact list + status
@@ -124,27 +123,92 @@ export const Step3ContactQualification = () => {
   
   // Use status from optimized status API (preferred) or contact list
   // statusData = { success, data: { status, ... } } from GetCampaignStatusMinimalResponse
-  const campaignCycleStatus = statusData?.data?.status || contactListData?.data?.campaign_status?.prospecting_cycle?.status;
+  const statusFromMinimal = statusData?.data?.status;
+  const cycleFromMinimal = statusData?.data?.prospecting_cycle?.status;
+  const campaignCycleStatus =
+    cycleFromMinimal ||
+    statusFromMinimal ||
+    contactListData?.data?.campaign_status?.prospecting_cycle?.status;
+  const isEnrichmentInProgress =
+    statusFromMinimal === 'contact_enrichment_in_progress' ||
+    cycleFromMinimal === 'contact_enrichment_in_progress' ||
+    campaignCycleStatus === 'contact_enrichment_in_progress';
+
+  // Step is "already completed" if campaign has moved past contact qualification
+  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
+  const isReviewOnly = stepAlreadyCompleted;
+  const effectiveMode = isReviewOnly ? 'manual' : state.contactQualificationMode;
+  
+  // Enable status polling when enrichment is running or AI qualification is active.
+  const shouldPollStatus =
+    !stepAlreadyCompleted &&
+    (isEnrichPolling ||
+      isEnrichmentInProgress ||
+      (shouldPollAiProgress && !aiStopPolling));
+  useEffect(() => {
+    if (!shouldPollStatus) return;
+    const interval = setInterval(() => {
+      refetchStatus();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [shouldPollStatus, refetchStatus]);
   
   // Check if AI contact qualification has active/completed job
   const contactAiJobStatus = aiProgressData?.data?.status;
   
   // Derive state from backend status (source of truth)
-  const showModeSelection = shouldShowModeSelection(campaignCycleStatus) && !state.contactQualificationMode;
+  const showModeSelection =
+    shouldShowModeSelection(campaignCycleStatus) &&
+    !state.contactQualificationMode &&
+    !stepAlreadyCompleted;
   const aiActiveFromStatus = isAiInProgress(campaignCycleStatus);
-  
-  // Step is "already completed" if campaign has moved past contact qualification
-  const stepAlreadyCompleted = isStepAlreadyCompleted(campaignCycleStatus);
   
   // Log for debugging
   console.log('[Step3] cycleStatus:', campaignCycleStatus, 'mode:', state.contactQualificationMode, 
     'showModeSelection:', showModeSelection, 'aiActiveFromStatus:', aiActiveFromStatus, 
     'stepAlreadyCompleted:', stepAlreadyCompleted, 'aiJobStatus:', contactAiJobStatus);
 
+  // Review-only: ensure we don't keep loading overlays running.
+  useEffect(() => {
+    if (stepAlreadyCompleted && state.isLoading) {
+      setLoading(false);
+    }
+  }, [stepAlreadyCompleted, state.isLoading, setLoading]);
+
+  // Review-only: stop any polling/enrichment state.
+  useEffect(() => {
+    if (!stepAlreadyCompleted) return;
+    setAiStopPolling(true);
+    setIsEnrichPolling(false);
+    setIsWaitingForEnrichment(false);
+  }, [stepAlreadyCompleted]);
+
+  // Resume enrichment progress if backend is already enriching contacts.
+  useEffect(() => {
+    if (!campaignId || !isEnrichmentInProgress) return;
+    if (!isWaitingForEnrichment) {
+      setIsWaitingForEnrichment(true);
+    }
+    if (!isEnrichPolling) {
+      setIsEnrichPolling(true);
+    }
+    if (!state.isLoading) {
+      setLoading(true, 'Enriching contacts from Apollo...');
+    }
+  }, [
+    campaignId,
+    isEnrichmentInProgress,
+    isWaitingForEnrichment,
+    isEnrichPolling,
+    setLoading,
+    state.isLoading,
+  ]);
+
   // AUTO-DETECT MODE based on backend status - ONLY when resuming a campaign
   // When status is contact_qualification_select, user MUST choose mode (don't auto-set)
   useEffect(() => {
     if (!campaignId) return;
+    if (stepAlreadyCompleted) return;
     
     // IMPORTANT: When status is contact_qualification_select, user should choose mode
     // Don't auto-set any mode - let them see the mode selection
@@ -178,7 +242,7 @@ export const Step3ContactQualification = () => {
         setAiStopPolling(true);
       }
     }
-  }, [campaignId, campaignCycleStatus, contactAiJobStatus, state.contactQualificationMode, setContactQualificationMode]);
+  }, [campaignId, campaignCycleStatus, contactAiJobStatus, state.contactQualificationMode, setContactQualificationMode, stepAlreadyCompleted]);
   
   // OPTIMIZED: Contacts from minimal API - only current page, not all
   const apiContacts: ContactMinimal[] = contactListData?.data?.contacts || [];
@@ -197,6 +261,15 @@ export const Step3ContactQualification = () => {
     
     console.log('[Step3 Enrich Effect] currentStatus:', currentStatus, 'isEnrichPolling:', isEnrichPolling, 'contacts:', apiContacts.length);
     
+    if (currentStatus === 'contact_enrichment_in_progress') {
+      if (!isEnrichPolling || !isWaitingForEnrichment) {
+        setLoading(true, 'Enriching contacts from Apollo...');
+        setIsWaitingForEnrichment(true);
+        setIsEnrichPolling(true);
+      }
+      return;
+    }
+
     // STOP condition: status is contact_qualification_select - ready for mode selection
     if (currentStatus === 'contact_qualification_select') {
       if (isEnrichPolling) {
@@ -214,7 +287,7 @@ export const Step3ContactQualification = () => {
       setLoading(true, 'Fetching contacts from Apollo...');
       setIsEnrichPolling(true);
     }
-  }, [campaignId, statusData?.data?.status, apiContacts.length, isEnrichPolling, setLoading]);
+  }, [campaignId, statusData?.data?.status, apiContacts.length, isEnrichPolling, setLoading, stepAlreadyCompleted]);
 
   // Map minimal contact data to display format - no state storage needed
   // Contact is qualified if:
@@ -262,6 +335,7 @@ export const Step3ContactQualification = () => {
 
   // Toggle single contact qualification via checkbox (current page only)
   const toggleContactQualification = (contactId: string) => {
+    if (stepAlreadyCompleted) return;
     const contact = apiContacts.find(c => c.contact_id === contactId);
     if (!contact) return;
     
@@ -290,6 +364,7 @@ export const Step3ContactQualification = () => {
 
   // Select/Deselect all contacts on current page
   const handleSelectAll = () => {
+    if (stepAlreadyCompleted) return;
     const allQualified = displayContacts.every(c => c.qualificationStatus === 'qualified');
     if (allQualified) {
       // Deselect all on this page
@@ -358,6 +433,11 @@ export const Step3ContactQualification = () => {
   const handlePageChange = async (newPage: number) => {
     if (newPage === currentPage || isSavingPage) return;
     
+    if (stepAlreadyCompleted) {
+      setCurrentPage(newPage);
+      return;
+    }
+    
     // Save current page selections/deselections before navigating
     const saved = await saveCurrentPageSelections();
     if (saved) {
@@ -375,6 +455,10 @@ export const Step3ContactQualification = () => {
     // Before going to Step 4, save current page, then queue contact enrichment
     if (!campaignId) {
       nextStep();
+      return;
+    }
+
+    if (isWaitingForEnrichment || isEnrichmentInProgress || stepAlreadyCompleted) {
       return;
     }
 
@@ -433,6 +517,10 @@ export const Step3ContactQualification = () => {
   const handleAiContinue = () => {
     if (!campaignId) {
       nextStep();
+      return;
+    }
+
+    if (isWaitingForEnrichment || isEnrichmentInProgress || stepAlreadyCompleted) {
       return;
     }
 
@@ -515,7 +603,7 @@ export const Step3ContactQualification = () => {
       </div>
 
       {/* Loading Animation - Only show when NOT in AI mode or before AI starts */}
-      {state.isLoading && state.contactQualificationMode !== 'ai' && (
+      {state.isLoading && effectiveMode !== 'ai' && !isReviewOnly && (
         <div className="loading-overlay">
           <div className="loading-card">
             <div className="loading-animation ai-animation">
@@ -541,7 +629,7 @@ export const Step3ContactQualification = () => {
       )}
 
       {/* Mode Selection - Show only if step not already completed, mode not selected, and status is contact_qualification_select */}
-      {(showModeSelection || (!state.contactQualificationMode && !stepAlreadyCompleted && !aiActiveFromStatus)) && (
+      {(showModeSelection || (!state.contactQualificationMode && !stepAlreadyCompleted && !aiActiveFromStatus && !isEnrichmentInProgress)) && (
         <div className="qualification-mode-selection">
           <h3>Choose Qualification Method</h3>
           <div className="mode-cards">
@@ -581,89 +669,18 @@ export const Step3ContactQualification = () => {
         </div>
       )}
 
-      {/* Step Already Completed - Show review mode */}
-      {!state.contactQualificationMode && stepAlreadyCompleted && (
-        <div className="step-completed-view">
-          <div className="sync-success-banner" style={{ marginBottom: '24px' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-              <polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
-            <span>Contact Qualification Completed</span>
-          </div>
-
-          <div className="qualification-stats">
-            <div className="stat">
-              <span className="stat-value">{contactListData?.pagination?.total_records ?? apiContacts.length}</span>
-              <span className="stat-label">Total Contacts</span>
-            </div>
-            <div className="stat qualified">
-              <span className="stat-value">
-                {apiContacts.filter(c => c.is_relevant).length}
-              </span>
-              <span className="stat-label">Qualified (this page)</span>
-            </div>
-          </div>
-
-          {/* Show qualified contacts (read-only view) */}
-          {apiContacts.length > 0 && (
-            <div className="contacts-qualification-list">
-              <div className="select-all-header">
-                <span className="select-all-text">
-                  Qualified Contacts (view only)
-                </span>
-              </div>
-
-              {apiContacts.filter(c => c.is_relevant).slice(0, 10).map((c) => (
-                <div key={c.contact_id} className="contact-qualification-card qualified" style={{ cursor: 'default' }}>
-                  <div className="contact-avatar">
-                    {c.firstname?.[0] || '?'}{c.lastname?.[0] || '?'}
-                  </div>
-                  <div className="contact-info">
-                    <h4>{c.firstname || ''} {c.lastname || ''}</h4>
-                    <div className="contact-meta">
-                      <span className="job-title">{c.jobtitle || 'N/A'}</span>
-                      <span className="company-name">{c.company || 'Unknown'}</span>
-                    </div>
-                    <span className="contact-email">{c.email || 'No email'}</span>
-                  </div>
-                  <div className="qualified-badge">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                  </div>
-                </div>
-              ))}
-              {apiContacts.filter(c => c.is_relevant).length > 10 && (
-                <div style={{ padding: '12px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>
-                  + {apiContacts.filter(c => c.is_relevant).length - 10} more contacts...
-                </div>
-              )}
+      {/* Manual Qualification */}
+      {effectiveMode === 'manual' && (
+        <div className="manual-qualification">
+          {isReviewOnly && (
+            <div className="sync-success-banner" style={{ marginBottom: '24px' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              <span>Contact Qualification Completed (view only)</span>
             </div>
           )}
-
-          <div className="step-navigation">
-            <button className="btn-secondary" onClick={prevStep}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="19" y1="12" x2="5" y2="12"/>
-                <polyline points="12 19 5 12 12 5"/>
-              </svg>
-              Back
-            </button>
-            <button className="btn-primary" onClick={nextStep}>
-              Continue to Sync to HubSpot
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-                <polyline points="12 5 19 12 12 19"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Manual Qualification */}
-      {state.contactQualificationMode === 'manual' && (
-        <div className="manual-qualification">
           {/* Stats Bar - OVERALL counts across all pages */}
           <div className="qualification-stats">
             <div className="stat">
@@ -695,11 +712,16 @@ export const Step3ContactQualification = () => {
                     if (el) el.indeterminate = someSelected;
                   }}
                   onChange={handleSelectAll}
+                  disabled={stepAlreadyCompleted}
                 />
                 <span className="checkmark"></span>
               </label>
               <span className="select-all-text">
-                {allSelected ? 'Deselect All' : 'Select All'} 
+                {stepAlreadyCompleted
+                  ? 'Selected Contacts (view only)'
+                  : allSelected
+                    ? 'Deselect All'
+                    : 'Select All'}
                 <span className="selected-count">({currentPageQualifiedCount} of {contacts.length} selected)</span>
               </span>
             </div>
@@ -711,7 +733,11 @@ export const Step3ContactQualification = () => {
                 <div 
                   key={contact.id} 
                   className={`contact-qualification-card ${isQualified ? 'qualified' : ''}`}
-                  onClick={() => toggleContactQualification(contact.id)}
+                  onClick={() => {
+                    if (!stepAlreadyCompleted) {
+                      toggleContactQualification(contact.id);
+                    }
+                  }}
                 >
                   <div className="contact-select">
                     <label className="checkbox-container">
@@ -720,6 +746,7 @@ export const Step3ContactQualification = () => {
                         checked={isQualified}
                         onChange={() => toggleContactQualification(contact.id)}
                         onClick={(e) => e.stopPropagation()}
+                        disabled={stepAlreadyCompleted}
                       />
                       <span className="checkmark"></span>
                     </label>
@@ -783,7 +810,7 @@ export const Step3ContactQualification = () => {
       )}
 
       {/* AI Qualification */}
-      {state.contactQualificationMode === 'ai' && (
+      {effectiveMode === 'ai' && (
         <div className="manual-qualification">
           <div className="ai-qualification-setup">
             <div className="ai-setup-header">
@@ -1020,10 +1047,10 @@ export const Step3ContactQualification = () => {
                     <button 
                       className="btn-primary" 
                       onClick={handleAiContinue}
-                      disabled={isAiContinueLoading || (overallSelectedContacts === 0)}
+                      disabled={isAiContinueLoading || (overallSelectedContacts === 0) || isWaitingForEnrichment || isEnrichmentInProgress}
                       style={{ display: 'flex', alignItems: 'center', gap: 8 }}
                     >
-                      {isAiContinueLoading ? (
+                      {isAiContinueLoading || isWaitingForEnrichment || isEnrichmentInProgress ? (
                         <>
                           <div className="spinner small" style={{ width: 16, height: 16, borderWidth: 2 }} />
                           Enriching...
@@ -1094,18 +1121,27 @@ export const Step3ContactQualification = () => {
             </button>
           )}
 
-          {(overallSelectedContacts > 0 || pageSelectedIds.size > 0) && state.contactQualificationMode !== 'ai' && (
-            <button className="btn-primary btn-large" onClick={handleContinue}>
-              Continue with {Math.max(0, overallSelectedContacts + apiContacts.filter(c => pageSelectedIds.has(c.contact_id) && !c.is_relevant).length - pageDeselectedIds.size)} Contacts
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="5" y1="12" x2="19" y2="12"/>
-                <polyline points="12 5 19 12 12 19"/>
-              </svg>
+          {state.contactQualificationMode !== 'ai' && (isWaitingForEnrichment || isEnrichmentInProgress) && (
+            <button className="btn-primary btn-large" disabled>
+              <div className="spinner small" style={{ width: 16, height: 16, borderWidth: 2, marginRight: 8 }} />
+              Enriching contacts...
             </button>
           )}
+
+          {(overallSelectedContacts > 0 || pageSelectedIds.size > 0) &&
+            state.contactQualificationMode !== 'ai' &&
+            !isWaitingForEnrichment &&
+            !isEnrichmentInProgress && (
+              <button className="btn-primary btn-large" onClick={handleContinue}>
+                Continue with {Math.max(0, overallSelectedContacts + apiContacts.filter(c => pageSelectedIds.has(c.contact_id) && !c.is_relevant).length - pageDeselectedIds.size)} Contacts
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                  <polyline points="12 5 19 12 12 19"/>
+                </svg>
+              </button>
+            )}
         </div>
       )}
     </div>
   );
 };
-

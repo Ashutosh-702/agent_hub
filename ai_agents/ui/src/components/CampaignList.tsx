@@ -13,6 +13,7 @@ const PROSPECTING_CYCLE_STAGES = [
   { value: 'prospecting', label: 'Step 1: Prospecting' },
   { value: 'company_qualification', label: 'Step 2: Company Qualification' },
   { value: 'contact_qualification', label: 'Step 3: Contact Qualification' },
+  { value: 'contact_enrichment_in_progress', label: 'Step 3: Enriching Contacts...' },
   { value: 'contact_enriched', label: 'Step 4: Sync to HubSpot' },
   { value: 'hubspot_sync_in_progress', label: 'Step 4: Syncing to HubSpot...' },
   { value: 'hubspot_sync_completed', label: 'Step 5: Personalization' },
@@ -29,6 +30,7 @@ const deriveWizardStep = (cycle: string): { stepId: WizardStepId; label: string 
   if (cycle === 'hubspot_sync_in_progress') return { stepId: 4, label: 'Syncing to HubSpot...' };
   if (cycle === 'hubspot_sync_failed') return { stepId: 4, label: 'HubSpot Sync Failed' };
   if (cycle === 'contact_enriched') return { stepId: 4, label: 'Sync to HubSpot' };
+  if (cycle === 'contact_enrichment_in_progress') return { stepId: 3, label: 'Enriching Contacts...' };
   if (cycle === 'contact_qualification') return { stepId: 3, label: 'Contact Qualification' };
   if (cycle === 'company_qualification') return { stepId: 2, label: 'Company Qualification' };
   if (cycle === 'prospecting') return { stepId: 1, label: 'Prospecting' };
@@ -44,6 +46,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   pending: { bg: 'rgba(156, 163, 175, 0.15)', text: '#9ca3af' },
   company_qualification: { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' },
   contact_qualification: { bg: 'rgba(168, 85, 247, 0.15)', text: '#a855f7' },
+  contact_enrichment_in_progress: { bg: 'rgba(168, 85, 247, 0.15)', text: '#a855f7' },
   contact_enriched: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981' },
 };
 

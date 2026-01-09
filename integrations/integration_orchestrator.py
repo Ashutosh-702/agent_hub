@@ -79,6 +79,7 @@ class IntegrationOrchestrator:
                 logger.error(f"Campaign is not in contact qualification status for campaign_id: {self.campaign_id}")
                 return
             logger.info("Enriching contacts from apollo...")
+            await self.campaigns_dao.update_campaign(self.campaign_id, {"prospecting_cycle.status": "contact_enrichment_in_progress"})
             await self.enrich_apollo_contacts(self.campaign_id)
             await self.campaigns_dao.update_campaign(self.campaign_id, {"prospecting_cycle.status": "contact_enriched"})
             return {
@@ -293,7 +294,7 @@ class IntegrationOrchestrator:
                 else:
                     for contact in contacts:
                         contact_id = contact.get("_id")
-                        campaign_contact_runs = await self.CampaignContactRunsDao.get_campaign_contact_runs({"campaign_id": self.campaign_id, "company_id": company_id, "contact_id": contact.get("contact_id")})
+                        campaign_contact_runs = await self.CampaignContactRunsDao.get_campaign_contact_runs({"campaign_id": self.campaign_id, "company_id": company_id, "contact_id": contact_id})
                         if campaign_contact_runs:
                             logger.error(f"Campaign contact run already exists for contact_id: {contact.get('contact_id')}")
                             continue
