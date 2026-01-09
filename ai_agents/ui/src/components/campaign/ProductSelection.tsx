@@ -4,6 +4,7 @@ import type { CampaignType } from './CampaignTypeSelection';
 // Hardcoded products for now
 const AVAILABLE_PRODUCTS = [
   { id: 'product-1', name: 'Fynd Platform', description: 'Complete e-commerce platform for enterprise brands' },
+  { id: 'GlamAR', name: 'GlamAR', description: 'AI-powered skin analysis and virtual try-on solution for beauty and skincare brands' },
   { id: 'product-2', name: 'Fynd Store', description: 'Point-of-sale and retail store management solution' },
   { id: 'product-3', name: 'Fynd OMS', description: 'Omnichannel order management and fulfillment' },
   { id: 'product-4', name: 'Fynd WMS', description: 'AI-powered warehouse management system' },

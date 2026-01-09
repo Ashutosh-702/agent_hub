@@ -94,6 +94,7 @@ export const CampaignTypeSelection: React.FC<CampaignTypeSelectionProps> = ({
   const [nameError, setNameError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isNameValid, setIsNameValid] = useState(false);
+  const isTypeSelectionEnabled = isNameValid && !isChecking;
 
   // Debounced validation
   const validateCampaignName = useCallback(async (name: string) => {
@@ -209,8 +210,9 @@ export const CampaignTypeSelection: React.FC<CampaignTypeSelectionProps> = ({
         {campaignTypes.map((type) => (
           <button
             key={type.id}
-            className={`campaign-type-card ${selectedType === type.id ? 'selected' : ''}`}
+            className={`campaign-type-card ${selectedType === type.id ? 'selected' : ''} ${!isTypeSelectionEnabled ? 'disabled' : ''}`}
             onClick={() => onSelect(type.id)}
+            disabled={!isTypeSelectionEnabled}
           >
             <div className="campaign-type-icon">{type.icon}</div>
             <h3 className="campaign-type-title">{type.title}</h3>
@@ -230,4 +232,3 @@ export const CampaignTypeSelection: React.FC<CampaignTypeSelectionProps> = ({
 };
 
 export default CampaignTypeSelection;
-
