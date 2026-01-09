@@ -231,7 +231,7 @@ export const Step1Prospecting = () => {
   return (
     <div className="step-container step-lead-generation">
       <div className="step-header">
-        <h2>Lead Generation</h2>
+        <h2>Prospect Companies</h2>
         <p>
           {!showResults 
             ? 'Define your target criteria to find potential prospects'
