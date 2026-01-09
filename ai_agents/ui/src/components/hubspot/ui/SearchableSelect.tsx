@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface Option {
   value: string;
@@ -11,6 +11,10 @@ interface SearchableSelectProps {
   value: string;
   onChange: (value: string) => void;
   onSearch?: (query: string) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  totalCount?: number;
   label?: string;
   placeholder?: string;
   error?: string;
@@ -23,6 +27,10 @@ export const SearchableSelect = ({
   value,
   onChange,
   onSearch,
+  onLoadMore,
+  hasMore = false,
+  isLoadingMore = false,
+  totalCount,
   label,
   placeholder = 'Search...',
   error,
@@ -32,8 +40,20 @@ export const SearchableSelect = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((o) => o.value === value);
+
+  // Handle scroll to load more
+  const handleScroll = useCallback(() => {
+    if (!listRef.current || !onLoadMore || !hasMore || isLoadingMore) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+    // Load more when scrolled within 50px of bottom
+    if (scrollHeight - scrollTop - clientHeight < 50) {
+      onLoadMore();
+    }
+  }, [onLoadMore, hasMore, isLoadingMore]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -154,7 +174,11 @@ export const SearchableSelect = ({
               onClick={(e) => e.stopPropagation()}
             />
           </div>
-          <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div 
+            ref={listRef}
+            onScroll={handleScroll}
+            style={{ overflowY: 'auto', flex: 1 }}
+          >
             {isLoading ? (
               <div
                 style={{
@@ -178,53 +202,81 @@ export const SearchableSelect = ({
                 No results found
               </div>
             ) : (
-              filteredOptions.map((option) => (
-                <div
-                  key={option.value}
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                    setSearchQuery('');
-                  }}
-                  style={{
-                    padding: '0.75rem 1rem',
-                    cursor: 'pointer',
-                    background: option.value === value ? 'var(--color-primary-light)' : 'transparent',
-                    transition: 'background 0.1s ease',
-                  }}
-                  onMouseOver={(e) => {
-                    if (option.value !== value) {
-                      e.currentTarget.style.background = 'var(--color-gray-50)';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (option.value !== value) {
-                      e.currentTarget.style.background = 'transparent';
-                    }
-                  }}
-                >
+              <>
+                {filteredOptions.map((option) => (
                   <div
+                    key={option.value}
+                    onClick={() => {
+                      onChange(option.value);
+                      setIsOpen(false);
+                      setSearchQuery('');
+                    }}
                     style={{
-                      fontSize: '0.9375rem',
-                      fontWeight: option.value === value ? 600 : 400,
-                      color: option.value === value ? 'var(--color-primary)' : 'var(--color-gray-800)',
+                      padding: '0.75rem 1rem',
+                      cursor: 'pointer',
+                      background: option.value === value ? 'var(--color-primary-light)' : 'transparent',
+                      transition: 'background 0.1s ease',
+                    }}
+                    onMouseOver={(e) => {
+                      if (option.value !== value) {
+                        e.currentTarget.style.background = 'var(--color-gray-50)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (option.value !== value) {
+                        e.currentTarget.style.background = 'transparent';
+                      }
                     }}
                   >
-                    {option.label}
-                  </div>
-                  {option.secondary && (
                     <div
                       style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--color-gray-500)',
-                        marginTop: '0.125rem',
+                        fontSize: '0.9375rem',
+                        fontWeight: option.value === value ? 600 : 400,
+                        color: option.value === value ? 'var(--color-primary)' : 'var(--color-gray-800)',
                       }}
                     >
-                      {option.secondary}
+                      {option.label}
                     </div>
-                  )}
-                </div>
-              ))
+                    {option.secondary && (
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--color-gray-500)',
+                          marginTop: '0.125rem',
+                        }}
+                      >
+                        {option.secondary}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {isLoadingMore && (
+                  <div
+                    style={{
+                      padding: '0.75rem 1rem',
+                      textAlign: 'center',
+                      color: 'var(--color-gray-500)',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Loading more...
+                  </div>
+                )}
+                {totalCount !== undefined && !isLoadingMore && (
+                  <div
+                    style={{
+                      padding: '0.5rem 1rem',
+                      textAlign: 'center',
+                      color: 'var(--color-gray-400)',
+                      fontSize: '0.75rem',
+                      borderTop: '1px solid var(--color-gray-100)',
+                    }}
+                  >
+                    Showing {filteredOptions.length} of {totalCount} results
+                    {hasMore && ' • Scroll for more'}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

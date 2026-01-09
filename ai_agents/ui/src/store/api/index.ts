@@ -115,7 +115,8 @@ export type {
 } from './campaignApi';
 export { 
   companyApi, 
-  useGetCompaniesQuery, 
+  useGetCompaniesQuery,
+  useLazyGetCompaniesQuery,
   useGetCompanyDetailsQuery,
   useLazyGetCompanyDetailsQuery,
 } from './companyApi';

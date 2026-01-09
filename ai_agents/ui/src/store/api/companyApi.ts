@@ -118,7 +118,8 @@ export const companyApi = baseApi.injectEndpoints({
 });
 
 export const { 
-  useGetCompaniesQuery, 
+  useGetCompaniesQuery,
+  useLazyGetCompaniesQuery,
   useGetCompanyDetailsQuery,
   useLazyGetCompanyDetailsQuery,
 } = companyApi;
