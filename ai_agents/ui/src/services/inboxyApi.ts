@@ -176,3 +176,4 @@ export function getPriorityColor(priority: RecommendationPriority): string {
   return colors[priority] || '#6b7280';
 }
 
+

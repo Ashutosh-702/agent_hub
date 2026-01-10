@@ -40,7 +40,8 @@ TRIGGER_KEYWORDS = {
     InsightType.COMPETITOR: [
         "sap", "oracle", "salesforce", "hubspot", "shopify", "magento",
         "woocommerce", "bigcommerce", "currently using", "other vendor",
-        "alternative", "compared to", "vs", "versus"
+        "alternative", "compared to", "vs", "versus", "unicommerce",
+        "increff", "vinculum", "manhattan", "lightspeed", "square"
     ],
     InsightType.PRICING_QUESTION: [
         "how much", "what's the cost", "pricing", "price", "budget",
@@ -55,45 +56,97 @@ TRIGGER_KEYWORDS = {
         "send me", "follow up", "schedule", "set up", "book a",
         "i'll", "we'll", "let's", "share with", "get back to"
     ],
+    InsightType.DISCOVERY_QUESTION: [
+        "challenge", "problem", "pain", "struggle", "difficult", "issue",
+        "bottleneck", "frustration", "slow", "manual", "inefficient"
+    ],
+    InsightType.VALUE_PROP: [
+        "benefit", "advantage", "help", "improve", "solve", "achieve",
+        "goal", "objective", "target", "success", "growth", "scale"
+    ],
+    InsightType.PRODUCT_FEATURE: [
+        "feature", "capability", "function", "can it", "does it",
+        "integration", "api", "mobile", "real-time", "automation"
+    ],
 }
 
 
-INSIGHTS_SYSTEM_PROMPT = """You are a real-time sales intelligence assistant. Analyze the live call transcript and provide actionable insights for the sales rep.
+INSIGHTS_SYSTEM_PROMPT = """You are an elite real-time sales coach helping a Fynd sales rep close deals. Your goal is to maximize conversion by providing actionable suggestions based on the live conversation, company research, and product knowledge.
 
-Available context:
-- Company research: {company_research}
-- Product details: {products}
-- Contact persona: {contact}
-- Previous meetings: {previous_meetings}
+## CONTEXT
 
-Generate insights ONLY when you detect significant moments. Each insight must be:
-1. Immediately actionable
-2. Grounded in the transcript (cite specific quote)
-3. Enhanced by the provided context
+**Company Research:**
+{company_research}
 
-Insight types to detect:
-- OBJECTION: Concern, hesitation, or pushback → Provide response framing
-- BUYING_SIGNAL: Interest, urgency, timeline mention → Recommend next question
-- COMPETITOR: Competitor name or comparison → Suggest differentiation points
-- PRICING_QUESTION: Budget/cost discussion → Provide guidance + clarifying prompts
-- PRODUCT_OPPORTUNITY: Feature need matching our product → Suggest mention
-- RISK_FLAG: Confusion, misfit, missing stakeholder → Alert with recommendation
-- ACTION_ITEM: Commitment or to-do mentioned → Capture with owner
+**Products Being Discussed:**
+{products}
 
-Return a JSON object with an "insights" array. Return {"insights": []} if no significant insights detected.
+**Contact Information:**
+{contact}
 
-Example output:
-{
+**Previous Meetings:**
+{previous_meetings}
+
+## YOUR MISSION
+
+Analyze the conversation and provide 1-3 high-impact suggestions that will help the sales rep:
+1. Uncover more pain points (discovery questions)
+2. Connect client needs to Fynd product capabilities (value propositions)
+3. Handle objections effectively (objection responses)
+4. Highlight relevant product features (product features)
+5. Identify buying signals and risks (signals)
+
+## INSIGHT TYPES
+
+- **DISCOVERY_QUESTION**: Suggest a probing question to uncover pain points. Base it on what the client just said + company research. Example: "Ask about their current order cancellation rate since they mentioned inventory issues"
+
+- **VALUE_PROP**: Suggest a value proposition that connects their stated need to Fynd's solution. Use specific product features and case studies. Example: "Highlight how Fynd OMS reduced order cancellations by 40% for similar retailers"
+
+- **OBJECTION**: When you detect hesitation or pushback, provide a response framework. Use evidence from case studies and ROI data. Example: "Address pricing concern with ROI timeline - typical payback in 3-6 months"
+
+- **PRODUCT_FEATURE**: When the client mentions a need, suggest a specific feature to highlight. Be specific about the capability. Example: "Mention real-time inventory sync across 50+ channels"
+
+- **BUYING_SIGNAL**: When you detect interest or urgency, suggest how to capitalize. Recommend next step or closing question. Example: "Strong interest detected - ask about their decision timeline"
+
+- **COMPETITOR**: When a competitor is mentioned, provide differentiation points. Use specific advantages from product knowledge. Example: "Counter Unicommerce mention with native OMS+WMS integration advantage"
+
+- **RISK_FLAG**: Alert to potential deal risks. Identify missing stakeholders, confusion, or misfit signals. Example: "Prospect seems confused about integration - clarify API-first architecture"
+
+- **ACTION_ITEM**: Capture commitments made during the call. Note the owner and deadline if mentioned.
+
+## RULES
+
+1. ALWAYS ground suggestions in the actual conversation (cite what was said)
+2. ALWAYS use specific product features, case studies, or data points when available
+3. Keep message short (max 80 chars) - the suggested_response can be longer
+4. Provide suggested_response with actual words the rep can say
+5. Only generate insights when there's something actionable - quality over quantity
+6. Focus on insights that increase conversion probability
+
+## OUTPUT FORMAT
+
+Return JSON with "insights" array. Return {{"insights": []}} if no actionable insights.
+
+```json
+{{
   "insights": [
-    {
-      "type": "OBJECTION",
-      "message": "Budget concern detected - ROI framing needed",
-      "suggested_response": "I understand budget is a consideration. Companies like yours typically see ROI within 3-6 months through reduced manual work and faster order processing.",
-      "evidence": "We're not sure if we can afford this right now",
+    {{
+      "type": "DISCOVERY_QUESTION",
+      "message": "Probe deeper on inventory challenges mentioned",
+      "suggested_response": "You mentioned inventory discrepancies - what's the impact on your order cancellation rate? Many retailers we work with see 10-15% cancellations from this.",
+      "evidence": "We're struggling with inventory visibility",
+      "confidence": 0.9
+    }},
+    {{
+      "type": "VALUE_PROP", 
+      "message": "Connect their omnichannel goal to Fynd OMS",
+      "suggested_response": "For true omnichannel, you need real-time inventory sync and intelligent order routing. Our OMS handles ship-from-store, BOPIS, and split shipping automatically.",
+      "evidence": "We want to enable buy online pickup in store",
       "confidence": 0.85
-    }
+    }}
   ]
-}
+}}
+```
 """
 
 
@@ -126,8 +179,8 @@ class InsightsEngine:
         self._insight_hashes: set = set()  # For deduplication
         
         # Configuration
-        self.time_trigger_seconds = 30  # Generate insights every 30 seconds
-        self.max_transcript_tokens = 800  # Approximate tokens for recent transcript
+        self.time_trigger_seconds = 20  # Generate insights every 20 seconds
+        self.max_transcript_tokens = 1000  # Approximate tokens for recent transcript
         self.min_confidence_threshold = 0.6
         
     def set_context(self, context: InsightGenerationContext):
@@ -175,6 +228,14 @@ class InsightsEngine:
             True if insights should be generated
         """
         # Time-based trigger
+        # If _last_insight_time is 0, it means no insights have been generated yet
+        # In that case, only generate if we have transcript content
+        if self._last_insight_time == 0:
+            # First generation - only if we have transcript content
+            if self._transcript_buffer:
+                return True
+            return False
+        
         if current_time - self._last_insight_time >= self.time_trigger_seconds:
             return True
         
@@ -272,9 +333,14 @@ Previous Interactions: {', '.join(c.previous_interactions) if c.previous_interac
             List of new insights
         """
         if not self._transcript_buffer:
+            logger.warning("⚠️ No transcript buffer - cannot generate insights")
             return []
         
-        self._last_insight_time = current_time
+        buffer_size = len(self._transcript_buffer)
+        logger.info(f"🔄 GENERATING INSIGHTS - buffer: {buffer_size} entries, last insight time: {self._last_insight_time:.1f}s, current time: {current_time:.1f}s")
+        
+        # Update last insight time AFTER successful generation (moved to end of method)
+        # self._last_insight_time = current_time  # Moved to after API call
         
         # Build the prompt
         context_parts = self._build_prompt_context()
@@ -287,7 +353,15 @@ Previous Interactions: {', '.join(c.previous_interactions) if c.previous_interac
 
 Analyze this conversation and generate any relevant insights. Focus on actionable intelligence that helps the sales rep right now."""
         
+        if not self._openai_client:
+            logger.error("❌ OpenAI client not initialized - cannot generate insights. Check OPENAI_API_KEY environment variable.")
+            return []
+        
         try:
+            logger.debug(f"Calling OpenAI API with {len(self._transcript_buffer)} transcript entries")
+            logger.debug(f"System prompt length: {len(system_prompt)} chars")
+            logger.debug(f"User prompt length: {len(user_prompt)} chars")
+            
             response = await self._openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
@@ -299,8 +373,16 @@ Analyze this conversation and generate any relevant insights. Focus on actionabl
                 max_tokens=1000,
             )
             
+            logger.debug(f"OpenAI API response received: {response.choices[0].message.content[:200]}...")
+            
             result = json.loads(response.choices[0].message.content)
             raw_insights = result.get("insights", [])
+            
+            logger.info(f"📥 OpenAI returned {len(raw_insights)} raw insights")
+            
+            if not raw_insights:
+                logger.warning(f"⚠️ No insights in OpenAI response at {current_time:.1f}s - may be normal if conversation is too short or no actionable items")
+                logger.debug(f"   Transcript buffer size: {len(self._transcript_buffer)}, Last insight time: {self._last_insight_time:.1f}s")
             
             new_insights = []
             for raw in raw_insights:
@@ -318,9 +400,25 @@ Analyze this conversation and generate any relevant insights. Focus on actionabl
                     continue
                 
                 # Create insight object
+                raw_type = raw.get("type", "").lower()
                 try:
-                    insight_type = InsightType(raw.get("type", "").lower())
-                except ValueError:
+                    # Map common variations to enum values
+                    type_mapping = {
+                        "discovery_question": InsightType.DISCOVERY_QUESTION,
+                        "value_prop": InsightType.VALUE_PROP,
+                        "value_proposition": InsightType.VALUE_PROP,
+                        "product_feature": InsightType.PRODUCT_FEATURE,
+                        "objection": InsightType.OBJECTION,
+                        "buying_signal": InsightType.BUYING_SIGNAL,
+                        "competitor": InsightType.COMPETITOR,
+                        "pricing_question": InsightType.PRICING_QUESTION,
+                        "product_opportunity": InsightType.PRODUCT_OPPORTUNITY,
+                        "risk_flag": InsightType.RISK_FLAG,
+                        "action_item": InsightType.ACTION_ITEM,
+                    }
+                    insight_type = type_mapping.get(raw_type, InsightType(raw_type))
+                except (ValueError, KeyError) as e:
+                    logger.warning(f"Unknown insight type '{raw_type}', defaulting to RISK_FLAG: {e}")
                     insight_type = InsightType.RISK_FLAG
                 
                 insight = LiveInsight(
@@ -339,11 +437,20 @@ Analyze this conversation and generate any relevant insights. Focus on actionabl
                 self._generated_insights.append(insight)
                 new_insights.append(insight)
             
-            logger.info(f"Generated {len(new_insights)} new insights")
+            logger.info(f"✅ Generated {len(new_insights)} new insights from {len(raw_insights)} raw insights")
+            
+            if len(new_insights) == 0 and len(raw_insights) > 0:
+                logger.warning(f"⚠️ All {len(raw_insights)} raw insights were filtered out (low confidence, duplicates, or invalid types)")
+            
+            # Update last insight time only after successful generation
+            self._last_insight_time = current_time
+            logger.debug(f"Updated _last_insight_time to {current_time:.1f}s")
+            
             return new_insights
             
         except Exception as e:
-            logger.error(f"Error generating insights: {e}")
+            logger.error(f"❌ Error generating insights: {e}", exc_info=True)
+            # Don't update _last_insight_time on error, so we can retry
             return []
     
     async def generate_post_call_summary(self) -> Dict[str, Any]:

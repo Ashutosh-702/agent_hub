@@ -12,11 +12,27 @@ export interface TranscriptEntry {
 
 export interface Insight {
   id: string;
-  type: 'objection_detected' | 'buying_signal' | 'competitor_mention' | 'pricing_question' |
-        'timeline_question' | 'product_opportunity' | 'next_step_suggestion' | 'risk_flag' |
-        'discovery_opportunity' | 'feature_interest';
+  type: 
+    // Detection types
+    | 'objection' | 'objection_detected' 
+    | 'buying_signal' 
+    | 'competitor' | 'competitor_mention' 
+    | 'pricing_question' | 'timeline_question' 
+    | 'product_opportunity' 
+    | 'next_step_suggestion' 
+    | 'risk_flag' 
+    | 'action_item'
+    // Proactive suggestion types
+    | 'discovery_question' | 'discovery_opportunity' 
+    | 'value_prop' 
+    | 'product_feature' | 'feature_interest';
   message: string;
   suggestedResponse?: string;
+  evidence?: string;
+  evidenceRefs?: {
+    transcript_spans?: string[];
+    research_snippets?: string[];
+  };
   timestamp: number;
   confidence: number;
 }
@@ -167,10 +183,37 @@ export const useMeetingWebSocket = () => {
               });
             }
           } else if (message.type === 'insight') {
+            logger.debug('Received insight message:', message);
             if (message.data) {
+              logger.debug('Adding insight from message.data:', message.data);
               setInsights(prev => [...prev, message.data]);
             } else if (message.insight) {
-              setInsights(prev => [...prev, message.insight]);
+              logger.debug('Adding insight from message.insight:', message.insight);
+              // Ensure the insight has all required fields
+              // Handle both snake_case (backend) and camelCase (frontend) formats
+              const insight: Insight = {
+                id: message.insight.id || `insight-${Date.now()}-${Math.random()}`,
+                type: (message.insight.type || 'discovery_question') as Insight['type'],
+                message: message.insight.message || '',
+                suggestedResponse: message.insight.suggested_response || message.insight.suggestedResponse || '',
+                timestamp: message.insight.timestamp || Date.now() / 1000,
+                confidence: message.insight.confidence || 0.8,
+                evidence: message.insight.evidence || '',
+                evidenceRefs: message.insight.evidence_refs || message.insight.evidenceRefs,
+              };
+              logger.info(`✅ Adding insight: ${insight.type} - ${insight.message.substring(0, 50)}...`);
+              setInsights(prev => {
+                // Check for duplicates by ID
+                if (prev.some(i => i.id === insight.id)) {
+                  logger.debug(`Skipping duplicate insight: ${insight.id}`);
+                  return prev;
+                }
+                const updated = [...prev, insight];
+                logger.info(`📊 Total insights now: ${updated.length}`);
+                return updated;
+              });
+            } else {
+              logger.warn('⚠️ Insight message received but no insight data found:', message);
             }
           } else if (message.type === 'error') {
             const errorMsg = message.data?.message || message.message || 'Unknown error';
