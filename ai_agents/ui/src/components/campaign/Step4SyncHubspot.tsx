@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useCampaignWizard, type Company, type Contact } from './NewCampaignWizard';
 import { useLazyGetContactListMinimalQuery, useLazyGetHubspotSyncCandidatesQuery, useSyncToHubspotMutation, useLazyGetHubspotSyncProgressQuery } from '../../store';
+import { ExportContactsModal } from './ExportContactsModal';
 
 // Feature flag to enable/disable selection functionality
 const ENABLE_SELECTION = false;
@@ -35,6 +36,9 @@ export const Step4SyncHubspot = () => {
   
   // UI Pagination state - to avoid rendering too many items at once
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const campaignId = state.campaignId;
   const [fetchHubspotSyncCandidates] = useLazyGetHubspotSyncCandidatesQuery();
@@ -562,9 +566,31 @@ export const Step4SyncHubspot = () => {
   return (
     <div className="step-container step-sync-hubspot">
       <div className="step-header">
-        <h2>Review & Sync to HubSpot</h2>
-        <p>Review the qualified contacts before syncing to your CRM</p>
+        <div className="step-header-content">
+          <h2>Review & Sync to HubSpot</h2>
+          <p>Review the qualified contacts before syncing to your CRM</p>
+        </div>
+        <button
+          className="btn-secondary export-btn"
+          onClick={() => setShowExportModal(true)}
+          disabled={!campaignId || totalContacts === 0}
+          title="Export contacts to CSV"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Export CSV
+        </button>
       </div>
+
+      {/* Export Modal */}
+      <ExportContactsModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        campaignId={campaignId || ''}
+      />
 
       {/* Sync Progress Bar */}
       {syncProgress && (

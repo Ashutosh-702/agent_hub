@@ -39,4 +39,20 @@ class ContactsDao(BaseMongoDao):
         filters = self._process_query_objectids(filters)
         response, pagination_info = await self.get_paginated_response(filters, page_size=limit, page_number=page, projection=projection)
         return response, pagination_info
+
+    async def get_contacts_by_ids(self, contact_ids: List[str], projection: dict = None) -> List[Dict[str, Any]]:
+        """Fetch multiple contacts by their IDs in bulk"""
+        if not contact_ids:
+            return []
+        
+        if projection is None:
+            projection = {}
+        
+        # Convert string IDs to ObjectId
+        object_ids = [ObjectId(cid) if isinstance(cid, str) else cid for cid in contact_ids]
+        
+        cursor = self.collection.find({"_id": {"$in": object_ids}}, projection)
+        results = await cursor.to_list(length=len(contact_ids))
+        
+        return results
     
