@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 
 from structlog.contextvars import bind_contextvars
 
-from config.loaded_config import loaded_config
+from config.loaded_config import loaded_config, Settings
 from config.logging import logger
 from global_utils.exceptions import ApiException
 from ai_agents.leadgen.schemas.ai_agents import (
@@ -24,11 +24,14 @@ from ai_agents.leadgen.schemas.ai_agents import (
 )
 from ai_agents.leadgen.schemas.contact_models import ContactCampaignMapping, ContactDocument
 from ai_agents.leadgen.utils import serialize_objectid
-from database.collection_dao.campaigns import CampaignsDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.contacts import ContactsDao
-from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
+# Use DAO factory for MongoDB/PostgreSQL support
+from database.factory import (
+    get_campaigns_dao,
+    get_companies_dao,
+    get_contacts_dao,
+    get_campaign_company_runs_dao,
+    get_campaign_contact_runs_dao
+)
 from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import(
     LEADGEN_BATCH_PROCESSING, 
@@ -44,7 +47,10 @@ from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob
 
 class CampaignService:
     def __init__(self):
-        self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        # Use factory to get the appropriate DAO (MongoDB or PostgreSQL based on feature flags)
+        Settings.db_backend_campaigns = "postgres"
+
+        self.campaign_dao = get_campaigns_dao(loaded_config.connection_manager)
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
         self.prospecting_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_PROSPECTING_JOB_PROCESSING]
@@ -94,7 +100,6 @@ class CampaignService:
     async def create_campaign_from_prospecting_job(self, query_params: CreateCampaignFromProspectingJob) -> Dict[str, Any]:
         db_data = self._transform_create_campaign_from_prospecting_job_to_db_data(query_params)
         campaign_id = await self.campaign_dao.create_campaign(db_data)
-
         if not campaign_id:
             raise ApiException("campaign_id not generated")
 
@@ -131,9 +136,9 @@ class CampaignService:
         - If company already exists in DB (by identifiers.source_domain): use existing, skip Kafka
         - Otherwise: create placeholder, emit Kafka for Apollo enrichment
         """
-        # Initialize DAOs
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        # Initialize DAOs using factory (supports both MongoDB and PostgreSQL)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
+        campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
         
         # Check if company already exists by domain
         existing_company = await companies_dao.get_company_by_source_domain(query_params.company_domain)
@@ -561,10 +566,9 @@ class CampaignService:
 
 class CompanyService:
     def __init__(self):
-        self.campaign_company_run_dao = CampaignCompanyRunsDao(
-            loaded_config.connection_manager.mongo_client)
-        self.companies_dao = CompaniesDao(
-            loaded_config.connection_manager.mongo_client)
+        # Use factory to get the appropriate DAOs (MongoDB or PostgreSQL based on feature flags)
+        self.campaign_company_run_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
+        self.companies_dao = get_companies_dao(loaded_config.connection_manager)
 
     async def get_company_mapping_list(self, query_params: CompanyMappingList):
         projection = {
@@ -664,10 +668,9 @@ class CompanyService:
 
 class ContactService:
     def __init__(self):
-        self.campaign_contact_run_dao = CampaignContactRunsDao(
-            loaded_config.connection_manager.mongo_client)
-        self.contacts_dao = ContactsDao(
-            loaded_config.connection_manager.mongo_client)
+        # Use factory to get the appropriate DAOs (MongoDB or PostgreSQL based on feature flags)
+        self.campaign_contact_run_dao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
+        self.contacts_dao = get_contacts_dao(loaded_config.connection_manager)
         self.lusha_api_client = LushaAPIClient()
 
     async def get_campaign_contact_data(self, query_params: CampaignContactData):

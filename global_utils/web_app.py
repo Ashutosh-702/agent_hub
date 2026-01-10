@@ -24,8 +24,11 @@ async def run_on_shutdown():
 
     
 async def initialize_database():
-    loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_sdr")
-    
+    loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, postgres_url=loaded_config.postgres_url, db_name="linkedin_sdr")
+    print(f"🔄 Connecting to PostgreSQL...")
+    print(f"   PostgreSQL: {loaded_config.postgres_url}")
+    await loaded_config.connection_manager.setup_postgres(echo=False)
+    print(f"✅ PostgreSQL connection successful!")
 
 async def eventbridge_producer():
      # Initialize EventBridge producer in connection manager
