@@ -14,11 +14,11 @@ from config.loaded_config import loaded_config
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 
-def get_mongo_client():
-    """Get MongoDB client from loaded config."""
+def get_connection_manager():
+    """Get connection manager from loaded config."""
     if not loaded_config.connection_manager:
         raise HTTPException(status_code=503, detail="Database connection not initialized")
-    return loaded_config.connection_manager.mongo_client
+    return loaded_config.connection_manager
 
 
 @router.post("/register", status_code=201)
@@ -33,7 +33,7 @@ async def register(payload: RegisterRequest):
     - **password**: Password (min 4 chars, must have uppercase, lowercase, number)
     - **name**: Display name (1-100 characters)
     """
-    auth_service = AuthService(get_mongo_client())
+    auth_service = AuthService(get_connection_manager())
     return await auth_service.register(
         email=payload.email,
         password=payload.password,
@@ -52,7 +52,7 @@ async def login(payload: LoginRequest):
     - **email**: Registered email address
     - **password**: User's password
     """
-    auth_service = AuthService(get_mongo_client())
+    auth_service = AuthService(get_connection_manager())
     return await auth_service.login(
         email=payload.email,
         password=payload.password
@@ -92,7 +92,7 @@ async def logout(request: Request):
     
     token = auth_header.split(" ", 1)[1]
     
-    auth_service = AuthService(get_mongo_client())
+    auth_service = AuthService(get_connection_manager())
     return await auth_service.logout(token)
 
 
@@ -110,6 +110,6 @@ async def logout_all_devices(request: Request):
     
     user_id = request.state.user["id"]
     
-    auth_service = AuthService(get_mongo_client())
+    auth_service = AuthService(get_connection_manager())
     return await auth_service.logout_all_devices(user_id)
 

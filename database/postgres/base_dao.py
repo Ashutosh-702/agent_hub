@@ -37,8 +37,8 @@ def generate_objectid() -> str:
     return str(ObjectId())
 
 
-def normalize_value(value: Any) -> Any:
-    """Convert ObjectId and datetime instances to JSON-serializable types.
+def normalize_value_for_jsonb(value: Any) -> Any:
+    """Convert ObjectId and datetime instances to JSON-serializable types for JSONB columns.
     
     Args:
         value: Any value that might be an ObjectId or datetime
@@ -53,18 +53,38 @@ def normalize_value(value: Any) -> Any:
     return value
 
 
+def normalize_value(value: Any) -> Any:
+    """Convert ObjectId instances to strings, but preserve datetime objects.
+    
+    For queries/filters, datetime objects should remain as datetime so PostgreSQL
+    can properly compare them with TIMESTAMP columns.
+    
+    Args:
+        value: Any value that might be an ObjectId
+        
+    Returns:
+        String if ObjectId, otherwise original value (including datetime)
+    """
+    if isinstance(value, ObjectId):
+        return str(value)
+    # DO NOT convert datetime to string - let SQLAlchemy handle it properly
+    return value
+
+
 # Alias for backward compatibility
 normalize_objectid = normalize_value
 
 
 def normalize_document(doc: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively normalize ObjectIds and datetimes in a document.
+    """Recursively normalize ObjectIds in a document for queries.
+    
+    Preserves datetime objects for proper timestamp column comparisons.
     
     Args:
         doc: Document dictionary
         
     Returns:
-        Document with ObjectIds and datetimes converted to strings
+        Document with ObjectIds converted to strings, datetimes preserved
     """
     if not isinstance(doc, dict):
         return normalize_value(doc)
@@ -77,6 +97,29 @@ def normalize_document(doc: Dict[str, Any]) -> Dict[str, Any]:
             result[key] = [normalize_document(item) if isinstance(item, dict) else normalize_value(item) for item in value]
         else:
             result[key] = normalize_value(value)
+    return result
+
+
+def normalize_document_for_jsonb(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively normalize ObjectIds and datetimes for JSONB storage.
+    
+    Args:
+        doc: Document dictionary
+        
+    Returns:
+        Document with ObjectIds and datetimes converted to strings
+    """
+    if not isinstance(doc, dict):
+        return normalize_value_for_jsonb(doc)
+    
+    result = {}
+    for key, value in doc.items():
+        if isinstance(value, dict):
+            result[key] = normalize_document_for_jsonb(value)
+        elif isinstance(value, list):
+            result[key] = [normalize_document_for_jsonb(item) if isinstance(item, dict) else normalize_value_for_jsonb(item) for item in value]
+        else:
+            result[key] = normalize_value_for_jsonb(value)
     return result
 
 
@@ -398,7 +441,6 @@ class BasePostgresDao:
             if op == "$set":
                 for field, value in fields.items():
                     mapped_field = self._map_field(field)
-                    value = normalize_objectid(value)
                     
                     if self._is_jsonb_field(field):
                         jsonb_column = self._get_jsonb_column(field)
@@ -407,13 +449,18 @@ class BasePostgresDao:
                         if jsonb_column not in jsonb_updates:
                             jsonb_updates[jsonb_column] = {}
                         
+                        # Normalize for JSONB (convert datetime to string)
+                        normalized_value = normalize_document_for_jsonb(value) if isinstance(value, dict) else normalize_value_for_jsonb(value)
+                        
                         # If field is a top-level JSONB field, set directly (don't double-nest)
                         if len(path) == 1 and path[0] == jsonb_column:
-                            jsonb_updates[jsonb_column] = value if isinstance(value, dict) else {path[0]: value}
+                            jsonb_updates[jsonb_column] = normalized_value if isinstance(normalized_value, dict) else {path[0]: normalized_value}
                         else:
                             # Set nested path
-                            self._set_nested_value(jsonb_updates[jsonb_column], path, value)
+                            self._set_nested_value(jsonb_updates[jsonb_column], path, normalized_value)
                     else:
+                        # For regular columns, preserve datetime objects
+                        value = normalize_objectid(value)  # Only normalize ObjectId, preserve datetime
                         try:
                             getattr(self.model, mapped_field)
                             values[mapped_field] = value
@@ -422,7 +469,7 @@ class BasePostgresDao:
                             jsonb_column = "metadata_json"
                             if jsonb_column not in jsonb_updates:
                                 jsonb_updates[jsonb_column] = {}
-                            self._set_nested_value(jsonb_updates[jsonb_column], [field], value)
+                            self._set_nested_value(jsonb_updates[jsonb_column], [field], normalize_value_for_jsonb(value))
             
             elif op == "$inc":
                 for field, value in fields.items():
@@ -443,7 +490,7 @@ class BasePostgresDao:
                     # Will be handled specially in update methods
                     if jsonb_column not in jsonb_updates:
                         jsonb_updates[jsonb_column] = {"$push": {}}
-                    jsonb_updates[jsonb_column]["$push"][".".join(path)] = normalize_document(value) if isinstance(value, dict) else normalize_objectid(value)
+                    jsonb_updates[jsonb_column]["$push"][".".join(path)] = normalize_document_for_jsonb(value) if isinstance(value, dict) else normalize_value_for_jsonb(value)
             
             elif op == "$addToSet":
                 # Similar to $push but checks for duplicates
@@ -453,7 +500,7 @@ class BasePostgresDao:
                     
                     if jsonb_column not in jsonb_updates:
                         jsonb_updates[jsonb_column] = {"$addToSet": {}}
-                    jsonb_updates[jsonb_column]["$addToSet"][".".join(path)] = normalize_document(value) if isinstance(value, dict) else normalize_objectid(value)
+                    jsonb_updates[jsonb_column]["$addToSet"][".".join(path)] = normalize_document_for_jsonb(value) if isinstance(value, dict) else normalize_value_for_jsonb(value)
             
             elif op == "$unset":
                 for field, _ in fields.items():
@@ -498,7 +545,7 @@ class BasePostgresDao:
         Returns:
             Inserted document ID
         """
-        # Normalize ObjectIds
+        # Normalize ObjectIds only (preserve datetime for timestamp columns)
         document = normalize_document(document)
         
         # Generate ID if not provided
@@ -521,13 +568,16 @@ class BasePostgresDao:
                 if jsonb_column not in jsonb_data:
                     jsonb_data[jsonb_column] = {}
                 
+                # Normalize value for JSONB (convert datetime to string)
+                normalized_value = normalize_document_for_jsonb(value) if isinstance(value, dict) else normalize_value_for_jsonb(value)
+                
                 # If field is a top-level JSONB field (e.g., "identifiers"), set directly
                 # Otherwise it's a nested path (e.g., "identifiers.name"), use set_nested_value
                 if len(path) == 1 and path[0] == jsonb_column:
                     # Direct assignment to JSONB column - don't double-nest
-                    jsonb_data[jsonb_column] = value if isinstance(value, dict) else {path[0]: value}
+                    jsonb_data[jsonb_column] = normalized_value if isinstance(normalized_value, dict) else {path[0]: normalized_value}
                 else:
-                    self._set_nested_value(jsonb_data[jsonb_column], path, value)
+                    self._set_nested_value(jsonb_data[jsonb_column], path, normalized_value)
             else:
                 try:
                     getattr(self.model, mapped_field)
@@ -537,7 +587,8 @@ class BasePostgresDao:
                     if hasattr(self.model, "metadata_json"):
                         if "metadata_json" not in jsonb_data:
                             jsonb_data["metadata_json"] = {}
-                        jsonb_data["metadata_json"][field] = value
+                        # Normalize for JSONB storage
+                        jsonb_data["metadata_json"][field] = normalize_value_for_jsonb(value)
                     # Otherwise, silently skip unknown fields
         
         # Add JSONB data

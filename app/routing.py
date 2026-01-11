@@ -89,16 +89,15 @@ async def validate_auth_token(request: Request, url_path: str) -> None:
     from ai_agents.auth.service import AuthService
     from config.loaded_config import loaded_config
     
-    # Get mongo client from loaded config
+    # Get connection manager from loaded config
     if not loaded_config.connection_manager:
         raise HTTPException(
             status_code=503, 
             detail="Database connection not initialized"
         )
-    mongo_client = loaded_config.connection_manager.mongo_client
     
-    # Validate token and get user
-    auth_service = AuthService(mongo_client)
+    # Validate token and get user (AuthService uses DAO factory for PostgreSQL support)
+    auth_service = AuthService(loaded_config.connection_manager)
     try:
         user = await auth_service.validate_token_and_get_user(token)
         logger.debug(f"Token validated successfully for user: {user.get('email')}")

@@ -1455,6 +1455,21 @@ The MongoDB to PostgreSQL migration infrastructure is **100% complete and tested
    - Engine pool increased: pool_size 20→30, max_overflow 30→50, pool_recycle 3600→300
    - Files updated: database/postgres/base_dao.py, database/postgres/engine.py
    - Session lifecycle: Every DAO operation now properly acquires, uses, and releases connection
+   
+   Issue 15 - Auth module not using PostgreSQL:
+   - Updated ai_agents/auth/service.py to use DAO factory pattern
+   - Updated ai_agents/auth/routes.py to pass connection_manager instead of mongo_client
+   - Updated app/routing.py token validation to use factory-based AuthService
+   - AuthService.__init__ now accepts connection_manager, uses get_users_dao() and get_user_tokens_dao()
+   
+   Issue 16 - "operator does not exist: timestamp without time zone > character varying":
+   - Root cause: normalize_document() was converting ALL datetime objects to ISO strings
+   - This broke timestamp column comparisons like "expires_at > now"
+   - Fix: Created separate normalization functions:
+     * normalize_value() / normalize_document() - For queries, preserves datetime objects
+     * normalize_value_for_jsonb() / normalize_document_for_jsonb() - For JSONB storage, converts datetime to ISO string
+   - insert_one and _build_update_values updated to use correct normalization per context
+   - Files updated: database/postgres/base_dao.py
 ```
 
 The migration was designed to minimize risk while providing a clear path to full PostgreSQL adoption.
@@ -1482,6 +1497,7 @@ The migration was designed to minimize risk while providing a clear path to full
 | Pagination returning duplicate/missing records | No stable sort order without `ORDER BY` | Fixed by adding `sl_no` BIGINT column to all tables and using it for default sorting |
 | Pagination slow on large datasets | String-based `id` sorting is slower than integer | Fixed by using `sl_no` (indexed BIGINT) for sorting instead of `created_at + id` |
 | `null value in column "sl_no" violates not-null constraint` | sl_no included in INSERT statement instead of auto-generated | Fixed in `base_dao.py` - `insert_one` now removes sl_no from data, letting PostgreSQL sequence generate it |
+| `operator does not exist: timestamp without time zone > character varying` | datetime converted to string for timestamp column comparison | Fixed in `base_dao.py` - separate normalization functions: `normalize_document` preserves datetime for queries, `normalize_document_for_jsonb` converts to string for JSONB storage |
 
 ### Verifying PostgreSQL Connection
 

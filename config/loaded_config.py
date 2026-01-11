@@ -53,20 +53,18 @@ class Settings:
         "POSTGRES_URL",
         os.getenv("DATABASE_URL", "postgresql+asyncpg://agent_hub:agent_hub@localhost:5432/agent_hub")
     )
-    
-    # Per-collection database backend selection
-    # Valid values: "mongo" (default) or "postgres"
-    db_backend_users = os.getenv("DB_BACKEND_USERS", "mongo")
-    db_backend_user_tokens = os.getenv("DB_BACKEND_USER_TOKENS", "mongo")
-    db_backend_campaigns = os.getenv("DB_BACKEND_CAMPAIGNS", "mongo")
-    db_backend_companies = os.getenv("DB_BACKEND_COMPANIES", "mongo")
-    db_backend_contacts = os.getenv("DB_BACKEND_CONTACTS", "mongo")
-    db_backend_campaign_company_runs = os.getenv("DB_BACKEND_CAMPAIGN_COMPANY_RUNS", "mongo")
-    db_backend_campaign_contact_runs = os.getenv("DB_BACKEND_CAMPAIGN_CONTACT_RUNS", "mongo")
-    db_backend_meetings = os.getenv("DB_BACKEND_MEETINGS", "mongo")
-    db_backend_inbox_leads = os.getenv("DB_BACKEND_INBOX_LEADS", "mongo")
-    db_backend_inbox_events = os.getenv("DB_BACKEND_INBOX_EVENTS", "mongo")
-    db_backend_inbox_notes = os.getenv("DB_BACKEND_INBOX_NOTES", "mongo")
+    db_type = os.getenv("DB_TYPE", "mongo")
+    db_backend_users = os.getenv("DB_BACKEND_USERS", db_type)
+    db_backend_user_tokens = os.getenv("DB_BACKEND_USER_TOKENS", db_type)
+    db_backend_campaigns = os.getenv("DB_BACKEND_CAMPAIGNS", db_type)
+    db_backend_companies = os.getenv("DB_BACKEND_COMPANIES", db_type)
+    db_backend_contacts = os.getenv("DB_BACKEND_CONTACTS", db_type)
+    db_backend_campaign_company_runs = os.getenv("DB_BACKEND_CAMPAIGN_COMPANY_RUNS", db_type)
+    db_backend_campaign_contact_runs = os.getenv("DB_BACKEND_CAMPAIGN_CONTACT_RUNS", db_type)
+    db_backend_meetings = os.getenv("DB_BACKEND_MEETINGS", db_type)
+    db_backend_inbox_leads = os.getenv("DB_BACKEND_INBOX_LEADS", db_type)
+    db_backend_inbox_events = os.getenv("DB_BACKEND_INBOX_EVENTS", db_type)
+    db_backend_inbox_notes = os.getenv("DB_BACKEND_INBOX_NOTES", db_type)
     
     @classmethod
     def use_postgres(cls, collection: str) -> bool:
