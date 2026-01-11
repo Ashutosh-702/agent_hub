@@ -1,0 +1,35 @@
+{
+  "ai_pim": {
+    "product_id": "ai_pim",
+    "name": "Fynd AI PIM",
+    "url": "https://www.fynd.com/solutions/ai-pim",
+    "category": "AI Tools",
+    "subcategory": "Catalog Management",
+    "tagline": "Enrich, manage and scale product catalog with AI",
+    "description": "Save time and effort with automated, high-quality catalog management so you never lose a sale to bad data",
+    "key_features": [],
+    "benefits": [
+      "Extensions marketplace",
+      "Order management system",
+      "Warehouse management system",
+      "Carrier management system",
+      "Fleet management system"
+    ],
+    "target_industries": [
+      "Retail",
+      "Fashion",
+      "D2C",
+      "B2B",
+      "Ecommerce",
+      "E-Commerce",
+      "Quick Commerce",
+      "Hyperlocal",
+      "Manufacturing"
+    ],
+    "customer_logos": [],
+    "case_studies": [],
+    "differentiators": [],
+    "faq": [],
+    "common_objections": {},
+    "scraped_at": "2026-01-05T19:34:44.755038+00:00",
+    "updated_at": 

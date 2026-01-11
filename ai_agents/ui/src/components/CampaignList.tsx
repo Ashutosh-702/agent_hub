@@ -4,6 +4,7 @@ import { useGetCampaignsQuery } from '../store';
 import { DataTable, EmptyState, ErrorBanner, Loader, PageHeader, Pagination } from './shared';
 import type { DataTableColumn } from './shared';
 import type { Campaign } from '../store';
+import { ExportContactsModal } from './campaign/ExportContactsModal';
 
 type WizardStepId = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -72,6 +73,11 @@ export const CampaignList = () => {
   const [searchName, setSearchName] = useState('');
   const [searchInput, setSearchInput] = useState(''); // Local input state for debouncing
   const limit = 10;
+  
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportCampaignId, setExportCampaignId] = useState('');
+  const [exportCampaignName, setExportCampaignName] = useState('');
 
   // Debounce search input
   React.useEffect(() => {
@@ -140,6 +146,12 @@ export const CampaignList = () => {
 
   const openDetails = (campaignId: string) => {
     navigate(`/campaign/${campaignId}`);
+  };
+
+  const openExportModal = (campaignId: string, campaignName: string) => {
+    setExportCampaignId(campaignId);
+    setExportCampaignName(campaignName);
+    setShowExportModal(true);
   };
 
   // Truncate ID to first 4 characters with full ID on hover
@@ -263,6 +275,21 @@ export const CampaignList = () => {
             </svg>
           </button>
           <button
+            className="action-btn"
+            title="Export Contacts CSV"
+            aria-label="Export contacts to CSV"
+            onClick={(e) => {
+              e.stopPropagation();
+              openExportModal(row.campaign._id, row.campaign.name || 'Unnamed Campaign');
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          </button>
+          <button
             className="action-btn action-btn-primary"
             title="Resume Wizard"
             aria-label="Resume campaign wizard"
@@ -282,6 +309,14 @@ export const CampaignList = () => {
 
   return (
     <div className="campaign-list-container">
+      {/* Export Modal */}
+      <ExportContactsModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        campaignId={exportCampaignId}
+        campaignName={exportCampaignName}
+      />
+
       <div className="campaign-list-card">
         {/* Header */}
         <div className="campaign-list-header">

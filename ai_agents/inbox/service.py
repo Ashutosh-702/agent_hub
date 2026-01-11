@@ -639,3 +639,4 @@ def get_inbox_service() -> InboxService:
         _inbox_service = InboxService()
     return _inbox_service
 
+

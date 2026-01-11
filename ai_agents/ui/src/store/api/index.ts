@@ -66,6 +66,9 @@ export {
   useLazyGetEnrollmentContactsQuery,
   useEnrollContactsToSequenceMutation,
   useGetLemlistCampaignsQuery,
+  // Export Contacts APIs
+  useGetExportContactsMetadataQuery,
+  useLazyGetExportContactsMetadataQuery,
 } from './campaignApi';
 export type { 
   Campaign, 
@@ -112,6 +115,9 @@ export type {
   CampaignCompany,
   CampaignDetailsResponse,
   GetCampaignDetailsParams,
+  // Export Contacts API types
+  ExportContactsMetadataResponse,
+  GetExportContactsMetadataParams,
 } from './campaignApi';
 export { 
   companyApi, 

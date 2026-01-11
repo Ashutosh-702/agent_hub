@@ -45,6 +45,7 @@ from ai_agents.leadgen.helper.ai_agents_helper import LushaContactEnrichmentHelp
 from ai_agents.leadgen.helper.ai_agents_helper import ApolloContactEnrichmentHelper
 from ai_agents.leadgen.helper.ai_agents_helper import CampaignsHelper
 from ai_agents.leadgen.helper.ai_agents_helper import CompaniesHelper
+from ai_agents.leadgen.helper.ai_agents_helper import ExportContactsHelper
 async def upload_leadgen_form(
     request_data: FormSubmission = Body(),
 ) -> Dict[str, Any]:
@@ -670,3 +671,55 @@ async def webhook_for_personalization(query_params: Dict[str, Any] = Body()) -> 
     response_data.data = response
 
     return response_data.dict()
+
+
+async def get_export_contacts_metadata(campaign_id: str) -> Dict[str, Any]:
+    """Get metadata for contacts export (total count, page info)"""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    export_helper = ExportContactsHelper()
+
+    response = await export_helper.get_export_metadata(campaign_id)
+    response_data.success = True
+    response_data.data = response
+
+    return response_data.dict()
+
+
+async def export_contacts_csv(campaign_id: str, page: int = 1, limit: int = 500):
+    """Export campaign contacts as CSV file"""
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+    
+    export_helper = ExportContactsHelper()
+    
+    # Get export data
+    csv_rows = await export_helper.generate_export_data(campaign_id, page=page, limit=limit)
+    
+    # Generate CSV
+    output = io.StringIO()
+    fieldnames = ["sl_no", "company_name", "company_industry", "contact_name", "email", "jobtitle", "linkedin_url", "country", "city"]
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    
+    writer.writeheader()
+    for row in csv_rows:
+        writer.writerow(row)
+    
+    # Get string value and encode to bytes
+    csv_content = output.getvalue()
+    output.close()
+    
+    # Create streaming response
+    def generate():
+        yield csv_content.encode('utf-8')
+    
+    filename = f"contacts_export_campaign_{campaign_id}_page_{page}.csv"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Type": "text/csv; charset=utf-8"
+        }
+    )

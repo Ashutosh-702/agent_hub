@@ -47,6 +47,8 @@ from ai_agents.leadgen.views.ai_agents import (
     webhook_from_deepsearch_research,
     webhook_for_legal_name_and_other_entities,
     webhook_for_personalization,
+    get_export_contacts_metadata,
+    export_contacts_csv,
 )
 
 router = APIRouter(tags=["AI Agents"], route_class=CustomRequestRoute)
@@ -366,4 +368,19 @@ router.add_api_route(
     methods=["POST"],
     endpoint=webhook_for_personalization,
     response_model=ResponseData,
+)
+
+# ============ CONTACTS EXPORT ROUTES ============
+
+router.add_api_route(
+    "/export_contacts_metadata",
+    methods=["GET"],
+    endpoint=get_export_contacts_metadata,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/export_contacts_csv",
+    methods=["GET"],
+    endpoint=export_contacts_csv,
 )

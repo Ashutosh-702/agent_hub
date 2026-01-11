@@ -6,7 +6,7 @@ from typing import Callable
 import orjson
 from fastapi import Request, Response
 from fastapi.exceptions import HTTPException, RequestValidationError, ResponseValidationError
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import ORJSONResponse, StreamingResponse
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_500_INTERNAL_SERVER_ERROR
@@ -31,6 +31,9 @@ PUBLIC_ROUTES = [
     "/api/v1/webhook_from_deepsearch_research",
     "/api/v1/webhook_for_legal_name_and_other_entities",
     "/api/v1/webhook_for_personalization",
+    # Export endpoints (direct browser download)
+    "/api/v1/export_contacts_csv",
+    "/api/v1/export_contacts_metadata",
 ]
 
 # Route prefixes that are public (e.g., static files, websockets)
@@ -129,6 +132,13 @@ class CustomRequestRoute(APIRoute):
                 response: Response = await original_route_handler(request)
                 end_time = time.perf_counter()
                 request_data['request_duration'] = end_time - start_time
+                
+                # Handle StreamingResponse differently - it doesn't have .body attribute
+                if isinstance(response, StreamingResponse):
+                    logger.info(f"HTTP streaming request for {request_data['url_path']} with method {request.method}",
+                                request_data=request_data, response_data={'status_code': response.status_code, 'body': 'streaming'})
+                    return response
+                
                 response_data = {
                     'status_code': response.status_code,
                     'body': orjson.loads(response.body.decode('utf-8'))

@@ -89,8 +89,16 @@ class ConnectionManager:
         # Close EventBridge
         if self.event_emitter and hasattr(self.event_emitter, 'event_emitter') and hasattr(self.event_emitter.event_emitter, 'kafka_producer'):
             try:
-                await self.event_emitter.event_emitter.kafka_producer.stop_producer()
-                print("✅ EventBridge Producer closed")
+                if hasattr(self.event_emitter, 'event_emitter') and self.event_emitter.event_emitter:
+                    if hasattr(self.event_emitter.event_emitter, 'kafka_producer') and self.event_emitter.event_emitter.kafka_producer:
+                        await self.event_emitter.event_emitter.kafka_producer.stop_producer()
+                        print("✅ EventBridge Producer closed")
+                    else:
+                        print("⚠️ EventBridge Producer kafka_producer not initialized, skipping close")
+                else:
+                    print("⚠️ EventBridge Producer event_emitter not initialized, skipping close")
+            except AttributeError as e:
+                print(f"⚠️ EventBridge Producer structure unexpected: {e}")
             except Exception as e:
                 print(f"❌ Error closing EventBridge Producer: {e}")
                 

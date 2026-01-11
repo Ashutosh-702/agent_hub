@@ -373,3 +373,4 @@ def get_metrics_service() -> InboxMetricsService:
         _metrics_service = InboxMetricsService()
     return _metrics_service
 
+

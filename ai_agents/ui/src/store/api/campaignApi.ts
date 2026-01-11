@@ -599,6 +599,22 @@ export interface GetCompanyListMinimalResponse {
   errors: string[];
 }
 
+// ============ EXPORT CONTACTS TYPES ============
+
+export interface ExportContactsMetadataResponse {
+  success: boolean;
+  data: {
+    total_count: number;
+    total_pages: number;
+    per_page: number;
+  };
+  errors?: string[];
+}
+
+export interface GetExportContactsMetadataParams {
+  campaign_id: string;
+}
+
 export const campaignApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getCampaigns: builder.query<CampaignsResponse, GetCampaignsParams>({
@@ -1115,6 +1131,17 @@ export const campaignApi = baseApi.injectEndpoints({
       providesTags: ['Campaign'],
     }),
 
+    // ============ EXPORT CONTACTS ENDPOINTS ============
+
+    // Get export metadata (total count, page info)
+    getExportContactsMetadata: builder.query<ExportContactsMetadataResponse, GetExportContactsMetadataParams>({
+      query: ({ campaign_id }) => ({
+        url: `/api/v1/export_contacts_metadata?campaign_id=${campaign_id}`,
+        method: 'GET',
+      }),
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
     // Enroll contacts to a Lemlist sequence
     enrollContactsToSequence: builder.mutation<
       {
@@ -1207,4 +1234,7 @@ export const {
   useLazyGetEnrollmentContactsQuery,
   useEnrollContactsToSequenceMutation,
   useGetLemlistCampaignsQuery,
+  // Export Contacts APIs
+  useGetExportContactsMetadataQuery,
+  useLazyGetExportContactsMetadataQuery,
 } = campaignApi;

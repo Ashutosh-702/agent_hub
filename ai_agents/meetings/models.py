@@ -24,6 +24,7 @@ class CallType(str, Enum):
 
 class InsightType(str, Enum):
     """Types of live insights that can be detected."""
+    # Detection types
     OBJECTION = "objection"
     BUYING_SIGNAL = "buying_signal"
     COMPETITOR = "competitor"
@@ -31,6 +32,10 @@ class InsightType(str, Enum):
     PRODUCT_OPPORTUNITY = "product_opportunity"
     RISK_FLAG = "risk_flag"
     ACTION_ITEM = "action_item"
+    # Proactive suggestion types
+    DISCOVERY_QUESTION = "discovery_question"
+    VALUE_PROP = "value_prop"
+    PRODUCT_FEATURE = "product_feature"
 
 
 class RelationshipStatus(str, Enum):

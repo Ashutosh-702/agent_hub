@@ -4,6 +4,7 @@ from structlog.contextvars import bind_contextvars
 from config.logging import logger
 from config.loaded_config import loaded_config, Settings
 from database.connection_manager import ConnectionManager
+from scheduler import start_scheduler, stop_scheduler
 
 
 async def run_on_startup():
@@ -12,12 +13,15 @@ async def run_on_startup():
     await initialize_database()
     await eventbridge_producer()
     await http_session()
+    await start_scheduler()
    
     logger.info("✅ Database and EventBridge connected successfully")
     logger.info("✅ HTTP session initialized")
+    logger.info("✅ Background scheduler started")
 
 
 async def run_on_shutdown():
+    await stop_scheduler()
     await close_database()
     await close_http_session()
     logger.info("✅ Database and session disconnected successfully")
