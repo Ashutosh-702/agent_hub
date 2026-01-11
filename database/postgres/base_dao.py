@@ -464,7 +464,13 @@ class BasePostgresDao:
                             # Set nested path - strip the JSONB column name from path if it's the first element
                             # e.g., "prospecting_cycle.company_qualification_ai.status" should become
                             # ["company_qualification_ai", "status"] not ["prospecting_cycle", "company_qualification_ai", "status"]
-                            nested_path = path[1:] if path[0] == jsonb_column else path
+                            # Also handle case where MongoDB field name differs from PostgreSQL column name
+                            # e.g., "metadata.raw_data" where metadata -> metadata_json
+                            should_strip = (
+                                path[0] == jsonb_column or  # Direct match: prospecting_cycle == prospecting_cycle
+                                self.JSONB_FIELDS.get(path[0]) == jsonb_column  # Mapped match: metadata -> metadata_json
+                            )
+                            nested_path = path[1:] if should_strip else path
                             self._set_nested_value(jsonb_updates[jsonb_column], nested_path, normalized_value)
                     else:
                         # For regular columns, preserve datetime objects

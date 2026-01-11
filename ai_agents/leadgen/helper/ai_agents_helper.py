@@ -1509,8 +1509,9 @@ class ExportContactsHelper:
     """Helper class for exporting contacts to CSV"""
 
     def __init__(self):
-        self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
-        self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access
+        self.campaign_contact_runs_dao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
+        self.contacts_dao = get_contacts_dao(loaded_config.connection_manager)
 
     async def get_export_metadata(self, campaign_id: str) -> dict:
         """Get metadata for export (total count, page info)"""

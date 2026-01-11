@@ -149,4 +149,48 @@ class PostgresCampaignContactRunsDao(BasePostgresDao):
             query, page_size=limit, page_number=page, sort_by=sort_by, projection=projection
         )
 
+    async def get_exportable_contacts_count(self, campaign_id: str) -> int:
+        """Get total count of contacts eligible for export (is_relevant=True, enrichment_status=True)
+        
+        Args:
+            campaign_id: Campaign ID
+            
+        Returns:
+            Count of exportable contacts
+        """
+        query = {
+            "campaign_id": campaign_id,
+            "is_relevant": True,
+            "enrichment_status": True
+        }
+        query = self._process_query_objectids(query)
+        return await self.count(query)
+
+    async def get_exportable_contact_ids(
+        self, 
+        campaign_id: str, 
+        page: int = 1, 
+        limit: int = 500
+    ) -> list:
+        """Get contact runs for export with pagination (is_relevant=True, enrichment_status=True)
+        
+        Args:
+            campaign_id: Campaign ID
+            page: Page number
+            limit: Items per page
+            
+        Returns:
+            List of contact run documents
+        """
+        query = {
+            "campaign_id": campaign_id,
+            "is_relevant": True,
+            "enrichment_status": True
+        }
+        query = self._process_query_objectids(query)
+        
+        skip = (page - 1) * limit
+        
+        return await self.find_many(query, skip=skip, limit=limit)
+
 

@@ -191,4 +191,21 @@ class PostgresContactsDao(BasePostgresDao):
         filters = self._process_query_objectids(filters)
         return await self.get_paginated_response(filters, page_size=limit, page_number=page, projection=projection)
 
+    async def get_contacts_by_ids(self, contact_ids: list, projection: dict = None) -> list:
+        """Fetch multiple contacts by their IDs in bulk.
+        
+        Args:
+            contact_ids: List of contact IDs
+            projection: Fields to include/exclude
+            
+        Returns:
+            List of contact documents
+        """
+        if not contact_ids:
+            return []
+        
+        # Use $in query to fetch all at once
+        query = {"_id": {"$in": contact_ids}}
+        return await self.find_many(query)
+
 
