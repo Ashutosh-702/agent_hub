@@ -231,6 +231,7 @@ class ConnectionManager:
 - `alembic/versions/20260111_111719_make_status_columns_nullable.py` - Make status columns nullable
 - `alembic/versions/20260111_114703_make_companies_columns_nullable.py` - Make companies columns nullable
 - `alembic/versions/20260111_115000_make_contacts_columns_nullable.py` - Make contacts columns nullable
+- `alembic/versions/20260111_135339_add_sl_no_serial_column_for_pagination.py` - Add `sl_no` for pagination
 
 The initial migration creates all 11 tables with:
 - Proper column types and constraints
@@ -868,6 +869,9 @@ export DB_BACKEND_CAMPAIGNS=postgres
 - [x] Test Kafka handlers with PostgreSQL backend ✅
 - [x] Update AI qualification modules for PostgreSQL ✅
 - [x] Fix `is_relevant` nullable issue for `$exists` queries ✅
+- [x] Fix `prospecting_cycle` JSONB not updating on dot notation updates ✅
+- [x] Add `sl_no` column for efficient pagination on 1M+ rows ✅
+- [x] Update base_dao to use `sl_no` for default sorting ✅
 - [ ] Data migration from MongoDB (if switching fully)
 - [ ] Performance benchmarking between MongoDB and PostgreSQL
 - [ ] Update deployment documentation
@@ -1050,6 +1054,246 @@ ALTER TABLE contacts ALTER COLUMN enrichment_status DROP NOT NULL;
 ALTER TABLE contacts ALTER COLUMN is_relevant DROP NOT NULL;
 ```
 
+### Issue 9: `update_campaign` Not Supporting Dot Notation ✅ Fixed
+
+**Problem**: The `update_campaign` method in PostgresCampaignsDao was not handling dot notation paths like `{"prospecting_cycle.status": "company_qualification_select"}`.
+
+**Error Context**: In `integration_orchestrator.py`:
+```python
+await self.campaigns_dao.update_campaign(self.campaign_id, {"prospecting_cycle.status": "company_qualification_select"})
+```
+
+**Cause**: The method only checked for nested dict format (`{"prospecting_cycle": {"status": "..."}}`) but not dot notation.
+
+**Solution**: Updated `database/postgres/collection_dao/campaigns.py` to handle both formats:
+
+```python
+async def update_campaign(self, campaign_id: str, update_data: dict) -> int:
+    # Support nested dict format: {"lifecycle": {"status": "value"}}
+    if "lifecycle" in update_data and isinstance(update_data["lifecycle"], dict):
+        update_data["lifecycle_status"] = update_data["lifecycle"]["status"]
+    if "prospecting_cycle" in update_data and isinstance(update_data["prospecting_cycle"], dict):
+        update_data["prospecting_status"] = update_data["prospecting_cycle"]["status"]
+    
+    # Support dot notation format: {"prospecting_cycle.status": "value"}
+    if "lifecycle.status" in update_data:
+        update_data["lifecycle_status"] = update_data["lifecycle.status"]
+    if "prospecting_cycle.status" in update_data:
+        update_data["prospecting_status"] = update_data["prospecting_cycle.status"]
+    
+    return await self.update_one({"_id": campaign_id}, {"$set": update_data})
+```
+
+### Issue 10: Connection Pool Leak Warning ✅ Fixed
+
+**Problem**: Sessions were not being returned to the connection pool, causing garbage collector warnings:
+```
+The garbage collector is trying to clean up non-checked-in connection...
+Please ensure that SQLAlchemy pooled connections are returned to the pool explicitly
+```
+
+**Cause**: DAOs held sessions for their entire lifetime, committed operations but never closed sessions.
+
+**Solution**: 
+
+1. **Updated `database/postgres/base_dao.py`**:
+   - Sessions are now closed after each commit
+   - Session factory is stored for creating fresh sessions
+   - Each operation: commit → close → get fresh session
+
+```python
+def __init__(self, session: AsyncSession):
+    self._session = session
+    self._session_factory = None  # Set by factory
+    self._auto_commit = True
+
+def set_session_factory(self, factory):
+    """Set the session factory for creating new sessions."""
+    self._session_factory = factory
+
+# In each CRUD method:
+if self._auto_commit:
+    await self._session.commit()
+    await self._session.close()
+    if self._session_factory:
+        self._session = self._session_factory()
+```
+
+2. **Updated `database/factory.py`**:
+   - All DAO factory functions now pass session factory to DAOs
+
+```python
+def get_campaigns_dao(connection_manager):
+    if Settings.use_postgres("campaigns"):
+        session = connection_manager.get_pg_session()
+        dao = PostgresCampaignsDao(session)
+        if connection_manager.postgres_engine:
+            dao.set_session_factory(connection_manager.postgres_engine.get_session)
+        return dao
+```
+
+**Result**: Connections are properly returned to the pool after each operation, eliminating the garbage collector warning.
+
+### Issue 11: `prospecting_cycle` JSONB Not Updating ✅ Fixed
+
+**Problem**: When updating campaign with `{"prospecting_cycle.status": "value"}`, only the `prospecting_status` column was updated, but the `prospecting_cycle` JSONB field was not updated.
+
+**Error Context**: In DBeaver, after update:
+- `prospecting_status` column = `"company_qualification_select"` ✅
+- `prospecting_cycle` JSONB = `{"status": "prospecting"}` ❌ (old value)
+
+**Cause**: The `_is_jsonb_field` method returned `False` for `prospecting_cycle.status` because it was in `COLUMN_MAP`, so the base_dao only updated the column, not the JSONB.
+
+**Solution**: Updated `database/postgres/collection_dao/campaigns.py` to convert dot notation to nested dict for proper JSONB merge:
+
+```python
+async def update_campaign(self, campaign_id: str, update_data: dict) -> int:
+    # Convert dot notation to nested dict for JSONB merge while also setting the column
+    if "prospecting_cycle.status" in update_data:
+        status_value = update_data.pop("prospecting_cycle.status")
+        update_data["prospecting_status"] = status_value  # Update column
+        # Merge into prospecting_cycle JSONB field
+        if "prospecting_cycle" not in update_data:
+            update_data["prospecting_cycle"] = {}
+        update_data["prospecting_cycle"]["status"] = status_value  # Update JSONB
+    
+    return await self.update_one({"_id": campaign_id}, {"$set": update_data})
+```
+
+**Result**: Both column AND JSONB are now updated:
+- `prospecting_status` = `"company_qualification_select"` ✅
+- `prospecting_cycle` = `{"status": "company_qualification_select"}` ✅ (merged with existing data)
+
+### Issue 12: Other DAOs with Dot Notation Column Mapping ✅ Fixed
+
+**Problem**: Other DAOs (companies, contacts, inbox_leads) also had dot notation fields in COLUMN_MAP that needed to update both columns AND JSONB for data consistency.
+
+### Issue 13: Pagination Not Working Without Incremental Key ✅ Fixed
+
+**Problem**: Pagination was inconsistent because PostgreSQL doesn't guarantee row order without `ORDER BY`. Records could appear on multiple pages or be skipped.
+
+**User Request**: Add `sl_no` (serial number) column to all tables for optimal pagination on 1M+ rows.
+
+**Solution**:
+
+1. **Added `sl_no` column to all 11 tables** (`database/postgres/models.py`):
+   - Type: `BIGINT` with auto-increment sequence
+   - Constraints: `NOT NULL`, `UNIQUE`, `INDEXED`
+   - Purpose: Provides stable ordering for pagination
+
+2. **Created Alembic migration** (`add_sl_no_pagination`):
+   - Created sequences for each table
+   - Added columns with auto-increment defaults
+   - Added unique constraints and indexes
+
+3. **Updated `base_dao.py` for default sorting**:
+
+```python
+# In find_many() and get_paginated_response()
+if not sort_by:
+    # Default sorting for stable pagination
+    if hasattr(self.model, 'sl_no'):
+        stmt = stmt.order_by(self.model.sl_no.asc())
+    elif hasattr(self.model, 'created_at'):
+        stmt = stmt.order_by(self.model.created_at.desc())
+```
+
+**Tables Updated**:
+
+| Table | sl_no Column | Index | Unique |
+|-------|-------------|-------|--------|
+| users | ✅ BIGINT | ✅ ix_users_sl_no | ✅ uq_users_sl_no |
+| user_tokens | ✅ BIGINT | ✅ ix_user_tokens_sl_no | ✅ uq_user_tokens_sl_no |
+| campaigns | ✅ BIGINT | ✅ ix_campaigns_sl_no | ✅ uq_campaigns_sl_no |
+| companies | ✅ BIGINT | ✅ ix_companies_sl_no | ✅ uq_companies_sl_no |
+| contacts | ✅ BIGINT | ✅ ix_contacts_sl_no | ✅ uq_contacts_sl_no |
+| campaign_company_runs | ✅ BIGINT | ✅ ix_campaign_company_runs_sl_no | ✅ uq_campaign_company_runs_sl_no |
+| campaign_contact_runs | ✅ BIGINT | ✅ ix_campaign_contact_runs_sl_no | ✅ uq_campaign_contact_runs_sl_no |
+| meetings | ✅ BIGINT | ✅ ix_meetings_sl_no | ✅ uq_meetings_sl_no |
+| inbox_leads | ✅ BIGINT | ✅ ix_inbox_leads_sl_no | ✅ uq_inbox_leads_sl_no |
+| inbox_events | ✅ BIGINT | ✅ ix_inbox_events_sl_no | ✅ uq_inbox_events_sl_no |
+| inbox_notes | ✅ BIGINT | ✅ ix_inbox_notes_sl_no | ✅ uq_inbox_notes_sl_no |
+
+**Migration Command**:
+```bash
+POSTGRES_URL="postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub" alembic upgrade head
+```
+
+**Performance Benefit** (for 1M+ rows):
+```sql
+-- Before: Uses created_at + id (slower, string comparison)
+SELECT * FROM contacts ORDER BY created_at DESC, id ASC LIMIT 10 OFFSET 10000
+
+-- After: Uses sl_no (faster, integer comparison, single index)
+SELECT * FROM contacts ORDER BY sl_no ASC LIMIT 10 OFFSET 10000
+```
+
+**Affected DAOs and Fields**:
+
+| DAO | Dot Notation Field | Column | JSONB |
+|-----|-------------------|--------|-------|
+| `companies` | `identifiers.name` | `name` | `identifiers.name` |
+| `companies` | `identifiers.source_id` | `source_id` | `identifiers.source_id` |
+| `companies` | `identifiers.source_domain` | `source_domain` | `identifiers.source_domain` |
+| `companies` | `profile.industry` | `industry` | `profile.industry` |
+| `contacts` | `contact_data.email` | `email` | `contact_data.email` |
+| `contacts` | `contact_data.firstname` | `firstname` | `contact_data.firstname` |
+| `inbox_leads` | `owner.email` | `owner_email` | Already handled |
+| `inbox_leads` | `last_touch.at` | `last_touch_at` | Already handled |
+
+**Solution**:
+
+1. **companies.py** - Updated `update_company` to:
+   - Extract dot notation fields
+   - Update both the column (for indexed queries)
+   - Merge into JSONB (for data consistency on reads)
+
+```python
+async def update_company(self, company_id: str, update_data: Dict[str, Any]) -> int:
+    # Handle dot notation like "identifiers.source_id"
+    if "identifiers.source_id" in set_data:
+        set_data["source_id"] = set_data["identifiers.source_id"]
+        identifiers_updates["source_id"] = set_data.pop("identifiers.source_id")
+    
+    # Merge JSONB updates with current data
+    if identifiers_updates:
+        current = await self.find_one({"_id": company_id})
+        current_identifiers = current.get("identifiers", {}) or {}
+        current_identifiers.update(identifiers_updates)
+        set_data["identifiers"] = current_identifiers
+```
+
+2. **contacts.py** - Already had proper handling in `update_contact` method
+
+3. **inbox_events.py** - `update_last_touch` already handled both updates
+
+### Verification Test (January 11, 2026) ✅
+
+Ran end-to-end test of `create_campaign_from_prospecting_job` API:
+
+```bash
+curl --location 'http://0.0.0.0/api/v1/create_campaign_from_prospecting_job' \
+--header 'authorization: Bearer <token>' \
+--data '{
+  "campaign_name":"test_session_fix_1768115505",
+  "industry": "E-commerce & Retail",
+  "employee_count": "11-50,51-200",
+  ...
+}'
+```
+
+**Results**:
+| Check | Result |
+|-------|--------|
+| API Response | ✅ `{"success":true,"campaign_id":"69634d31a03dea964bd0a0e3"}` |
+| Kafka Event | ✅ Produced to `leadgen_prospecting_job_processing` |
+| Consumer Processing | ✅ `Status: SUCCESS :: Latency: 1.42s` |
+| PostgreSQL Init | ✅ `PostgreSQL connection initialized for consumer` |
+| Companies Inserted | ✅ 10 companies from Apollo |
+| Campaign Mappings | ✅ 10 campaign-company mappings |
+| Status Update | ✅ `prospecting_status = 'company_qualification_select'` |
+| Connection Pool Warning | ✅ **None!** |
+
 ### Debug Logging Added
 
 Added debug logging to troubleshoot query issues:
@@ -1144,7 +1388,7 @@ The MongoDB to PostgreSQL migration infrastructure is **100% complete and tested
    - Webhooks: contact_hubspot_webhook.py
    - Parsers: company_saver.py
 
-📊 Schema Fixes Applied (4 Alembic Migrations):
+📊 Schema Fixes Applied (5 Alembic Migrations):
    Migration 1 (635ab6ee7464):
    - is_relevant column now nullable in campaign_company_runs
    - is_relevant column now nullable in campaign_contact_runs
@@ -1167,7 +1411,50 @@ The MongoDB to PostgreSQL migration infrastructure is **100% complete and tested
    - enrichment_status column now nullable in contacts
    - is_relevant column now nullable in contacts
    
-   All changes enable proper $exists: False query support and flexible data handling
+   Migration 5 (add_sl_no_pagination):
+   - Added sl_no BIGINT column to all 11 tables for efficient pagination
+   - Created sequences, unique constraints, and indexes for each table
+   - Default sorting now uses sl_no for stable pagination on 1M+ rows
+   
+   All changes enable proper $exists: False query support, flexible data handling,
+   and optimal pagination performance
+
+📊 Code Fixes Applied (January 11, 2026):
+   Issue 9 - update_campaign dot notation:
+   - PostgresCampaignsDao now handles both {"prospecting_cycle.status": "value"}
+     and {"prospecting_cycle": {"status": "value"}} formats
+   - Ensures lifecycle_status and prospecting_status columns are updated correctly
+   
+   Issue 10 - Connection pool leak:
+   - Sessions now closed after each commit to return connections to pool
+   - Session factory passed to DAOs for fresh session creation
+   - All 11 DAO factory functions updated
+   - Eliminates "garbage collector cleaning up non-checked-in connection" warning
+   
+   Issue 11 - prospecting_cycle JSONB not updating:
+   - update_campaign now converts dot notation to nested dict
+   - Both column AND JSONB field are updated
+   - Uses deep merge to preserve existing JSONB data
+   
+   Issue 12 - Other DAOs with dot notation:
+   - companies.py: update_company now handles identifiers.*, profile.*, metadata.* paths
+   - Updates both column (for indexed queries) and JSONB (for data consistency)
+   - contacts.py: Already had proper handling in update_contact
+   - inbox_events.py: Already had proper handling in update_last_touch
+   
+   Issue 13 - Pagination without incremental key:
+   - Added sl_no (BIGINT) column to all 11 tables
+   - base_dao.py now uses sl_no for default sorting when paginating
+   - Indexes created on sl_no for optimal query performance
+   - Supports 1M+ rows with consistent pagination results
+   
+   Issue 14 - Connection pool exhaustion during high load (QueuePool limit of size 20 overflow 30 reached):
+   - Root cause: Read operations (find_one, find_many, count, count_documents, get_paginated_response)
+     were NOT closing sessions after use, causing connections to pile up
+   - Fix: All read operations now close session and get fresh one after returning results
+   - Engine pool increased: pool_size 20→30, max_overflow 30→50, pool_recycle 3600→300
+   - Files updated: database/postgres/base_dao.py, database/postgres/engine.py
+   - Session lifecycle: Every DAO operation now properly acquires, uses, and releases connection
 ```
 
 The migration was designed to minimize risk while providing a clear path to full PostgreSQL adoption.
@@ -1184,11 +1471,17 @@ The migration was designed to minimize risk while providing a clear path to full
 | `Object of type datetime is not JSON serializable` | `datetime` in JSONB columns | Fixed in `base_dao.py` - datetimes now auto-converted to ISO strings |
 | `fe_sendauth: no password supplied` | Missing password in connection | Ensure password is provided in connection string or GUI tool |
 | `SCRAM-based authentication failed` | Wrong credentials | Use username: `agent_hub`, password: `agent_hub` |
-| `QueuePool limit reached, connection timed out` | Connection pool exhausted | Fixed in `engine.py` - pool size increased to 20+30 |
+| `QueuePool limit reached, connection timed out` | Connection pool exhausted - read ops not closing sessions | Fixed in `base_dao.py` - all read operations now close sessions; pool size increased to 30+50 in `engine.py` |
 | `'NoneType' has no attribute 'get_pg_session'` | Kafka consumer PostgreSQL not initialized | Fixed in `handlers.py` - `initialize_consumer_connections()` now sets up PostgreSQL |
 | `null value in column "is_relevant" violates not-null constraint` | `is_relevant` column was NOT NULL | Fixed in `models.py` - column now nullable. Run: `ALTER TABLE campaign_company_runs ALTER COLUMN is_relevant DROP NOT NULL;` |
 | `$exists: False` query returns 0 | Records have `is_relevant = false` instead of `NULL` | Make column nullable and ensure new records insert with `NULL` for unprocessed state |
 | `NameError: name 'MeetingsDao' is not defined` | Type hints referencing MongoDB DAOs after switching to factory | Replace DAO type hints with `Any` or remove them |
+| `update_campaign` not updating `prospecting_status` | Method only handled nested dict, not dot notation | Fixed in `campaigns.py` to handle both `{"prospecting_cycle.status": "value"}` and `{"prospecting_cycle": {"status": "value"}}` |
+| `garbage collector cleaning up non-checked-in connection` | Sessions not returned to pool after operations | Fixed in `base_dao.py` - sessions now closed after commit, fresh session created for next operation |
+| `prospecting_cycle` JSONB not updating | Dot notation mapped to column only, JSONB ignored | Fixed in `campaigns.py` - now converts dot notation to nested dict and updates BOTH column AND JSONB |
+| Pagination returning duplicate/missing records | No stable sort order without `ORDER BY` | Fixed by adding `sl_no` BIGINT column to all tables and using it for default sorting |
+| Pagination slow on large datasets | String-based `id` sorting is slower than integer | Fixed by using `sl_no` (indexed BIGINT) for sorting instead of `created_at + id` |
+| `null value in column "sl_no" violates not-null constraint` | sl_no included in INSERT statement instead of auto-generated | Fixed in `base_dao.py` - `insert_one` now removes sl_no from data, letting PostgreSQL sequence generate it |
 
 ### Verifying PostgreSQL Connection
 

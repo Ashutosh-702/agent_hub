@@ -154,7 +154,7 @@ class PostgresCompaniesDao(BasePostgresDao):
         
         Args:
             company_id: Company ID
-            update_data: Fields to update
+            update_data: Fields to update (supports both dot notation and nested dict)
             
         Returns:
             Number of modified documents
@@ -162,6 +162,56 @@ class PostgresCompaniesDao(BasePostgresDao):
         has_operators = any(key.startswith('$') for key in update_data.keys())
         if not has_operators:
             update_data = {"$set": update_data}
+        
+        # Handle dot notation that maps to both columns and JSONB
+        # For fields like "identifiers.source_id", we need to update both:
+        # 1. The source_id column (for indexed queries)
+        # 2. The identifiers JSONB (for data consistency when reading)
+        if "$set" in update_data:
+            set_data = update_data["$set"]
+            
+            # Track JSONB updates needed
+            identifiers_updates = {}
+            profile_updates = {}
+            metadata_updates = {}
+            
+            # Map dot notation to column names and collect JSONB updates
+            if "identifiers.name" in set_data:
+                set_data["name"] = set_data["identifiers.name"]
+                identifiers_updates["name"] = set_data.pop("identifiers.name")
+            if "identifiers.source_id" in set_data:
+                set_data["source_id"] = set_data["identifiers.source_id"]
+                identifiers_updates["source_id"] = set_data.pop("identifiers.source_id")
+            if "identifiers.source_domain" in set_data:
+                set_data["source_domain"] = set_data["identifiers.source_domain"]
+                identifiers_updates["source_domain"] = set_data.pop("identifiers.source_domain")
+            if "profile.industry" in set_data:
+                set_data["industry"] = set_data["profile.industry"]
+                profile_updates["industry"] = set_data.pop("profile.industry")
+            if "metadata.updated_at" in set_data:
+                metadata_updates["updated_at"] = set_data.pop("metadata.updated_at")
+            if "metadata.api_response.primary_domain" in set_data:
+                set_data["primary_domain"] = set_data["metadata.api_response.primary_domain"]
+                del set_data["metadata.api_response.primary_domain"]
+            
+            # Merge JSONB updates with current data if any
+            if identifiers_updates or profile_updates or metadata_updates:
+                current = await self.find_one({"_id": company_id})
+                if current:
+                    if identifiers_updates:
+                        current_identifiers = current.get("identifiers", {}) or {}
+                        current_identifiers.update(identifiers_updates)
+                        set_data["identifiers"] = current_identifiers
+                    if profile_updates:
+                        current_profile = current.get("profile", {}) or {}
+                        current_profile.update(profile_updates)
+                        set_data["profile"] = current_profile
+                    if metadata_updates:
+                        current_metadata = current.get("metadata", {}) or {}
+                        if isinstance(current_metadata, str):
+                            current_metadata = {}
+                        current_metadata.update(metadata_updates)
+                        set_data["metadata"] = current_metadata
             
         return await self.update_one({"_id": company_id}, update_data)
     

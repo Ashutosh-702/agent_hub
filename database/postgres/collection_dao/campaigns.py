@@ -2,7 +2,9 @@
 
 from typing import Dict, Any, Optional, List
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import JSONB
 
 from database.postgres.base_dao import BasePostgresDao
 from database.postgres.models import Campaign
@@ -88,16 +90,38 @@ class PostgresCampaignsDao(BasePostgresDao):
         
         Args:
             campaign_id: Campaign ID
-            update_data: Fields to update
+            update_data: Fields to update (supports both dot notation and nested dict)
             
         Returns:
             Number of modified documents
         """
         # Handle column mapping for specific fields
-        if "lifecycle" in update_data and "status" in update_data["lifecycle"]:
+        # Support nested dict format: {"lifecycle": {"status": "value"}}
+        if "lifecycle" in update_data and isinstance(update_data["lifecycle"], dict) and "status" in update_data["lifecycle"]:
             update_data["lifecycle_status"] = update_data["lifecycle"]["status"]
-        if "prospecting_cycle" in update_data and "status" in update_data["prospecting_cycle"]:
+        if "prospecting_cycle" in update_data and isinstance(update_data["prospecting_cycle"], dict) and "status" in update_data["prospecting_cycle"]:
             update_data["prospecting_status"] = update_data["prospecting_cycle"]["status"]
+        
+        # Support dot notation format: {"lifecycle.status": "value"} or {"prospecting_cycle.status": "value"}
+        # For these, we need to update BOTH the column AND the JSONB field
+        # Convert dot notation to nested dict for JSONB merge while also setting the column
+        if "lifecycle.status" in update_data:
+            status_value = update_data.pop("lifecycle.status")
+            update_data["lifecycle_status"] = status_value
+            # Merge into lifecycle JSONB field
+            if "lifecycle" not in update_data or not isinstance(update_data.get("lifecycle"), dict):
+                update_data["lifecycle"] = {"status": status_value}
+            else:
+                update_data["lifecycle"]["status"] = status_value
+            
+        if "prospecting_cycle.status" in update_data:
+            status_value = update_data.pop("prospecting_cycle.status")
+            update_data["prospecting_status"] = status_value
+            # Merge into prospecting_cycle JSONB field
+            if "prospecting_cycle" not in update_data or not isinstance(update_data.get("prospecting_cycle"), dict):
+                update_data["prospecting_cycle"] = {"status": status_value}
+            else:
+                update_data["prospecting_cycle"]["status"] = status_value
         
         return await self.update_one({"_id": campaign_id}, {"$set": update_data})
     

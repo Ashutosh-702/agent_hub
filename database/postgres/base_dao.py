@@ -105,20 +105,50 @@ class BasePostgresDao:
         Args:
             session: SQLAlchemy async session
         """
-        self.session = session
+        self._session = session
+        self._session_factory = None  # Set by factory if available
         self._auto_commit = True  # Auto-commit after each operation by default
+    
+    @property
+    def session(self) -> AsyncSession:
+        """Get the current session."""
+        return self._session
+    
+    @session.setter
+    def session(self, value: AsyncSession):
+        """Set the session."""
+        self._session = value
+    
+    def set_session_factory(self, factory):
+        """Set the session factory for creating new sessions.
+        
+        Args:
+            factory: Callable that returns a new AsyncSession
+        """
+        self._session_factory = factory
     
     async def commit(self) -> None:
         """Commit the current transaction."""
-        await self.session.commit()
+        await self._session.commit()
     
     async def rollback(self) -> None:
         """Rollback the current transaction."""
-        await self.session.rollback()
+        await self._session.rollback()
     
     async def close(self) -> None:
-        """Close the session."""
-        await self.session.close()
+        """Close the session and return connection to pool."""
+        await self._session.close()
+    
+    async def _get_fresh_session(self) -> AsyncSession:
+        """Get a fresh session, closing the old one if needed."""
+        if self._session_factory:
+            if self._session:
+                try:
+                    await self._session.close()
+                except Exception:
+                    pass
+            self._session = self._session_factory()
+        return self._session
     
     def _map_field(self, field: str) -> str:
         """Map MongoDB field name to PostgreSQL column name.
@@ -514,6 +544,10 @@ class BasePostgresDao:
         for jsonb_column, data in jsonb_data.items():
             column_data[jsonb_column] = data
         
+        # Remove sl_no - let PostgreSQL auto-generate via sequence
+        if "sl_no" in column_data:
+            del column_data["sl_no"]
+        
         # Add timestamps if not present and model has these fields
         now = datetime.utcnow()
         if "created_at" not in column_data and hasattr(self.model, "created_at"):
@@ -523,14 +557,20 @@ class BasePostgresDao:
         
         # Create and add instance
         instance = self.model(**column_data)
-        self.session.add(instance)
-        await self.session.flush()
+        self._session.add(instance)
+        await self._session.flush()
         
-        # Auto-commit if enabled
+        result_id = instance.id
+        
+        # Auto-commit if enabled - commit and close to return connection to pool
         if self._auto_commit:
-            await self.session.commit()
+            await self._session.commit()
+            await self._session.close()
+            # Get fresh session for next operation if factory available
+            if self._session_factory:
+                self._session = self._session_factory()
         
-        return instance.id
+        return result_id
     
     async def insert_many(self, documents: List[Dict[str, Any]], ordered: bool = False) -> List[str]:
         """Insert multiple documents.
@@ -564,13 +604,24 @@ class BasePostgresDao:
         filter_expr = self._build_filter_expression(query)
         stmt = select(self.model).where(filter_expr).limit(1)
         
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         instance = result.scalar_one_or_none()
         
         if instance is None:
+            # Close session and get fresh one for next operation
+            if self._session_factory:
+                await self._session.close()
+                self._session = self._session_factory()
             return None
         
-        return self._instance_to_dict(instance)
+        doc = self._instance_to_dict(instance)
+        
+        # Close session and get fresh one for next operation
+        if self._session_factory:
+            await self._session.close()
+            self._session = self._session_factory()
+        
+        return doc
     
     async def find_many(
         self, 
@@ -610,6 +661,15 @@ class BasePostgresDao:
                         stmt = stmt.order_by(column.asc())
                 except AttributeError:
                     pass  # Skip unknown fields
+        elif skip is not None or limit is not None:
+            # Default sorting for stable pagination when using skip/limit
+            # Use sl_no (serial number) for optimal performance on large datasets
+            if hasattr(self.model, 'sl_no'):
+                stmt = stmt.order_by(self.model.sl_no.asc())
+            elif hasattr(self.model, 'created_at'):
+                stmt = stmt.order_by(self.model.created_at.desc())
+                if hasattr(self.model, 'id'):
+                    stmt = stmt.order_by(self.model.id.asc())
         
         # Apply pagination
         if skip:
@@ -617,10 +677,17 @@ class BasePostgresDao:
         if limit:
             stmt = stmt.limit(limit)
         
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         instances = result.scalars().all()
         
-        return [self._instance_to_dict(inst) for inst in instances]
+        docs = [self._instance_to_dict(inst) for inst in instances]
+        
+        # Close session and get fresh one for next operation
+        if self._session_factory:
+            await self._session.close()
+            self._session = self._session_factory()
+        
+        return docs
     
     async def count(self, query: Dict[str, Any] = None) -> int:
         """Count documents matching query.
@@ -638,8 +705,15 @@ class BasePostgresDao:
         else:
             stmt = select(func.count()).select_from(self.model)
         
-        result = await self.session.execute(stmt)
-        return result.scalar() or 0
+        result = await self._session.execute(stmt)
+        count_result = result.scalar() or 0
+        
+        # Close session and get fresh one for next operation
+        if self._session_factory:
+            await self._session.close()
+            self._session = self._session_factory()
+        
+        return count_result
     
     async def update_one(self, query: Dict[str, Any], update_clause: Dict[str, Any]) -> int:
         """Update a single document.
@@ -658,7 +732,7 @@ class BasePostgresDao:
         # Find the document first
         filter_expr = self._build_filter_expression(query)
         stmt = select(self.model).where(filter_expr).limit(1)
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         instance = result.scalar_one_or_none()
         
         if instance is None:
@@ -703,11 +777,15 @@ class BasePostgresDao:
         if hasattr(instance, "updated_at"):
             instance.updated_at = datetime.utcnow()
         
-        await self.session.flush()
+        await self._session.flush()
         
-        # Auto-commit if enabled
+        # Auto-commit if enabled - commit and close to return connection to pool
         if self._auto_commit:
-            await self.session.commit()
+            await self._session.commit()
+            await self._session.close()
+            # Get fresh session for next operation if factory available
+            if self._session_factory:
+                self._session = self._session_factory()
         
         return 1
     
@@ -760,7 +838,7 @@ class BasePostgresDao:
         # Find all matching documents
         filter_expr = self._build_filter_expression(query)
         stmt = select(self.model).where(filter_expr)
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         instances = result.scalars().all()
         
         if not instances:
@@ -804,11 +882,15 @@ class BasePostgresDao:
                 instance.updated_at = datetime.utcnow()
             count += 1
         
-        await self.session.flush()
+        await self._session.flush()
         
-        # Auto-commit if enabled
+        # Auto-commit if enabled - commit and close to return connection to pool
         if self._auto_commit:
-            await self.session.commit()
+            await self._session.commit()
+            await self._session.close()
+            # Get fresh session for next operation if factory available
+            if self._session_factory:
+                self._session = self._session_factory()
         
         return count
     
@@ -825,18 +907,22 @@ class BasePostgresDao:
         
         filter_expr = self._build_filter_expression(query)
         stmt = select(self.model).where(filter_expr).limit(1)
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         instance = result.scalar_one_or_none()
         
         if instance is None:
             return {"deleted_count": 0}
         
-        await self.session.delete(instance)
-        await self.session.flush()
+        await self._session.delete(instance)
+        await self._session.flush()
         
-        # Auto-commit if enabled
+        # Auto-commit if enabled - commit and close to return connection to pool
         if self._auto_commit:
-            await self.session.commit()
+            await self._session.commit()
+            await self._session.close()
+            # Get fresh session for next operation if factory available
+            if self._session_factory:
+                self._session = self._session_factory()
         
         return {"deleted_count": 1}
     
@@ -853,18 +939,22 @@ class BasePostgresDao:
         
         filter_expr = self._build_filter_expression(query)
         stmt = select(self.model).where(filter_expr)
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         instances = result.scalars().all()
         
         count = len(instances)
         for instance in instances:
-            await self.session.delete(instance)
+            await self._session.delete(instance)
         
-        await self.session.flush()
+        await self._session.flush()
         
-        # Auto-commit if enabled
+        # Auto-commit if enabled - commit and close to return connection to pool
         if self._auto_commit:
-            await self.session.commit()
+            await self._session.commit()
+            await self._session.close()
+            # Get fresh session for next operation if factory available
+            if self._session_factory:
+                self._session = self._session_factory()
         
         return count
     
@@ -881,15 +971,17 @@ class BasePostgresDao:
             filters = {}
         
         filters = normalize_document(filters)
-        print(f"[DEBUG] count_documents normalized filters: {filters}")
         filter_expr = self._build_filter_expression(filters)
-        print(f"[DEBUG] count_documents filter_expr: {filter_expr}")
         
         stmt = select(func.count()).select_from(self.model).where(filter_expr)
-        print(f"[DEBUG] count_documents SQL: {stmt}")
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         count = result.scalar() or 0
-        print(f"[DEBUG] count_documents result: {count}")
+        
+        # Close session and get fresh one for next operation
+        if self._session_factory:
+            await self._session.close()
+            self._session = self._session_factory()
+        
         return count
     
     async def get_paginated_response(
@@ -917,7 +1009,7 @@ class BasePostgresDao:
         
         # Count total
         count_stmt = select(func.count()).select_from(self.model).where(filter_expr)
-        count_result = await self.session.execute(count_stmt)
+        count_result = await self._session.execute(count_stmt)
         total_records = count_result.scalar() or 0
         
         # Build query
@@ -935,14 +1027,25 @@ class BasePostgresDao:
                         stmt = stmt.order_by(column.asc())
                 except AttributeError:
                     pass  # Skip invalid sort fields
+        else:
+            # Default sorting for stable pagination
+            # Use sl_no (serial number) for optimal performance on large datasets
+            if hasattr(self.model, 'sl_no'):
+                stmt = stmt.order_by(self.model.sl_no.asc())
+            elif hasattr(self.model, 'created_at'):
+                stmt = stmt.order_by(self.model.created_at.desc())
+                if hasattr(self.model, 'id'):
+                    stmt = stmt.order_by(self.model.id.asc())
         
         # Apply pagination
         if page_size != -1:
             offset = (page_number - 1) * page_size
             stmt = stmt.offset(offset).limit(page_size)
         
-        result = await self.session.execute(stmt)
+        result = await self._session.execute(stmt)
         instances = result.scalars().all()
+        
+        docs = [self._instance_to_dict(inst) for inst in instances]
         
         pagination_info = {
             "page_size": page_size,
@@ -951,7 +1054,12 @@ class BasePostgresDao:
             "total_records": total_records
         }
         
-        return [self._instance_to_dict(inst) for inst in instances], pagination_info
+        # Close session and get fresh one for next operation
+        if self._session_factory:
+            await self._session.close()
+            self._session = self._session_factory()
+        
+        return docs, pagination_info
     
     def _instance_to_dict(self, instance: Any) -> Dict[str, Any]:
         """Convert SQLAlchemy instance to dictionary.

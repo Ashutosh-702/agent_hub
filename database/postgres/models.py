@@ -5,21 +5,43 @@ mapping MongoDB collections to PostgreSQL tables with a hybrid approach:
 - Frequently queried fields are stored as native columns with indexes
 - Complex nested data is stored in JSONB columns for flexibility
 - ObjectId-style string IDs (24-char hex) are preserved for API compatibility
+- sl_no (serial number) is an auto-increment column for efficient pagination
 """
 
 from datetime import datetime
 from typing import Optional, List, Any
 from sqlalchemy import (
     Column, String, Boolean, DateTime, Text, Integer, Index, 
-    ForeignKey, UniqueConstraint, func
+    ForeignKey, UniqueConstraint, func, BigInteger, Sequence
 )
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
 
 
+# Define sequences for sl_no columns (must be created before tables)
+users_sl_no_seq = Sequence('users_sl_no_seq')
+user_tokens_sl_no_seq = Sequence('user_tokens_sl_no_seq')
+campaigns_sl_no_seq = Sequence('campaigns_sl_no_seq')
+companies_sl_no_seq = Sequence('companies_sl_no_seq')
+contacts_sl_no_seq = Sequence('contacts_sl_no_seq')
+campaign_company_runs_sl_no_seq = Sequence('campaign_company_runs_sl_no_seq')
+campaign_contact_runs_sl_no_seq = Sequence('campaign_contact_runs_sl_no_seq')
+meetings_sl_no_seq = Sequence('meetings_sl_no_seq')
+inbox_leads_sl_no_seq = Sequence('inbox_leads_sl_no_seq')
+inbox_events_sl_no_seq = Sequence('inbox_events_sl_no_seq')
+inbox_notes_sl_no_seq = Sequence('inbox_notes_sl_no_seq')
+
+
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
     pass
+
+
+# Note: sl_no (serial number) is added to all tables for efficient pagination.
+# It's an auto-increment BigInteger that provides:
+# - Stable ordering for pagination (no duplicates/gaps between pages)
+# - Efficient keyset pagination (WHERE sl_no > last_seen)
+# - Better performance than OFFSET on large datasets (1M+ rows)
 
 
 class User(Base):
@@ -31,6 +53,9 @@ class User(Base):
     
     # Primary key - 24-char hex string (ObjectId format)
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    
+    # Serial number for efficient pagination (auto-generated via sequence)
+    sl_no: Mapped[int] = mapped_column(BigInteger, users_sl_no_seq, server_default=users_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     
     # Core fields (indexed for queries)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
@@ -58,6 +83,7 @@ class UserToken(Base):
     __tablename__ = "user_tokens"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, user_tokens_sl_no_seq, server_default=user_tokens_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     user_id: Mapped[str] = mapped_column(String(24), ForeignKey("users.id"), nullable=False, index=True)
     token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -84,6 +110,7 @@ class Campaign(Base):
     __tablename__ = "campaigns"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, campaigns_sl_no_seq, server_default=campaigns_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     
     # Core fields (indexed for queries)
     name: Mapped[Optional[str]] = mapped_column(String(500), index=True)
@@ -123,6 +150,7 @@ class Company(Base):
     __tablename__ = "companies"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, companies_sl_no_seq, server_default=companies_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     
     # Core fields (indexed for queries)
     name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, index=True)
@@ -163,6 +191,7 @@ class Contact(Base):
     __tablename__ = "contacts"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, contacts_sl_no_seq, server_default=contacts_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     company_id: Mapped[Optional[str]] = mapped_column(String(24), ForeignKey("companies.id"), index=True)
     
     # Core fields (indexed for queries)
@@ -202,6 +231,7 @@ class CampaignCompanyRun(Base):
     __tablename__ = "campaign_company_runs"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, campaign_company_runs_sl_no_seq, server_default=campaign_company_runs_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     campaign_id: Mapped[str] = mapped_column(String(24), ForeignKey("campaigns.id"), nullable=False, index=True)
     company_id: Mapped[str] = mapped_column(String(24), ForeignKey("companies.id"), nullable=False, index=True)
     
@@ -239,6 +269,7 @@ class CampaignContactRun(Base):
     __tablename__ = "campaign_contact_runs"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, campaign_contact_runs_sl_no_seq, server_default=campaign_contact_runs_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     campaign_id: Mapped[str] = mapped_column(String(24), ForeignKey("campaigns.id"), nullable=False, index=True)
     company_id: Mapped[str] = mapped_column(String(24), ForeignKey("companies.id"), nullable=False, index=True)
     contact_id: Mapped[str] = mapped_column(String(24), ForeignKey("contacts.id"), nullable=False, index=True)
@@ -283,6 +314,7 @@ class Meeting(Base):
     __tablename__ = "meetings"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, meetings_sl_no_seq, server_default=meetings_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     meeting_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)  # UUID
     company_id: Mapped[Optional[str]] = mapped_column(String(24), ForeignKey("companies.id"), index=True)
     
@@ -333,6 +365,7 @@ class InboxLead(Base):
     __tablename__ = "inbox_leads"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, inbox_leads_sl_no_seq, server_default=inbox_leads_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     lead_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     
     # Lemlist identifiers
@@ -377,6 +410,7 @@ class InboxEvent(Base):
     __tablename__ = "inbox_events"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, inbox_events_sl_no_seq, server_default=inbox_events_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     lead_id: Mapped[str] = mapped_column(String(100), ForeignKey("inbox_leads.lead_id"), nullable=False, index=True)
     
     # Event details
@@ -416,6 +450,7 @@ class InboxNote(Base):
     __tablename__ = "inbox_notes"
     
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, inbox_notes_sl_no_seq, server_default=inbox_notes_sl_no_seq.next_value(), nullable=False, index=True, unique=True)
     lead_id: Mapped[str] = mapped_column(String(100), ForeignKey("inbox_leads.lead_id"), nullable=False, index=True)
     
     # Note content
