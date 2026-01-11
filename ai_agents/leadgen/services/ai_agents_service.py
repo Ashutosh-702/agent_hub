@@ -48,7 +48,7 @@ from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob
 class CampaignService:
     def __init__(self):
         # Use factory to get the appropriate DAO (MongoDB or PostgreSQL based on feature flags)
-        Settings.db_backend_campaigns = "postgres"
+        # Settings.db_backend_campaigns = "postgres"
 
         self.campaign_dao = get_campaigns_dao(loaded_config.connection_manager)
         self.event_emitter = loaded_config.connection_manager.event_emitter

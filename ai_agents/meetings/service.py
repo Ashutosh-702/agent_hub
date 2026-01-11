@@ -8,9 +8,7 @@ import uuid
 from bson import ObjectId
 
 from config.loaded_config import loaded_config
-from database.collection_dao.meetings import MeetingsDao
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.contacts import ContactsDao
+from database.factory import get_meetings_dao, get_companies_dao, get_contacts_dao
 from ai_agents.meetings.models import (
     MeetingRecord,
     MeetingStatus,
@@ -47,22 +45,22 @@ class MeetingService:
         self._post_call_analyzer = PostCallAnalyzer()
         self._red_flag_detector = RedFlagDetector()
     
-    def _get_meetings_dao(self) -> MeetingsDao:
+    def _get_meetings_dao(self):
         """Get or create MeetingsDao instance."""
         if not self._meetings_dao:
-            self._meetings_dao = MeetingsDao(loaded_config.connection_manager.mongo_client)
+            self._meetings_dao = get_meetings_dao(loaded_config.connection_manager)
         return self._meetings_dao
     
-    def _get_companies_dao(self) -> CompaniesDao:
+    def _get_companies_dao(self):
         """Get or create CompaniesDao instance."""
         if not self._companies_dao:
-            self._companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+            self._companies_dao = get_companies_dao(loaded_config.connection_manager)
         return self._companies_dao
     
-    def _get_contacts_dao(self) -> ContactsDao:
+    def _get_contacts_dao(self):
         """Get or create ContactsDao instance."""
         if not self._contacts_dao:
-            self._contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+            self._contacts_dao = get_contacts_dao(loaded_config.connection_manager)
         return self._contacts_dao
     
     def _serialize_meeting(self, meeting_data: Dict[str, Any]) -> Dict[str, Any]:

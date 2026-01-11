@@ -113,6 +113,50 @@ class PostgresContactsDao(BasePostgresDao):
         Returns:
             Number of modified documents
         """
+        if "$set" in update_clause:
+            set_clause = update_clause["$set"]
+            
+            # Build JSONB update for contact_data fields
+            # Since contact_data.* fields are in COLUMN_MAP, they update columns only
+            # We need to also update the JSONB to keep data in sync
+            contact_data_updates = {}
+            
+            # Handle contact_data.email specially
+            if "contact_data.email" in set_clause:
+                email = set_clause["contact_data.email"]
+                if isinstance(email, list) and email:
+                    set_clause["email"] = email[0]  # First email in indexed column
+                    contact_data_updates["email"] = email  # Full array in JSONB
+                elif isinstance(email, str):
+                    set_clause["email"] = email
+                    contact_data_updates["email"] = [email]
+                # Remove from set_clause to avoid column type mismatch
+                del set_clause["contact_data.email"]
+            
+            # Handle other contact_data nested fields
+            if "contact_data.firstname" in set_clause:
+                set_clause["firstname"] = set_clause["contact_data.firstname"]
+                contact_data_updates["firstname"] = set_clause.pop("contact_data.firstname")
+            if "contact_data.lastname" in set_clause:
+                set_clause["lastname"] = set_clause["contact_data.lastname"]
+                contact_data_updates["lastname"] = set_clause.pop("contact_data.lastname")
+            if "contact_data.jobtitle" in set_clause:
+                set_clause["jobtitle"] = set_clause["contact_data.jobtitle"]
+                contact_data_updates["jobtitle"] = set_clause.pop("contact_data.jobtitle")
+            if "contact_data.phone" in set_clause:
+                contact_data_updates["phone"] = set_clause.pop("contact_data.phone")
+            if "contact_data.source_id" in set_clause:
+                set_clause["source_id"] = set_clause["contact_data.source_id"]
+                contact_data_updates["source_id"] = set_clause.pop("contact_data.source_id")
+            
+            # If we have contact_data updates, fetch current and merge
+            if contact_data_updates:
+                current = await self.find_one({"_id": contact_id})
+                if current:
+                    current_contact_data = current.get("contact_data", {}) or {}
+                    current_contact_data.update(contact_data_updates)
+                    set_clause["contact_data"] = current_contact_data
+        
         return await self.update_one({"_id": contact_id}, update_clause)
 
     async def get_contacts_count(self, filters: dict = None) -> int:

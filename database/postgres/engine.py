@@ -70,7 +70,7 @@ class PostgresEngine:
             raise RuntimeError("PostgreSQL engine not initialized. Call connect() first.")
         return self._session_factory
     
-    async def connect(self, echo: bool = False, pool_size: int = 5, max_overflow: int = 10) -> None:
+    async def connect(self, echo: bool = False, pool_size: int = 20, max_overflow: int = 30) -> None:
         """Initialize the database engine and session factory.
         
         Args:
@@ -81,13 +81,15 @@ class PostgresEngine:
         if self._engine is not None:
             return  # Already connected
             
-        # Create async engine
+        # Create async engine with larger pool for concurrent API requests
         self._engine = create_async_engine(
             self._database_url,
             echo=echo,
             pool_size=pool_size,
             max_overflow=max_overflow,
             pool_pre_ping=True,  # Verify connections before using
+            pool_recycle=3600,   # Recycle connections after 1 hour
+            pool_timeout=60,     # Increase timeout to 60 seconds
         )
         
         # Create session factory

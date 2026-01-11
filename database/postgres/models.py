@@ -125,26 +125,26 @@ class Company(Base):
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
     
     # Core fields (indexed for queries)
-    name: Mapped[Optional[str]] = mapped_column(String(500), index=True)
-    source: Mapped[Optional[str]] = mapped_column(String(100), index=True)
-    source_id: Mapped[Optional[str]] = mapped_column(String(100), index=True)
-    primary_domain: Mapped[Optional[str]] = mapped_column(String(255), index=True)
-    source_domain: Mapped[Optional[str]] = mapped_column(String(255), index=True)
+    name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, index=True)
+    source: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    source_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    primary_domain: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    source_domain: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     
     # Industry as array (for filtering)
-    industry: Mapped[Optional[list]] = mapped_column(ARRAY(String(255)), index=True)
+    industry: Mapped[Optional[list]] = mapped_column(ARRAY(String(255)), nullable=True, index=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
     
     # JSONB fields for complex nested data
-    identifiers: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
-    profile: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
-    location: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
-    metadata_json: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
-    deep_research: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
-    red_flags_history: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
+    identifiers: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
+    profile: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
+    location: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
+    metadata_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
+    deep_research: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
+    red_flags_history: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True, default=list)
     
     # Relationships
     contacts: Mapped[List["Contact"]] = relationship("Contact", back_populates="company", cascade="all, delete-orphan")
@@ -166,16 +166,16 @@ class Contact(Base):
     company_id: Mapped[Optional[str]] = mapped_column(String(24), ForeignKey("companies.id"), index=True)
     
     # Core fields (indexed for queries)
-    firstname: Mapped[Optional[str]] = mapped_column(String(255))
-    lastname: Mapped[Optional[str]] = mapped_column(String(255))
-    email: Mapped[Optional[str]] = mapped_column(String(255), index=True)
-    jobtitle: Mapped[Optional[str]] = mapped_column(String(500))
-    source_id: Mapped[Optional[str]] = mapped_column(String(100), index=True)
+    firstname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    lastname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    jobtitle: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    source_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     
     # Status fields
-    webhook_sent: Mapped[bool] = mapped_column(Boolean, default=False)
-    enrichment_status: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_relevant: Mapped[bool] = mapped_column(Boolean, default=False)
+    webhook_sent: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
+    enrichment_status: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
+    is_relevant: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
@@ -208,8 +208,8 @@ class CampaignCompanyRun(Base):
     # Status fields
     company_status: Mapped[bool] = mapped_column(Boolean, default=False)
     linkedin_contact_status: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_relevant: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    sync_to_hubspot_status: Mapped[Optional[str]] = mapped_column(String(50), index=True)
+    is_relevant: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, index=True)  # NULL = not processed yet
+    sync_to_hubspot_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
@@ -244,9 +244,9 @@ class CampaignContactRun(Base):
     contact_id: Mapped[str] = mapped_column(String(24), ForeignKey("contacts.id"), nullable=False, index=True)
     
     # Status fields
-    is_relevant: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    enrichment_status: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    personalization_status: Mapped[Optional[str]] = mapped_column(String(50), index=True)
+    is_relevant: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, index=True)  # NULL = not processed yet
+    enrichment_status: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, index=True)  # NULL = not processed yet
+    personalization_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     
     # Contact enrichment data
     email_id: Mapped[Optional[str]] = mapped_column(String(255), index=True)

@@ -150,6 +150,9 @@ class PostgresCampaignCompanyRunsDao(BasePostgresDao):
         if query is None:
             query = {}
         query = self._process_query_objectids(query)
-        return await self.count_documents(query)
+        print(f"[DEBUG] campaign_company_runs_count query after processing: {query}")
+        count = await self.count_documents(query)
+        print(f"[DEBUG] campaign_company_runs_count result: {count}")
+        return count
 
 

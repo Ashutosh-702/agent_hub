@@ -2,7 +2,7 @@ import aiohttp
 from structlog.contextvars import bind_contextvars
 
 from config.logging import logger
-from config.loaded_config import loaded_config
+from config.loaded_config import loaded_config, Settings
 from database.connection_manager import ConnectionManager
 
 
@@ -28,6 +28,7 @@ async def initialize_database():
     print(f"🔄 Connecting to PostgreSQL...")
     print(f"   PostgreSQL: {loaded_config.postgres_url}")
     await loaded_config.connection_manager.setup_postgres(echo=False)
+    Settings.db_backend_campaigns = "postgres"
     print(f"✅ PostgreSQL connection successful!")
 
 async def eventbridge_producer():

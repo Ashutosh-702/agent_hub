@@ -11,9 +11,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 from config.loaded_config import loaded_config
-from database.collection_dao.meetings import MeetingsDao
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.contacts import ContactsDao
+from database.factory import get_meetings_dao, get_companies_dao, get_contacts_dao
 from ai_agents.meetings.models import (
     TranscriptEntry,
     LiveInsight,
@@ -47,9 +45,9 @@ class MeetingWebSocketHandler:
         self,
         websocket: WebSocket,
         meeting_id: str,
-        meetings_dao: MeetingsDao,
-        companies_dao: Optional[CompaniesDao] = None,
-        contacts_dao: Optional[ContactsDao] = None,
+        meetings_dao: Any,
+        companies_dao: Optional[Any] = None,
+        contacts_dao: Optional[Any] = None,
     ):
         """
         Initialize the WebSocket handler.
@@ -604,9 +602,9 @@ async def meeting_websocket_endpoint(
     logger.info(f"WebSocket connection accepted for meeting {meeting_id}")
     
     # Get DAOs
-    meetings_dao = MeetingsDao(loaded_config.connection_manager.mongo_client)
-    companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-    contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+    meetings_dao = get_meetings_dao(loaded_config.connection_manager)
+    companies_dao = get_companies_dao(loaded_config.connection_manager)
+    contacts_dao = get_contacts_dao(loaded_config.connection_manager)
     
     # Create handler
     handler = MeetingWebSocketHandler(

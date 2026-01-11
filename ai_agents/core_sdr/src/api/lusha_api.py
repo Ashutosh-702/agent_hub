@@ -14,8 +14,7 @@ from global_utils.chronos_utils import (
 )
 from ai_agents.core_sdr.src.parsers.constants import COMPANY_GROUPINGS
 from ai_agents.core_sdr.src.parsers.company_saver import insert_companies_batch_to_db, create_campaign_company_mappings_batch
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.factory import get_companies_dao, get_campaign_company_runs_dao
 from ai_agents.core_sdr.config.department_mappers import DEPARTMENT_TO_CATEGORY
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -156,8 +155,8 @@ async def lusha_collect_companies_from_search(
     total_inserted = 0
 
     try:
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
+        campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
         print("working propoer")
         
         page_size = payload_values.get("pages", {}).get("size", 20)
@@ -274,7 +273,7 @@ async def lusha_collect_companies_from_search(
                 # ✅ IMMEDIATE DATABASE INSERTION
                 inserted_count = await insert_companies_batch_to_db(
                     page_companies, config,
-                    "lusha", CompaniesDao(loaded_config.connection_manager.mongo_client)
+                    "lusha", get_companies_dao(loaded_config.connection_manager)
                 )
                 total_inserted += len(inserted_count['inserted_ids'])
 

@@ -150,6 +150,10 @@ class BasePostgresDao:
         Returns:
             True if field is in JSONB
         """
+        # First check if there's an explicit column mapping - if so, use the column not JSONB
+        if field in self.COLUMN_MAP:
+            return False
+        
         base_field = field.split(".")[0]
         return base_field in self.JSONB_FIELDS or "." in field
     
@@ -248,7 +252,12 @@ class BasePostgresDao:
                     if op == "$eq":
                         conditions.append(column == op_value)
                     elif op == "$ne":
-                        conditions.append(column != op_value)
+                        # Handle special case: $ne: [] means "not empty"
+                        # In PostgreSQL, translate to "is not null and != ''"
+                        if isinstance(op_value, list) and len(op_value) == 0:
+                            conditions.append(and_(column.isnot(None), column != ""))
+                        else:
+                            conditions.append(column != op_value)
                     elif op == "$gt":
                         conditions.append(column > op_value)
                     elif op == "$gte":
@@ -308,7 +317,13 @@ class BasePostgresDao:
                 if op == "$eq":
                     conditions.append(accessor == str(op_value))
                 elif op == "$ne":
-                    conditions.append(accessor != str(op_value))
+                    # Handle special case: $ne: [] means "not empty array" in JSONB
+                    if isinstance(op_value, list) and len(op_value) == 0:
+                        # Check that the JSONB array is not empty using jsonb_array_length
+                        path_expr = "{" + ",".join(path) + "}"
+                        conditions.append(text(f"jsonb_array_length({jsonb_column} #> '{path_expr}') > 0"))
+                    else:
+                        conditions.append(accessor != str(op_value))
                 elif op == "$gt":
                     conditions.append(cast(accessor, String) > str(op_value))
                 elif op == "$gte":
@@ -362,8 +377,12 @@ class BasePostgresDao:
                         if jsonb_column not in jsonb_updates:
                             jsonb_updates[jsonb_column] = {}
                         
-                        # Set nested path
-                        self._set_nested_value(jsonb_updates[jsonb_column], path, value)
+                        # If field is a top-level JSONB field, set directly (don't double-nest)
+                        if len(path) == 1 and path[0] == jsonb_column:
+                            jsonb_updates[jsonb_column] = value if isinstance(value, dict) else {path[0]: value}
+                        else:
+                            # Set nested path
+                            self._set_nested_value(jsonb_updates[jsonb_column], path, value)
                     else:
                         try:
                             getattr(self.model, mapped_field)
@@ -472,7 +491,13 @@ class BasePostgresDao:
                 if jsonb_column not in jsonb_data:
                     jsonb_data[jsonb_column] = {}
                 
-                self._set_nested_value(jsonb_data[jsonb_column], path, value)
+                # If field is a top-level JSONB field (e.g., "identifiers"), set directly
+                # Otherwise it's a nested path (e.g., "identifiers.name"), use set_nested_value
+                if len(path) == 1 and path[0] == jsonb_column:
+                    # Direct assignment to JSONB column - don't double-nest
+                    jsonb_data[jsonb_column] = value if isinstance(value, dict) else {path[0]: value}
+                else:
+                    self._set_nested_value(jsonb_data[jsonb_column], path, value)
             else:
                 try:
                     getattr(self.model, mapped_field)
@@ -856,11 +881,16 @@ class BasePostgresDao:
             filters = {}
         
         filters = normalize_document(filters)
+        print(f"[DEBUG] count_documents normalized filters: {filters}")
         filter_expr = self._build_filter_expression(filters)
+        print(f"[DEBUG] count_documents filter_expr: {filter_expr}")
         
         stmt = select(func.count()).select_from(self.model).where(filter_expr)
+        print(f"[DEBUG] count_documents SQL: {stmt}")
         result = await self.session.execute(stmt)
-        return result.scalar() or 0
+        count = result.scalar() or 0
+        print(f"[DEBUG] count_documents result: {count}")
+        return count
     
     async def get_paginated_response(
         self,

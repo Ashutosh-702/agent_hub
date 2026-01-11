@@ -7,11 +7,7 @@ from typing import Dict, Any, List, Optional
 from bson import ObjectId
 
 from config.loaded_config import loaded_config
-from database.collection_dao.contacts import ContactsDao
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.campaigns import CampaignsDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
+from database.factory import get_contacts_dao, get_companies_dao, get_campaigns_dao, get_campaign_company_runs_dao, get_campaign_contact_runs_dao
 from config.logging import logger
 from global_utils.constants import HUBSPOT_BOLTIC_WEBHOOK_URL
 
@@ -27,11 +23,11 @@ class ContactHubspotWebhook:
         self.campaign_id = campaign_id
         self.company_id = None
         self.source = source
-        self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
-        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        self.campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-        self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
+        self.contacts_dao = get_contacts_dao(loaded_config.connection_manager)
+        self.companies_dao = get_companies_dao(loaded_config.connection_manager)
+        self.campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
+        self.campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
+        self.campaign_contact_runs_dao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
     async def format_phone_number(self, phone: str, country_code: Optional[str] = None) -> str:
         if not phone:
             return ""

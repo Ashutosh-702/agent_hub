@@ -3,7 +3,7 @@ import requests
 from dotenv import load_dotenv
 
 from config import loaded_config
-from database.collection_dao.campaigns import CampaignsDao
+from database.factory import get_campaigns_dao
 BASE_URL = "http://localhost:8000/api/v1/orchestrated/run"
 load_dotenv()
 from ai_agents.core_sdr.src.cli.main import process_company_search
@@ -15,7 +15,7 @@ from database.connection_manager import ConnectionManager
 import json
 async def run_batch():
     loaded_config.connection_manager = ConnectionManager(mongo_uri=loaded_config.mongo_uri, db_name="linkedin_db")
-    campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+    campaign_dao = get_campaigns_dao(loaded_config.connection_manager)
     # response = await campaign_dao.get_campaigns({"status": "active"})
     prompts = await prompt_fetcher()
 

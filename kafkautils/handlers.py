@@ -5,10 +5,19 @@ import json
 from datetime import datetime
 from database.connection_manager import ConnectionManager
 from database.collection_dao.campaigns import CampaignsDao
-from config.loaded_config import loaded_config
-from integrations.lusha.lusha_api import LushaAPIClient
 from database.collection_dao.companies import CompaniesDao
 from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.collection_dao.contacts import ContactsDao
+# Import DAO factory for database-agnostic access
+from database.factory import (
+    get_campaigns_dao,
+    get_companies_dao,
+    get_contacts_dao,
+    get_campaign_company_runs_dao,
+    get_campaign_contact_runs_dao,
+)
+from config.loaded_config import loaded_config
+from integrations.lusha.lusha_api import LushaAPIClient
 from integrations.integration_orchestrator import IntegrationOrchestrator
 from integrations.apollo.apollo_api import ApolloAPIClient
 from global_utils.chronos_utils import (
@@ -20,7 +29,6 @@ from config.logging import logger
 from integrations.apollo.apollo_helper import ApolloHelper
 from integrations.apollo.schema import ApolloResponseSchema
 from webhooks.contact_hubspot_webhook import ContactHubspotWebhook
-from database.collection_dao.contacts import ContactsDao
 def convert_objectid_to_string(payload: dict) -> dict:
     """Convert ObjectId values to strings for JSON serialization."""
     converted_payload = payload.copy()
@@ -34,15 +42,37 @@ def convert_objectid_to_string(payload: dict) -> dict:
 
 
 async def initialize_consumer_connections():
-    """Initialize database connections for consumer context."""
+    """Initialize database connections for consumer context (MongoDB and PostgreSQL)."""
     
     if not loaded_config.connection_manager:
         logger.info("🔄 Initializing database connection for consumer...")
+        logger.info(f"   📋 PostgreSQL URL: {loaded_config.postgres_url}")
         loaded_config.connection_manager = ConnectionManager(
             mongo_uri=loaded_config.mongo_uri, 
-            db_name="linkedin_sdr"
+            db_name="linkedin_sdr",
+            postgres_url=loaded_config.postgres_url
         )
+        # Initialize PostgreSQL if configured
+        if loaded_config.postgres_url:
+            logger.info("🔄 Initializing PostgreSQL connection for consumer...")
+            try:
+                await loaded_config.connection_manager.setup_postgres()
+                # Verify the session is available
+                session = loaded_config.connection_manager.get_pg_session()
+                if session:
+                    logger.info("✅ PostgreSQL session factory available")
+                    await session.close()  # Close the test session
+                else:
+                    logger.error("❌ PostgreSQL session factory returned None")
+            except Exception as e:
+                logger.error(f"❌ PostgreSQL setup failed: {e}")
+            logger.info("✅ PostgreSQL connection initialized for consumer")
         logger.info("✅ Database connection initialized for consumer")
+    else:
+        # Ensure PostgreSQL is initialized even if connection_manager exists
+        if loaded_config.postgres_url and not loaded_config.connection_manager.postgres_engine:
+            logger.info("🔄 PostgreSQL not initialized, setting up now...")
+            await loaded_config.connection_manager.setup_postgres()
 
 
 async def leadgen_batch_processing_handler(message: Any):
@@ -240,9 +270,10 @@ async def process_csv_import(request_id: str, campaign_id: str):
         # Initialize database connection if needed
         await initialize_consumer_connections()
         
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
+        campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
         apollo_client = ApolloAPIClient()
         
         # 1. Fetch campaign to get domains list
@@ -552,11 +583,12 @@ async def leadgen_company_qualification_ai_processing_handler(message: Any):
             logger.error(f"❌ Unknown action: {action}")
             return
 
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
         logger.info(f"🔄 Processing AI company qualification: {request_id}")
         await campaigns_dao.update_campaign( campaign_id, {"prospecting_cycle.status":"company_qualification_ai_started"})
         await process_company_qualification_ai(request_id, campaign_id)
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
         await campaigns_dao.update_campaign( campaign_id, {"prospecting_cycle.status":"company_qualification"})
         
     except Exception as e:
@@ -618,7 +650,7 @@ async def ai_contact_qualification(request_id: str, campaign_id: str):
 
         await initialize_consumer_connections()
 
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
         campaign_data = await campaigns_dao.get_campaign(campaign_id)
 
         if not campaign_data:
@@ -655,7 +687,7 @@ async def ai_contact_qualification(request_id: str, campaign_id: str):
     except Exception as e:
         logger.error(f"❌ Error processing AI contact qualification {request_id}: {e}")
         # Update status to failed
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
         await campaigns_dao.update_campaign(campaign_id, {
             "prospecting_cycle.contact_qualification_ai.status": "failed",
             "prospecting_cycle.contact_qualification_ai.error": str(e),
@@ -715,7 +747,7 @@ async def process_apollo_contact_list(request_id: str, campaign_id: str, slack_m
     """
     try:
         await initialize_consumer_connections()
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
         campaign_data = await campaigns_dao.get_campaign(campaign_id)
         
         if not campaign_data:
@@ -739,7 +771,7 @@ async def process_company_qualification_ai(request_id: str, campaign_id: str):
 
         await initialize_consumer_connections()
 
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
         campaign_data = await campaigns_dao.get_campaign(campaign_id)
 
         if not campaign_data:
@@ -772,7 +804,7 @@ async def process_prospecting_job(request_id: str, campaign_id: str):
         await initialize_consumer_connections()
         
         # Fetch campaign data from database using campaign_id
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
         campaign_data = await campaigns_dao.get_campaign(campaign_id)
         
         if not campaign_data:
@@ -816,9 +848,9 @@ async def process_single_company(request_id: str, campaign_id: str):
         # Initialize database connection if needed
         await initialize_consumer_connections()
         
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
+        campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
         
         # 1. Fetch campaign to get domain
         campaign_data = await campaigns_dao.get_campaign(campaign_id)
@@ -1006,7 +1038,7 @@ async def process_leadgen_message(request_id: str, campaign_id: str):
         await initialize_consumer_connections()
         
         # Fetch campaign data from database using campaign_id
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
         campaign_data = await campaigns_dao.get_campaign(campaign_id)
         
         if not campaign_data:
@@ -1157,8 +1189,8 @@ async def lusha_company_data_collection(campaign_details: Any):
             total_pages = (total_results + page_size - 1) // page_size if total_results > 0 else 1
             page_companies = []
 
-            companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-            campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+            companies_dao = get_companies_dao(loaded_config.connection_manager)
+            campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
             company_saver = CompanySaver(companies_dao, campaign_company_runs_dao)
             raw_config =campaign_details["raw_config"]
             
@@ -1288,7 +1320,7 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
         await initialize_consumer_connections()
         
         # Fetch campaign data from database using campaign_id
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
         company_data = await companies_dao.get_companies({"_id": {"$in": company_ids}})
         if not company_data:
             logger.error(f"❌ Company not found: {company_ids}")
@@ -1310,7 +1342,7 @@ async def process_contacts_enrichment(request_id: str, company_ids: list, slack_
             apollo_helper = ApolloHelper()
 
             # if company as  multple unsent contacts, then don't do apollo search
-            contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+            contacts_dao = get_contacts_dao(loaded_config.connection_manager)
             contacts = await contacts_dao.get_contacts({
                 "company_id": company_id,
                 # "webhook_sent": False,

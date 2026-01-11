@@ -14,7 +14,7 @@ from ai_agents.meetings.models import (
 from ai_agents.meetings.service import meeting_service
 from ai_agents.meetings.websocket import meeting_websocket_endpoint
 from config.loaded_config import loaded_config
-from database.collection_dao.companies import CompaniesDao
+from database.factory import get_companies_dao
 
 
 def _is_uuid(meeting_id: str) -> bool:
@@ -411,9 +411,8 @@ async def trigger_deep_research(company_id: str):
     """
     try:
         from ai_agents.meetings.deep_research_service import DeepResearchService
-        from database.collection_dao.companies import CompaniesDao
         
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
         company = await companies_dao.get_company(company_id)
         if not company:
             raise HTTPException(status_code=404, detail="Company not found")
@@ -442,7 +441,7 @@ async def get_company_research(company_id: str):
     Get the latest deep research for a company.
     """
     try:
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
         research = await companies_dao.get_deep_research(company_id)
         if not research:
             raise HTTPException(status_code=404, detail="Research not found. Trigger research first.")
@@ -459,7 +458,7 @@ async def get_company_red_flags(company_id: str):
     Get cumulative red flags history for a company.
     """
     try:
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
         red_flags = await companies_dao.get_red_flags_history(company_id)
         return ORJSONResponse(content={"success": True, "data": red_flags})
     except Exception as e:

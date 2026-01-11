@@ -1,13 +1,25 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from datetime import datetime, timezone
 
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from config.logging import logger
+
+# Type hints support both MongoDB and PostgreSQL DAOs
+try:
+    from database.collection_dao.companies import CompaniesDao
+    from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+    from database.postgres.collection_dao.companies import PostgresCompaniesDao
+    from database.postgres.collection_dao.campaign_company_runs import PostgresCampaignCompanyRunsDao
+    CompaniesDAOType = Union[CompaniesDao, PostgresCompaniesDao]
+    CampaignCompanyRunsDAOType = Union[CampaignCompanyRunsDao, PostgresCampaignCompanyRunsDao]
+except ImportError:
+    CompaniesDAOType = Any
+    CampaignCompanyRunsDAOType = Any
 
 
 class CompanySaver:
-    def __init__(self, companies_dao: CompaniesDao, campaign_company_runs_dao: CampaignCompanyRunsDao):
+    """Saves companies to database - works with both MongoDB and PostgreSQL DAOs."""
+    
+    def __init__(self, companies_dao: CompaniesDAOType, campaign_company_runs_dao: CampaignCompanyRunsDAOType):
         self.companies_dao = companies_dao
         self.campaign_company_runs_dao = campaign_company_runs_dao
 
@@ -54,12 +66,13 @@ class CompanySaver:
 
 
         for company in existing_companies:
-            source_id = company.get("identifiers", {}).get("source_id")
+            # Support both MongoDB (nested) and PostgreSQL (top-level) data formats
+            source_id = company.get("source_id") or company.get("identifiers", {}).get("source_id")
 
             if source_id not in existing_source_ids:
                 campaign_company_details['company_ids'].append(company['_id'])
 
-            existing_source_ids.add(company.get("identifiers", {}).get("source_id"))
+            existing_source_ids.add(source_id)
 
         logger.info(f"📊 Found {len(existing_source_ids)} existing companies in database")
         companies_to_insert = []

@@ -11,8 +11,10 @@ from global_utils.chronos_utils import (
 )
 from ai_agents.core_sdr.src.parsers.constants import COMPANY_GROUPINGS
 from integrations.lusha.company_saver import CompanySaver
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
+from database.factory import (
+    get_companies_dao,
+    get_campaign_company_runs_dao,
+)
 from integrations.config.lusha_department_mapper import DEPARTMENT_TO_CATEGORY
 from global_utils.constants import LUSHA_BASE_URL
 from config.logging import logger
@@ -31,8 +33,9 @@ class LushaAPIClient:
             'Content-Type': 'application/json'
         }
         self.payload_values = payload_values
-        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access (supports both MongoDB and PostgreSQL)
+        self.companies_dao = get_companies_dao(loaded_config.connection_manager)
+        self.campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
         self.company_saver = CompanySaver(self.companies_dao, self.campaign_company_runs_dao)
         self.timeout = 30
 
