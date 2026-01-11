@@ -11,6 +11,7 @@ Supported MongoDB operators:
 JSONB path access is supported via dot notation (e.g., "metadata.created_at")
 """
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 import re
@@ -21,8 +22,11 @@ from sqlalchemy import select, update, delete, func, text, and_, or_, cast, Stri
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm.attributes import flag_modified
 
 from database.postgres.models import Base
+
+logger = logging.getLogger(__name__)
 
 
 T = TypeVar("T", bound=DeclarativeBase)
@@ -453,8 +457,9 @@ class BasePostgresDao:
                         normalized_value = normalize_document_for_jsonb(value) if isinstance(value, dict) else normalize_value_for_jsonb(value)
                         
                         # If field is a top-level JSONB field, set directly (don't double-nest)
+                        # For lists (like contact_ids) or dicts (like identifiers), assign directly
                         if len(path) == 1 and path[0] == jsonb_column:
-                            jsonb_updates[jsonb_column] = normalized_value if isinstance(normalized_value, dict) else {path[0]: normalized_value}
+                            jsonb_updates[jsonb_column] = normalized_value
                         else:
                             # Set nested path
                             self._set_nested_value(jsonb_updates[jsonb_column], path, normalized_value)
@@ -571,11 +576,12 @@ class BasePostgresDao:
                 # Normalize value for JSONB (convert datetime to string)
                 normalized_value = normalize_document_for_jsonb(value) if isinstance(value, dict) else normalize_value_for_jsonb(value)
                 
-                # If field is a top-level JSONB field (e.g., "identifiers"), set directly
+                # If field is a top-level JSONB field (e.g., "identifiers", "contact_ids"), set directly
                 # Otherwise it's a nested path (e.g., "identifiers.name"), use set_nested_value
                 if len(path) == 1 and path[0] == jsonb_column:
                     # Direct assignment to JSONB column - don't double-nest
-                    jsonb_data[jsonb_column] = normalized_value if isinstance(normalized_value, dict) else {path[0]: normalized_value}
+                    # For lists (like contact_ids) or dicts (like identifiers), assign directly
+                    jsonb_data[jsonb_column] = normalized_value
                 else:
                     self._set_nested_value(jsonb_data[jsonb_column], path, normalized_value)
             else:
@@ -797,30 +803,83 @@ class BasePostgresDao:
             if key.startswith("__") and key.endswith("_merge"):
                 # JSONB merge update
                 jsonb_column = key[2:-6]  # Remove __ prefix and _merge suffix
-                current = getattr(instance, jsonb_column) or {}
-                merged = self._deep_merge(current, value)
-                setattr(instance, jsonb_column, merged)
+                current = getattr(instance, jsonb_column)
+                # If value is a list or not a dict, replace directly (don't try to merge)
+                if isinstance(value, list) or not isinstance(value, dict):
+                    setattr(instance, jsonb_column, value)
+                    flag_modified(instance, jsonb_column)
+                else:
+                    # Value is a dict, do deep merge
+                    current = dict(current) if isinstance(current, dict) else {}
+                    merged = self._deep_merge(current, value)
+                    setattr(instance, jsonb_column, merged)
+                    flag_modified(instance, jsonb_column)
             elif key.startswith("__") and key.endswith("_special"):
                 # Special JSONB operations ($push, $addToSet)
                 jsonb_column = key[2:-8]
-                current = getattr(instance, jsonb_column) or {}
+                current = getattr(instance, jsonb_column)
+                logger.debug(f"🔧 $push/$addToSet: jsonb_column={jsonb_column}, current_type={type(current)}, current_len={len(current) if isinstance(current, list) else 'N/A'}")
                 
                 for op, fields in value.items():
                     if op == "$push":
                         for path_str, item in fields.items():
                             path = path_str.split(".")
-                            arr = self._get_nested_value(current, path) or []
-                            arr.append(item)
-                            self._set_nested_value(current, path, arr)
+                            logger.debug(f"   $push: path={path}, item_keys={item.keys() if isinstance(item, dict) else 'not_dict'}")
+                            
+                            # Check if this is a direct push to a top-level JSONB array column
+                            # e.g., path=["transcript"] and jsonb_column="transcript"
+                            if len(path) == 1 and path[0] == jsonb_column:
+                                # Direct array push - don't nest in a dict
+                                # Create a NEW list to ensure SQLAlchemy detects the change
+                                arr = list(current) if isinstance(current, list) else []
+                                arr.append(item)
+                                setattr(instance, jsonb_column, arr)
+                                # Flag the column as modified for JSONB change detection
+                                flag_modified(instance, jsonb_column)
+                                logger.debug(f"   ✅ Direct push: arr now has {len(arr)} items, flagged as modified")
+                            else:
+                                # Nested push - need dict structure
+                                if current is None:
+                                    current = {}
+                                elif isinstance(current, list):
+                                    current = {jsonb_column: current}
+                                else:
+                                    # Create a copy to ensure change detection
+                                    current = dict(current) if isinstance(current, dict) else {}
+                                arr = self._get_nested_value(current, path) or []
+                                arr.append(item)
+                                self._set_nested_value(current, path, arr)
+                                setattr(instance, jsonb_column, current)
+                                flag_modified(instance, jsonb_column)
+                                
                     elif op == "$addToSet":
                         for path_str, item in fields.items():
                             path = path_str.split(".")
-                            arr = self._get_nested_value(current, path) or []
-                            if item not in arr:
-                                arr.append(item)
-                            self._set_nested_value(current, path, arr)
-                
-                setattr(instance, jsonb_column, current)
+                            
+                            # Check if this is a direct addToSet to a top-level JSONB array column
+                            if len(path) == 1 and path[0] == jsonb_column:
+                                # Direct array addToSet - don't nest in a dict
+                                # Create a NEW list to ensure SQLAlchemy detects the change
+                                arr = list(current) if isinstance(current, list) else []
+                                if item not in arr:
+                                    arr.append(item)
+                                setattr(instance, jsonb_column, arr)
+                                flag_modified(instance, jsonb_column)
+                            else:
+                                # Nested addToSet - need dict structure
+                                if current is None:
+                                    current = {}
+                                elif isinstance(current, list):
+                                    current = {jsonb_column: current}
+                                else:
+                                    # Create a copy to ensure change detection
+                                    current = dict(current) if isinstance(current, dict) else {}
+                                arr = self._get_nested_value(current, path) or []
+                                if item not in arr:
+                                    arr.append(item)
+                                self._set_nested_value(current, path, arr)
+                                setattr(instance, jsonb_column, current)
+                                flag_modified(instance, jsonb_column)
             else:
                 setattr(instance, key, value)
         
@@ -1141,16 +1200,25 @@ class BasePostgresDao:
         
         return result
     
-    def _deep_merge(self, base: Dict, update: Dict) -> Dict:
-        """Deep merge two dictionaries.
+    def _deep_merge(self, base: Any, update: Any) -> Any:
+        """Deep merge two values (dicts, lists, or scalars).
         
         Args:
-            base: Base dictionary
-            update: Dictionary with updates
+            base: Base value (dict, list, or scalar)
+            update: Update value (dict, list, or scalar)
             
         Returns:
-            Merged dictionary
+            Merged value
         """
+        # If update is not a dict, just return the update (replace)
+        if not isinstance(update, dict):
+            return update
+        
+        # If base is not a dict, just return the update
+        if not isinstance(base, dict):
+            return update
+        
+        # Both are dicts, do deep merge
         result = base.copy()
         
         for key, value in update.items():

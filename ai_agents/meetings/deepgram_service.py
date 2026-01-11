@@ -3,8 +3,16 @@
 import asyncio
 import json
 import logging
+import os
 from typing import Callable, Optional, Any, List, Dict
 from datetime import datetime
+
+# Set up file logging for debugging
+log_dir = "/Users/ashutoshtripathy/agent_hub/logs"
+os.makedirs(log_dir, exist_ok=True)
+file_handler = logging.FileHandler(os.path.join(log_dir, "meetings_deepgram.log"))
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 
 try:
     from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
@@ -18,6 +26,8 @@ except ImportError:
 from config.loaded_config import loaded_config
 
 logger = logging.getLogger(__name__)
+logger.addHandler(file_handler)
+logger.setLevel(logging.DEBUG)
 
 
 class DeepgramTranscriptionService:

@@ -37,9 +37,9 @@ class MeetingService:
     
     def __init__(self):
         """Initialize the meeting service."""
-        self._meetings_dao: Optional[MeetingsDao] = None
-        self._companies_dao: Optional[CompaniesDao] = None
-        self._contacts_dao: Optional[ContactsDao] = None
+        self._meetings_dao: Optional[Any] = None
+        self._companies_dao: Optional[Any] = None
+        self._contacts_dao: Optional[Any] = None
         self._battlecard_generator = BattlecardGenerator()
         self._reflections_generator = ReflectionsGenerator()
         self._post_call_analyzer = PostCallAnalyzer()
@@ -487,7 +487,10 @@ class MeetingService:
         
         # Get transcript
         transcript = meeting.get("transcript", [])
-        if not transcript:
+        # Handle both list format and legacy double-nested format {"transcript": [...]}
+        if isinstance(transcript, dict) and "transcript" in transcript:
+            transcript = transcript.get("transcript", [])
+        if not transcript or not isinstance(transcript, list):
             raise ValueError(f"Meeting {meeting_id} has no transcript to summarize")
         
         # Get company name
@@ -608,7 +611,12 @@ class MeetingService:
         
         # Get transcript
         transcript = meeting.get("transcript", [])
-        if not transcript:
+        logger.info(f"📝 Raw transcript type: {type(transcript)}, value preview: {str(transcript)[:200] if transcript else 'None'}")
+        
+        # Handle both list format and legacy double-nested format {"transcript": [...]}
+        if isinstance(transcript, dict) and "transcript" in transcript:
+            transcript = transcript.get("transcript", [])
+        if not transcript or not isinstance(transcript, list):
             raise ValueError(f"Meeting {meeting_id} has no transcript to analyze")
         
         # Get company data
@@ -620,7 +628,10 @@ class MeetingService:
         # Get contact data
         contact_data = None
         contact_ids = meeting.get("contact_ids", [])
-        if contact_ids:
+        # Handle both list format and legacy double-nested format {"contact_ids": [...]}
+        if isinstance(contact_ids, dict) and "contact_ids" in contact_ids:
+            contact_ids = contact_ids.get("contact_ids", [])
+        if contact_ids and isinstance(contact_ids, list) and len(contact_ids) > 0:
             contact_data = await contacts_dao.get_contact(str(contact_ids[0]))
         
         # Get previous meetings
@@ -641,12 +652,19 @@ class MeetingService:
         api_key = loaded_config.openai_api_key
         logger.info(f"Analyzing meeting {meeting_id}. OpenAI API key present: {bool(api_key)}, length: {len(api_key) if api_key else 0}")
         
+        # Get product_ids and unwrap if double-nested
+        product_ids = meeting.get("product_ids", [])
+        if isinstance(product_ids, dict) and "product_ids" in product_ids:
+            product_ids = product_ids.get("product_ids", [])
+        if not isinstance(product_ids, list):
+            product_ids = []
+        
         # Analyze meeting
         analysis = await self._post_call_analyzer.analyze_meeting(
             transcript=transcript,
             company_data=company_data,
             contact_data=contact_data,
-            products=meeting.get("product_ids", []),
+            products=product_ids,
             previous_meetings=previous_meetings,
             company_name=company_name,
         )

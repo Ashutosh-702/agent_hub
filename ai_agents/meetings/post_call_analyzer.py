@@ -76,6 +76,12 @@ class PostCallAnalyzer:
             return "No transcript available"
         
         lines = []
+        # Handle double-nested format if it slipped through {"transcript": [...]}
+        if isinstance(transcript, dict):
+            logger.warning(f"⚠️ Transcript is a dict, not a list! Keys: {transcript.keys()}")
+            if "transcript" in transcript:
+                transcript = transcript.get("transcript", [])
+        
         for entry in transcript:
             timestamp = entry.get("timestamp", 0)
             speaker = "You" if entry.get("speaker") == "user" else "Client"
@@ -169,6 +175,11 @@ class PostCallAnalyzer:
         context_text = self._format_context(
             company_data, contact_data, products, previous_meetings
         )
+        
+        # Debug logging to see what's being sent to OpenAI
+        logger.info(f"📝 Analyzing meeting with transcript entries: {len(transcript)}")
+        logger.info(f"📝 Transcript preview: {transcript_text[:500] if transcript_text else 'EMPTY'}")
+        logger.info(f"📝 Context: {context_text[:500] if context_text else 'EMPTY'}")
         
         user_prompt = f"""## Meeting Context
 {context_text}

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from typing import Dict, Any, Optional
 import uuid
@@ -11,6 +12,13 @@ from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 from config.loaded_config import loaded_config
+
+# Set up file logging for debugging
+log_dir = "/Users/ashutoshtripathy/agent_hub/logs"
+os.makedirs(log_dir, exist_ok=True)
+file_handler = logging.FileHandler(os.path.join(log_dir, "meetings_websocket.log"))
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 from database.factory import get_meetings_dao, get_companies_dao, get_contacts_dao
 from ai_agents.meetings.models import (
     TranscriptEntry,
@@ -28,6 +36,8 @@ from ai_agents.meetings.post_call_analyzer import PostCallAnalyzer
 from ai_agents.meetings.red_flag_detector import RedFlagDetector
 
 logger = logging.getLogger(__name__)
+logger.addHandler(file_handler)
+logger.setLevel(logging.DEBUG)
 
 
 class MeetingWebSocketHandler:
@@ -121,6 +131,25 @@ class MeetingWebSocketHandler:
         logger.info(f"Received interim transcript: {text[:100]}... (speaker: {speaker})")
         # Determine source: 'user' speaker = mic, 'client' speaker = system_audio
         source = "mic" if speaker == "user" else "system_audio"
+        
+        # Save to database if text is not empty - fallback for when Deepgram finals are empty
+        if self._db_meeting_id and text.strip():
+            entry = TranscriptEntry(
+                timestamp=timestamp,
+                speaker=speaker,
+                source=source,
+                text=text,
+                is_final=False,  # Mark as interim
+            )
+            try:
+                result = await self.meetings_dao.append_transcript(
+                    self._db_meeting_id,
+                    entry.model_dump()
+                )
+                logger.info(f"📝 Saved INTERIM transcript to DB: meeting={self._db_meeting_id}, result={result}, text={text[:50]}...")
+            except Exception as e:
+                logger.error(f"❌ Failed to save interim transcript: {e}", exc_info=True)
+        
         await self._send_json({
             "type": "transcript_interim",
             "text": text,
@@ -238,6 +267,9 @@ class MeetingWebSocketHandler:
         
         # Load product context
         product_ids = self._meeting_data.get("product_ids", [])
+        # Handle both list format and legacy double-nested format {"product_ids": [...]}
+        if isinstance(product_ids, dict) and "product_ids" in product_ids:
+            product_ids = product_ids.get("product_ids", [])
         from ai_agents.meetings.battlecard_generator import PRODUCT_INFO
         for pid in product_ids:
             if pid in PRODUCT_INFO:
@@ -251,7 +283,10 @@ class MeetingWebSocketHandler:
         
         # Load contact context
         contact_ids = self._meeting_data.get("contact_ids", [])
-        if contact_ids and self.contacts_dao:
+        # Handle both list format and legacy double-nested format {"contact_ids": [...]}
+        if isinstance(contact_ids, dict) and "contact_ids" in contact_ids:
+            contact_ids = contact_ids.get("contact_ids", [])
+        if contact_ids and isinstance(contact_ids, list) and len(contact_ids) > 0 and self.contacts_dao:
             try:
                 contact_id = str(contact_ids[0])
                 contact = await self.contacts_dao.get_contact(contact_id)

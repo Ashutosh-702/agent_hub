@@ -47,7 +47,16 @@ class PostgresMeetingsDao(BasePostgresDao):
         "reflections": "reflections",
     }
     
-    ARRAY_FIELDS = ["contact_ids", "product_ids"]
+    ARRAY_FIELDS = [
+        "contact_ids", 
+        "product_ids", 
+        "transcript", 
+        "live_insights", 
+        "action_items", 
+        "next_steps", 
+        "key_discussion_points", 
+        "objections_resolutions"
+    ]
     
     def __init__(self, session: AsyncSession):
         super().__init__(session)
