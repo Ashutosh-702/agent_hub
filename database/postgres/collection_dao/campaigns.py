@@ -104,24 +104,38 @@ class PostgresCampaignsDao(BasePostgresDao):
         
         # Support dot notation format: {"lifecycle.status": "value"} or {"prospecting_cycle.status": "value"}
         # For these, we need to update BOTH the column AND the JSONB field
-        # Convert dot notation to nested dict for JSONB merge while also setting the column
+        # The dot notation paths in COLUMN_MAP are treated as columns by base_dao, NOT JSONB
+        # So we must:
+        # 1. Set the column value
+        # 2. Convert dot notation to nested dict for JSONB merge
+        # 3. Ensure nested paths are processed AFTER the base dict to avoid overwrites
+        
+        # Collect other nested updates that should be applied AFTER the base status
+        nested_updates = {}
+        
         if "lifecycle.status" in update_data:
             status_value = update_data.pop("lifecycle.status")
             update_data["lifecycle_status"] = status_value
-            # Merge into lifecycle JSONB field
-            if "lifecycle" not in update_data or not isinstance(update_data.get("lifecycle"), dict):
-                update_data["lifecycle"] = {"status": status_value}
-            else:
-                update_data["lifecycle"]["status"] = status_value
+            # Merge into lifecycle JSONB - but check for other nested lifecycle paths first
+            lifecycle_base = {"status": status_value}
+            for key in list(update_data.keys()):
+                if key.startswith("lifecycle.") and key != "lifecycle.status":
+                    nested_updates[key] = update_data.pop(key)
+            update_data["lifecycle"] = lifecycle_base
             
         if "prospecting_cycle.status" in update_data:
             status_value = update_data.pop("prospecting_cycle.status")
             update_data["prospecting_status"] = status_value
-            # Merge into prospecting_cycle JSONB field
-            if "prospecting_cycle" not in update_data or not isinstance(update_data.get("prospecting_cycle"), dict):
-                update_data["prospecting_cycle"] = {"status": status_value}
-            else:
-                update_data["prospecting_cycle"]["status"] = status_value
+            # Collect all other nested prospecting_cycle paths
+            for key in list(update_data.keys()):
+                if key.startswith("prospecting_cycle.") and key != "prospecting_cycle.status":
+                    nested_updates[key] = update_data.pop(key)
+            # Set the base dict FIRST
+            update_data["prospecting_cycle"] = {"status": status_value}
+        
+        # Re-add nested updates so they are processed AFTER the base dict
+        # This ensures _set_nested_value merges INTO the base dict rather than being overwritten
+        update_data.update(nested_updates)
         
         return await self.update_one({"_id": campaign_id}, {"$set": update_data})
     

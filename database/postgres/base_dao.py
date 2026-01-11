@@ -461,8 +461,11 @@ class BasePostgresDao:
                         if len(path) == 1 and path[0] == jsonb_column:
                             jsonb_updates[jsonb_column] = normalized_value
                         else:
-                            # Set nested path
-                            self._set_nested_value(jsonb_updates[jsonb_column], path, normalized_value)
+                            # Set nested path - strip the JSONB column name from path if it's the first element
+                            # e.g., "prospecting_cycle.company_qualification_ai.status" should become
+                            # ["company_qualification_ai", "status"] not ["prospecting_cycle", "company_qualification_ai", "status"]
+                            nested_path = path[1:] if path[0] == jsonb_column else path
+                            self._set_nested_value(jsonb_updates[jsonb_column], nested_path, normalized_value)
                     else:
                         # For regular columns, preserve datetime objects
                         value = normalize_objectid(value)  # Only normalize ObjectId, preserve datetime
