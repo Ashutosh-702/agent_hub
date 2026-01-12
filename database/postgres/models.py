@@ -122,6 +122,7 @@ class Campaign(Base):
     # Status fields for tracking workflow stages
     single_company_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     csv_import_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    ai_prospecting_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
@@ -138,6 +139,7 @@ class Campaign(Base):
     metadata_json: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)  # 'metadata' is reserved
     single_company: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)  # Single company workflow data
     csv_import: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)  # CSV import workflow data
+    ai_prospecting: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)  # AI prospecting workflow data (similar_companies, nl_filter)
     shortlisting_approach: Mapped[Optional[str]] = mapped_column(String(100))
     
     # Relationships

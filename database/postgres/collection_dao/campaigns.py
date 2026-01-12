@@ -25,6 +25,7 @@ class PostgresCampaignsDao(BasePostgresDao):
         "shortlisting_approach": "shortlisting_approach",
         "single_company.status": "single_company_status",
         "csv_import.status": "csv_import_status",
+        "ai_prospecting.status": "ai_prospecting_status",
         "created_at": "created_at",
         "updated_at": "updated_at",
     }
@@ -40,6 +41,7 @@ class PostgresCampaignsDao(BasePostgresDao):
         "metadata": "metadata_json",
         "single_company": "single_company",
         "csv_import": "csv_import",
+        "ai_prospecting": "ai_prospecting",
     }
     
     def __init__(self, session: AsyncSession):
@@ -65,6 +67,8 @@ class PostgresCampaignsDao(BasePostgresDao):
             campaign["single_company_status"] = campaign["single_company"].get("status")
         if "csv_import" in campaign:
             campaign["csv_import_status"] = campaign["csv_import"].get("status")
+        if "ai_prospecting" in campaign:
+            campaign["ai_prospecting_status"] = campaign["ai_prospecting"].get("status")
         
         return await self.insert_one(campaign)
     

@@ -102,6 +102,46 @@ class CreateCampaignFromSingleCompany(BaseModel):
         return name
 
 
+class CreateCampaignFromSimilarSearch(BaseModel):
+    """Schema for creating a campaign from similar company search"""
+    campaign_name: str  # Required unique campaign name
+    source_domain: str  # The domain to find similar companies for (e.g., 'hubspot.com')
+    product_name: Optional[str] = None
+    hubspot_email: Optional[str] = None
+    business_team: Optional[str] = None
+    user_email: Optional[str] = None
+    campaign_type: Optional[str] = "similar_companies"
+    prospecting_cycle_status: Optional[str] = "started"  # starts with 'started' status
+
+    @field_validator('campaign_name')
+    @classmethod
+    def validate_campaign_name(cls, name: str):
+        if not name or not name.strip():
+            raise ValueError("Campaign name cannot be empty")
+        name = name.strip()
+        if len(name) < 3:
+            raise ValueError("Campaign name must be at least 3 characters")
+        if len(name) > 100:
+            raise ValueError("Campaign name must be less than 100 characters")
+        return name
+
+    @field_validator('source_domain')
+    @classmethod
+    def validate_source_domain(cls, domain: str):
+        if not domain or not domain.strip():
+            raise ValueError("source_domain cannot be empty")
+        # Normalize domain
+        d = domain.strip().lower()
+        if d.startswith('http://'):
+            d = d[7:]
+        elif d.startswith('https://'):
+            d = d[8:]
+        if d.startswith('www.'):
+            d = d[4:]
+        d = d.split('/')[0]
+        return d
+
+
 class CreateCampaignFromCSVImport(BaseModel):
     """Schema for creating a campaign from CSV import with company domains"""
     campaign_name: str  # Required unique campaign name

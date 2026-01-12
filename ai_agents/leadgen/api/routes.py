@@ -25,6 +25,7 @@ from ai_agents.leadgen.views.ai_agents import (
     create_campaign_from_prospecting_job,
     create_campaign_from_single_company,
     create_campaign_from_csv_import,
+    create_campaign_from_similar_search,
     manual_company_qualification,
     ai_company_qualification,
     ai_contact_qualification,
@@ -204,6 +205,13 @@ router.add_api_route(
     "/create_campaign_from_csv_import",
     methods=["POST"],
     endpoint=create_campaign_from_csv_import,
+    response_model=ResponseData,
+)
+
+router.add_api_route(
+    "/create_campaign_from_similar_search",
+    methods=["POST"],
+    endpoint=create_campaign_from_similar_search,
     response_model=ResponseData,
 )
 

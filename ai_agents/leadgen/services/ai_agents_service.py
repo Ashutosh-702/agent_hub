@@ -42,7 +42,7 @@ from kafkautils.constants import(
     LeadgenServices
 )
 from integrations.lusha.lusha_api import LushaAPIClient
-from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob, CreateCampaignFromSingleCompany, CreateCampaignFromCSVImport
+from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob, CreateCampaignFromSingleCompany, CreateCampaignFromCSVImport, CreateCampaignFromSimilarSearch
 
 
 class CampaignService:
@@ -314,6 +314,98 @@ class CampaignService:
             "request_id": request_id,
             "campaign_id": str(campaign_id),
             "total_companies": total_domains
+        }
+
+    async def create_campaign_from_similar_search(self, query_params: CreateCampaignFromSimilarSearch) -> Dict[str, Any]:
+        """
+        Create a campaign from similar company search.
+        - Creates campaign with empty data and status 'started'
+        - Sends campaign_id and source_domain to webhook (external processing)
+        - Returns campaign_id for frontend polling
+        
+        The webhook receiver will:
+        1. Find similar companies using external service
+        2. Enrich companies via Apollo
+        3. Update campaign status to 'company_qualification_select' when done
+        """
+        import httpx
+        
+        # 1. Create campaign with 'started' status
+        db_data = self._transform_similar_search_to_db_data(query_params)
+        campaign_id = await self.campaign_dao.create_campaign(db_data)
+        
+        if not campaign_id:
+            raise ApiException("campaign_id not generated")
+        
+        logger.info(f"📤 Similar Search Campaign {campaign_id} created with source_domain: {query_params.source_domain}")
+        
+        # 2. Send webhook with campaign_id and source_domain
+        # TODO: Replace with actual webhook URL from config
+        webhook_url = loaded_config.similar_companies_webhook_url if hasattr(loaded_config, 'similar_companies_webhook_url') else None
+        
+        if webhook_url:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    webhook_payload = {
+                        "campaign_id": str(campaign_id),
+                        "source_domain": query_params.source_domain,
+                        "campaign_name": query_params.campaign_name,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                    response = await client.post(webhook_url, json=webhook_payload)
+                    logger.info(f"📤 Webhook sent for campaign {campaign_id}: status={response.status_code}")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to send webhook for campaign {campaign_id}: {e}")
+                # Don't fail the request if webhook fails - processing can be retried
+        else:
+            logger.info(f"ℹ️ No webhook URL configured for similar companies search (campaign_id={campaign_id})")
+        
+        return {
+            "campaign_id": str(campaign_id),
+            "source_domain": query_params.source_domain
+        }
+
+    def _transform_similar_search_to_db_data(self, query_params: CreateCampaignFromSimilarSearch) -> Dict[str, Any]:
+        """Transform similar search request to database format"""
+        return {
+            "name": query_params.campaign_name,
+            "prompts": {
+                "web": None,
+                "persona": None
+            },
+            "segmentation": {
+                "industry": [],
+                "keywords": None,
+                "categories": None
+            },
+            "target": {
+                "employee_count": [],
+                "revenue_min": None,
+                "revenue_max": None,
+                "currency": None,
+                "location": {"type": None, "names": []}
+            },
+            "ownership": {
+                "hubspot_email": query_params.hubspot_email,
+                "product_name": query_params.product_name,
+                "business_team": query_params.business_team,
+                "user_email": query_params.user_email
+            },
+            "lifecycle": {"status": "active"},
+            "prospecting_cycle": {
+                "status": "started"  # New status: started -> company_qualification_select
+            },
+            "campaign_type": query_params.campaign_type,
+            "ai_prospecting": {
+                "source_domain": query_params.source_domain,
+                "status": "pending",  # pending -> processing -> completed -> failed
+                "total_count": 0,
+                "processed_count": 0
+            },
+            "metadata": {
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
         }
 
     def _transform_csv_import_to_db_data(self, query_params: CreateCampaignFromCSVImport) -> Dict[str, Any]:

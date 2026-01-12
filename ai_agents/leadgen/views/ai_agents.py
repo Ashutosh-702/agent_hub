@@ -21,6 +21,7 @@ from ai_agents.leadgen.schemas.ai_agents import (
     CreateCampaignFromProspectingJob,
     CreateCampaignFromSingleCompany,
     CreateCampaignFromCSVImport,
+    CreateCampaignFromSimilarSearch,
     ManualCompanyQualification,
     AiCompanyQualification,
     AiContactQualification,
@@ -347,6 +348,22 @@ async def create_campaign_from_csv_import(query_params: CreateCampaignFromCSVImp
         "existing_companies": response.get("existing_companies"),
         "new_companies": response.get("new_companies"),
         "total_companies": response.get("total_companies")
+    }
+
+    return response_data.dict()
+
+
+async def create_campaign_from_similar_search(query_params: CreateCampaignFromSimilarSearch = Body()) -> Dict[str, Any]:
+    """Create a campaign from similar company search and send webhook for external processing."""
+    response_data = ResponseData.model_construct(data={}, success=False)
+    campaign_service = CampaignService()
+
+    response = await campaign_service.create_campaign_from_similar_search(query_params)
+    response_data.success = True
+    response_data.data = {
+        "message": "Similar search campaign created and webhook sent",
+        "campaign_id": response.get("campaign_id"),
+        "source_domain": response.get("source_domain")
     }
 
     return response_data.dict()
