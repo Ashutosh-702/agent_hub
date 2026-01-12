@@ -458,7 +458,12 @@ class BasePostgresDao:
                         
                         # If field is a top-level JSONB field, set directly (don't double-nest)
                         # For lists (like contact_ids) or dicts (like identifiers), assign directly
-                        if len(path) == 1 and path[0] == jsonb_column:
+                        # Handle both direct match (path[0] == jsonb_column) and mapped match (metadata -> metadata_json)
+                        is_top_level_jsonb = len(path) == 1 and (
+                            path[0] == jsonb_column or 
+                            self.JSONB_FIELDS.get(path[0]) == jsonb_column
+                        )
+                        if is_top_level_jsonb:
                             jsonb_updates[jsonb_column] = normalized_value
                         else:
                             # Set nested path - strip the JSONB column name from path if it's the first element

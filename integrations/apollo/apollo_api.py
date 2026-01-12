@@ -245,9 +245,9 @@ class ApolloAPIClient:
             # Step 2: Calculate total pages needed
             pagination = results.get("pagination", {})
             total_results = pagination.get("total_entries", 0)
-            # total_pages = pagination.get("total_pages", 1)
+            total_pages = (total_results + per_page - 1) // per_page if total_results > 0 else 1
 
-            total_pages = 1
+            total_pages = 10 if total_pages > 10 else total_pages
             
             logger.info(f"Total pages: {total_pages}")
 

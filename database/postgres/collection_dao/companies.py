@@ -22,6 +22,7 @@ class PostgresCompaniesDao(BasePostgresDao):
         "profile.industry": "industry",
         "metadata.api_response.primary_domain": "primary_domain",
         "source": "source",
+        "webhook_sent": "webhook_sent",
         "created_at": "created_at",
         "updated_at": "updated_at",
     }

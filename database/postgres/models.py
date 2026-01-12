@@ -119,6 +119,10 @@ class Campaign(Base):
     prospecting_status: Mapped[Optional[str]] = mapped_column(String(50), index=True)
     user_email: Mapped[Optional[str]] = mapped_column(String(255), index=True)
     
+    # Status fields for tracking workflow stages
+    single_company_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    csv_import_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
@@ -132,6 +136,8 @@ class Campaign(Base):
     prospecting_cycle: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
     sequence_enrollment: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
     metadata_json: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)  # 'metadata' is reserved
+    single_company: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)  # Single company workflow data
+    csv_import: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)  # CSV import workflow data
     shortlisting_approach: Mapped[Optional[str]] = mapped_column(String(100))
     
     # Relationships
@@ -161,6 +167,9 @@ class Company(Base):
     
     # Industry as array (for filtering)
     industry: Mapped[Optional[list]] = mapped_column(ARRAY(String(255)), nullable=True, index=True)
+    
+    # Status fields
+    webhook_sent: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())

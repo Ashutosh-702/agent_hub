@@ -23,6 +23,8 @@ class PostgresCampaignsDao(BasePostgresDao):
         "prospecting_cycle.status": "prospecting_status",
         "ownership.user_email": "user_email",
         "shortlisting_approach": "shortlisting_approach",
+        "single_company.status": "single_company_status",
+        "csv_import.status": "csv_import_status",
         "created_at": "created_at",
         "updated_at": "updated_at",
     }
@@ -36,6 +38,8 @@ class PostgresCampaignsDao(BasePostgresDao):
         "prospecting_cycle": "prospecting_cycle",
         "sequence_enrollment": "sequence_enrollment",
         "metadata": "metadata_json",
+        "single_company": "single_company",
+        "csv_import": "csv_import",
     }
     
     def __init__(self, session: AsyncSession):
@@ -57,6 +61,10 @@ class PostgresCampaignsDao(BasePostgresDao):
             campaign["prospecting_status"] = campaign["prospecting_cycle"].get("status")
         if "ownership" in campaign:
             campaign["user_email"] = campaign["ownership"].get("user_email")
+        if "single_company" in campaign:
+            campaign["single_company_status"] = campaign["single_company"].get("status")
+        if "csv_import" in campaign:
+            campaign["csv_import_status"] = campaign["csv_import"].get("status")
         
         return await self.insert_one(campaign)
     
@@ -101,6 +109,10 @@ class PostgresCampaignsDao(BasePostgresDao):
             update_data["lifecycle_status"] = update_data["lifecycle"]["status"]
         if "prospecting_cycle" in update_data and isinstance(update_data["prospecting_cycle"], dict) and "status" in update_data["prospecting_cycle"]:
             update_data["prospecting_status"] = update_data["prospecting_cycle"]["status"]
+        if "single_company" in update_data and isinstance(update_data["single_company"], dict) and "status" in update_data["single_company"]:
+            update_data["single_company_status"] = update_data["single_company"]["status"]
+        if "csv_import" in update_data and isinstance(update_data["csv_import"], dict) and "status" in update_data["csv_import"]:
+            update_data["csv_import_status"] = update_data["csv_import"]["status"]
         
         # Support dot notation format: {"lifecycle.status": "value"} or {"prospecting_cycle.status": "value"}
         # For these, we need to update BOTH the column AND the JSONB field
@@ -132,6 +144,30 @@ class PostgresCampaignsDao(BasePostgresDao):
                     nested_updates[key] = update_data.pop(key)
             # Set the base dict FIRST
             update_data["prospecting_cycle"] = {"status": status_value}
+        
+        if "single_company.status" in update_data:
+            status_value = update_data.pop("single_company.status")
+            update_data["single_company_status"] = status_value
+            # Collect all other nested single_company paths
+            single_company_base = {"status": status_value}
+            for key in list(update_data.keys()):
+                if key.startswith("single_company.") and key != "single_company.status":
+                    # Extract nested key (e.g., "single_company.company_id" -> "company_id")
+                    nested_key = key.split(".", 1)[1]
+                    single_company_base[nested_key] = update_data.pop(key)
+            update_data["single_company"] = single_company_base
+        
+        if "csv_import.status" in update_data:
+            status_value = update_data.pop("csv_import.status")
+            update_data["csv_import_status"] = status_value
+            # Collect all other nested csv_import paths
+            csv_import_base = {"status": status_value}
+            for key in list(update_data.keys()):
+                if key.startswith("csv_import.") and key != "csv_import.status":
+                    # Extract nested key (e.g., "csv_import.error" -> "error")
+                    nested_key = key.split(".", 1)[1]
+                    csv_import_base[nested_key] = update_data.pop(key)
+            update_data["csv_import"] = csv_import_base
         
         # Re-add nested updates so they are processed AFTER the base dict
         # This ensures _set_nested_value merges INTO the base dict rather than being overwritten

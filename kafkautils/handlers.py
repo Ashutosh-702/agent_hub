@@ -858,7 +858,13 @@ async def process_single_company(request_id: str, campaign_id: str):
             logger.error(f"❌ Campaign not found: {campaign_id}")
             return
         
-        company_domain = campaign_data.get("single_company", {}).get("domain")
+        # company_domain = campaign_data.get("single_company", {}).get("domain")
+        campaign_company_runs = await campaign_company_runs_dao.get_campaign_company_runs({
+            "campaign_id": campaign_id
+        })
+        company_ids = [campaign_company_run.get("company_id") for campaign_company_run in campaign_company_runs]
+        company_data = await companies_dao.get_companies({"_id": {"$in": company_ids}})
+        company_domain = company_data[0].get("identifiers", {}).get("source_domain")
         if not company_domain:
             logger.error(f"❌ No domain found in campaign: {campaign_id}")
             await campaigns_dao.update_campaign(campaign_id, {
@@ -877,9 +883,9 @@ async def process_single_company(request_id: str, campaign_id: str):
         })
         
         # 2. Fetch campaign_company_runs to get company_id
-        campaign_company_runs = await campaign_company_runs_dao.get_campaign_company_runs({
-            "campaign_id": campaign_id
-        })
+        # campaign_company_runs = await campaign_company_runs_dao.get_campaign_company_runs({
+        #     "campaign_id": campaign_id
+        # })
         
         if not campaign_company_runs:
             logger.error(f"❌ No campaign_company_runs found for campaign: {campaign_id}")
