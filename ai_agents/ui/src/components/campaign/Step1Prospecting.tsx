@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useCampaignWizard } from './NewCampaignWizard';
 
 import {
@@ -59,6 +59,8 @@ export const Step1Prospecting = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [isCheckingResume, setIsCheckingResume] = useState(false);
+  const hasCheckedResume = useRef(false);
   
   // Industry dropdown state
   const [industrySearchQuery, setIndustrySearchQuery] = useState('');
@@ -74,14 +76,18 @@ export const Step1Prospecting = () => {
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
   const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
 
+  // Determine which campaign ID to poll - either newly created or resumed from state
+  const activeCampaignId = createdCampaignId || (isPolling || isCheckingResume ? state.campaignId : null);
+
   // OPTIMIZED: Use minimal status API instead of heavy campaign_details_with_companies
+  // Also used for initial resume check
   const { data: campaignStatusData } = useGetCampaignStatusMinimalQuery(
-    createdCampaignId
-      ? { campaign_id: createdCampaignId }
+    activeCampaignId
+      ? { campaign_id: activeCampaignId }
       : { campaign_id: '' },
     {
-      skip: !createdCampaignId || !isPolling,
-      pollingInterval: createdCampaignId && isPolling ? 2000 : 0,
+      skip: !activeCampaignId,
+      pollingInterval: activeCampaignId && isPolling ? 2000 : 0,
     }
   );
 
@@ -208,12 +214,39 @@ export const Step1Prospecting = () => {
     }
   };
 
+  // Check if we're resuming a campaign with 'prospecting' status (only for wide_prospecting type)
+  useEffect(() => {
+    if (hasCheckedResume.current) return;
+    if (!state.campaignId || state.campaignType !== 'wide_prospecting') return;
+    
+    // Trigger a status check to see if we need to resume polling
+    setIsCheckingResume(true);
+  }, [state.campaignId, state.campaignType]);
+
+  // Handle resume check result
+  useEffect(() => {
+    if (!isCheckingResume || hasCheckedResume.current) return;
+    if (!campaignStatusData) return;
+    
+    hasCheckedResume.current = true;
+    setIsCheckingResume(false);
+    
+    const prospectingCycleStatus = campaignStatusData?.data?.prospecting_cycle?.status;
+    
+    // If campaign is in 'prospecting' status, resume polling with loader
+    if (prospectingCycleStatus === 'prospecting') {
+      setLoading(true, 'Prospecting in progress… waiting for company qualification…', 0);
+      setIsPolling(true);
+    }
+  }, [campaignStatusData, isCheckingResume, setLoading]);
+
+  // Handle polling result for both new campaigns and resumed campaigns
   useEffect(() => {
     // OPTIMIZED: Read from minimal status API (not full campaign details)
     const lifecycleStatus = campaignStatusData?.data?.lifecycle?.status;
     const prospectingCycleStatus = campaignStatusData?.data?.prospecting_cycle?.status;
 
-    if (!createdCampaignId || !isPolling) return;
+    if (!activeCampaignId || !isPolling) return;
 
     // Stop polling once the backend moved the campaign forward.
     if (lifecycleStatus === 'company_qualification' || (prospectingCycleStatus && prospectingCycleStatus !== 'prospecting')) {
@@ -222,7 +255,7 @@ export const Step1Prospecting = () => {
       // Move to Step 2; Step 2 will load companies page-wise (100/page) from backend.
       nextStep();
     }
-  }, [campaignStatusData, createdCampaignId, isPolling, nextStep, setLoading]);
+  }, [campaignStatusData, activeCampaignId, isPolling, nextStep, setLoading]);
 
   const handleRefineSearch = () => {
     setIsRefining(true); // Show filters but keep results visible below
@@ -242,7 +275,7 @@ export const Step1Prospecting = () => {
       </div>
 
       {/* Loading Overlay (no progress bar) */}
-      {(state.isLoading || isCreating || isPolling) && (
+      {(state.isLoading || isCreating || isPolling || isCheckingResume) && (
         <div className="loading-overlay">
           <div className="loading-card">
             <div className="loading-animation">
@@ -254,8 +287,8 @@ export const Step1Prospecting = () => {
                 Companies fetched: {campaignStatusData.data.company_runs_count}
               </p>
             )}
-            {createdCampaignId && (
-              <p style={{ marginTop: 8, opacity: 0.85 }}>Campaign ID: {createdCampaignId}</p>
+            {(activeCampaignId || state.campaignId) && (
+              <p style={{ marginTop: 8, opacity: 0.85 }}>Campaign ID: {activeCampaignId || state.campaignId}</p>
             )}
           </div>
         </div>

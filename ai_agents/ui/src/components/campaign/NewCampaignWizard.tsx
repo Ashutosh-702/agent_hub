@@ -483,7 +483,15 @@ export const NewCampaignWizard = () => {
           derivedCampaignType = rawCampaignType as CampaignType;
         }
         
+        // Adjust step based on campaign type
+        // single_company skips company qualification (step 2), so steps 3+ need to be shifted down by 1
+        let adjustedStep = derivedStep;
+        if (derivedCampaignType === 'single_company' && derivedStep >= 3) {
+          adjustedStep = derivedStep - 1;
+        }
+        
         console.log('[Resume] cycleStatus:', cycleStatus, 'derivedStep:', derivedStep, 
+          'adjustedStep:', adjustedStep, 'campaignType:', derivedCampaignType,
           'companyMode:', derivedCompanyMode, 'contactMode:', derivedContactMode);
         
         setState((prev) => ({
@@ -491,10 +499,14 @@ export const NewCampaignWizard = () => {
           campaignId: urlCampaignId,
           campaignType: derivedCampaignType,
           wizardPhase: 'steps', // IMPORTANT: Set to 'steps' so wizard renders the actual steps
-          currentStep: derivedStep,
-          maxStepReached: Math.max(prev.maxStepReached, derivedStep),
+          currentStep: adjustedStep,
+          maxStepReached: Math.max(prev.maxStepReached, adjustedStep),
           companyQualificationMode: derivedCompanyMode,
           contactQualificationMode: derivedContactMode,
+          // IMPORTANT: Reset loading state to prevent stale loading overlays from previous session
+          isLoading: false,
+          loadingMessage: '',
+          estimatedCount: 0,
         }));
       } catch (err) {
         // If fetch fails, still set the campaignId but stay on step 1
@@ -504,6 +516,10 @@ export const NewCampaignWizard = () => {
             campaignId: urlCampaignId,
             campaignType: 'wide_prospecting',
             wizardPhase: 'steps',
+            // Reset loading state on error too
+            isLoading: false,
+            loadingMessage: '',
+            estimatedCount: 0,
           }));
         }
       }

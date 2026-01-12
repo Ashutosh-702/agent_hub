@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCampaignWizard } from './NewCampaignWizard';
 import {
   useCreateCampaignFromSimilarSearchMutation,
@@ -12,24 +12,56 @@ export const Step1SimilarCompanies: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [isCheckingResume, setIsCheckingResume] = useState(false);
+  const hasCheckedResume = useRef(false);
   
   // Backend API integration
   const [createCampaignFromSimilarSearch, { isLoading: isCreating }] = useCreateCampaignFromSimilarSearchMutation();
 
+  // Determine which campaign ID to poll - either newly created or resumed from state
+  const activeCampaignId = createdCampaignId || (isPolling || isCheckingResume ? state.campaignId : null);
+
   // Poll for campaign status change from 'started' to 'company_qualification_select'
+  // Also used for initial resume check
   const { data: campaignStatusData } = useGetCampaignStatusMinimalQuery(
-    createdCampaignId
-      ? { campaign_id: createdCampaignId }
+    activeCampaignId
+      ? { campaign_id: activeCampaignId }
       : { campaign_id: '' },
     {
-      skip: !createdCampaignId || !isPolling,
-      pollingInterval: createdCampaignId && isPolling ? 3000 : 0,
+      skip: !activeCampaignId,
+      pollingInterval: activeCampaignId && isPolling ? 3000 : 0,
     }
   );
 
+  // Check if we're resuming a campaign with 'started' status (only for similar_companies type)
+  useEffect(() => {
+    if (hasCheckedResume.current) return;
+    if (!state.campaignId || state.campaignType !== 'similar_companies') return;
+    
+    // Trigger a status check to see if we need to resume polling
+    setIsCheckingResume(true);
+  }, [state.campaignId, state.campaignType]);
+
+  // Handle resume check result
+  useEffect(() => {
+    if (!isCheckingResume || hasCheckedResume.current) return;
+    if (!campaignStatusData) return;
+    
+    hasCheckedResume.current = true;
+    setIsCheckingResume(false);
+    
+    const prospectingCycleStatus = campaignStatusData?.data?.prospecting_cycle?.status;
+    
+    // If campaign is in 'started' status, resume polling with loader
+    if (prospectingCycleStatus === 'started') {
+      setLoading(true, 'Fetching similar companies...', 0);
+      setIsPolling(true);
+    }
+  }, [campaignStatusData, isCheckingResume, setLoading]);
+
   // Handle polling result
   useEffect(() => {
-    if (!createdCampaignId || !isPolling) return;
+    if (!activeCampaignId || !isPolling) return;
 
     const prospectingCycleStatus = campaignStatusData?.data?.prospecting_cycle?.status;
     const aiProspectingStatus = campaignStatusData?.data?.ai_prospecting?.status;
@@ -53,7 +85,7 @@ export const Step1SimilarCompanies: React.FC = () => {
       setLoading(false);
       setError(campaignStatusData?.data?.ai_prospecting?.error || 'Failed to find similar companies');
     }
-  }, [campaignStatusData, createdCampaignId, isPolling, nextStep, setLoading]);
+  }, [campaignStatusData, activeCampaignId, isPolling, nextStep, setLoading]);
 
   const extractDomain = (url: string): string => {
     try {
@@ -116,7 +148,7 @@ export const Step1SimilarCompanies: React.FC = () => {
     setLoading(false);
   };
 
-  const isProcessing = isCreating || isPolling;
+  const isProcessing = isCreating || isPolling || isCheckingResume;
 
   return (
     <div className="step-container step-similar-companies">
@@ -133,8 +165,8 @@ export const Step1SimilarCompanies: React.FC = () => {
               <div className="spinner large" />
             </div>
             <h3>{state.loadingMessage || 'Processing...'}</h3>
-            {createdCampaignId && (
-              <p style={{ marginTop: 8, opacity: 0.85 }}>Campaign ID: {createdCampaignId}</p>
+            {(activeCampaignId || state.campaignId) && (
+              <p style={{ marginTop: 8, opacity: 0.85 }}>Campaign ID: {activeCampaignId || state.campaignId}</p>
             )}
           </div>
         </div>
