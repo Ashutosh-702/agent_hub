@@ -14,7 +14,8 @@
 11. [Next Steps](#next-steps)
 12. [Live Testing Progress (January 10, 2026)](#live-testing-progress-january-10-2026)
 13. [Live Testing Progress (January 11, 2026)](#live-testing-progress-january-11-2026)
-14. [Appendix: Troubleshooting](#appendix-troubleshooting)
+14. [Live Testing Progress (January 12, 2026)](#live-testing-progress-january-12-2026)
+15. [Appendix: Troubleshooting](#appendix-troubleshooting)
 
 ---
 
@@ -1470,9 +1471,267 @@ The MongoDB to PostgreSQL migration infrastructure is **100% complete and tested
      * normalize_value_for_jsonb() / normalize_document_for_jsonb() - For JSONB storage, converts datetime to ISO string
    - insert_one and _build_update_values updated to use correct normalization per context
    - Files updated: database/postgres/base_dao.py
+
+📊 Code Fixes Applied (January 12, 2026):
+   Issue 17 - metadata.raw_data stored as null in contacts during enrichment:
+   - Root cause: _build_update_values in base_dao.py only checked direct match for path stripping
+   - When path = ["metadata", "raw_data"] and column = "metadata_json":
+     * Old check: path[0] == jsonb_column → "metadata" == "metadata_json" → False (wrong!)
+     * Path wasn't stripped, causing double-nesting: {"metadata": {"raw_data": null}}
+   - Fix: Added mapped match check: JSONB_FIELDS.get(path[0]) == jsonb_column
+     * New check: "metadata" maps to "metadata_json" → True → path stripped correctly
+   - Files updated: database/postgres/base_dao.py
+   
+   Issue 18 - export_contacts_metadata API not working after CSV import merge:
+   - Root cause: ExportContactsHelper directly instantiated MongoDB DAOs
+   - PostgreSQL DAOs missing get_exportable_contacts_count, get_exportable_contact_ids, get_contacts_by_ids
+   - Fix: Added missing methods to PostgreSQL DAOs
+   - Updated ExportContactsHelper to use get_campaign_contact_runs_dao() and get_contacts_dao()
+   - Files updated: campaign_contact_runs.py, contacts.py, ai_agents_helper.py
 ```
 
 The migration was designed to minimize risk while providing a clear path to full PostgreSQL adoption.
+
+---
+
+## Live Testing Progress (January 12, 2026)
+
+### New Columns Added to Support Single Company & CSV Import Workflows ✅
+
+Added missing columns and JSONB fields to support the `single_company` and `csv_import` campaign workflows.
+
+#### Campaign Model Updates (`database/postgres/models.py`)
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `single_company_status` | String(50), indexed | Track single company processing status |
+| `csv_import_status` | String(50), indexed | Track CSV import processing status |
+| `single_company` | JSONB | Store nested single company workflow data (company_id, company_name, error, etc.) |
+| `csv_import` | JSONB | Store nested CSV import workflow data (domains, total_count, processed_count, etc.) |
+
+#### Company Model Updates
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `webhook_sent` | Boolean, nullable | Track webhook sent status for companies |
+
+### PostgresCampaignsDao Updates (`database/postgres/collection_dao/campaigns.py`) ✅
+
+**COLUMN_MAP additions:**
+```python
+"single_company.status": "single_company_status",
+"csv_import.status": "csv_import_status",
+```
+
+**JSONB_FIELDS additions:**
+```python
+"single_company": "single_company",
+"csv_import": "csv_import",
+```
+
+**`create_campaign` method updated** to extract status fields:
+```python
+if "single_company" in campaign:
+    campaign["single_company_status"] = campaign["single_company"].get("status")
+if "csv_import" in campaign:
+    campaign["csv_import_status"] = campaign["csv_import"].get("status")
+```
+
+**`update_campaign` method updated** to handle both nested dict and dot notation:
+- `single_company.status`, `single_company.company_id`, `single_company.company_name`, etc.
+- `csv_import.status`, `csv_import.domains`, `csv_import.processed_count`, etc.
+
+### PostgresCompaniesDao Updates (`database/postgres/collection_dao/companies.py`) ✅
+
+**COLUMN_MAP addition:**
+```python
+"webhook_sent": "webhook_sent",
+```
+
+### Critical Bug Fix in Base DAO (`database/postgres/base_dao.py`) ✅
+
+**Issue**: `IndexError: list index out of range` when processing top-level JSONB fields where the field name differs from the column name (e.g., `"metadata"` → `"metadata_json"`).
+
+**Root Cause**: The check `path[0] == jsonb_column` failed when MongoDB field name (`"metadata"`) didn't match PostgreSQL column name (`"metadata_json"`), causing `nested_path` to become empty.
+
+**Fix**: Updated the condition to also check for mapped field names:
+
+```python
+# Before (broken):
+if len(path) == 1 and path[0] == jsonb_column:
+
+# After (fixed):
+is_top_level_jsonb = len(path) == 1 and (
+    path[0] == jsonb_column or 
+    self.JSONB_FIELDS.get(path[0]) == jsonb_column
+)
+if is_top_level_jsonb:
+```
+
+### Alembic Migration Created ✅
+
+**File**: `alembic/versions/20260112_add_single_company_csv_import_columns.py`
+
+**Migration adds:**
+- `campaigns.single_company_status` (String(50), indexed)
+- `campaigns.csv_import_status` (String(50), indexed)
+- `campaigns.single_company` (JSONB)
+- `campaigns.csv_import` (JSONB)
+- `companies.webhook_sent` (Boolean)
+
+**To apply:**
+```bash
+export POSTGRES_URL="postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub"
+alembic upgrade head
+```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `database/postgres/models.py` | Added `single_company_status`, `csv_import_status`, `single_company`, `csv_import` to Campaign; Added `webhook_sent` to Company |
+| `database/postgres/collection_dao/campaigns.py` | Updated COLUMN_MAP, JSONB_FIELDS, `create_campaign`, `update_campaign` |
+| `database/postgres/collection_dao/companies.py` | Added `webhook_sent` to COLUMN_MAP |
+| `database/postgres/base_dao.py` | Fixed `IndexError` for mapped JSONB field names |
+| `alembic/versions/20260112_add_single_company_csv_import_columns.py` | New migration file |
+
+---
+
+### Critical Bug Fix: Nested JSONB Path Stripping for Mapped Field Names ✅
+
+**Issue 17: `metadata.raw_data` stored as `null` in contacts during enrichment**
+
+**Problem**: Contact metadata's `raw_data` field was being stored as `null` in PostgreSQL during Apollo enrichment, even though it worked correctly in MongoDB.
+
+**Error Context**: In `apollo_helper.py`, when saving contact metadata:
+```python
+await contacts_dao.update_contact(contact_id, {"metadata.raw_data": apollo_response_data})
+```
+
+The `metadata_json` JSONB column stored:
+```json
+{
+  "metadata": {
+    "raw_data": null
+  }
+}
+```
+
+Instead of the expected:
+```json
+{
+  "raw_data": {...apollo_data...}
+}
+```
+
+**Root Cause**: In `base_dao.py`, the `_build_update_values` method incorrectly stripped paths for nested JSONB updates when the MongoDB field name differs from the PostgreSQL column name.
+
+```python
+# BEFORE (broken):
+nested_path = path[1:] if path[0] == jsonb_column else path
+# When path = ["metadata", "raw_data"] and jsonb_column = "metadata_json":
+# path[0] == jsonb_column → "metadata" == "metadata_json" → False
+# nested_path = ["metadata", "raw_data"]  # WRONG! Should be ["raw_data"]
+```
+
+**Solution**: Updated the condition to check BOTH direct match AND mapped match:
+
+```python
+# AFTER (fixed):
+should_strip = (
+    path[0] == jsonb_column or  # Direct match: prospecting_cycle == prospecting_cycle
+    self.JSONB_FIELDS.get(path[0]) == jsonb_column  # Mapped match: metadata -> metadata_json
+)
+nested_path = path[1:] if should_strip else path
+# When path = ["metadata", "raw_data"] and jsonb_column = "metadata_json":
+# self.JSONB_FIELDS.get("metadata") == "metadata_json" → True
+# nested_path = ["raw_data"]  # CORRECT!
+```
+
+**Affected Tables and Mappings**:
+
+| Table | MongoDB Field | PostgreSQL Column | Status |
+|-------|---------------|-------------------|--------|
+| `contacts` | `metadata` | `metadata_json` | ✅ Fixed |
+| `companies` | `metadata` | `metadata_json` | ✅ Not affected (updates work differently) |
+| `campaigns` | `prospecting_cycle` | `prospecting_cycle` | ✅ Not affected (same name) |
+
+**Impact**: This fix is **additive** - it only enables correct path stripping for cases where it was broken. Existing working updates (where field name matches column name) are unaffected.
+
+**File Modified**: `database/postgres/base_dao.py`
+
+---
+
+### Export Contacts Metadata API Fix ✅
+
+**Issue 18: `export_contacts_metadata` API not working after CSV import merge**
+
+**Problem**: The `GET /api/v1/export_contacts_metadata?campaign_id=...` endpoint was failing after merging the CSV import branch.
+
+**Root Cause**: The `ExportContactsHelper` class in `ai_agents/leadgen/helper/ai_agents_helper.py` was directly instantiating MongoDB DAOs instead of using the database-agnostic DAO factory:
+
+```python
+# BEFORE (broken):
+from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
+from database.collection_dao.contacts import ContactsDao
+
+self.campaign_contact_runs_dao = CampaignContactRunsDao(...)
+self.contacts_dao = ContactsDao(...)
+```
+
+Additionally, the PostgreSQL DAOs were missing required methods:
+- `PostgresCampaignContactRunsDao` missing `get_exportable_contacts_count` and `get_exportable_contact_ids`
+- `PostgresContactsDao` missing `get_contacts_by_ids`
+
+**Solution**:
+
+1. **Added missing methods to PostgreSQL DAOs**:
+
+   **`database/postgres/collection_dao/campaign_contact_runs.py`**:
+   ```python
+   async def get_exportable_contacts_count(self, campaign_id: str) -> int:
+       """Get count of contacts that can be exported (relevant and enriched)."""
+       query = {
+           "campaign_id": campaign_id,
+           "is_relevant": True,
+           "enrichment_status": True
+       }
+       return await self.count_documents(query)
+
+   async def get_exportable_contact_ids(self, campaign_id: str, skip: int = 0, limit: int = 100) -> List[str]:
+       """Get contact IDs for export with pagination."""
+       query = {
+           "campaign_id": campaign_id,
+           "is_relevant": True,
+           "enrichment_status": True
+       }
+       runs = await self.find_many(query, skip=skip, limit=limit, projection={"contact_id": 1})
+       return [run.get("contact_id") for run in runs if run.get("contact_id")]
+   ```
+
+   **`database/postgres/collection_dao/contacts.py`**:
+   ```python
+   async def get_contacts_by_ids(self, contact_ids: List[str]) -> List[Dict[str, Any]]:
+       """Get multiple contacts by their IDs."""
+       if not contact_ids:
+           return []
+       return await self.find_many({"_id": {"$in": contact_ids}})
+   ```
+
+2. **Updated `ExportContactsHelper` to use DAO factory**:
+
+   ```python
+   # AFTER (fixed):
+   from database.factory import get_campaign_contact_runs_dao, get_contacts_dao
+
+   self.campaign_contact_runs_dao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
+   self.contacts_dao = get_contacts_dao(loaded_config.connection_manager)
+   ```
+
+**Files Modified**:
+- `database/postgres/collection_dao/campaign_contact_runs.py` - Added export methods
+- `database/postgres/collection_dao/contacts.py` - Added `get_contacts_by_ids`
+- `ai_agents/leadgen/helper/ai_agents_helper.py` - Updated to use DAO factory
 
 ---
 
@@ -1498,6 +1757,10 @@ The migration was designed to minimize risk while providing a clear path to full
 | Pagination slow on large datasets | String-based `id` sorting is slower than integer | Fixed by using `sl_no` (indexed BIGINT) for sorting instead of `created_at + id` |
 | `null value in column "sl_no" violates not-null constraint` | sl_no included in INSERT statement instead of auto-generated | Fixed in `base_dao.py` - `insert_one` now removes sl_no from data, letting PostgreSQL sequence generate it |
 | `operator does not exist: timestamp without time zone > character varying` | datetime converted to string for timestamp column comparison | Fixed in `base_dao.py` - separate normalization functions: `normalize_document` preserves datetime for queries, `normalize_document_for_jsonb` converts to string for JSONB storage |
+| `column campaigns.single_company_status does not exist` | New columns added to model but migration not run | Run `alembic upgrade head` to apply migration |
+| `IndexError: list index out of range` in `_set_nested_value` | Top-level JSONB field name differs from column name (e.g., `"metadata"` → `"metadata_json"`) | Fixed in `base_dao.py` - condition now checks both direct match AND mapped match for top-level JSONB fields |
+| `metadata.raw_data` stored as `null` in contacts | Nested JSONB path not stripped when MongoDB field name differs from PostgreSQL column name | Fixed in `base_dao.py` - `_build_update_values` now checks `JSONB_FIELDS.get(path[0]) == jsonb_column` for mapped matches |
+| `export_contacts_metadata` API failing | `ExportContactsHelper` using MongoDB DAOs directly instead of DAO factory | Fixed in `ai_agents_helper.py` - now uses `get_campaign_contact_runs_dao()` and `get_contacts_dao()` |
 
 ### Verifying PostgreSQL Connection
 
