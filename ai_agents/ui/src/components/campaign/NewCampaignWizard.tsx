@@ -285,8 +285,9 @@ const deriveStepFromCycleStatus = (cycleStatus?: string): number => {
   if (cycleStatus === 'company_qualification_select') return 2;
   if (cycleStatus === 'company_qualification_ai_started') return 2;
   
-  // Step 1: Prospecting
+  // Step 1: Prospecting / Started (initial status for similar_companies)
   if (cycleStatus === 'prospecting') return 1;
+  if (cycleStatus === 'started') return 1;  // Similar companies search in progress
   
   return 1; // Default to step 1
 };

@@ -189,6 +189,24 @@ export interface CreateCampaignFromCSVImportPayload {
   prospecting_cycle_status?: string;
 }
 
+// Similar Companies Search
+export interface CreateCampaignFromSimilarSearchPayload {
+  campaign_name: string;
+  source_domain: string;
+  product_name?: string;
+  campaign_type?: string;
+  prospecting_cycle_status?: string;
+}
+
+export interface CreateCampaignFromSimilarSearchResponse {
+  success: boolean;
+  data: {
+    campaign_id: string;
+    message?: string;
+  };
+  errors?: string[];
+}
+
 // Check Campaign Name
 export interface CheckCampaignNamePayload {
   campaign_name: string;
@@ -556,6 +574,12 @@ export interface GetCampaignStatusMinimalResponse {
     single_company?: {
       status?: string;
     };
+    ai_prospecting?: {
+      status?: string;
+      processed_count?: number;
+      total_count?: number;
+      error?: string;
+    };
   };
   errors: string[];
 }
@@ -699,6 +723,18 @@ export const campaignApi = baseApi.injectEndpoints({
     >({
       query: (payload) => ({
         url: '/api/v1/create_campaign_from_csv_import',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Campaign'],
+    }),
+
+    createCampaignFromSimilarSearch: builder.mutation<
+      CreateCampaignFromSimilarSearchResponse,
+      CreateCampaignFromSimilarSearchPayload
+    >({
+      query: (payload) => ({
+        url: '/api/v1/create_campaign_from_similar_search',
         method: 'POST',
         body: payload,
       }),
@@ -1201,6 +1237,7 @@ export const {
   useCreateCampaignFromProspectingJobMutation,
   useCreateCampaignFromSingleCompanyMutation,
   useCreateCampaignFromCSVImportMutation,
+  useCreateCampaignFromSimilarSearchMutation,
   useGetCampaignDetailsQuery,
   useLazyGetCampaignDetailsQuery,
   useManualCompanyQualificationMutation,

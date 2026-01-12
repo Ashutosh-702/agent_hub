@@ -33,6 +33,7 @@ export {
   useCreateCampaignFromProspectingJobMutation,
   useCreateCampaignFromSingleCompanyMutation,
   useCreateCampaignFromCSVImportMutation,
+  useCreateCampaignFromSimilarSearchMutation,
   useGetCampaignDetailsQuery,
   useLazyGetCampaignDetailsQuery,
   useManualCompanyQualificationMutation,
