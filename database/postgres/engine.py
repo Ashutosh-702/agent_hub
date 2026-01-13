@@ -33,7 +33,15 @@ class PostgresEngine:
             database_url: PostgreSQL connection URL. If not provided,
                          uses DATABASE_URL env var or default.
         """
-        self._database_url = database_url or os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+        url = database_url or os.getenv("POSTGRES_NEBULA_READ_WRITE", DEFAULT_DATABASE_URL)
+        
+        # Ensure we use asyncpg driver for async operations
+        if url and url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif url and url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        
+        self._database_url = url
         self._engine: Optional[AsyncEngine] = None
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         

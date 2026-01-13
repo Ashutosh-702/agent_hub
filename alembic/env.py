@@ -36,7 +36,7 @@ def get_url() -> str:
     """Get database URL from environment or config."""
     url = os.getenv(
         "POSTGRES_NEBULA_READ_WRITE",
-        os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+        os.getenv("POSTGRES_NEBULA_READ_WRITE", config.get_main_option("sqlalchemy.url"))
     )
     
     # Ensure we use asyncpg driver for async migrations
