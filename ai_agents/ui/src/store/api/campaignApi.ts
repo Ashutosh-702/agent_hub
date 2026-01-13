@@ -189,6 +189,24 @@ export interface CreateCampaignFromCSVImportPayload {
   prospecting_cycle_status?: string;
 }
 
+// Similar Companies Search
+export interface CreateCampaignFromSimilarSearchPayload {
+  campaign_name: string;
+  source_domain: string;
+  product_name?: string;
+  campaign_type?: string;
+  prospecting_cycle_status?: string;
+}
+
+export interface CreateCampaignFromSimilarSearchResponse {
+  success: boolean;
+  data: {
+    campaign_id: string;
+    message?: string;
+  };
+  errors?: string[];
+}
+
 // Check Campaign Name
 export interface CheckCampaignNamePayload {
   campaign_name: string;
@@ -556,6 +574,12 @@ export interface GetCampaignStatusMinimalResponse {
     single_company?: {
       status?: string;
     };
+    ai_prospecting?: {
+      status?: string;
+      processed_count?: number;
+      total_count?: number;
+      error?: string;
+    };
   };
   errors: string[];
 }
@@ -597,6 +621,22 @@ export interface GetCompanyListMinimalResponse {
   };
   pagination: Pagination | null;
   errors: string[];
+}
+
+// ============ EXPORT CONTACTS TYPES ============
+
+export interface ExportContactsMetadataResponse {
+  success: boolean;
+  data: {
+    total_count: number;
+    total_pages: number;
+    per_page: number;
+  };
+  errors?: string[];
+}
+
+export interface GetExportContactsMetadataParams {
+  campaign_id: string;
 }
 
 export const campaignApi = baseApi.injectEndpoints({
@@ -683,6 +723,18 @@ export const campaignApi = baseApi.injectEndpoints({
     >({
       query: (payload) => ({
         url: '/api/v1/create_campaign_from_csv_import',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: ['Campaign'],
+    }),
+
+    createCampaignFromSimilarSearch: builder.mutation<
+      CreateCampaignFromSimilarSearchResponse,
+      CreateCampaignFromSimilarSearchPayload
+    >({
+      query: (payload) => ({
+        url: '/api/v1/create_campaign_from_similar_search',
         method: 'POST',
         body: payload,
       }),
@@ -1115,6 +1167,17 @@ export const campaignApi = baseApi.injectEndpoints({
       providesTags: ['Campaign'],
     }),
 
+    // ============ EXPORT CONTACTS ENDPOINTS ============
+
+    // Get export metadata (total count, page info)
+    getExportContactsMetadata: builder.query<ExportContactsMetadataResponse, GetExportContactsMetadataParams>({
+      query: ({ campaign_id }) => ({
+        url: `/api/v1/export_contacts_metadata?campaign_id=${campaign_id}`,
+        method: 'GET',
+      }),
+      providesTags: (_result, _error, { campaign_id }) => [{ type: 'Campaign', id: campaign_id }],
+    }),
+
     // Enroll contacts to a Lemlist sequence
     enrollContactsToSequence: builder.mutation<
       {
@@ -1174,6 +1237,7 @@ export const {
   useCreateCampaignFromProspectingJobMutation,
   useCreateCampaignFromSingleCompanyMutation,
   useCreateCampaignFromCSVImportMutation,
+  useCreateCampaignFromSimilarSearchMutation,
   useGetCampaignDetailsQuery,
   useLazyGetCampaignDetailsQuery,
   useManualCompanyQualificationMutation,
@@ -1207,4 +1271,7 @@ export const {
   useLazyGetEnrollmentContactsQuery,
   useEnrollContactsToSequenceMutation,
   useGetLemlistCampaignsQuery,
+  // Export Contacts APIs
+  useGetExportContactsMetadataQuery,
+  useLazyGetExportContactsMetadataQuery,
 } = campaignApi;

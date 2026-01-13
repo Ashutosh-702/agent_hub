@@ -41,4 +41,57 @@ class Settings:
     # Client Calls / Meetings - Deepgram for transcription
     deepgram_api_key = os.getenv("DEEPGRAM_API_KEY", "9be8d4f2be2830be27ba2710784c76d8d0a724a7")
     
+    # ============================================================
+    # PostgreSQL Migration Feature Flags
+    # ============================================================
+    # Set to "postgres" to use PostgreSQL, "mongo" to use MongoDB
+    # This allows gradual migration collection by collection
+    # ============================================================
+    
+    # PostgreSQL connection URL
+    postgres_url = os.getenv(
+        "POSTGRES_NEBULA_READ_WRITE",
+        os.getenv("POSTGRES_NEBULA_READ_WRITE", "postgresql+asyncpg://agent_hub:agent_hub@localhost:5432/agent_hub")
+    )
+    db_type = os.getenv("DB_TYPE", "postgres")
+    db_backend_users = os.getenv("DB_BACKEND_USERS", db_type)
+    db_backend_user_tokens = os.getenv("DB_BACKEND_USER_TOKENS", db_type)
+    db_backend_campaigns = os.getenv("DB_BACKEND_CAMPAIGNS", db_type)
+    db_backend_companies = os.getenv("DB_BACKEND_COMPANIES", db_type)
+    db_backend_contacts = os.getenv("DB_BACKEND_CONTACTS", db_type)
+    db_backend_campaign_company_runs = os.getenv("DB_BACKEND_CAMPAIGN_COMPANY_RUNS", db_type)
+    db_backend_campaign_contact_runs = os.getenv("DB_BACKEND_CAMPAIGN_CONTACT_RUNS", db_type)
+    db_backend_meetings = os.getenv("DB_BACKEND_MEETINGS", db_type)
+    db_backend_inbox_leads = os.getenv("DB_BACKEND_INBOX_LEADS", db_type)
+    db_backend_inbox_events = os.getenv("DB_BACKEND_INBOX_EVENTS", db_type)
+    db_backend_inbox_notes = os.getenv("DB_BACKEND_INBOX_NOTES", db_type)
+    
+    @classmethod
+    def use_postgres(cls, collection: str) -> bool:
+        """Check if a collection should use PostgreSQL.
+        
+        Args:
+            collection: Collection name (e.g., "users", "campaigns")
+            
+        Returns:
+            True if PostgreSQL should be used, False for MongoDB
+        """
+        attr_name = f"db_backend_{collection}"
+        backend = getattr(cls, attr_name, "mongo")
+        return backend.lower() == "postgres"
+    
+    @classmethod
+    def is_any_postgres_enabled(cls) -> bool:
+        """Check if any collection is using PostgreSQL.
+        
+        Returns:
+            True if at least one collection uses PostgreSQL
+        """
+        collections = [
+            "users", "user_tokens", "campaigns", "companies", "contacts",
+            "campaign_company_runs", "campaign_contact_runs", "meetings",
+            "inbox_leads", "inbox_events", "inbox_notes"
+        ]
+        return any(cls.use_postgres(c) for c in collections)
+    
 loaded_config = Settings()

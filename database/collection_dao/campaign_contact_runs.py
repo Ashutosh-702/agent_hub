@@ -65,3 +65,35 @@ class CampaignContactRunsDao(BaseMongoDao):
             page_number=page, sort_by=sort_by, 
             projection=projection
         )
+
+    async def get_exportable_contacts_count(self, campaign_id: str) -> int:
+        """Get total count of contacts eligible for export (is_relevant=True, enrichment_status=True)"""
+        query = {
+            "campaign_id": campaign_id,
+            "is_relevant": True,
+            "enrichment_status": True
+        }
+        query = self._process_query_objectids(query)
+        return await self.count_documents(query)
+
+    async def get_exportable_contact_ids(
+        self, 
+        campaign_id: str, 
+        page: int = 1, 
+        limit: int = 500
+    ) -> list:
+        """Get contact runs for export with pagination (is_relevant=True, enrichment_status=True)"""
+        query = {
+            "campaign_id": campaign_id,
+            "is_relevant": True,
+            "enrichment_status": True
+        }
+        query = self._process_query_objectids(query)
+        
+        skip = (page - 1) * limit
+        
+        # Fetch with pagination
+        cursor = self.collection.find(query).skip(skip).limit(limit)
+        results = await cursor.to_list(length=limit)
+        
+        return results

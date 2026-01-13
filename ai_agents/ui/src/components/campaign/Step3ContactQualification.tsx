@@ -250,9 +250,29 @@ export const Step3ContactQualification = () => {
   const totalContacts = contactListData?.pagination?.total_records || contactListData?.data?.total_count || 0;
   const totalPages = Math.ceil(totalContacts / PAGE_SIZE);
 
+  // Statuses where Step 3 should NOT start polling - either we're not at contact stage yet, or we're already done
+  const statusesWhereStep3ShouldNotPoll = [
+    // Company qualification statuses (Step 2) - we shouldn't be polling yet
+    'company_qualification',
+    'company_qualification_select',
+    // Note: company_qualification_ai_started is NOT here - polling should continue for AI progress
+    'prospecting',
+    'started',
+    // Contact qualification statuses where polling is not needed
+    'contact_qualification_select',
+    'contact_qualification',
+    // Note: contact_qualification_ai_started is NOT here - AI polling should continue
+    // Post-contact statuses (Step 4+)
+    'contact_enriched',
+    // Note: hubspot_sync_in_progress is NOT here - polling should continue for sync progress
+    'hubspot_sync_completed',
+    'hubspot_sync_failed',
+    'personalization_completed',
+    'enrolled_to_sequence',
+  ];
+
   // Auto-start polling if contacts are being fetched
   // This handles the Single Company flow where get_apollo_contact_list was queued before entering this step
-  // Poll UNTIL status becomes 'contact_qualification_select' (ready for mode selection)
   useEffect(() => {
     if (!campaignId) return;
     
@@ -261,6 +281,7 @@ export const Step3ContactQualification = () => {
     
     console.log('[Step3 Enrich Effect] currentStatus:', currentStatus, 'isEnrichPolling:', isEnrichPolling, 'contacts:', apiContacts.length);
     
+    // Only show enrichment loading if status is specifically 'contact_enrichment_in_progress'
     if (currentStatus === 'contact_enrichment_in_progress') {
       if (!isEnrichPolling || !isWaitingForEnrichment) {
         setLoading(true, 'Enriching contacts from Apollo...');
@@ -270,24 +291,39 @@ export const Step3ContactQualification = () => {
       return;
     }
 
-    // STOP condition: status is contact_qualification_select - ready for mode selection
-    if (currentStatus === 'contact_qualification_select') {
-      if (isEnrichPolling) {
-        console.log('[Step3] Status is contact_qualification_select, stopping enrich polling');
+    // STOP/SKIP condition: If status indicates we should NOT be polling, stop any existing polling
+    // BUT: Don't stop if we're explicitly waiting for enrichment (user just clicked submit button)
+    if (currentStatus && statusesWhereStep3ShouldNotPoll.includes(currentStatus)) {
+      // If we're waiting for enrichment, don't stop - backend status will change soon
+      if (isWaitingForEnrichment) {
+        console.log('[Step3] Status is', currentStatus, 'but waiting for enrichment - continue polling');
+        return;
+      }
+      if (isEnrichPolling || state.isLoading) {
+        console.log('[Step3] Status is', currentStatus, '- stopping/skipping polling');
         setLoading(false);
         setIsEnrichPolling(false);
       }
       return;
     }
     
-    // START condition: status is NOT contact_qualification_select and we have no contacts
-    // This means contacts are still being fetched from Apollo
-    if (!isEnrichPolling && apiContacts.length === 0 && currentStatus !== undefined) {
-      console.log('[Step3] Starting enrich polling, current status:', currentStatus);
-      setLoading(true, 'Fetching contacts from Apollo...');
-      setIsEnrichPolling(true);
+    // Don't start polling if step is already completed
+    if (stepAlreadyCompleted) {
+      if (isEnrichPolling) {
+        setLoading(false);
+        setIsEnrichPolling(false);
+      }
+      return;
     }
-  }, [campaignId, statusData?.data?.status, apiContacts.length, isEnrichPolling, setLoading, stepAlreadyCompleted]);
+    
+    // START condition: ONLY start polling if status is undefined or null (initial load)
+    // This prevents false starts when resuming from sessionStorage with wrong step
+    // The wizard will correct the step based on actual status
+    if (!isEnrichPolling && apiContacts.length === 0 && currentStatus === undefined) {
+      console.log('[Step3] Starting initial fetch, waiting for status');
+      // Don't set loading here - wait for status to determine if we should poll
+    }
+  }, [campaignId, statusData?.data?.status, apiContacts.length, isEnrichPolling, setLoading, stepAlreadyCompleted, state.isLoading, isWaitingForEnrichment]);
 
   // Map minimal contact data to display format - no state storage needed
   // Contact is qualified if:

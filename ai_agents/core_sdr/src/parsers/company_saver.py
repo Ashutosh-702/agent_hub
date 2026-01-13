@@ -1,7 +1,5 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from datetime import datetime, timezone
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
 from bson import ObjectId
 
 
@@ -9,7 +7,7 @@ async def insert_companies_batch_to_db(
     company_data_list: List[Dict[str, Any]], 
     config: Dict[str, Any], 
     source: str,
-    companies_dao: CompaniesDao,
+    companies_dao: Any,
 ) -> List[str]:  # ✅ Return inserted company IDs instead of count
     """
     Insert companies into database.
@@ -100,7 +98,7 @@ async def insert_companies_batch_to_db(
 async def create_campaign_company_mappings_batch(
     company_ids: List[str],
     campaign_id: str,
-    campaign_company_runs_dao: CampaignCompanyRunsDao
+    campaign_company_runs_dao: Any
 ) -> int:
     """
     Create campaign-company mappings for a batch of companies.

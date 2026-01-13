@@ -9,9 +9,7 @@ from openai import AsyncOpenAI
 from ai_agents.ai_sdr.sdr.models import Company
 from ai_agents.ai_sdr.sdr.prompts import PromptsConfig
 from config.loaded_config import loaded_config
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from database.collection_dao.campaigns import CampaignsDao
+from database.factory import get_companies_dao, get_campaign_company_runs_dao, get_campaigns_dao
 from bson import ObjectId
 
 
@@ -262,12 +260,9 @@ Please try a different search approach or be more thorough in your analysis.
 
             self.prompts = PromptsConfig(custom_prompts)
 
-            companies_dao = CompaniesDao(
-                loaded_config.connection_manager.mongo_client)
-
-            campaign_company_runs_dao = CampaignCompanyRunsDao(
-                loaded_config.connection_manager.mongo_client)
-            campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+            companies_dao = get_companies_dao(loaded_config.connection_manager)
+            campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
+            campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
 
             # Progress bootstrap (resume-safe)
             total = await campaign_company_runs_dao.get_campaign_company_runs_count({"campaign_id": campaign_id})
@@ -386,7 +381,7 @@ Please try a different search approach or be more thorough in your analysis.
         except Exception as e:
             # Mark job failed (do not crash the consumer)
             try:
-                campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+                campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
                 await campaigns_dao.update_campaign(
                     campaign_id,
                     {

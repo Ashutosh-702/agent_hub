@@ -4,11 +4,13 @@
 from typing import Dict, Any, Optional
 from integrations import coresignal
 from integrations.coresignal.coresignal_api_client import CoresignalAPIClient
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.campaigns import CampaignsDao
-from database.collection_dao.contacts import ContactsDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
+from database.factory import (
+    get_companies_dao,
+    get_campaigns_dao,
+    get_contacts_dao,
+    get_campaign_company_runs_dao,
+    get_campaign_contact_runs_dao,
+)
 from config.loaded_config import loaded_config
 from ai_agents.core_sdr.src.api.company_relevance_check import CompanyRelevanceCheck
 from ai_agents.core_sdr.src.api.people_relevance_check import PeopleRelevanceCheck
@@ -26,16 +28,17 @@ from time import sleep
 
 
 class IntegrationOrchestrator:
-    def __init__(self,config: Dict[str,Any]):
+    def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.coresignal_api = CoresignalAPIClient()
         self.lusha_helper = LushaHelper()
         self.coresignal_helper = CoresignalAPIClient()
-        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        self.campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-        self.CompanyMappingsDao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-        self.CampaignContactRunsDao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
-        self.ContactsDao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access (supports both MongoDB and PostgreSQL)
+        self.companies_dao = get_companies_dao(loaded_config.connection_manager)
+        self.campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
+        self.CompanyMappingsDao = get_campaign_company_runs_dao(loaded_config.connection_manager)
+        self.CampaignContactRunsDao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
+        self.ContactsDao = get_contacts_dao(loaded_config.connection_manager)
         self.relevance_check = CompanyRelevanceCheck(self.config)
         self.people_relevance_check = PeopleRelevanceCheck(self.config)
 

@@ -73,7 +73,7 @@ class MeetingsDao(BaseMongoDao):
                 "$set": {"updated_at": datetime.utcnow()}
             }
         )
-        return result.modified_count > 0
+        return result > 0  # result is already an int from base_dao
     
     async def append_insight(self, meeting_id: str, insight: Dict[str, Any]) -> bool:
         """Append a live insight to the meeting."""
@@ -84,7 +84,7 @@ class MeetingsDao(BaseMongoDao):
                 "$set": {"updated_at": datetime.utcnow()}
             }
         )
-        return result.modified_count > 0
+        return result > 0  # result is already an int from base_dao
     
     async def update_insight(self, meeting_id: str, insight_id: str, update_data: Dict[str, Any]) -> bool:
         """Update a specific insight in the meeting."""

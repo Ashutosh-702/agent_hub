@@ -4,6 +4,13 @@ from typing import Dict, Any
 import json
 from ai_agents.leadgen.schemas.ai_agents import LushaContactEnrichment, LushaGetContactEnrichment
 from database.collection_dao.companies import CompaniesDao
+from database.factory import (
+    get_campaigns_dao,
+    get_companies_dao,
+    get_contacts_dao,
+    get_campaign_company_runs_dao,
+    get_campaign_contact_runs_dao,
+)
 from config.logging import logger
 from config.loaded_config import loaded_config
 from integrations.lusha.lusha_api import LushaAPIClient
@@ -39,7 +46,8 @@ class LushaContactEnrichmentHelper:
         self.lusha_api_client = LushaAPIClient()
         self.company_service = CompanyService()
         self.contact_service = ContactService()
-        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access
+        self.companies_dao = get_companies_dao(loaded_config.connection_manager)
 
     async def lusha_get_contact_enrichment(self, query_params: LushaGetContactEnrichment):
         campaign_id = query_params.campaign_id
@@ -212,8 +220,9 @@ class SaveProspectsDataToMongoHelper:
     def __init__(self):
         self.contact_service = ContactService()
         self.company_service = CompanyService()
-        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-        self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access
+        self.campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
+        self.contacts_dao = get_contacts_dao(loaded_config.connection_manager)
 
     async def save_prospects_data_to_mongo(self, query_params: SaveProspectsDataToMongo):
         prospects = query_params.prospects
@@ -303,7 +312,8 @@ class ApolloContactEnrichmentHelper:
         self.apollo_helper = ApolloHelper()
         self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][CONTACTS_ENRICHMENT]
         self.event_emitter = loaded_config.connection_manager.event_emitter
-        self.company_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access
+        self.company_dao = get_companies_dao(loaded_config.connection_manager)
 
 
     async def apollo_contact_enrichment(self, query_params: ApolloContactEnrichment):
@@ -374,11 +384,12 @@ class CampaignsHelper:
 
     def __init__(self):
         self.campaign_service = CampaignService()
-        self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
-        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        self.campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-        self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
-        self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access (supports both MongoDB and PostgreSQL)
+        self.campaign_dao = get_campaigns_dao(loaded_config.connection_manager)
+        self.companies_dao = get_companies_dao(loaded_config.connection_manager)
+        self.campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
+        self.campaign_contact_runs_dao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
+        self.contacts_dao = get_contacts_dao(loaded_config.connection_manager)
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.company_qualification_ai_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_COMPANY_QUALIFICATION_AI_PROCESSING]
         self.contact_qualification_ai_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_CONTACT_QUALIFICATION_AI_PROCESSING]
@@ -1494,11 +1505,108 @@ class CampaignsHelper:
             "contact_id": contact_id,
             "campaign_id": campaign_id
         }
+class ExportContactsHelper:
+    """Helper class for exporting contacts to CSV"""
+
+    def __init__(self):
+        # Use DAO factory for database-agnostic access
+        self.campaign_contact_runs_dao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
+        self.contacts_dao = get_contacts_dao(loaded_config.connection_manager)
+
+    async def get_export_metadata(self, campaign_id: str) -> dict:
+        """Get metadata for export (total count, page info)"""
+        total_count = await self.campaign_contact_runs_dao.get_exportable_contacts_count(campaign_id)
+        per_page = 500
+        total_pages = max(1, (total_count + per_page - 1) // per_page)  # Ceiling division
+        
+        return {
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "per_page": per_page
+        }
+
+    def _safe_get(self, data: dict, *keys, default="N/A"):
+        """Safely get nested value from dict"""
+        for key in keys:
+            if isinstance(data, dict):
+                data = data.get(key)
+            else:
+                return default
+        return data if data else default
+
+    def _transform_contact_to_csv_row(self, contact: dict, contact_run: dict, serial_no: int) -> dict:
+        """Transform contact document to CSV row format"""
+        raw_data = contact.get("metadata", {}).get("raw_data", {})
+        person = raw_data.get("person", {})
+        organization = person.get("organization", {})
+        contact_data = contact.get("contact_data", {})
+        linkedin_data = contact.get("linkedin_data", {})
+        
+        # Get email (first from list or single value)
+        email = contact_data.get("email", [])
+        if isinstance(email, list):
+            email = email[0] if email else "N/A"
+        
+        # Build contact name
+        firstname = contact_data.get("firstname", "")
+        lastname = contact_data.get("lastname", "")
+        contact_name = f"{firstname} {lastname}".strip() or "N/A"
+        
+        return {
+            "sl_no": serial_no,
+            "company_name": contact_data.get("company") or organization.get("name") or "N/A",
+            "company_industry": organization.get("industry", "N/A"),
+            "contact_name": contact_name,
+            "email": email or "N/A",
+            "jobtitle": contact_data.get("jobtitle", "N/A"),
+            "linkedin_url": linkedin_data.get("linkedin_url", "N/A"),
+            "country": person.get("country", "N/A"),
+            "city": person.get("city", "N/A")
+        }
+
+    async def generate_export_data(self, campaign_id: str, page: int = 1, limit: int = 500) -> list:
+        """Generate export data for a specific page"""
+        # Get contact runs for this page
+        contact_runs = await self.campaign_contact_runs_dao.get_exportable_contact_ids(
+            campaign_id, page=page, limit=limit
+        )
+        
+        if not contact_runs:
+            return []
+        
+        # Get contact IDs
+        contact_ids = [str(run.get("contact_id")) for run in contact_runs if run.get("contact_id")]
+        
+        # Bulk fetch contacts
+        contacts = await self.contacts_dao.get_contacts_by_ids(contact_ids)
+        
+        # Create contact lookup map
+        contact_map = {str(c.get("_id")): c for c in contacts}
+        
+        # Transform to CSV rows
+        csv_rows = []
+        base_serial = (page - 1) * limit + 1
+        
+        for idx, contact_run in enumerate(contact_runs):
+            contact_id = str(contact_run.get("contact_id", ""))
+            contact = contact_map.get(contact_id, {})
+            
+            row = self._transform_contact_to_csv_row(
+                contact=contact,
+                contact_run=contact_run,
+                serial_no=base_serial + idx
+            )
+            csv_rows.append(row)
+        
+        return csv_rows
+
+
 class CompaniesHelper:
 
     def __init__(self):
         self.company_service = CompanyService()
-        self.contact_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access
+        self.contact_dao = get_contacts_dao(loaded_config.connection_manager)
     async def get_companies_with_contact_counts(self, query_params: Companies):
         companies = await self.company_service.get_companies(query_params)
         for company in companies.get("companies"):

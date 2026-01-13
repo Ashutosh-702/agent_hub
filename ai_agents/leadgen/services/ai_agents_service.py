@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 
 from structlog.contextvars import bind_contextvars
 
-from config.loaded_config import loaded_config
+from config.loaded_config import loaded_config, Settings
 from config.logging import logger
 from global_utils.exceptions import ApiException
 from ai_agents.leadgen.schemas.ai_agents import (
@@ -24,11 +24,14 @@ from ai_agents.leadgen.schemas.ai_agents import (
 )
 from ai_agents.leadgen.schemas.contact_models import ContactCampaignMapping, ContactDocument
 from ai_agents.leadgen.utils import serialize_objectid
-from database.collection_dao.campaigns import CampaignsDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.contacts import ContactsDao
-from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
+# Use DAO factory for MongoDB/PostgreSQL support
+from database.factory import (
+    get_campaigns_dao,
+    get_companies_dao,
+    get_contacts_dao,
+    get_campaign_company_runs_dao,
+    get_campaign_contact_runs_dao
+)
 from kafkautils.producer.event_helpers import emit_event_helper
 from kafkautils.constants import(
     LEADGEN_BATCH_PROCESSING, 
@@ -39,12 +42,15 @@ from kafkautils.constants import(
     LeadgenServices
 )
 from integrations.lusha.lusha_api import LushaAPIClient
-from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob, CreateCampaignFromSingleCompany, CreateCampaignFromCSVImport
+from ai_agents.leadgen.schemas.ai_agents import CreateCampaignFromProspectingJob, CreateCampaignFromSingleCompany, CreateCampaignFromCSVImport, CreateCampaignFromSimilarSearch
 
 
 class CampaignService:
     def __init__(self):
-        self.campaign_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        # Use factory to get the appropriate DAO (MongoDB or PostgreSQL based on feature flags)
+        # Settings.db_backend_campaigns = "postgres"
+
+        self.campaign_dao = get_campaigns_dao(loaded_config.connection_manager)
         self.event_emitter = loaded_config.connection_manager.event_emitter
         self.kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_BATCH_PROCESSING]
         self.prospecting_kafka_config = KAFKA_SERVICE_CONFIG_MAPPING[LeadgenServices.leadgen][LEADGEN_PROSPECTING_JOB_PROCESSING]
@@ -94,7 +100,6 @@ class CampaignService:
     async def create_campaign_from_prospecting_job(self, query_params: CreateCampaignFromProspectingJob) -> Dict[str, Any]:
         db_data = self._transform_create_campaign_from_prospecting_job_to_db_data(query_params)
         campaign_id = await self.campaign_dao.create_campaign(db_data)
-
         if not campaign_id:
             raise ApiException("campaign_id not generated")
 
@@ -131,9 +136,9 @@ class CampaignService:
         - If company already exists in DB (by identifiers.source_domain): use existing, skip Kafka
         - Otherwise: create placeholder, emit Kafka for Apollo enrichment
         """
-        # Initialize DAOs
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+        # Initialize DAOs using factory (supports both MongoDB and PostgreSQL)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
+        campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
         
         # Check if company already exists by domain
         existing_company = await companies_dao.get_company_by_source_domain(query_params.company_domain)
@@ -309,6 +314,98 @@ class CampaignService:
             "request_id": request_id,
             "campaign_id": str(campaign_id),
             "total_companies": total_domains
+        }
+
+    async def create_campaign_from_similar_search(self, query_params: CreateCampaignFromSimilarSearch) -> Dict[str, Any]:
+        """
+        Create a campaign from similar company search.
+        - Creates campaign with empty data and status 'started'
+        - Sends campaign_id and source_domain to webhook (external processing)
+        - Returns campaign_id for frontend polling
+        
+        The webhook receiver will:
+        1. Find similar companies using external service
+        2. Enrich companies via Apollo
+        3. Update campaign status to 'company_qualification_select' when done
+        """
+        import httpx
+        
+        # 1. Create campaign with 'started' status
+        db_data = self._transform_similar_search_to_db_data(query_params)
+        campaign_id = await self.campaign_dao.create_campaign(db_data)
+        
+        if not campaign_id:
+            raise ApiException("campaign_id not generated")
+        
+        logger.info(f"📤 Similar Search Campaign {campaign_id} created with source_domain: {query_params.source_domain}")
+        
+        # 2. Send webhook with campaign_id and source_domain
+        # TODO: Replace with actual webhook URL from config
+        webhook_url = loaded_config.similar_companies_webhook_url if hasattr(loaded_config, 'similar_companies_webhook_url') else None
+        
+        if webhook_url:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    webhook_payload = {
+                        "campaign_id": str(campaign_id),
+                        "source_domain": query_params.source_domain,
+                        "campaign_name": query_params.campaign_name,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                    response = await client.post(webhook_url, json=webhook_payload)
+                    logger.info(f"📤 Webhook sent for campaign {campaign_id}: status={response.status_code}")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to send webhook for campaign {campaign_id}: {e}")
+                # Don't fail the request if webhook fails - processing can be retried
+        else:
+            logger.info(f"ℹ️ No webhook URL configured for similar companies search (campaign_id={campaign_id})")
+        
+        return {
+            "campaign_id": str(campaign_id),
+            "source_domain": query_params.source_domain
+        }
+
+    def _transform_similar_search_to_db_data(self, query_params: CreateCampaignFromSimilarSearch) -> Dict[str, Any]:
+        """Transform similar search request to database format"""
+        return {
+            "name": query_params.campaign_name,
+            "prompts": {
+                "web": None,
+                "persona": None
+            },
+            "segmentation": {
+                "industry": [],
+                "keywords": None,
+                "categories": None
+            },
+            "target": {
+                "employee_count": [],
+                "revenue_min": None,
+                "revenue_max": None,
+                "currency": None,
+                "location": {"type": None, "names": []}
+            },
+            "ownership": {
+                "hubspot_email": query_params.hubspot_email,
+                "product_name": query_params.product_name,
+                "business_team": query_params.business_team,
+                "user_email": query_params.user_email
+            },
+            "lifecycle": {"status": "active"},
+            "prospecting_cycle": {
+                "status": "started"  # New status: started -> company_qualification_select
+            },
+            "campaign_type": query_params.campaign_type,
+            "ai_prospecting": {
+                "source_domain": query_params.source_domain,
+                "status": "pending",  # pending -> processing -> completed -> failed
+                "total_count": 0,
+                "processed_count": 0
+            },
+            "metadata": {
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
         }
 
     def _transform_csv_import_to_db_data(self, query_params: CreateCampaignFromCSVImport) -> Dict[str, Any]:
@@ -561,10 +658,9 @@ class CampaignService:
 
 class CompanyService:
     def __init__(self):
-        self.campaign_company_run_dao = CampaignCompanyRunsDao(
-            loaded_config.connection_manager.mongo_client)
-        self.companies_dao = CompaniesDao(
-            loaded_config.connection_manager.mongo_client)
+        # Use factory to get the appropriate DAOs (MongoDB or PostgreSQL based on feature flags)
+        self.campaign_company_run_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
+        self.companies_dao = get_companies_dao(loaded_config.connection_manager)
 
     async def get_company_mapping_list(self, query_params: CompanyMappingList):
         projection = {
@@ -664,10 +760,9 @@ class CompanyService:
 
 class ContactService:
     def __init__(self):
-        self.campaign_contact_run_dao = CampaignContactRunsDao(
-            loaded_config.connection_manager.mongo_client)
-        self.contacts_dao = ContactsDao(
-            loaded_config.connection_manager.mongo_client)
+        # Use factory to get the appropriate DAOs (MongoDB or PostgreSQL based on feature flags)
+        self.campaign_contact_run_dao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
+        self.contacts_dao = get_contacts_dao(loaded_config.connection_manager)
         self.lusha_api_client = LushaAPIClient()
 
     async def get_campaign_contact_data(self, query_params: CampaignContactData):

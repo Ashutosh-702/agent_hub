@@ -1,14 +1,12 @@
 """Authentication service for Agent Hub."""
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from datetime import datetime
 from fastapi import HTTPException
 
-from motor.motor_asyncio import AsyncIOMotorClient
-
-from database.collection_dao.users import UsersDao
-from database.collection_dao.user_tokens import UserTokensDao
+from database.factory import get_users_dao, get_user_tokens_dao
+from config.loaded_config import loaded_config
 from ai_agents.auth.utils import (
     hash_password,
     verify_password,
@@ -25,15 +23,17 @@ logger = logging.getLogger(__name__)
 class AuthService:
     """Service class for authentication operations."""
     
-    def __init__(self, mongo_client: AsyncIOMotorClient):
+    def __init__(self, connection_manager=None):
         """
         Initialize AuthService with database connection.
         
         Args:
-            mongo_client: MongoDB async client
+            connection_manager: Optional ConnectionManager instance.
+                              If not provided, uses loaded_config.connection_manager
         """
-        self.users_dao = UsersDao(mongo_client)
-        self.tokens_dao = UserTokensDao(mongo_client)
+        cm = connection_manager or loaded_config.connection_manager
+        self.users_dao = get_users_dao(cm)
+        self.tokens_dao = get_user_tokens_dao(cm)
 
     def _user_to_response(self, user: Dict[str, Any]) -> Dict[str, Any]:
         """

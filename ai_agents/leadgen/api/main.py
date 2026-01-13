@@ -17,11 +17,7 @@ import pandas as pd
 from pydantic import BaseModel
 from ai_agents.core_sdr.src.cli.main import process_company_search
 from ai_agents.leadgen.workflow.prompt_reader import submit_company_data
-from database.collection_dao.campaigns import CampaignsDao
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
-from database.collection_dao.contacts import ContactsDao
+from database.factory import get_campaigns_dao, get_companies_dao, get_campaign_company_runs_dao, get_campaign_contact_runs_dao, get_contacts_dao
 from database.connection_manager import ConnectionManager
 from config.loaded_config import loaded_config
 from typing import Dict, Any
@@ -241,7 +237,7 @@ async def call_data_apis(config: Dict[str, Any]):
 
 @app.post("/api/v1/ai-sdr")
 async def run_ai_sdr():
-    campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+    campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
     unprocessed_campaigns = await campaigns_dao.get_campaigns({'lifecycle.status': 'pending'})
     print(f"Unprocessed Campaigns: {len(unprocessed_campaigns)}")
     for campaign in unprocessed_campaigns[-1:]:
@@ -284,7 +280,7 @@ async def get_company_mapping_list(
     page: int = 1,
     limit: int = 10
     ):
-    campaign_company_run_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+    campaign_company_run_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
     response, pagination_info = await campaign_company_run_dao.get_campaign_company_runs_paginated({"campaign_id": ObjectId(campaign_id), "is_relevant": True}, page, limit)
 
     serialized_response = serialize_objectid(response)
@@ -484,7 +480,7 @@ async def get_linkedin_contact_details(linkedin_url: str):
                 
 @app.get("/api/v1/fetch_and_claim_first_campaign")
 async def fetch_and_claim_first_campaign():
-    campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+    campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
     claimed_campaign = await campaigns_dao.find_one_and_update({"lifecycle.status": "pending"},{"$set": {"lifecycle.status": "processing"}})
     if not claimed_campaign:
         return {"status":"success", "message": "No campaign found"}
@@ -513,7 +509,7 @@ async def fetch_and_claim_first_campaign():
 
 @app.post("/api/v1/update_campaign_status")
 async def update_campaign_status(campaign_id: str,status: str):
-    campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+    campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
     claimed_campaign = await campaigns_dao.update_campaign_status(ObjectId(campaign_id),status)
     if claimed_campaign:
         return {"status":"success","message": f"Successfully updated campaign status for id {campaign_id} to {status}"}
@@ -524,8 +520,8 @@ async def update_campaign_status(campaign_id: str,status: str):
 async def fetch_companies_from_mappings(campaign_id: str):
     campaign_oid = ObjectId(campaign_id)
 
-    mappings_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
-    companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+    mappings_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
+    companies_dao = get_companies_dao(loaded_config.connection_manager)
 
     mapping_docs = await mappings_dao.get_campaign_company_runs({"campaign_id": campaign_oid})
     if not mapping_docs:
@@ -567,9 +563,9 @@ async def save_prospects_data_to_mongo(request: Request):
     campaign_id = body.get("campaign_id","")
     company_name = body.get("company_name","")
     company_id = body.get("company_id","")
-    contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
-    campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
-    campaign_company_runs_dao = CampaignCompanyRunsDao(loaded_config.connection_manager.mongo_client)
+    contacts_dao = get_contacts_dao(loaded_config.connection_manager)
+    campaign_contact_runs_dao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
+    campaign_company_runs_dao = get_campaign_company_runs_dao(loaded_config.connection_manager)
     
     await campaign_company_runs_dao.update_campaign_company_run({"campaign_id":ObjectId(campaign_id),"company_id":ObjectId(company_id)},{
         "$set":{"company_status":True, "metadata.updated_at":datetime.utcnow()}

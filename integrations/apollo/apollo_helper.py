@@ -5,8 +5,11 @@ from structlog.contextvars import bind_contextvars
 from integrations.apollo.apollo_api import ApolloAPIClient
 from config.logging import logger
 from ai_agents.core_sdr.src.api.people_relevance_check import PeopleRelevanceCheck
-from database.collection_dao.contacts import ContactsDao
-from database.collection_dao.companies import CompaniesDao
+from database.factory import (
+    get_contacts_dao,
+    get_companies_dao,
+    get_campaign_contact_runs_dao,
+)
 from config.loaded_config import loaded_config
 from datetime import datetime, timezone
 from bson import ObjectId
@@ -14,15 +17,15 @@ from integrations.apollo.schema import ApolloResponseSchema
 from integrations.apollo.schema import SearchEnrichPeopleSchema
 from integrations.apollo.schema import SearchPeopleSchema
 from integrations.config.constants import MAX_EMPLOYEES, DOLLAR_TO_INR_RATIO, MILLION_TO_ACTUAL
-from database.collection_dao.campaign_contact_runs import CampaignContactRunsDao
 
 class ApolloHelper:
     def __init__(self):
         config = {}
         self.people_relevance_check = PeopleRelevanceCheck(config)
-        self.contacts_dao = ContactsDao(loaded_config.connection_manager.mongo_client)
-        self.companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
-        self.campaign_contact_runs_dao = CampaignContactRunsDao(loaded_config.connection_manager.mongo_client)
+        # Use DAO factory for database-agnostic access (supports both MongoDB and PostgreSQL)
+        self.contacts_dao = get_contacts_dao(loaded_config.connection_manager)
+        self.companies_dao = get_companies_dao(loaded_config.connection_manager)
+        self.campaign_contact_runs_dao = get_campaign_contact_runs_dao(loaded_config.connection_manager)
     async def get_company_contacts(self, query_params: ApolloResponseSchema) -> Dict[str, Any]:
  
         bind_contextvars(

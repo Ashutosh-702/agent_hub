@@ -16,9 +16,7 @@ from click import Context
 from dotenv import load_dotenv
 from ai_agents.core_sdr.src.api.coresignal_api import collect_companies_from_search
 from ai_agents.core_sdr.src.parsers.lusha_helper import get_companies_from_lusha
-from database.collection_dao.companies import CompaniesDao
-from database.collection_dao.campaign_company_runs import CampaignCompanyRunsDao
-from database.collection_dao.campaigns import CampaignsDao
+from database.factory import get_companies_dao, get_campaign_company_runs_dao, get_campaigns_dao
 from config.loaded_config import loaded_config
 from datetime import datetime
 from ai_agents.core_sdr.src.api.company_relevance_check import CompanyRelevanceCheck
@@ -111,7 +109,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
                 "error": "Database connection not available"
             }
             
-        companies_dao = CompaniesDao(loaded_config.connection_manager.mongo_client)
+        companies_dao = get_companies_dao(loaded_config.connection_manager)
         print("Fetching companies from lusha...")
         temp_cached_data = []
         # inserted_count = await get_companies_from_lusha(config,temp_cached_data) # List of {'id': int, 'name': str}
@@ -125,7 +123,7 @@ async def process_company_search(config: Dict[str,Any]) -> Dict[str, Any]:
         campaign_id = config.get('_id')
         print(f"Total new companies added into companies collection: {inserted_count}")
 
-        campaigns_dao = CampaignsDao(loaded_config.connection_manager.mongo_client)
+        campaigns_dao = get_campaigns_dao(loaded_config.connection_manager)
         relevance_check = CompanyRelevanceCheck(config)
         await relevance_check.company_relevance_check(campaign_id)
         await campaigns_dao.update_campaign_status(campaign_id,"pending")
