@@ -23,7 +23,7 @@ async def test_crud_operations():
     # Set environment to use PostgreSQL
     os.environ["DB_BACKEND_USERS"] = "postgres"
     os.environ["DB_BACKEND_USER_TOKENS"] = "postgres"
-    os.environ["POSTGRES_URL"] = "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub"
+    os.environ["POSTGRES_NEBULA_READ_WRITE"] = "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub"
     
     # Reload settings
     Settings.db_backend_users = "postgres"

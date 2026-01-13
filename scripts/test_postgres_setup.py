@@ -20,13 +20,13 @@ async def test_postgres_setup():
     
     # Set environment to use PostgreSQL for users
     os.environ["DB_BACKEND_USERS"] = "postgres"
-    os.environ["POSTGRES_URL"] = "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub"
+    os.environ["POSTGRES_NEBULA_READ_WRITE"] = "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub"
     
     # Reload settings
     Settings.db_backend_users = "postgres"
     Settings.postgres_url = "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub"
     
-    print(f"📊 Testing with POSTGRES_URL: {Settings.postgres_url}")
+    print(f"📊 Testing with POSTGRES_NEBULA_READ_WRITE: {Settings.postgres_url}")
     print(f"🔧 Using backend for users: {Settings.db_backend_users}\n")
     
     # Initialize connection manager

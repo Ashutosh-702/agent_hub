@@ -35,7 +35,7 @@ target_metadata = Base.metadata
 def get_url() -> str:
     """Get database URL from environment or config."""
     return os.getenv(
-        "POSTGRES_URL",
+        "POSTGRES_NEBULA_READ_WRITE",
         os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
     )
 

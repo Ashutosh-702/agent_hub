@@ -14,7 +14,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Set environment variable for PostgreSQL
-os.environ.setdefault("POSTGRES_URL", "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub")
+os.environ.setdefault("POSTGRES_NEBULA_READ_WRITE", "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub")
 
 from config.loaded_config import loaded_config, Settings
 
@@ -33,7 +33,7 @@ async def setup_connections():
     
     # Initialize connection manager
     mongo_uri = os.getenv("MONGO_LINKEDIN_SDR_READ_WRITE", "mongodb://localhost:27017")
-    postgres_url = os.getenv("POSTGRES_URL", "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub")
+    postgres_url = os.getenv("POSTGRES_NEBULA_READ_WRITE", "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub")
     
     connection_manager = ConnectionManager(
         mongo_uri=mongo_uri,

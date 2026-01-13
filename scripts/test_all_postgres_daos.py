@@ -11,7 +11,7 @@ import traceback
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Set PostgreSQL as the backend for all collections
-os.environ["POSTGRES_URL"] = "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub"
+os.environ["POSTGRES_NEBULA_READ_WRITE"] = "postgresql+asyncpg://agent_hub:agent_hub@localhost:5433/agent_hub"
 os.environ["DB_BACKEND_USERS"] = "postgres"
 os.environ["DB_BACKEND_USER_TOKENS"] = "postgres"
 os.environ["DB_BACKEND_CAMPAIGNS"] = "postgres"
@@ -695,7 +695,7 @@ async def main():
     print("="*70)
     
     # Update settings
-    Settings.postgres_url = os.environ["POSTGRES_URL"]
+    Settings.postgres_url = os.environ["POSTGRES_NEBULA_READ_WRITE"]
     for collection in ["users", "user_tokens", "campaigns", "companies", "contacts",
                        "campaign_company_runs", "campaign_contact_runs", "meetings",
                        "inbox_leads", "inbox_events", "inbox_notes"]:

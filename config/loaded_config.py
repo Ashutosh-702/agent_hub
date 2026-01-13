@@ -50,10 +50,10 @@ class Settings:
     
     # PostgreSQL connection URL
     postgres_url = os.getenv(
-        "POSTGRES_URL",
+        "POSTGRES_NEBULA_READ_WRITE",
         os.getenv("DATABASE_URL", "postgresql+asyncpg://agent_hub:agent_hub@localhost:5432/agent_hub")
     )
-    db_type = os.getenv("DB_TYPE", "mongo")
+    db_type = os.getenv("DB_TYPE", "postgres")
     db_backend_users = os.getenv("DB_BACKEND_USERS", db_type)
     db_backend_user_tokens = os.getenv("DB_BACKEND_USER_TOKENS", db_type)
     db_backend_campaigns = os.getenv("DB_BACKEND_CAMPAIGNS", db_type)
