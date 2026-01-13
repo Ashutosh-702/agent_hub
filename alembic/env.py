@@ -34,10 +34,18 @@ target_metadata = Base.metadata
 
 def get_url() -> str:
     """Get database URL from environment or config."""
-    return os.getenv(
+    url = os.getenv(
         "POSTGRES_NEBULA_READ_WRITE",
         os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
     )
+    
+    # Ensure we use asyncpg driver for async migrations
+    if url and url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif url and url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    
+    return url
 
 
 def run_migrations_offline() -> None:
