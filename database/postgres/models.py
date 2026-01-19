@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Optional, List, Any
 from sqlalchemy import (
     Column, String, Boolean, DateTime, Text, Integer, Index, 
-    ForeignKey, UniqueConstraint, func, BigInteger, Sequence
+    ForeignKey, UniqueConstraint, func, BigInteger, Sequence, Numeric, SmallInteger, Identity, Identity
 )
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
@@ -30,6 +30,12 @@ meetings_sl_no_seq = Sequence('meetings_sl_no_seq')
 inbox_leads_sl_no_seq = Sequence('inbox_leads_sl_no_seq')
 inbox_events_sl_no_seq = Sequence('inbox_events_sl_no_seq')
 inbox_notes_sl_no_seq = Sequence('inbox_notes_sl_no_seq')
+
+# Tasks module sequences
+deals_sl_no_seq = Sequence('deals_sl_no_seq')
+tasks_sl_no_seq = Sequence('tasks_sl_no_seq')
+task_links_sl_no_seq = Sequence('task_links_sl_no_seq')
+task_activity_sl_no_seq = Sequence('task_activity_sl_no_seq')
 
 
 class Base(DeclarativeBase):
@@ -173,6 +179,9 @@ class Company(Base):
     # Status fields
     webhook_sent: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     
+    # Owner (for task assignment)
+    owner_user_id: Mapped[Optional[str]] = mapped_column(String(24), nullable=True, index=True)
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
@@ -189,6 +198,7 @@ class Company(Base):
     contacts: Mapped[List["Contact"]] = relationship("Contact", back_populates="company", cascade="all, delete-orphan")
     meetings: Mapped[List["Meeting"]] = relationship("Meeting", back_populates="company", cascade="all, delete-orphan")
     company_runs: Mapped[List["CampaignCompanyRun"]] = relationship("CampaignCompanyRun", back_populates="company", cascade="all, delete-orphan")
+    deals: Mapped[List["Deal"]] = relationship("Deal", back_populates="company", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         return f"<Company(id={self.id}, name={self.name})>"
@@ -216,6 +226,9 @@ class Contact(Base):
     webhook_sent: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     enrichment_status: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
     is_relevant: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
+    
+    # Owner (for task assignment)
+    owner_user_id: Mapped[Optional[str]] = mapped_column(String(24), nullable=True, index=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
@@ -482,4 +495,178 @@ class InboxNote(Base):
     def __repr__(self) -> str:
         return f"<InboxNote(id={self.id}, lead_id={self.lead_id})>"
 
+
+# =============================================================================
+# Tasks Module Models
+# =============================================================================
+
+class Deal(Base):
+    """Deal model for sales opportunities.
+    
+    Minimal deals table for task association.
+    """
+    __tablename__ = "deals"
+    
+    id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False, index=True, unique=True)
+    company_id: Mapped[Optional[str]] = mapped_column(String(24), ForeignKey("companies.id"), index=True)
+    owner_user_id: Mapped[Optional[str]] = mapped_column(String(24), nullable=True, index=True)
+    
+    # Deal details
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    stage: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    amount: Mapped[Optional[float]] = mapped_column(Numeric(), nullable=True)
+    
+    # JSONB for metadata
+    metadata_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=False, default=dict)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    company: Mapped[Optional["Company"]] = relationship("Company", back_populates="deals")
+    
+    def __repr__(self) -> str:
+        return f"<Deal(id={self.id}, name={self.name})>"
+
+
+class TaskTypePolicy(Base):
+    """Task type policy for SLA defaults.
+    
+    Stores default SLA and priority per task type.
+    """
+    __tablename__ = "task_type_policies"
+    
+    type: Mapped[str] = mapped_column(String(40), primary_key=True)
+    default_sla_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    default_priority: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=3)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    def __repr__(self) -> str:
+        return f"<TaskTypePolicy(type={self.type}, sla_minutes={self.default_sla_minutes})>"
+
+
+class Task(Base):
+    """Task model for the ticket management system.
+    
+    Tasks can be linked to contacts, companies, or deals.
+    """
+    __tablename__ = "tasks"
+    
+    id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False, index=True, unique=True)
+    
+    # Primary entity association
+    primary_entity_type: Mapped[str] = mapped_column(String(20), nullable=False)  # contact|company|deal
+    primary_entity_id: Mapped[str] = mapped_column(String(24), nullable=False)
+    
+    # Task details
+    type: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    priority: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=3)
+    
+    # Dates
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    snoozed_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
+    # User associations
+    assigned_to_user_id: Mapped[Optional[str]] = mapped_column(String(24), ForeignKey("users.id"), nullable=True)
+    owner_user_id: Mapped[Optional[str]] = mapped_column(String(24), ForeignKey("users.id"), nullable=True)
+    created_by_user_id: Mapped[Optional[str]] = mapped_column(String(24), ForeignKey("users.id"), nullable=True)
+    
+    # Content
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Source tracking
+    source: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
+    
+    # Context data
+    context_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=False, default=dict)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    assigned_to: Mapped[Optional["User"]] = relationship("User", foreign_keys=[assigned_to_user_id])
+    owner: Mapped[Optional["User"]] = relationship("User", foreign_keys=[owner_user_id])
+    created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_user_id])
+    links: Mapped[List["TaskLink"]] = relationship("TaskLink", back_populates="task", cascade="all, delete-orphan")
+    activity: Mapped[List["TaskActivity"]] = relationship("TaskActivity", back_populates="task", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        Index("ix_tasks_inbox", "status", "assigned_to_user_id", "due_at", "sl_no"),
+        Index("ix_tasks_primary_entity", "primary_entity_type", "primary_entity_id", "sl_no"),
+        Index("ix_tasks_type_status_due", "type", "status", "due_at"),
+        Index("ix_tasks_source_ref", "source", "source_ref"),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<Task(id={self.id}, type={self.type}, status={self.status})>"
+
+
+class TaskLink(Base):
+    """Junction table linking tasks to entities.
+    
+    Allows tasks to appear on multiple entity pages (e.g., contact task also shows on company page).
+    """
+    __tablename__ = "task_links"
+    
+    id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False, index=True, unique=True)
+    
+    task_id: Mapped[str] = mapped_column(String(24), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    entity_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(24), nullable=False)
+    link_reason: Mapped[str] = mapped_column(String(30), nullable=False)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
+    
+    # Relationships
+    task: Mapped["Task"] = relationship("Task", back_populates="links")
+    
+    __table_args__ = (
+        UniqueConstraint("task_id", "entity_type", "entity_id", name="uq_task_links_task_entity"),
+        Index("ix_task_links_entity", "entity_type", "entity_id", "sl_no"),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<TaskLink(id={self.id}, task_id={self.task_id}, entity={self.entity_type}:{self.entity_id})>"
+
+
+class TaskActivity(Base):
+    """Audit log for task changes.
+    
+    Records all create/update events with before/after diffs.
+    """
+    __tablename__ = "task_activity"
+    
+    id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    sl_no: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False, index=True, unique=True)
+    
+    task_id: Mapped[str] = mapped_column(String(24), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    actor_user_id: Mapped[Optional[str]] = mapped_column(String(24), ForeignKey("users.id"), nullable=True)
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    diff_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=False, default=dict)
+    
+    # Relationships
+    task: Mapped["Task"] = relationship("Task", back_populates="activity")
+    actor: Mapped[Optional["User"]] = relationship("User")
+    
+    __table_args__ = (
+        Index("ix_task_activity_task_at", "task_id", "at"),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<TaskActivity(id={self.id}, task_id={self.task_id}, event={self.event_type})>"
 

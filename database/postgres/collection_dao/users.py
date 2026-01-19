@@ -1,8 +1,9 @@
 """PostgreSQL Users DAO for authentication."""
 
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.postgres.base_dao import BasePostgresDao, generate_objectid
@@ -134,5 +135,47 @@ class PostgresUsersDao(BasePostgresDao):
             Number of modified documents
         """
         return await self.update_user(user_id, {"is_active": True})
+
+    async def search_users(
+        self,
+        query: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Search users by email or name.
+        
+        Args:
+            query: Search query string
+            limit: Max results
+            
+        Returns:
+            List of users ordered by created_at DESC
+        """
+        conditions = []
+        
+        if query:
+            # Case-insensitive search on email or name
+            search_pattern = f"%{query}%"
+            conditions.append(
+                or_(
+                    User.email.ilike(search_pattern),
+                    User.name.ilike(search_pattern),
+                )
+            )
+        
+        stmt = select(User)
+        if conditions:
+            stmt = stmt.where(*conditions)
+        stmt = stmt.order_by(User.created_at.desc()).limit(limit)
+        
+        result = await self._session.execute(stmt)
+        instances = result.scalars().all()
+        
+        docs = [self._instance_to_dict(inst) for inst in instances]
+        
+        if self._session_factory:
+            await self._session.close()
+            self._session = self._session_factory()
+        
+        return docs
 
 

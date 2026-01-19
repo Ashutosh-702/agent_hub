@@ -4,6 +4,7 @@ import { useLazyGetCompanyDetailsQuery } from '../store';
 import type { Company, Contact, Pagination } from '../store';
 import { InfoGrid, Loader } from './shared';
 import type { InfoGridItem } from './shared';
+import { EntityTasksWidget } from './tasks';
 
 type CompanyDetailsNavState =
   | {
@@ -308,6 +309,18 @@ export const CompanyDetails = () => {
                 )}
               </div>
             </div>
+            
+            {/* Tasks Section */}
+            {companyId && (
+              <div className="tasks-section" style={{ marginTop: '24px' }}>
+                <EntityTasksWidget
+                  entityType="company"
+                  entityId={companyId}
+                  title="Tasks"
+                  maxHeight="350px"
+                />
+              </div>
+            )}
           </>
         ) : null}
       </div>

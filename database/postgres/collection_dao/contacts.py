@@ -2,6 +2,7 @@
 
 from typing import List, Dict, Any, Optional
 
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.postgres.base_dao import BasePostgresDao
@@ -207,5 +208,48 @@ class PostgresContactsDao(BasePostgresDao):
         # Use $in query to fetch all at once
         query = {"_id": {"$in": contact_ids}}
         return await self.find_many(query)
+
+    async def search_contacts(
+        self,
+        query: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Search contacts by email, firstname, or lastname.
+        
+        Args:
+            query: Search query string
+            limit: Max results
+            
+        Returns:
+            List of contacts ordered by sl_no DESC
+        """
+        conditions = []
+        
+        if query:
+            # Case-insensitive search on email, firstname, or lastname
+            search_pattern = f"%{query}%"
+            conditions.append(
+                or_(
+                    Contact.email.ilike(search_pattern),
+                    Contact.firstname.ilike(search_pattern),
+                    Contact.lastname.ilike(search_pattern),
+                )
+            )
+        
+        stmt = select(Contact)
+        if conditions:
+            stmt = stmt.where(*conditions)
+        stmt = stmt.order_by(Contact.sl_no.desc()).limit(limit)
+        
+        result = await self._session.execute(stmt)
+        instances = result.scalars().all()
+        
+        docs = [self._instance_to_dict(inst) for inst in instances]
+        
+        if self._session_factory:
+            await self._session.close()
+            self._session = self._session_factory()
+        
+        return docs
 
 

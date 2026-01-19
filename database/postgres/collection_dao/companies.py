@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.postgres.base_dao import BasePostgresDao
@@ -302,5 +303,42 @@ class PostgresCompaniesDao(BasePostgresDao):
         if not company:
             return None
         return company.get("deep_research")
+
+    async def search_companies(
+        self,
+        query: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Search companies by name.
+        
+        Args:
+            query: Search query string
+            limit: Max results
+            
+        Returns:
+            List of companies ordered by sl_no DESC
+        """
+        conditions = []
+        
+        if query:
+            # Case-insensitive search on name
+            search_pattern = f"%{query}%"
+            conditions.append(Company.name.ilike(search_pattern))
+        
+        stmt = select(Company)
+        if conditions:
+            stmt = stmt.where(*conditions)
+        stmt = stmt.order_by(Company.sl_no.desc()).limit(limit)
+        
+        result = await self._session.execute(stmt)
+        instances = result.scalars().all()
+        
+        docs = [self._instance_to_dict(inst) for inst in instances]
+        
+        if self._session_factory:
+            await self._session.close()
+            self._session = self._session_factory()
+        
+        return docs
 
 

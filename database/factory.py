@@ -241,3 +241,94 @@ def get_inbox_notes_dao(connection_manager) -> Union["InboxNotesDao", "PostgresI
         return InboxNotesDao(connection_manager.mongo_client)
 
 
+
+
+# =============================================================================
+# Tasks Module DAOs (PostgreSQL only - no MongoDB fallback)
+# =============================================================================
+
+def get_tasks_dao(connection_manager) -> "PostgresTasksDao":
+    """Get the Tasks DAO.
+    
+    Tasks module is PostgreSQL-only.
+    
+    Args:
+        connection_manager: ConnectionManager instance
+        
+    Returns:
+        PostgresTasksDao
+    """
+    from database.postgres.collection_dao.tasks_dao import PostgresTasksDao
+    session = connection_manager.get_pg_session()
+    dao = PostgresTasksDao(session)
+    if connection_manager.postgres_engine:
+        dao.set_session_factory(connection_manager.postgres_engine.get_session)
+    return dao
+
+
+def get_task_type_policies_dao(connection_manager) -> "PostgresTaskTypePoliciesDao":
+    """Get the TaskTypePolicy DAO.
+    
+    Args:
+        connection_manager: ConnectionManager instance
+        
+    Returns:
+        PostgresTaskTypePoliciesDao
+    """
+    from database.postgres.collection_dao.task_type_policies_dao import PostgresTaskTypePoliciesDao
+    session = connection_manager.get_pg_session()
+    dao = PostgresTaskTypePoliciesDao(session)
+    if connection_manager.postgres_engine:
+        dao.set_session_factory(connection_manager.postgres_engine.get_session)
+    return dao
+
+
+def get_task_activity_dao(connection_manager) -> "PostgresTaskActivityDao":
+    """Get the TaskActivity DAO.
+    
+    Args:
+        connection_manager: ConnectionManager instance
+        
+    Returns:
+        PostgresTaskActivityDao
+    """
+    from database.postgres.collection_dao.task_activity_dao import PostgresTaskActivityDao
+    session = connection_manager.get_pg_session()
+    dao = PostgresTaskActivityDao(session)
+    if connection_manager.postgres_engine:
+        dao.set_session_factory(connection_manager.postgres_engine.get_session)
+    return dao
+
+
+def get_task_links_dao(connection_manager) -> "PostgresTaskLinksDao":
+    """Get the TaskLinks DAO.
+    
+    Args:
+        connection_manager: ConnectionManager instance
+        
+    Returns:
+        PostgresTaskLinksDao
+    """
+    from database.postgres.collection_dao.task_links_dao import PostgresTaskLinksDao
+    session = connection_manager.get_pg_session()
+    dao = PostgresTaskLinksDao(session)
+    if connection_manager.postgres_engine:
+        dao.set_session_factory(connection_manager.postgres_engine.get_session)
+    return dao
+
+
+def get_deals_dao(connection_manager) -> "PostgresDealsDao":
+    """Get the Deals DAO.
+    
+    Args:
+        connection_manager: ConnectionManager instance
+        
+    Returns:
+        PostgresDealsDao
+    """
+    from database.postgres.collection_dao.deals_dao import PostgresDealsDao
+    session = connection_manager.get_pg_session()
+    dao = PostgresDealsDao(session)
+    if connection_manager.postgres_engine:
+        dao.set_session_factory(connection_manager.postgres_engine.get_session)
+    return dao

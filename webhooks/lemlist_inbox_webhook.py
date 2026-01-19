@@ -7,6 +7,8 @@ from fastapi import APIRouter, Request, HTTPException, Header
 from fastapi.responses import ORJSONResponse
 
 from ai_agents.inbox.service import get_inbox_service
+from ai_agents.tasks.service import get_task_service
+from ai_agents.tasks.schemas import LemlistEventRequest
 from config.loaded_config import loaded_config
 from config.logging import logger
 
@@ -23,6 +25,7 @@ async def receive_lemlist_webhook(
     Receive webhook events from Lemlist.
     
     Events we handle:
+    - emailsOpened: First email open -> create call task
     - emailsReplied: Email reply received
     - emailsSent: Email sent
     - linkedinReplied: LinkedIn reply received
@@ -34,7 +37,8 @@ async def receive_lemlist_webhook(
         # Get raw body for signature verification
         body = await request.json()
         
-        logger.info(f"Received Lemlist webhook", event_type=body.get("type"))
+        event_type = body.get("type")
+        logger.info(f"Received Lemlist webhook", event_type=event_type)
         
         # Verify signature if configured
         webhook_secret = loaded_config.lemlist_webhook_secret
@@ -43,7 +47,27 @@ async def receive_lemlist_webhook(
             # Lemlist uses HMAC-SHA256 for webhook signatures
             pass
         
-        # Process the event
+        # Handle email open events - create call task
+        if event_type == "emailsOpened":
+            try:
+                task_service = get_task_service()
+                event_request = LemlistEventRequest(
+                    type=event_type,
+                    contactId=body.get("contactId"),
+                    campaignId=body.get("campaignId"),
+                    leadId=body.get("leadId"),
+                    messageId=body.get("messageId"),
+                    email=body.get("email"),
+                )
+                task = await task_service.create_task_from_lemlist_event(event_request)
+                
+                if task:
+                    logger.info(f"Created call task from email open", task_id=task["_id"])
+            except Exception as task_error:
+                logger.warning(f"Failed to create call task from email open: {task_error}")
+                # Don't fail the webhook - continue processing
+        
+        # Process the event for inbox
         service = get_inbox_service()
         success = await service.process_webhook_event(body)
         
@@ -106,6 +130,7 @@ async def register_lemlist_webhooks(base_url: str):
         
         # Register new webhook
         events = [
+            "emailsOpened",   # For task creation on first open
             "emailsReplied",
             "emailsSent",
             "linkedinReplied",

@@ -12,7 +12,7 @@ JSONB path access is supported via dot notation (e.g., "metadata.created_at")
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 import re
 import json
@@ -567,6 +567,11 @@ class BasePostgresDao:
         # Normalize ObjectIds only (preserve datetime for timestamp columns)
         document = normalize_document(document)
         
+        # Convert timezone-aware datetimes to timezone-naive UTC for TIMESTAMP WITHOUT TIME ZONE columns
+        for key, value in document.items():
+            if isinstance(value, datetime) and value.tzinfo is not None:
+                document[key] = value.astimezone(timezone.utc).replace(tzinfo=None)
+        
         # Generate ID if not provided
         if "_id" not in document and "id" not in document:
             document["id"] = generate_objectid()
@@ -615,9 +620,12 @@ class BasePostgresDao:
         for jsonb_column, data in jsonb_data.items():
             column_data[jsonb_column] = data
         
-        # Remove sl_no - let PostgreSQL auto-generate via sequence
-        if "sl_no" in column_data:
-            del column_data["sl_no"]
+        # Remove sl_no and other identity columns - let PostgreSQL auto-generate
+        # This is critical for GENERATED ALWAYS AS IDENTITY columns
+        identity_columns = ["sl_no"]
+        for col in identity_columns:
+            if col in column_data:
+                del column_data[col]
         
         # Add timestamps if not present and model has these fields
         now = datetime.utcnow()

@@ -5,6 +5,7 @@ from ai_agents.leadgen.api.routes import router as leadgen_router
 from ai_agents.inbox.routes import router as inbox_router
 from ai_agents.meetings.routes import router as meetings_router, ws_router as meetings_ws_router
 from ai_agents.auth.routes import router as auth_router
+from ai_agents.tasks.routes import router as tasks_router
 from webhooks.lemlist_inbox_webhook import router as lemlist_webhook_router
 from app.static_serving import get_env_config
 
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/api/v1", route_class=CustomRequestRoute)
 router.include_router(leadgen_router)
 router.include_router(inbox_router)
 router.include_router(meetings_router)
+router.include_router(tasks_router)
 
 # Auth router is at root level (already has /api/v1/auth prefix)
 api_router_auth = APIRouter(route_class=CustomRequestRoute)

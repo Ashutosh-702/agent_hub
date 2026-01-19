@@ -203,7 +203,7 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: dynamicBaseQuery,
-  tagTypes: ['Campaign', 'Company', 'Contact', 'Meetings', 'Auth'],
+  tagTypes: ['Campaign', 'Company', 'Contact', 'Meetings', 'Auth', 'Tasks'],
   endpoints: () => ({}),
 });
 

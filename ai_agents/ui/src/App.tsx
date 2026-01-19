@@ -27,6 +27,7 @@ import {
   StartPhoneCallForm,
   LogPhoneCallForm,
 } from './components/clientCalls';
+import { TasksPage } from './components/tasks';
 
 function AppContent() {
   const { isCollapsed } = useSidebar();
@@ -56,6 +57,8 @@ function AppContent() {
             <Route path="/client-calls/phone" element={<PhoneCallPage />} />
             <Route path="/client-calls/phone/start" element={<StartPhoneCallForm />} />
             <Route path="/client-calls/phone/log" element={<LogPhoneCallForm />} />
+            {/* Tasks - Ticket Management */}
+            <Route path="/tasks" element={<TasksPage />} />
             {/* Campaign - Top level section */}
             <Route path="/campaign" element={<CampaignList />} />
             <Route path="/campaign/new" element={<NewCampaignWizard />} />

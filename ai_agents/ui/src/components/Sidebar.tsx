@@ -130,6 +130,12 @@ const Icons = {
       <circle cx="12" cy="7" r="4"/>
     </svg>
   ),
+  tasks: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11l3 3L22 4"/>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg>
+  ),
 };
 
 interface MenuItem {
@@ -185,7 +191,13 @@ const menuItems: MenuItem[] = [
       { path: '/client-calls/reflections', label: 'Reflect', icon: Icons.lightbulb },
     ]
   },
-  // 4. Master Data
+  // 4. Tasks
+  { 
+    path: '/tasks', 
+    label: 'Tasks', 
+    icon: Icons.tasks,
+  },
+  // 6. Master Data
   { 
     path: '/master-data', 
     label: 'Master Data', 
@@ -195,7 +207,7 @@ const menuItems: MenuItem[] = [
       { path: '/master-data/contacts', label: 'Contacts', icon: Icons.contactProspecting },
     ]
   },
-  // 5. HubSpot
+  // 7. HubSpot
   { 
     path: '/hubspot', 
     label: 'HubSpot', 

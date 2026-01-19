@@ -8,7 +8,7 @@ from typing import Callable, Optional, Any, List, Dict
 from datetime import datetime
 
 # Set up file logging for debugging
-log_dir = "/Users/ashutoshtripathy/agent_hub/logs"
+log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "logs")
 os.makedirs(log_dir, exist_ok=True)
 file_handler = logging.FileHandler(os.path.join(log_dir, "meetings_deepgram.log"))
 file_handler.setLevel(logging.DEBUG)
